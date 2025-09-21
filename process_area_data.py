@@ -7,6 +7,8 @@ This script processes all CSV files in the Datasets folder and its subfolders,
 modifying the "Area µm^2" column by dividing each value by 144.
 The processed files are saved to a new "Processed_Datasets" folder,
 preserving the original files.
+
+Must be in the same directory as the "Datasets" folder.
 """
 
 import os
