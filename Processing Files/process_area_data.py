@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Script to process cancer growth dynamics datasets.
-Divides all "Area µm^2" values by 144 for normalization.
+Divides all "Area µm^2" values by 144 for normalization and renames column to "Cells µm^2".
 
 This script processes all CSV files in the Datasets folder and its subfolders,
-modifying the "Area µm^2" column by dividing each value by 144.
+modifying the "Area µm^2" column by dividing each value by 144 and renaming it to "Cells µm^2".
 The processed files are saved to a new "Processed_Datasets" folder,
 preserving the original files.
 
@@ -18,7 +18,7 @@ from pathlib import Path
 
 def process_csv_file(file_path, output_path):
     """
-    Process a single CSV file by dividing the "Area µm^2" column by 144.
+    Process a single CSV file by dividing the "Area µm^2" column by 144 and renaming to "Cells".
     
     Args:
         file_path (str): Path to the CSV file to process
@@ -39,6 +39,9 @@ def process_csv_file(file_path, output_path):
         # Divide the Area column by 144
         df['Area µm^2'] = df['Area µm^2'] / 144
         
+        # Rename the column from "Area µm^2" to "Cells µm^2"
+        df = df.rename(columns={'Area µm^2': 'Cells'})
+        
         # Create output directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
@@ -46,6 +49,7 @@ def process_csv_file(file_path, output_path):
         df.to_csv(output_path, index=False)
         
         print(f"✓ Successfully processed: {os.path.basename(file_path)} → {os.path.basename(output_path)}")
+        print(f"  → Normalized values (÷144) and renamed column to 'Cells'")
         return True
         
     except Exception as e:
@@ -106,8 +110,8 @@ def main():
         print(f"✗ Failed to process: {failed_count} files")
     
     print(f"\nOriginal files preserved in: {datasets_dir}")
-    print(f"Processed files (Area µm^² ÷ 144) saved to: {processed_dir}")
-    print(f"\nAll 'Area µm^2' values in processed files have been divided by 144.")
+    print(f"Processed files (Area µm^² ÷ 144 → Cells µm^²) saved to: {processed_dir}")
+    print(f"\nAll 'Area µm^2' values normalized (÷144) and column renamed to 'Cells'.")
 
 def preview_changes():
     """
@@ -139,7 +143,7 @@ if __name__ == "__main__":
     preview_changes()
     
     # Confirm before proceeding
-    response = input("\nProceed with processing? This will create 'Processed_Datasets' folder with normalized area values (y/n): ").lower().strip()
+    response = input("\nProceed with processing? This will create 'Processed_Datasets' folder with normalized cell values and renamed columns (y/n): ").lower().strip()
     
     if response in ['y', 'yes']:
         main()
