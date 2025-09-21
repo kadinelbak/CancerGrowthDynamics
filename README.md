@@ -4,3 +4,4 @@
 
 # Personal Notes
 
+Please create a file that will navigate to datasets to untreated monoculture and then separate it into 30k and 20k directories based on the well label. It should be so that if the well has the label A1-A3 it gets separated into 20k -> A2780Naive. A4-A6 should be 20k->A2780cis.csv.  whereas if it has label B1-B3 it goes to 30k -> A2780Naive where as label B4-B6 goes to A2780cis. Please ensure you do not remove the original csv. and just make new ones please. 
