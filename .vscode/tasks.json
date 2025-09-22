@@ -1,0 +1,58 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Split Treated MonoCulture",
+			"type": "shell",
+			"command": "python \"Processing Files/Treated MonoCulture/split_treated_monoculture.py\"",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Split Treated MonoCulture (venv)",
+			"type": "shell",
+			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"args": [
+				"Processing Files/Treated MonoCulture/split_treated_monoculture.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Split Treated MonoCulture IC25 (venv)",
+			"type": "shell",
+			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"args": [
+				"Processing Files/Treated MonoCulture/split_treated_monoculture_ic25.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Compute Treated Sample Averages (venv)",
+			"type": "shell",
+			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"args": [
+				"Processing Files/Treated MonoCulture/compute_sample_averages.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Compute Treated Day Averages (venv)",
+			"type": "shell",
+			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"args": [
+				"Processing Files/Treated MonoCulture/compute_group_day_averages.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
