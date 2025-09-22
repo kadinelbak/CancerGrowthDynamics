@@ -29,9 +29,11 @@ def create_day_averages(df, output_path, file_prefix):
     df['Tile'] = df['Image'].apply(lambda x: parse_filename_components(x)[1])
     df['Well'] = df['Image'].apply(lambda x: parse_filename_components(x)[2])
     
-    # Group by Day and Well, calculate mean area across tiles
-    day_averages = df.groupby(['Day', 'Well'])['Area µm^2'].agg(['mean', 'count']).reset_index()
-    day_averages.columns = ['Day', 'Well', 'Average_Area_um2', 'Tile_Count']
+    # Group by Day and Well, calculate mean Cells across tiles.
+    # Inputs are expected to be already converted to Cells in Processed_Datasets.
+    value_col = 'Cells' if 'Cells' in df.columns else 'Area µm^2'
+    day_averages = df.groupby(['Day', 'Well'])[value_col].agg(['mean', 'count']).reset_index()
+    day_averages.columns = ['Day', 'Well', 'Average_Cells', 'Tile_Count']
     
     # Sort by Day and Well
     day_averages = day_averages.sort_values(['Day', 'Well'])
@@ -50,21 +52,22 @@ def create_sample_averages(df, output_path, file_prefix):
     df['Well'] = df['Image'].apply(lambda x: parse_filename_components(x)[2])
     
     # Group by Well only, calculate statistics across all tiles and days
-    sample_averages = df.groupby('Well')['Area µm^2'].agg([
+    value_col = 'Cells' if 'Cells' in df.columns else 'Area µm^2'
+    sample_averages = df.groupby('Well')[value_col].agg([
         'mean', 'std', 'count', 'min', 'max'
     ]).reset_index()
     
     sample_averages.columns = [
         'Well', 
-        'Average_Area_um2', 
-        'StdDev_Area_um2', 
+        'Average_Cells', 
+        'StdDev_Cells', 
         'Total_Measurements', 
-        'Min_Area_um2', 
-        'Max_Area_um2'
+        'Min_Cells', 
+        'Max_Cells'
     ]
     
     # Round numerical values for readability
-    numeric_cols = ['Average_Area_um2', 'StdDev_Area_um2', 'Min_Area_um2', 'Max_Area_um2']
+    numeric_cols = ['Average_Cells', 'StdDev_Cells', 'Min_Cells', 'Max_Cells']
     sample_averages[numeric_cols] = sample_averages[numeric_cols].round(2)
     
     # Sort by well

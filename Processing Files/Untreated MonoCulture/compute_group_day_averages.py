@@ -23,7 +23,9 @@ def read_per_well_means(sample_csv: Path) -> Dict[int, List[float]]:
         for row in reader:
             try:
                 day = int((row.get("Day") or "").strip())
-                m = float((row.get("Mean Area µm^2") or row.get("Mean") or "").strip())
+                # Support both legacy 'Mean Area µm^2' and new 'Mean Cells'
+                m_str = (row.get("Mean Cells") or row.get("Mean Area µm^2") or row.get("Mean") or "").strip()
+                m = float(m_str)
             except Exception:
                 continue
             day_to_means.setdefault(day, []).append(m)
@@ -42,7 +44,8 @@ def write_per_file_day_averages(avg_dir: Path) -> int:
         out_path = s.with_name(s.stem.replace("_sample_averages", "_day_averages") + ".csv")
         with out_path.open("w", encoding="utf-8-sig", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["Day", "N Samples", "Mean Area µm^2", "SD Area µm^2", "SEM Area µm^2"])
+            # Output headers in Cells units
+            writer.writerow(["Day", "N Samples", "Mean Cells", "SD Cells", "SEM Cells"])
             for day in days:
                 vals = day_to_means[day]
                 n = len(vals)

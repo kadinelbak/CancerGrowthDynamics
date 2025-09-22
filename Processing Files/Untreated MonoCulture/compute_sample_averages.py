@@ -10,7 +10,7 @@ For each input CSV (e.g., 20k/A2780Naive.csv), the script:
 2) Aggregates the tiles to a single mean per (Day, Well)
 
 Outputs a file in an Averages subfolder named <basename>_sample_averages.csv with columns:
-Day, Well, N Tiles, Mean Area µm^2, SD Area µm^2, SEM Area µm^2
+Day, Well, N Tiles, Mean Cells, SD Cells, SEM Cells
 
 No original files are modified or removed.
 """
@@ -83,7 +83,9 @@ def per_day_sample_stats(input_csv: Path, output_csv: Path) -> int:
 
     with output_csv.open("w", encoding="utf-8-sig", newline="") as fo:
         writer = csv.writer(fo)
-        writer.writerow(["Day", "Well", "N Tiles", "Mean Area µm^2", "SD Area µm^2", "SEM Area µm^2"])
+        # Values are computed from processed inputs in units of Cells.
+        # Write headers accordingly.
+        writer.writerow(["Day", "Well", "N Tiles", "Mean Cells", "SD Cells", "SEM Cells"])
         for day, well, ntiles, m, sd, sem in rows:
             writer.writerow([day, well, ntiles, f"{m:.6f}", f"{sd:.6f}", f"{sem:.6f}"])
 

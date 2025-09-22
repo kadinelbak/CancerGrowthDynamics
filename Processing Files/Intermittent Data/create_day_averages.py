@@ -26,7 +26,9 @@ def create_day_averages(sample_avg_file_path):
     df = pd.read_csv(sample_avg_file_path)
     
     # Group by Day and calculate statistics
-    day_stats = df.groupby('Day')['Average_Area_um2'].agg([
+    # Support both legacy 'Average_Area_um2' and new 'Average_Cells'
+    value_col = 'Average_Cells' if 'Average_Cells' in df.columns else 'Average_Area_um2'
+    day_stats = df.groupby('Day')[value_col].agg([
         'mean',      # Average of all wells for each day
         'std',       # Standard deviation
         'count',     # Number of wells/samples
@@ -34,7 +36,7 @@ def create_day_averages(sample_avg_file_path):
     ]).reset_index()
     
     # Rename columns for clarity
-    day_stats.columns = ['Day', 'Mean_Area_um2', 'Std_Dev_um2', 'Sample_Count', 'Std_Error_um2']
+    day_stats.columns = ['Day', 'Mean_Cells', 'Std_Dev_Cells', 'Sample_Count', 'Std_Error_Cells']
     
     # Calculate 95% confidence interval bounds (using normal approximation for simplicity)
     # For small samples, this is an approximation; proper t-distribution would be better
@@ -42,9 +44,9 @@ def create_day_averages(sample_avg_file_path):
     z_critical = 1.96  # 95% confidence interval for normal distribution
     
     # Calculate confidence intervals using normal approximation
-    day_stats['CI_95_Margin_um2'] = z_critical * day_stats['Std_Error_um2']
-    day_stats['CI_95_Lower_um2'] = day_stats['Mean_Area_um2'] - day_stats['CI_95_Margin_um2']
-    day_stats['CI_95_Upper_um2'] = day_stats['Mean_Area_um2'] + day_stats['CI_95_Margin_um2']
+    day_stats['CI_95_Margin_Cells'] = z_critical * day_stats['Std_Error_Cells']
+    day_stats['CI_95_Lower_Cells'] = day_stats['Mean_Cells'] - day_stats['CI_95_Margin_Cells']
+    day_stats['CI_95_Upper_Cells'] = day_stats['Mean_Cells'] + day_stats['CI_95_Margin_Cells']
     
     return day_stats
 
