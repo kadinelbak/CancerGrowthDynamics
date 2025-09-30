@@ -49,9 +49,12 @@ summary_path = BASE / 'validation_split_summary.csv'
 summary.to_csv(summary_path, index=False)
 print(f"Validation summary written to {summary_path}")
 
-anomalies = summary[summary['invalid_wells'].astype(str).str.len() > 0]
-if not anomalies.empty:
-    print("Anomalies detected:")
-    print(anomalies[['density','file','invalid_wells']])
+if 'invalid_wells' in summary.columns:
+    anomalies = summary[summary['invalid_wells'].astype(str).str.len() > 0]
+    if not anomalies.empty:
+        print("Anomalies detected:")
+        print(anomalies[['density','file','invalid_wells']])
+    else:
+        print("No invalid wells detected.")
 else:
-    print("No invalid wells detected.")
+    print("Column 'invalid_wells' missing in summary (no records processed?)")
