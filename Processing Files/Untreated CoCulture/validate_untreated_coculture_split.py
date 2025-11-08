@@ -10,15 +10,24 @@ import re
 from pathlib import Path
 import pandas as pd
 
-ROOT = Path(r"c:/Users/MainFrameTower/Desktop/CancerGrowthDynamics")
-BASE = ROOT / "Processed_Datasets" / "Untreated CoCulture"
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
 WELL_PATTERN = re.compile(r"_([ABC][1-6])\.tif$", re.IGNORECASE)
 EXPECTED_20K = {f"{r}{c}" for r in "ABC" for c in (1,2,3)}
 EXPECTED_30K = {f"{r}{c}" for r in "ABC" for c in (4,5,6)}
 
+repo_root = find_repo_root(Path(__file__).resolve().parent)
+base = repo_root / 'Processed_Datasets' / 'Untreated CoCulture'
 records = []
 for density, expected in [("20k", EXPECTED_20K), ("30k", EXPECTED_30K)]:
-    folder = BASE / density
+    folder = base / density
     for csv in sorted(folder.glob('measure_*.csv')):
         df = pd.read_csv(csv)
         if 'Image' not in df.columns:
@@ -45,7 +54,7 @@ for density, expected in [("20k", EXPECTED_20K), ("30k", EXPECTED_30K)]:
         })
 
 summary = pd.DataFrame(records)
-summary_path = BASE / 'validation_split_summary.csv'
+summary_path = base / 'validation_split_summary.csv'
 summary.to_csv(summary_path, index=False)
 print(f"Validation summary written to {summary_path}")
 

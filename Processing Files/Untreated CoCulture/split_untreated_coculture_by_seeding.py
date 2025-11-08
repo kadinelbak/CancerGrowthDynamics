@@ -16,12 +16,15 @@ import re
 from pathlib import Path
 import pandas as pd
 
-ROOT = Path(r"c:/Users/MainFrameTower/Desktop/CancerGrowthDynamics")
-SRC_DIR = ROOT / "Processed_Datasets" / "Untreated CoCulture"
-OUT_20K = SRC_DIR / "20k"
-OUT_30K = SRC_DIR / "30k"
-OUT_20K.mkdir(parents=True, exist_ok=True)
-OUT_30K.mkdir(parents=True, exist_ok=True)
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
 
 WELLS_20K = {f"{row}{col}" for row in "ABC" for col in (1,2,3)}  # A1..C3
 WELLS_30K = {f"{row}{col}" for row in "ABC" for col in (4,5,6)}  # A4..C6
@@ -65,11 +68,22 @@ def process_file(path: Path) -> dict:
 
 
 def main():
-    csv_files = [p for p in SRC_DIR.glob('measure_*.csv') if p.is_file() and p.name not in ('20k', '30k')]
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    src_dir = repo_root / "Processed_Datasets" / "Untreated CoCulture"
+    out_20k = src_dir / "20k"
+    out_30k = src_dir / "30k"
+    out_20k.mkdir(parents=True, exist_ok=True)
+    out_30k.mkdir(parents=True, exist_ok=True)
+
+    # rebind module-level outputs for process_file
+    global OUT_20K, OUT_30K
+    OUT_20K, OUT_30K = out_20k, out_30k
+
+    csv_files = [p for p in src_dir.glob('measure_*.csv') if p.is_file() and p.name not in ('20k', '30k')]
     results = [process_file(p) for p in csv_files]
     # Simple report
     report_df = pd.DataFrame(results)
-    report_path = SRC_DIR / 'split_coculture_report.csv'
+    report_path = src_dir / 'split_coculture_report.csv'
     report_df.to_csv(report_path, index=False)
     print(f"Report written to {report_path}")
 

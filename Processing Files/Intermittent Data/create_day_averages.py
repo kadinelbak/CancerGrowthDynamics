@@ -11,6 +11,16 @@ import os
 import glob
 from pathlib import Path
 
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
+
 
 def create_day_averages(sample_avg_file_path):
     """
@@ -90,7 +100,8 @@ def main():
     """
     Main function to process all directories with sample average files.
     """
-    base_path = r"c:\Users\MainFrameTower\Desktop\CancerGrowthDynamics\Processed_Datasets\Intermittent Data"
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    base_path = str(repo_root / "Processed_Datasets" / "Intermittent Data")
     
     # Process 20k seeding density
     dir_20k = os.path.join(base_path, "20k_seeding_density", "Averages")

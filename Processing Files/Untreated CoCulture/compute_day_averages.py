@@ -20,8 +20,16 @@ from __future__ import annotations
 from pathlib import Path
 import pandas as pd
 
-ROOT = Path(r"c:/Users/MainFrameTower/Desktop/CancerGrowthDynamics")
-BASE = ROOT / "Processed_Datasets" / "Untreated CoCulture"
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
+
 DENSITIES = ["20k","30k"]
 CIS_STATES = ["cis","non_cis"]
 
@@ -47,10 +55,12 @@ def process_well_day_file(path: Path):
 
 
 def main():
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    base = repo_root / "Processed_Datasets" / "Untreated CoCulture"
     summary_rows = []
     for density in DENSITIES:
         for state in CIS_STATES:
-            avg_dir = BASE / density / state / 'Averages'
+            avg_dir = base / density / state / 'Averages'
             if not avg_dir.exists():
                 continue
             combined_parts = []
@@ -74,7 +84,7 @@ def main():
                 combined = pd.concat(combined_parts, ignore_index=True)
                 combined.to_csv(avg_dir / 'combined_day_averages.csv', index=False)
     summary_df = pd.DataFrame(summary_rows)
-    summary_path = BASE / 'day_averages_generation_summary.csv'
+    summary_path = base / 'day_averages_generation_summary.csv'
     summary_df.to_csv(summary_path, index=False)
     print(f"Summary written: {summary_path}")
     if not summary_df.empty:

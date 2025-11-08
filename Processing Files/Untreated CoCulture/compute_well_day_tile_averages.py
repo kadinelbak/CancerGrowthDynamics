@@ -18,8 +18,16 @@ import re
 from pathlib import Path
 import pandas as pd
 
-ROOT = Path(r"c:/Users/MainFrameTower/Desktop/CancerGrowthDynamics")
-BASE = ROOT / "Processed_Datasets" / "Untreated CoCulture"
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
+
 DENSITIES = ["20k", "30k"]
 CIS_STATES = ["cis", "non_cis"]
 # Capture day, channel (any letters/spaces), tile, well
@@ -79,10 +87,12 @@ def process_file(csv_path: Path, out_dir: Path):
 
 
 def main():
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    base = repo_root / "Processed_Datasets" / "Untreated CoCulture"
     summary_records = []
     for density in DENSITIES:
         for state in CIS_STATES:
-            folder = BASE / density / state
+            folder = base / density / state
             if not folder.exists():
                 continue
             averages_dir = folder / 'Averages'
@@ -99,7 +109,7 @@ def main():
                 combined = combined.sort_values(by=['source_file','Day','Well'], key=lambda col: [sort_well_key(v) if col.name=='Well' else v for v in col])
                 combined.to_csv(averages_dir / 'combined_well_day_averages.csv', index=False)
     summary_df = pd.DataFrame(summary_records)
-    summary_path = BASE / 'averages_generation_summary.csv'
+    summary_path = base / 'averages_generation_summary.csv'
     summary_df.to_csv(summary_path, index=False)
     print(f"Summary written: {summary_path}")
     if not summary_df.empty:

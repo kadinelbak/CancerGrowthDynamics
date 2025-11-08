@@ -9,14 +9,21 @@ from pathlib import Path
 import shutil
 import pandas as pd
 
-ROOT = Path(r"c:/Users/MainFrameTower/Desktop/CancerGrowthDynamics")
-BASE = ROOT / "Processed_Datasets" / "Untreated CoCulture"
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
 DENSITIES = ["20k", "30k"]
 MOVE_FILES = False  # set True to move instead of copy
 
 
-def classify_and_place(density: str):
-    folder = BASE / density
+def classify_and_place(density: str, base: Path):
+    folder = base / density
     cis_dir = folder / 'cis'
     non_dir = folder / 'non_cis'
     cis_dir.mkdir(exist_ok=True)
@@ -47,11 +54,13 @@ def classify_and_place(density: str):
 
 
 def main():
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    base = repo_root / "Processed_Datasets" / "Untreated CoCulture"
     all_records = []
     for d in DENSITIES:
-        all_records.extend(classify_and_place(d))
+        all_records.extend(classify_and_place(d, base))
     df = pd.DataFrame(all_records)
-    out = BASE / 'cis_split_summary.csv'
+    out = base / 'cis_split_summary.csv'
     df.to_csv(out, index=False)
     print(f"Summary written: {out}")
     print(df[['density','file','cis','action']])
