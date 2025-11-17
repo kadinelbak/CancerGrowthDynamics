@@ -10,17 +10,26 @@ import argparse
 from pathlib import Path
 import pandas as pd
 
-ROOT = Path(r"c:/Users/MainFrameTower/Desktop/CancerGrowthDynamics")
-RAW_DIR = ROOT / "Datasets" / "Untreated CoCulture"
-PROC_DIR = ROOT / "Processed_Datasets" / "Untreated CoCulture"
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Datasets").exists() or (cur / "Processed_Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
 
 
 def reprocess(force: bool=False):
-    if not RAW_DIR.exists():
-        print(f"Raw directory missing: {RAW_DIR}")
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    raw_dir = repo_root / "Datasets" / "Untreated CoCulture"
+    proc_dir = repo_root / "Processed_Datasets" / "Untreated CoCulture"
+    if not raw_dir.exists():
+        print(f"Raw directory missing: {raw_dir}")
         return
-    PROC_DIR.mkdir(parents=True, exist_ok=True)
-    csvs = sorted(RAW_DIR.glob('measure_*.csv'))
+    proc_dir.mkdir(parents=True, exist_ok=True)
+    csvs = sorted(raw_dir.glob('measure_*.csv'))
     if not csvs:
         print("No raw untreated co-culture CSVs found.")
         return
@@ -44,7 +53,7 @@ def reprocess(force: bool=False):
             status = 'forced-no-area'
         else:
             status = 'no-target-column'
-        out_path = PROC_DIR / src.name
+        out_path = proc_dir / src.name
         if status.startswith('converted') or (status.startswith('skipped') and not out_path.exists()):
             df.to_csv(out_path, index=False)
         elif status.startswith('converted'):
@@ -52,7 +61,7 @@ def reprocess(force: bool=False):
         rows.append({'file': src.name, 'rows': len(df), 'status': status})
         print(f"{src.name}: {status}")
     rep = pd.DataFrame(rows)
-    rep_path = PROC_DIR / 'reprocess_report.csv'
+    rep_path = proc_dir / 'reprocess_report.csv'
     rep.to_csv(rep_path, index=False)
     print(f"Report written: {rep_path}")
 

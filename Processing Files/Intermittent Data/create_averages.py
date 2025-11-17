@@ -2,6 +2,17 @@ import pandas as pd
 import os
 import re
 from collections import defaultdict
+from pathlib import Path
+
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
 
 def parse_filename_components(filename):
     """Extract day, tile, and well information from image filename"""
@@ -108,7 +119,8 @@ def process_seeding_density_folder(base_path, density_folder):
 
 # Main execution
 def main():
-    base_path = r"C:\Users\MainFrameTower\Desktop\CancerGrowthDynamics\Processed_Datasets\Intermittent Data"
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    base_path = str(repo_root / "Processed_Datasets" / "Intermittent Data")
     
     # Process both seeding density folders
     for density_folder in ["20k_seeding_density", "30k_seeding_density"]:

@@ -1,13 +1,24 @@
 import pandas as pd
 import os
+from pathlib import Path
 
 # This script splits CSV files containing image data into separate files based on seeding density (20k and 30k).
 # Each CSV file contains an 'Image' column with filenames that include well identifiers (e.g., C4, D5).
 # The mapping of wells to seeding densities is predefined, so if you want to change please copy and change the structure
 # Must be run in the same directory as the datasets folder
 
-# Define the base path
-base_path = r"C:\Users\MainFrameTower\Desktop\CancerGrowthDynamics\Processed_Datasets\Intermittent Data"
+def find_repo_root(start: Path) -> Path:
+    cur = start
+    for _ in range(10):
+        if (cur / "Processed_Datasets").exists() or (cur / "Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
+
+# Define the base path (repository-root relative)
+base_path = str(find_repo_root(Path(__file__).resolve().parent) / "Processed_Datasets" / "Intermittent Data")
 
 # Define the mapping of files to their well configurations
 file_well_mapping = {

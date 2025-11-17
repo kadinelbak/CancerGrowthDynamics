@@ -16,6 +16,17 @@ import pandas as pd
 import glob
 from pathlib import Path
 
+def find_repo_root(start: Path) -> Path:
+    """Walk upwards to find a folder containing 'Datasets' or 'Processed_Datasets'."""
+    cur = start
+    for _ in range(10):
+        if (cur / "Datasets").exists() or (cur / "Processed_Datasets").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
+
 def process_csv_file(file_path, output_path):
     """
     Process a single CSV file by dividing the "Area µm^2" column by 144 and renaming to "Cells".
@@ -60,10 +71,10 @@ def main():
     """
     Main function to process all CSV files in the Datasets folder.
     """
-    # Get the script directory and construct paths
-    script_dir = Path(__file__).parent
-    datasets_dir = script_dir / "Datasets"
-    processed_dir = script_dir / "Processed_Datasets"
+    # Locate repository root (so this works from anywhere in repo)
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    datasets_dir = repo_root / "Datasets"
+    processed_dir = repo_root / "Processed_Datasets"
     
     # Check if Datasets directory exists
     if not datasets_dir.exists():
@@ -117,8 +128,8 @@ def preview_changes():
     """
     Preview what changes will be made without actually processing files.
     """
-    script_dir = Path(__file__).parent
-    datasets_dir = script_dir / "Datasets"
+    repo_root = find_repo_root(Path(__file__).resolve().parent)
+    datasets_dir = repo_root / "Datasets"
     
     # Find all CSV files
     csv_pattern = str(datasets_dir / "**" / "*.csv")

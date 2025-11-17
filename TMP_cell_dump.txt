@@ -1,0 +1,1245 @@
+
+
+=== Cell 0 (markdown) ===
+# Cancer Growth Dynamics: Treated MonoCulture Analysis
+## IC25, IC50, IC75 Dose Response Modeling (20k Density)
+
+**Fixed Drug Concentrations:**
+- IC25: 1.47 µM (25% inhibition target) 
+- IC50: 1.00 µM (50% inhibition reference)
+- IC75: 0.62 µM (75% inhibition target)
+
+**Cell Lines:** A2780 (naive) and A2780cis (cisplatin-resistant)
+
+
+=== Cell 1 (markdown) ===
+## Mathematical Model Description
+
+### Core Model: Drug-Modified Logistic Growth
+
+Your model combines **logistic growth** with **Hill equation dose-response** to describe cancer cell growth under drug treatment:
+
+**Differential Equation:**
+```
+dN/dt = r_eff × N × (1 - N/K_eff)
+```
+
+Where:
+- **N(t)** = Number of cells at time t
+- **r_eff** = Effective growth rate (drug-modified)
+- **K_eff** = Effective carrying capacity (drug-modified)
+
+### Drug Effects via Hill Equation
+
+The drug modifies both growth parameters through Hill dose-response relationships:
+
+**Hill Function:**
+```
+inhibition = dose^n / (IC50^n + dose^n)
+```
+
+### Hierarchical Model Fitting Strategy
+
+The analysis tries **5 model variants** in order of complexity until one succeeds:
+
+**Model 2: Single Hill (3 parameters)**
+- **n** = Single Hill coefficient for both effects
+- **α_r** = Maximum growth rate inhibition
+- **α_K** = Maximum carrying capacity inhibition
+
+
+### Optimization Strategy
+
+**Local Optimization:**
+- Multiple optimizers: BFGS, LBFGS, NelderMead
+- Multiple starting points for each optimizer
+- Best result selected across all attempts
+
+**Global Optimization:**
+- Grid search for simpler models (≤3 parameters)
+- Used as backup when local optimization fails
+
+### Fixed Parameters
+
+**From untreated controls:**
+- **r** = Intrinsic growth rate
+- **K** = Carrying capacity  
+- **IC50** = 1.0 µM (reference concentration, fixed)
+
+### Experimental Design
+
+**Dose Conditions:**
+- **IC25**: 1.47 µM (25% inhibition target)
+- **IC50**: 1.00 µM (50% inhibition reference) 
+- **IC75**: 0.62 µM (75% inhibition target)
+
+**Cell Lines:**
+- **A2780 (naive)** - Cisplatin-sensitive
+- **A2780cis** - Cisplatin-resistant
+
+**Total Analysis:** 6 conditions (3 doses × 2 cell lines), each fitted with best available model
+
+
+=== Cell 2 (markdown) ===
+## 1) Packages and Imports
+
+
+=== Cell 3 (code) ===
+# Install required packages if not already installed
+using Pkg
+Pkg.add(["CSV", "DataFrames", "StaticArrays", "Statistics", "DifferentialEquations", "Optim", "Plots", "LinearAlgebra", "ForwardDiff"])
+
+# Load required packages
+using CSV, DataFrames, Statistics
+using DifferentialEquations, Optim, Plots
+using LinearAlgebra, Printf
+using Base.Threads
+using ForwardDiff, StaticArrays
+
+# Performance settings
+BLAS.set_num_threads(min(4, Threads.nthreads()))
+gr(fmt=:png, dpi=150)
+
+println("✅ Essential packages loaded:")
+println("  • Data: CSV, DataFrames, Statistics") 
+println("  • Math: DifferentialEquations, Optim, LinearAlgebra, ForwardDiff")
+println("  • Visualization: Plots (GR backend)")
+println("  • Performance: Base.Threads ($(Threads.nthreads()) threads), BLAS ($(BLAS.get_num_threads()) threads)")
+println("  • Utilities: Printf")
+println("✅ Setup completed - ready for analysis!")
+
+
+=== Cell 4 (markdown) ===
+## 2) Paths and Data Directories
+
+
+=== Cell 5 (code) ===
+# Set up paths for IC25, IC50, IC75 data
+# Since we're in a notebook, we need to construct the ROOT path from current working directory
+ROOT = dirname(dirname(pwd()))
+
+# Data directories for each dose
+IC25_DIR = joinpath(ROOT, "Processed_Datasets", "Treated MonoCulture", "20k", "IC25", "Averages")
+IC50_DIR = joinpath(ROOT, "Processed_Datasets", "Treated MonoCulture", "20k", "IC50", "Averages")  
+IC75_DIR = joinpath(ROOT, "Processed_Datasets", "Treated MonoCulture", "20k", "IC75", "Averages")
+
+# Output directory
+OUT_DIR = joinpath(ROOT, "Modelling Data Notebooks", "Treated MonoCulture", "20k", "Multi_Dose_Analysis")
+isdir(OUT_DIR) || mkpath(OUT_DIR)
+
+# Baseline parameters file
+RK_FILE = joinpath(ROOT, "Modelling Data Notebooks", "Untreated MonoCulture", "untreated_monoculture_logistic_parameters.csv")
+
+println("📁 Data paths configured:")
+println("  IC25 (1.47µM): $(isdir(IC25_DIR) ? "✅" : "❌") $IC25_DIR")
+println("  IC50 (1.00µM): $(isdir(IC50_DIR) ? "✅" : "❌") $IC50_DIR")
+println("  IC75 (0.62µM): $(isdir(IC75_DIR) ? "✅" : "❌") $IC75_DIR")
+println("  Output: $OUT_DIR")
+println("  Parameters: $(isfile(RK_FILE) ? "✅" : "❌") $RK_FILE")
+
+using CSV, DataFrames
+
+function load_day_averages_with_day0(path::AbstractString)
+    @assert isfile(path) "Missing file: $path"
+    df = CSV.read(path, DataFrame)
+
+    # Exact column names from your processed data
+    day_col    = findfirst(n -> String(n) == "Day",        names(df))
+    mean_col   = findfirst(n -> String(n) == "Mean Cells", names(df))
+    stderr_col = findfirst(n -> String(n) == "SEM Cells",  names(df))
+
+    @assert day_col !== nothing && mean_col !== nothing "Could not find required columns in $path. Available: $(names(df))"
+
+    x    = Float64.(df[!, day_col])
+    y    = Float64.(df[!, mean_col])
+    yerr = stderr_col !== nothing ? Float64.(df[!, stderr_col]) : zeros(length(y))
+
+    # Sort
+    p = sortperm(x); x, y, yerr = x[p], y[p], yerr[p]
+
+    # Insert day 0 (67 for 20k, 100 for 30k)
+    if minimum(x) > 0.1
+        dens = occursin("20k", path) ? "20k" : (occursin("30k", path) ? "30k" : "20k")
+        day0_cells = dens == "20k" ? 67.0 : 100.0
+        x    = vcat([0.0], x)
+        y    = vcat([day0_cells], y)
+        yerr = vcat([max(day0_cells * 0.1, 1.0)], yerr)  # floor std error
+    end
+
+    # Limit to 0–12 days
+    mask = x .<= 12.0
+    return x[mask], y[mask], yerr[mask]
+end
+
+
+=== Cell 6 (markdown) ===
+## 6) Load Baseline Parameters and Raw Data
+
+
+=== Cell 7 (code) ===
+using CSV, DataFrames
+
+"""
+    load_baseline_parameters(file::AbstractString)
+
+Load baseline theta-logistic parameters (r, K, v) from a CSV file with columns:
+File, Density, CellLine, r, K, v, SSR, BIC.
+
+Returns a Dict mapping cell line Symbols → (r, K, v).
+If duplicates (e.g. 20k vs. 30k) exist, keeps the row with smaller BIC.
+"""
+function load_baseline_parameters(file::AbstractString)
+    @assert isfile(file) "Missing baseline file: $file"
+
+    df = CSV.read(file, DataFrame)
+
+    required = [:CellLine, :r, :K, :v, :BIC]
+    missing_cols = setdiff(required, Symbol.(names(df)))
+    @assert isempty(missing_cols) "Missing columns: $(missing_cols)"
+
+    # group by CellLine and keep best (lowest BIC)
+    grouped = groupby(df, :CellLine)
+    best_rows = combine(grouped) do sub
+        sub[argmin(sub.BIC), :]
+    end
+
+    params = Dict{Symbol, Tuple{Float64, Float64, Float64}}()
+    for row in eachrow(best_rows)
+        cell = Symbol(row.CellLine)
+        params[cell] = (Float64(row.r), Float64(row.K), Float64(row.v))
+    end
+
+    return params
+end
+println("📊 Loading baseline parameters...")
+rk_params = load_baseline_parameters(RK_FILE)
+
+println("✅ Baseline parameters loaded:")
+for (cell_line, (r, K, v)) in rk_params
+    println("  $(String(cell_line)): r=$(round(r, digits=4)), K=$(round(K, digits=1)), v=$(round(v, digits=3))")
+end
+
+dose_conditions = [
+    ("IC25", 1.47, IC25_DIR),
+    ("IC50", 1.00, IC50_DIR),
+    ("IC75", 0.62, IC75_DIR),
+]
+
+
+
+=== Cell 8 (markdown) ===
+## Multifit
+
+
+=== Cell 9 (code) ===
+###############################
+# MODEL ZOO ACROSS ALL 20k DATA
+###############################
+
+using DifferentialEquations
+using Optim
+using Distributions
+using Plots
+using DataFrames
+
+# ------------------------------
+# 0) Helper: find treated CSV
+# ------------------------------
+
+function find_treated_file(dose_dir::AbstractString, cell_line::Symbol)
+    name_sub = lowercase(String(cell_line))          # :A2780Naive -> "a2780naive"
+    files = filter(f ->
+        endswith(f, ".csv") &&
+        occursin("day_averages", lowercase(f)) &&
+        occursin(name_sub, lowercase(f)),
+        readdir(dose_dir; join=true)
+    )
+    @assert !isempty(files) "No day_averages CSV for $cell_line in $dose_dir"
+    return files[1]
+end
+
+# ------------------------------
+# 1) Struct for models
+# ------------------------------
+
+if !@isdefined DoseResponseModel
+    struct DoseResponseModel
+        name::String
+        pnames::Vector{Symbol}         # parameter names
+        lower::Vector{Float64}
+        upper::Vector{Float64}
+        simulate::Function             # (t, p, dose, r,K,v,y0) -> y_pred
+    end
+end
+
+# ------------------------------
+# 2) Two-pop logistic (sens + static res)
+# ------------------------------
+
+if !@isdefined solve_treated_two_pop_static
+    function solve_treated_two_pop_static(
+        t_pts::AbstractVector,
+        r::Float64, K::Float64, v::Float64;
+        f_s0::Float64,
+        E_sens::Float64,
+        n::Float64,
+        IC50::Float64,
+        dose::Float64,
+        y0::Float64,
+        lambda::Float64,
+    )
+        t0 = minimum(t_pts)
+        tf = maximum(t_pts)
+
+        function f!(du, u, p_, t)
+            S, R = u
+            N = max(S + R, 1e-12)
+
+            growth_S = r * S * (1 - (N / K)^v)
+
+            # Hill kill on sensitive only, with ramp
+            ramp = 1.0 - exp(-max(t, 0.0) / lambda)
+            hill = E_sens * (dose^n) / (IC50^n + dose^n)
+            kill = ramp * hill
+
+            du[1] = growth_S - kill * S     # sensitive
+            du[2] = 0.0                     # resistant/static
+        end
+
+        S0 = f_s0 * y0
+        R0 = (1.0 - f_s0) * y0
+        u0 = [S0, R0]
+
+        prob = ODEProblem(f!, u0, (t0, tf))
+        sol  = solve(prob; saveat=t_pts, reltol=1e-6, abstol=1e-8)
+        return sol
+    end
+end
+
+# ------------------------------
+# 3) Model definitions
+# ------------------------------
+
+# 3.1 Hill-type ramp models (your original style)
+
+model_Hill_ramp = DoseResponseModel(
+    "Hill_ramp",
+    [:Emax, :n, :lambda, :IC50],
+    [0.0, 0.1, 0.01, 1e-3],
+    [1.5, 5.0, 10.0, 100.0],
+    (t, p, dose, r, K, v, y0) -> begin
+        Emax, n, λ, IC50 = p
+        sol = solve_treated_theta_logistic_mult_ramped(
+            t, r, K, v;
+            Emax   = Emax,
+            IC50   = IC50,
+            n      = n,
+            dose   = dose,
+            y0     = y0,
+            lambda = λ,
+            t_onset = 0.0,
+        )
+        getindex.(sol.u, 1)
+    end
+)
+
+model_Hill_ramp_tonset = DoseResponseModel(
+    "Hill_ramp_tonset",
+    [:Emax, :n, :lambda, :IC50, :t_onset],
+    [0.0, 0.1, 0.01, 1e-3, 0.0],
+    [1.5, 5.0, 10.0, 100.0, 5.0],
+    (t, p, dose, r, K, v, y0) -> begin
+        Emax, n, λ, IC50, t_onset = p
+        sol = solve_treated_theta_logistic_mult_ramped(
+            t, r, K, v;
+            Emax   = Emax,
+            IC50   = IC50,
+            n      = n,
+            dose   = dose,
+            y0     = y0,
+            lambda = λ,
+            t_onset = t_onset,
+        )
+        getindex.(sol.u, 1)
+    end
+)
+
+model_two_pop_static_res = DoseResponseModel(
+    "two_pop_static_res",
+    [:f_sens0, :E_sens, :n, :IC50, :lambda],
+    [0.0, 0.0, 0.5, 1e-3, 0.01],
+    [1.0, 2.0, 5.0, 100.0, 10.0],
+    (t, p, dose, r, K, v, y0) -> begin
+        f_s0, E_sens, n, IC50, λ = p
+        sol = solve_treated_two_pop_static(
+            t, r, K, v;
+            f_s0   = f_s0,
+            E_sens = E_sens,
+            n      = n,
+            IC50   = IC50,
+            dose   = dose,
+            y0     = y0,
+            lambda = λ,
+        )
+        map(u -> u[1] + u[2], sol.u)
+    end
+)
+
+# 3.2 PARPi models 1–4 (paper), with α treated as effective parameter
+#     since you fit each dose separately
+
+# Model 1
+model1_parpi = DoseResponseModel(
+    "Model1_parpi",
+    [:alpha, :beta, :d],
+    [0.0, 0.0, 0.0],
+    [1.0, 0.5, 4.0],
+    (t_pts, p, dose, r, K, v, y0) -> begin
+        alpha, beta, d = p
+        αeff = alpha  # effective α(D) for this fixed dose
+
+        function f!(du, u, p_, t)
+            P, A = u
+            N = P + A
+            g = r * (1 - (N / K)^v)
+            du[1] = g * (1 - 2*αeff) * P + beta * A
+            du[2] = αeff * g * P - beta * A - d * A
+        end
+
+        u0 = [y0, 0.0]
+        prob = ODEProblem(f!, u0, (minimum(t_pts), maximum(t_pts)))
+        sol  = solve(prob; saveat=t_pts, reltol=1e-6, abstol=1e-8)
+        map(u -> u[1] + u[2], sol.u)
+    end
+)
+
+# Model 2: n damage compartments collapsed to small fixed n
+const M2_NCOMP = 3  # can change to 3 if you want closer to paper
+
+model2_parpi = DoseResponseModel(
+    "Model2_parpi",
+    [:alpha, :beta, :d],
+    [0.0, 0.0, 0.0],
+    [1.0, 0.5, 4.0],
+    (t_pts, p, dose, r, K, v, y0) -> begin
+        alpha, beta, d = p
+        αeff = alpha
+        n = M2_NCOMP
+
+        function f!(du, u, p_, t)
+            # state: P0,...,Pn,A   (length n+2)
+            P = u[1:n+1]
+            A = u[n+2]
+            N = sum(P) + A
+            g = r * (1 - (N / K)^v)
+
+            fill!(du, 0.0)
+
+            # P0
+            du[1] = g*(1 - 2*αeff)*P[1] + beta * P[2]
+
+            # P_i for i=1..n-1
+            for i in 2:n
+                Pi_minus = P[i-1]
+                Pi       = P[i]
+                Pi_plus  = P[i+1]
+                du[i] = 2*αeff*g*Pi_minus + g*(1 - 2*αeff)*Pi - beta*Pi + beta*Pi_plus
+            end
+
+            # P_n (index n+1)
+            Pnm1 = P[n]
+            Pn   = P[n+1]
+            du[n+1] = 2*αeff*g*Pnm1 + g*(1 - 2*αeff)*Pn - beta*Pn + beta*A
+
+            # A
+            du[n+2] = αeff*g*Pn - beta*A - d*A
+        end
+
+        u0 = zeros(n+2)
+        u0[1] = y0
+
+        prob = ODEProblem(f!, u0, (minimum(t_pts), maximum(t_pts)))
+        sol  = solve(prob; saveat=t_pts, reltol=1e-6, abstol=1e-8)
+        map(u -> sum(u[1:n+1]) + u[n+2], sol.u)
+    end
+)
+
+# Model 3
+model3_parpi = DoseResponseModel(
+    "Model3_parpi",
+    [:alpha, :beta, :gamma, :d],
+    [0.0, 0.0, 0.0, 0.0],
+    [1.0, 0.5, 4.0, 4.0],
+    (t_pts, p, dose, r, K, v, y0) -> begin
+        alpha, beta, gamma, d = p
+        αeff = alpha
+
+        function f!(du, u, p_, t)
+            P, Pd, A = u
+            N = P + Pd + A
+            g = r * (1 - (N / K)^v)
+
+            du[1] = g*(1 - 2*αeff)*P + beta*Pd
+            du[2] = 2*αeff*g*P + g*Pd - gamma*Pd - beta*Pd + beta*A
+            du[3] = gamma*Pd - beta*A - d*A
+        end
+
+        u0 = [y0, 0.0, 0.0]
+        prob = ODEProblem(f!, u0, (minimum(t_pts), maximum(t_pts)))
+        sol  = solve(prob; saveat=t_pts, reltol=1e-6, abstol=1e-8)
+        map(u -> u[1] + u[2] + u[3], sol.u)
+    end
+)
+
+# Model 4
+model4_parpi = DoseResponseModel(
+    "Model4_parpi",
+    [:alpha, :phi, :d],
+    [0.0, 0.0, 0.0],
+    [1.0, 2.0, 4.0],
+    (t_pts, p, dose, r, K, v, y0) -> begin
+        alpha, phi, d = p
+        αeff = alpha
+
+        function f!(du, u, p_, t)
+            P, A = u
+            N = P + A
+            g = r * (1 - (N / K)^v)
+
+            du[1] = g*(1 - 2*αeff)*P
+            du[2] = (1 + phi)*αeff*g*P - d*A
+        end
+
+        u0 = [y0, 0.0]
+        prob = ODEProblem(f!, u0, (minimum(t_pts), maximum(t_pts)))
+        sol  = solve(prob; saveat=t_pts, reltol=1e-6, abstol=1e-8)
+        map(u -> u[1] + u[2], sol.u)
+    end
+)
+
+# ---------------------------------------------------------
+# Two-population models with delayed / ramped drug effect
+# ---------------------------------------------------------
+
+# Helper: ramped onset factor (consistent with lambda, t_onset usage)
+@inline function onset_factor(t, λ, t_onset)
+    if t <= t_onset
+        return 0.0
+    else
+        return 1.0 - exp(-λ * (t - t_onset))
+    end
+end
+
+# Hill effect (used by both models)
+@inline function hill_effect(dose, n, IC50)
+    dose_n  = dose^n
+    denom   = IC50^n + dose_n
+    return dose_n / denom
+end
+
+# Model A: static sensitive + resistant with delayed, ramped drug effect
+two_pop_ramp_tonset_static = DoseResponseModel(
+    "two_pop_ramp_tonset_static",
+    # f_s0: initial sensitive fraction
+    # E_sens: max fractional effect on sensitive growth
+    # n, IC50: Hill parameters
+    # lambda: ramp rate of onset
+    # t_onset: onset delay
+    # delta_s: additional death on sensitive after onset
+    [:f_s0, :E_sens, :n, :IC50, :lambda, :t_onset, :delta_s],
+    [0.0,   0.0,     0.5, 1e-3,  0.01,    0.0,      0.0],
+    [1.0,   2.0,     5.0, 100.0, 10.0,    5.0,      1.0],
+    (t_pts, p, dose, r, K, v, y0) -> begin
+        f_s0, E_sens, n, IC50, λ, t_onset, δs = p
+
+        function f!(du, u, p_, t)
+            Ns, Nr = u
+            N = Ns + Nr
+
+            g    = r * (1 - (N / K)^v)
+            hill = hill_effect(dose, n, IC50)
+            gon  = onset_factor(t, λ, t_onset)
+
+            # effective drug impact on sensitive population
+            eff_s = E_sens * hill * gon
+
+            # sensitive
+            du[1] = g * (1 - eff_s) * Ns - δs * gon * Ns
+
+            # resistant (assumed unaffected by drug except for logistic coupling)
+            du[2] = g * Nr
+        end
+
+        u0 = zeros(2)
+        u0[1] = f_s0 * y0
+        u0[2] = (1 - f_s0) * y0
+
+        prob = ODEProblem(f!, u0, (minimum(t_pts), maximum(t_pts)))
+        sol  = solve(prob; saveat=t_pts, reltol=1e-6, abstol=1e-8)
+        map(u -> u[1] + u[2], sol.u)
+    end
+)
+
+# Model B: sensitive + resistant with delayed effect AND sens→res switch
+two_pop_ramp_tonset_switch = DoseResponseModel(
+    "two_pop_ramp_tonset_switch",
+    # f_s0: initial sensitive fraction
+    # E_sens: effect on sensitive
+    # E_res: (weaker) effect on resistant
+    # n, IC50: Hill parameters
+    # lambda, t_onset: onset ramp
+    # delta_s, delta_r: death rates after onset
+    # q_sr: switching rate S -> R after onset
+    [:f_s0, :E_sens, :E_res, :n, :IC50, :lambda, :t_onset, :delta_s, :delta_r, :q_sr],
+    [0.0,   0.0,      0.0,    0.5, 1e-3,  0.01,    0.0,      0.0,      0.0,      0.0],
+    [1.0,   2.0,      1.0,    5.0, 100.0, 10.0,    5.0,      1.0,      1.0,      1.0],
+    (t_pts, p, dose, r, K, v, y0) -> begin
+        f_s0, E_sens, E_res, n, IC50, λ, t_onset, δs, δr, q_sr = p
+
+        function f!(du, u, p_, t)
+            Ns, Nr = u
+            N = Ns + Nr
+
+            g    = r * (1 - (N / K)^v)
+            hill = hill_effect(dose, n, IC50)
+            gon  = onset_factor(t, λ, t_onset)
+
+            eff_s = E_sens * hill * gon
+            eff_r = E_res  * hill * gon
+
+            # S -> R switching active only after onset (scaled by gon)
+            switch_sr = q_sr * gon * Ns
+
+            # sensitive
+            du[1] = g * (1 - eff_s) * Ns - δs * gon * Ns - switch_sr
+
+            # resistant (partially drug-affected + receives switched cells)
+            du[2] = g * (1 - eff_r) * Nr - δr * gon * Nr + switch_sr
+        end
+
+        u0 = zeros(2)
+        u0[1] = f_s0 * y0
+        u0[2] = (1 - f_s0) * y0
+
+        prob = ODEProblem(f!, u0, (minimum(t_pts), maximum(t_pts)))
+        sol  = solve(prob; saveat=t_pts, reltol=1e-6, abstol=1e-8)
+        map(u -> u[1] + u[2], sol.u)
+    end
+)
+
+# ---------------------------------------------------------
+# Extend model zoo
+# ---------------------------------------------------------
+models = [
+    #model_Hill_ramp,
+    #model_Hill_ramp_tonset,
+    #model_two_pop_static_res,
+    model1_parpi,
+    model2_parpi,
+    model3_parpi,
+    model4_parpi
+    #two_pop_ramp_tonset_static,
+    #two_pop_ramp_tonset_switch,
+]
+# ------------------------------
+# 4) Fitter for one model
+# ------------------------------
+
+function fit_one_model(model::DoseResponseModel,
+                       t, y, yerr,
+                       r, K, v, dose;
+                       n_starts::Int = 8)
+
+    t  = collect(Float64.(t))
+    y  = collect(Float64.(y))
+    ye = collect(Float64.(yerr))
+    y0 = y[1]
+
+    n_obs = length(y)
+    kpar  = length(model.pnames)
+
+    function loss(p)
+        p_clamped = clamp.(p, model.lower, model.upper)
+        y_pred = try
+            model.simulate(t, p_clamped, dose, r, K, v, y0)
+        catch
+            return 1e12
+        end
+        if length(y_pred) != n_obs
+            return 1e12
+        end
+        w   = 1.0 ./ (ye.^2 .+ 1e-12)
+        sse = sum(w .* (y_pred .- y).^2)
+        return sse
+    end
+
+    best_res = nothing
+    best_val = Inf
+
+    for s in 1:n_starts
+        init = [rand(Uniform(lo, hi)) for (lo, hi) in zip(model.lower, model.upper)]
+        res  = Optim.optimize(
+            loss, model.lower, model.upper, init,
+            Fminbox(NelderMead()),
+            Optim.Options(iterations=400, show_trace=false)
+        )
+        val = Optim.minimum(res)
+        if val < best_val
+            best_val = val
+            best_res = res
+        end
+    end
+
+    p̂   = Optim.minimizer(best_res)
+    sse = best_val
+    σ2  = sse / n_obs
+    bic = n_obs * log(σ2) + kpar * log(n_obs)
+    aic = n_obs * log(σ2) + 2kpar
+
+    return (model = model,
+            p̂ = p̂,
+            sse = sse,
+            bic = bic,
+            aic = aic)
+end
+
+# ------------------------------
+# 4b) Shared fitter across doses (shared drug params across IC25/50/75)
+# ------------------------------
+
+function dataset_sse(model::DoseResponseModel, p, dataset, r, K, v; fixed_ic50=nothing)
+    p_use = collect(p)
+    if fixed_ic50 !== nothing
+        idx = findfirst(isequal(:IC50), model.pnames)
+        if idx !== nothing
+            p_use[idx] = fixed_ic50
+        end
+    end
+
+    y_pred = try
+        model.simulate(dataset.x, p_use, dataset.dose_val, r, K, v, dataset.y0)
+    catch
+        return Inf
+    end
+    if length(y_pred) != length(dataset.y)
+        return Inf
+    end
+    w = dataset.yerr === nothing ? ones(length(dataset.y)) :
+        1.0 ./ (Float64.(dataset.yerr).^2 .+ 1e-12)
+    return sum(w .* (y_pred .- Float64.(dataset.y)).^2)
+end
+
+function fit_shared_across_doses(model::DoseResponseModel,
+                                 datasets,
+                                 r, K, v;
+                                 n_starts::Int = 8,
+                                 fixed_ic50 = nothing)
+    kpar = length(model.pnames)
+    n_obs_total = sum(length(d.y) for d in datasets)
+    idx_ic50 = findfirst(isequal(:IC50), model.pnames)
+
+    function loss(p)
+        p_clamped = clamp.(p, model.lower, model.upper)
+        if fixed_ic50 !== nothing && idx_ic50 !== nothing
+            p_clamped = collect(p_clamped)
+            p_clamped[idx_ic50] = fixed_ic50
+        end
+        total = 0.0
+        for d in datasets
+            w_sse = dataset_sse(model, p_clamped, d, r, K, v; fixed_ic50=fixed_ic50)
+            if !isfinite(w_sse)
+                return 1e12
+            end
+            total += w_sse
+        end
+        return total
+    end
+
+    best_res = nothing
+    best_val = Inf
+
+    for s in 1:n_starts
+        init = [rand(Uniform(lo, hi)) for (lo, hi) in zip(model.lower, model.upper)]
+        res  = Optim.optimize(
+            loss, model.lower, model.upper, init,
+            Fminbox(NelderMead()),
+            Optim.Options(iterations=400, show_trace=false)
+        )
+        val = Optim.minimum(res)
+        if val < best_val
+            best_val = val
+            best_res = res
+        end
+    end
+
+    p̂   = Optim.minimizer(best_res)
+    if fixed_ic50 !== nothing && idx_ic50 !== nothing
+        p̂ = collect(p̂)
+        p̂[idx_ic50] = fixed_ic50
+    end
+    sse = best_val
+    s2  = sse / n_obs_total
+    bic = n_obs_total * log(s2) + kpar * log(n_obs_total)
+    aic = n_obs_total * log(s2) + 2kpar
+
+    return (model = model,
+            p̂ = p̂,
+            sse = sse,
+            bic = bic,
+            aic = aic)
+end
+
+# ------------------------------
+# 5) Plotting for one dataset
+# ------------------------------
+
+function plot_model_comparison(x, y, yerr,
+                               r, K, v, dose_val,
+                               results;
+                               title_str::AbstractString = "")
+    t_dense = collect(range(minimum(x), maximum(x), length=200))
+    y0      = y[1]
+
+    plt = plot()
+    plot!(plt, x, y;
+          seriestype = :scatter,
+          yerror     = yerr,
+          label      = "data",
+          markersize = 4)
+
+    for res in results
+        model = res.model
+        p     = res.p̂
+        y_pred_dense = try
+            model.simulate(t_dense, p, dose_val, r, K, v, y0)
+        catch
+            continue
+        end
+        plot!(plt, t_dense, y_pred_dense; label = model.name)
+    end
+
+    xlabel!(plt, "Days")
+    ylabel!(plt, "Cell count")
+    title!(plt, title_str)
+    return plt
+end
+
+# ------------------------------
+# 6) Run across all 20k datasets
+# ------------------------------
+
+dose_dirs = Dict(
+    "IC25" => IC25_DIR,
+    "IC50" => IC50_DIR,
+    "IC75" => IC75_DIR,
+)
+
+dose_vals = Dict(
+    "IC25" => 1.47,
+    "IC50" => 1.00,
+    "IC75" => 0.62,
+)
+
+cell_lines = [:A2780Naive, :A2780cis]
+
+all_results = Dict{Tuple{Symbol,String},Vector{NamedTuple}}()
+
+summary_rows = DataFrame(
+    cell_line = String[],
+    dose_name = String[],
+    model     = String[],
+    sse       = Float64[],
+    bic       = Float64[],
+    aic       = Float64[],
+)
+
+for cl in cell_lines
+    println("\n==============================")
+
+
+
+    r, K, v = rk_params[cl]
+    fixed_ic50 = cl == :A2780Naive ? 1.0 : nothing
+
+    datasets = NamedTuple{(:dose_name,:dose_val,:x,:y,:yerr,:y0)}[]
+
+    for dn in ("IC25", "IC50", "IC75")
+        dose_dir  = dose_dirs[dn]
+        dose_val  = dose_vals[dn]
+        data_path = find_treated_file(dose_dir, cl)
+
+        println("Dataset: " * data_path)
+
+        x, y, yerr = load_day_averages_with_day0(data_path)
+        push!(datasets, (
+            dose_name = dn,
+            dose_val  = dose_val,
+            x         = x,
+            y         = y,
+            yerr      = yerr,
+            y0        = y[1],
+        ))
+    end
+
+    results = [fit_shared_across_doses(m, datasets, r, K, v; fixed_ic50=fixed_ic50) for m in models]
+
+    best = argmin(res -> res.bic, results)
+    param_names  = best.model.pnames
+    param_values = best.p̂
+    params       = (; zip(param_names, param_values)...)
+
+    println("Best model by BIC for " * String(cl) * ": " * best.model.name)
+    println("Parameters (shared across doses): " * string(params))
+    println("SSE_total = " * string(best.sse) * ", BIC = " * string(best.bic) * ", AIC = " * string(best.aic))
+
+    for res in results
+        for d in datasets
+            sse_d = dataset_sse(res.model, res.p̂, d, r, K, v; fixed_ic50=fixed_ic50)
+            push!(summary_rows, (
+                String(cl),
+                d.dose_name,
+                res.model.name,
+                sse_d,
+                res.bic,
+                res.aic,
+            ))
+            all_results[(cl, d.dose_name)] = results
+        end
+    end
+
+    for d in datasets
+        plt_title = string(cl, " ", d.dose_name, " (20k treated)")
+        plt = plot_model_comparison(d.x, d.y, d.yerr, r, K, v, d.dose_val, results;
+                                    title_str = plt_title)
+
+        display(plt)  # show in notebook
+
+        out_name = "model_comparison_" * String(cl) * "_" * d.dose_name * "_20k.png"
+        out_path = joinpath(OUT_DIR, out_name)
+        savefig(plt, out_path)
+        println("Saved plot to " * out_path)
+    end
+end
+
+println("\n================ BIC/AIC summary ================")
+sort!(summary_rows, [:cell_line, :dose_name, :bic])
+show(summary_rows, allrows=true, allcols=true)
+println()
+println()
+
+
+
+=== Cell 10 (code) ===
+###############################################
+# BIC ANALYSIS: GLOBAL AND PER CELL LINE
+###############################################
+
+using DataFrames
+using Statistics
+
+@assert @isdefined(summary_rows) "Run the model-fit cell first."
+
+println("Total fits in summary_rows: ", nrow(summary_rows))
+
+# ---------- 1) Global model comparison ----------
+
+global_stats = combine(
+    groupby(summary_rows, :model)
+) do sdf
+    (; mean_bic = mean(sdf.bic),
+       sum_bic  = sum(sdf.bic),
+       n_datasets = nrow(sdf))
+end
+
+sort!(global_stats, :sum_bic)  # lower is better
+
+println("\n=== Global model ranking by total BIC ===")
+show(global_stats, allrows=true, allcols=true)
+println()
+
+best_global = global_stats[1, :]
+println("\nBest global model by BIC: ", best_global.model)
+println("  total BIC = ", best_global.sum_bic,
+        ", mean BIC = ", best_global.mean_bic,
+        ", datasets = ", best_global.n_datasets)
+
+# ---------- 2) Per-cell-line model comparison ----------
+
+by_cell_model = combine(
+    groupby(summary_rows, [:cell_line, :model])
+) do sdf
+    (; mean_bic = mean(sdf.bic),
+       sum_bic  = sum(sdf.bic),
+       n_datasets = nrow(sdf))
+end
+
+sort!(by_cell_model, [:cell_line, :sum_bic])
+
+println("\n=== Per cell-line model ranking by total BIC ===")
+show(by_cell_model, allrows=true, allcols=true)
+println()
+
+for cl in unique(by_cell_model.cell_line)
+    sub = filter(row -> row.cell_line == cl, by_cell_model)
+    best = sub[1, :]
+    println("\nBest model for cell line ", cl, ": ", best.model)
+    println("  total BIC = ", best.sum_bic,
+            ", mean BIC = ", best.mean_bic,
+            ", datasets = ", best.n_datasets)
+end
+
+
+
+=== Cell 11 (code) ===
+############################################
+# Fit model zoo on 30k treated datasets
+############################################
+
+using CSV, DataFrames
+using Plots
+
+# 1) Directories for 30k data and outputs
+
+IC25_DIR_30k = joinpath(ROOT, "Processed_Datasets", "Treated MonoCulture", "30k", "IC25", "Averages")
+IC50_DIR_30k = joinpath(ROOT, "Processed_Datasets", "Treated MonoCulture", "30k", "IC50", "Averages")
+IC75_DIR_30k = joinpath(ROOT, "Processed_Datasets", "Treated MonoCulture", "30k", "IC75", "Averages")
+
+OUT_DIR_30k = joinpath(ROOT, "Modelling Data Notebooks", "Treated MonoCulture", "30k", "Multi_Dose_Analysis")
+isdir(OUT_DIR_30k) || mkpath(OUT_DIR_30k)
+
+println("30k IC25 dir: ", IC25_DIR_30k)
+println("30k IC50 dir: ", IC50_DIR_30k)
+println("30k IC75 dir: ", IC75_DIR_30k)
+println("30k output dir: ", OUT_DIR_30k)
+
+# 2) Load baseline logistic parameters for 30k (r, K, v)
+
+rk_df = CSV.read(RK_FILE, DataFrame)
+
+rk_params_30k = Dict{Symbol,Tuple{Float64,Float64,Float64}}()
+for row in eachrow(rk_df)
+    string(row.Density) == "30k" || continue
+    cl_sym = Symbol(row.CellLine)
+    rk_params_30k[cl_sym] = (Float64(row.r), Float64(row.K), Float64(row.v))
+end
+
+println("rk_params_30k keys: ", collect(keys(rk_params_30k)))
+
+# 3) Loop setup
+
+dose_dirs_30k = Dict(
+    "IC25" => IC25_DIR_30k,
+    "IC50" => IC50_DIR_30k,
+    "IC75" => IC75_DIR_30k,
+)
+
+dose_vals = Dict(   # same doses as 20k
+    "IC25" => 1.47,
+    "IC50" => 1.00,
+    "IC75" => 0.62,
+)
+
+cell_lines = [:A2780Naive, :A2780cis]
+
+all_results_30k = Dict{Tuple{Symbol,String},Vector{NamedTuple}}()
+
+summary_rows_30k = DataFrame(
+    cell_line = String[],
+    dose_name = String[],
+    model     = String[],
+    sse       = Float64[],
+    bic       = Float64[],
+    aic       = Float64[],
+)
+
+# 4) Fit all models on all 30k datasets
+
+for cl in cell_lines
+    @assert haskey(rk_params_30k, cl) "No 30k rk_params for $cl"
+
+    for dn in ("IC25", "IC50", "IC75")
+        dose_dir  = dose_dirs_30k[dn]
+        dose_val  = dose_vals[dn]
+        data_path = find_treated_file(dose_dir, cl)
+
+        println("\n==============================")
+        println("Fitting $cl at $dn (30k treated)")
+        println("Dataset: $data_path")
+
+        # load data; helper already inserts day0=100 for 30k
+        x, y, yerr = load_day_averages_with_day0(data_path)
+
+        # baseline parameters for 30k
+        r, K, v = rk_params_30k[cl]
+
+        # fit all models from the existing zoo
+        results = [fit_one_model(m, x, y, yerr, r, K, v, dose_val) for m in models]
+        all_results_30k[(cl, dn)] = results
+
+        # store BIC/AIC summary
+        for res in results
+            push!(summary_rows_30k, (
+                String(cl),
+                dn,
+                res.model.name,
+                res.sse,
+                res.bic,
+                res.aic,
+            ))
+        end
+
+        # choose best by BIC
+        best = argmin(res -> res.bic, results)
+        param_names  = best.model.pnames
+        param_values = best.p̂
+        params       = (; zip(param_names, param_values)...)
+
+        println("Best 30k model by BIC: ", best.model.name)
+        println("Parameters: ", params)
+        println("SSE = ", best.sse, ", BIC = ", best.bic, ", AIC = ", best.aic)
+
+        # plot and save comparison
+        plt_title = string(cl, " ", dn, " (30k treated)")
+        plt = plot_model_comparison(x, y, yerr, r, K, v, dose_val, results;
+                                    title_str = plt_title)
+
+        display(plt)
+
+        out_name = "model_comparison_$(String(cl))_$(dn)_30k.png"
+        out_path = joinpath(OUT_DIR_30k, out_name)
+        savefig(plt, out_path)
+        println("Saved 30k plot to $out_path")
+    end
+end
+
+println("\n=========== 30k BIC/AIC summary (sorted by BIC) ===========")
+sort!(summary_rows_30k, [:cell_line, :dose_name, :bic])
+show(summary_rows_30k, allrows=true, allcols=true)
+println()
+
+
+
+=== Cell 12 (code) ===
+###############################################
+# BIC ANALYSIS: GLOBAL AND PER CELL LINE
+###############################################
+
+using DataFrames
+using Statistics
+
+@assert @isdefined(summary_rows_30k) "Run the model-fit cell first."
+
+println("Total fits in summary_rows: ", nrow(summary_rows_30k))
+
+# ---------- 1) Global model comparison ----------
+
+global_stats = combine(
+    groupby(summary_rows_30k, :model)
+) do sdf
+    (; mean_bic = mean(sdf.bic),
+       sum_bic  = sum(sdf.bic),
+       n_datasets = nrow(sdf))
+end
+
+sort!(global_stats, :sum_bic)  # lower is better
+
+println("\n=== Global model ranking by total BIC ===")
+show(global_stats, allrows=true, allcols=true)
+println()
+
+best_global = global_stats[1, :]
+println("\nBest global model by BIC: ", best_global.model)
+println("  total BIC = ", best_global.sum_bic,
+        ", mean BIC = ", best_global.mean_bic,
+        ", datasets = ", best_global.n_datasets)
+
+# ---------- 2) Per-cell-line model comparison ----------
+
+by_cell_model = combine(
+    groupby(summary_rows_30k, [:cell_line, :model])
+) do sdf
+    (; mean_bic = mean(sdf.bic),
+       sum_bic  = sum(sdf.bic),
+       n_datasets = nrow(sdf))
+end
+
+sort!(by_cell_model, [:cell_line, :sum_bic])
+
+println("\n=== Per cell-line model ranking by total BIC ===")
+show(by_cell_model, allrows=true, allcols=true)
+println()
+
+for cl in unique(by_cell_model.cell_line)
+    sub = filter(row -> row.cell_line == cl, by_cell_model)
+    best = sub[1, :]
+    println("\nBest model for cell line ", cl, ": ", best.model)
+    println("  total BIC = ", best.sum_bic,
+            ", mean BIC = ", best.mean_bic,
+            ", datasets = ", best.n_datasets)
+end
+
+
+
+=== Cell 13 (code) ===
+# ------------------------------
+# 8) Comparison tables/plots for 20k vs 30k
+# ------------------------------
+
+using DataFrames
+using Statistics
+using Plots
+
+function tidy_density(df::DataFrame, density::String)
+    if nrow(df) == 0
+        return DataFrame()
+    end
+    d = copy(df)
+    if :params ∉ names(d)
+        d.params = fill("", nrow(d))
+    end
+    d.density = fill(density, nrow(d))
+    return d
+end
+
+df20 = @isdefined(summary_rows)    ? tidy_density(summary_rows, "20k") : DataFrame()
+df30 = @isdefined(summary_rows_30k) ? tidy_density(summary_rows_30k, "30k") : DataFrame()
+
+df_all = vcat(df20, df30)
+
+if nrow(df_all) == 0
+    println("No summary_rows data available yet. Run the 20k and 30k fit cells first.")
+else
+    sort!(df_all, [:density, :cell_line, :dose_name, :bic])
+    println("Full table (with params):")
+    show(df_all, allrows=true, allcols=true)
+    println()
+
+    # Best model per dose/cell_line/density
+    best_rows = combine(groupby(df_all, [:density, :cell_line, :dose_name])) do g
+        i = argmin(g.bic)
+        g[i, :]
+    end
+    println("\nBest models by BIC (per dose/cell_line/density):")
+    show(best_rows, allrows=true, allcols=true)
+    println()
+
+    # Plot BIC by model for each dose/cell combination
+    groups = collect(groupby(df_all, [:density, :cell_line, :dose_name]))
+    n = length(groups)
+    ncols = min(3, n == 0 ? 1 : n)
+    nrows = ceil(Int, n / ncols)
+    plt = plot(layout=(nrows, ncols), size=(1400, 400 + 200*max(nrows-1,0)))
+    for (idx, g) in enumerate(groups)
+        gp = sort(g, :model)
+        sp = idx
+        bar!(plt, gp.model, gp.bic; subplot=sp, legend=false,
+             title=string(gp.density[1], " ", gp.cell_line[1], " ", gp.dose_name[1]),
+             xticks=:auto, rotation=50)
+    end
+    display(plt)
+
+    # Parameter table of best models only
+    best_params = select(best_rows, [:density, :cell_line, :dose_name, :model, :params, :bic, :aic, :sse])
+    println("\nBest-model parameter snapshots:")
+    show(best_params, allrows=true, allcols=true)
+end

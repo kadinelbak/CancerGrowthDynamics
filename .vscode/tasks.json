@@ -11,9 +11,9 @@
 			"group": "build"
 		},
 		{
-			"label": "Split Treated MonoCulture (venv)",
+			"label": "Split Treated MonoCulture (repo)",
 			"type": "shell",
-			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"command": "python",
 			"args": [
 				"Processing Files/Treated MonoCulture/split_treated_monoculture.py"
 			],
@@ -22,9 +22,9 @@
 			"group": "build"
 		},
 		{
-			"label": "Split Treated MonoCulture IC25 (venv)",
+			"label": "Split Treated MonoCulture IC25 (repo)",
 			"type": "shell",
-			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"command": "python",
 			"args": [
 				"Processing Files/Treated MonoCulture/split_treated_monoculture_ic25.py"
 			],
@@ -33,9 +33,9 @@
 			"group": "build"
 		},
 		{
-			"label": "Compute Treated Sample Averages (venv)",
+			"label": "Compute Treated Sample Averages (repo)",
 			"type": "shell",
-			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"command": "python",
 			"args": [
 				"Processing Files/Treated MonoCulture/compute_sample_averages.py"
 			],
@@ -44,9 +44,9 @@
 			"group": "build"
 		},
 		{
-			"label": "Compute Treated Day Averages (venv)",
+			"label": "Compute Treated Day Averages (repo)",
 			"type": "shell",
-			"command": "C:/Users/MainFrameTower/Desktop/CancerGrowthDynamics/.venv/Scripts/python.exe",
+			"command": "python",
 			"args": [
 				"Processing Files/Treated MonoCulture/compute_group_day_averages.py"
 			],
