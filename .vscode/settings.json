@@ -1,0 +1,6 @@
+{
+    "chat.allowAnonymousAccess": true,
+    "chat.alternativeToolAction.enabled": true,
+    "chat.tools.terminal.autoReplyToPrompts": true,
+    "chat.tools.terminal.ignoreDefaultAutoApproveRules": true
+}
