@@ -5,6 +5,8 @@ Uses per-file inputs:
 
 For each per-file table:
   - day_mean_value = mean(mean_value over wells) per Day
+    - day_sd = standard deviation of mean_value across wells per Day
+    - day_sem = standard error of mean_value across wells per Day
   - n_wells = count unique Well per Day
 
 Outputs per-file:
@@ -46,13 +48,19 @@ def process_file(path: Path):
     grp = (
         df.dropna(subset=["Day"])
         .groupby("Day", as_index=False)
-        .agg(day_mean_value=("mean_value", "mean"), n_wells=("Well", "nunique"))
+        .agg(
+            day_mean_value=("mean_value", "mean"),
+            day_sd=("mean_value", "std"),
+            n_wells=("Well", "nunique"),
+        )
         .sort_values("Day")
     )
     if grp.empty:
         return None
 
     grp["day_mean_value"] = grp["day_mean_value"].round(2)
+    grp["day_sd"] = grp["day_sd"].round(4)
+    grp["day_sem"] = (grp["day_sd"] / (grp["n_wells"] ** 0.5)).round(4)
     out_path = path.parent / (path.stem.replace("_well_day_averages", "") + "_day_averages.csv")
     grp.to_csv(out_path, index=False)
     return out_path, grp
@@ -71,6 +79,8 @@ def main() -> None:
 
             combined_parts = []
             for input_file in sorted(avg_dir.glob("*_well_day_averages.csv")):
+                if input_file.name.lower().startswith("combined"):
+                    continue
                 result = process_file(input_file)
                 if not result:
                     continue
