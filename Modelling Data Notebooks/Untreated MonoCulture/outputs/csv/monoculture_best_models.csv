@@ -1,0 +1,3 @@
+cell_line,model,title,params,sse_raw,sse_norm,bic
+naive,logistic_shared_rk,LOGISTIC,"[0.8725, 3947.9117]",1.070501683819627e6,0.48887389309738927,321.2756121116244
+resistant,general_logistic_allee_shared_rk,GENERAL LOGISTIC + ALLEE,"[0.6847, 3745.8627, 2.4976, 118.9306]",2.712916014225006e6,1.7579796411817767,397.86936183011306

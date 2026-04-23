@@ -1,0 +1,8 @@
+model,delta_bic_mean,delta_bic_median,n_weak,n_positive,n_strong,n_decisive
+fixed_mono_sharedK_symmetric_alpha_log,3.1358718991211716,2.60604011413575,2,3,1,0
+fixed_mono_sharedK_competitive_log,5.7437084771077345,5.8768047706719475,1,2,3,0
+fixed_mono_sharedK_death_log,6.056848157240307,6.757182445101337,1,1,3,1
+fixed_mono_competitive_death_log,7.059909853725252,0.36466847243551115,4,0,0,2
+fixed_mono_competitive_log,11.90870079787843,6.194933230040679,0,3,1,2
+fixed_mono_symmetric_alpha_log,12.149258220563922,14.372366587746452,0,2,0,4
+fixed_mono_sharedK_log,37.73317123440258,48.37773835083938,1,1,0,4
