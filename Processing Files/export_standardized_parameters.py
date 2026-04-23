@@ -26,12 +26,12 @@ META_COLUMNS = {
 def find_repo_root(start: Path) -> Path:
     current = start.resolve()
     for _ in range(8):
-        if (current / "Modelling Data Notebooks").exists() and (current / "Processed_Datasets").exists():
+        if (current / "Modeling_Approaches/01_mechanical_manual").exists() and (current / "Processed_Datasets").exists():
             return current
         if current.parent == current:
             break
         current = current.parent
-    raise FileNotFoundError("Could not find repository root containing Modelling Data Notebooks and Processed_Datasets")
+    raise FileNotFoundError("Could not find repository root containing Modeling_Approaches/01_mechanical_manual and Processed_Datasets")
 
 
 def to_float(value: object) -> float | None:
@@ -144,7 +144,7 @@ def extract_parameter_rows(source_group: str, file_path: Path) -> list[dict[str,
 
 
 def iter_parameter_sources(root: Path) -> Iterable[tuple[str, Path]]:
-    base = root / "Modelling Data Notebooks"
+    base = root / "Modeling_Approaches/01_mechanical_manual"
     expected = [
         ("simplemodels", base / "SimpleModels" / "coculture_option1_params.csv"),
         ("simplemodels", base / "SimpleModels" / "coculture_option2_params.csv"),

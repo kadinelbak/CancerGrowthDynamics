@@ -1,0 +1,14 @@
+generated_at,file_type,path
+2026-04-23 18:07:02,csv,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/csv/treated_coculture_transfer_all_models.csv
+2026-04-23 18:07:02,csv,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/csv/treated_coculture_treated_aware_summary.csv
+2026-04-23 18:07:02,csv,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/csv/treated_coculture_treated_aware_curves.csv
+2026-04-23 18:07:02,csv,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/csv/treated_coculture_transfer_vs_fit_metrics.csv
+2026-04-23 18:07:02,csv,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/csv/treated_coculture_transfer_vs_fit_curves.csv
+2026-04-23 18:07:02,csv,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/csv/treated_coculture_top_transfer_candidates_by_total_rmse.csv
+2026-04-23 18:07:02,csv,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/csv/treated_coculture_best_transfer_per_condition.csv
+2026-04-23 18:07:02,image,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/images/treated_coculture_top_transfer_rank_bar.png
+2026-04-23 18:07:02,image,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/images/treated_coculture_top_transfer_trajectories.png
+2026-04-23 18:07:02,image,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/images/treated_coculture_treated_aware_panels_with_legend.png
+2026-04-23 18:07:02,image,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/images/treated_coculture_treated_aware_styled_panels.png
+2026-04-23 18:07:02,image,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/images/treated_coculture_transfer_vs_fit_total.png
+2026-04-23 18:07:02,image,/home/kadin/Desktop/Research/CancerGrowthDynamics/Modelling Data Notebooks/Treated Coculture/outputs/images/treated_coculture_transfer_vs_fit_cis.png
