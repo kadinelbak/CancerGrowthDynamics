@@ -1,0 +1,10 @@
+[run]
+author = "kadinelbak"
+mode = "full"
+
+[outputs]
+use_automatic_specific_names = true
+
+[analysis]
+include_sensitivity = true
+include_uncertainty = true
