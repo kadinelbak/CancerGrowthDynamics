@@ -1,0 +1,4 @@
+stage,model,condition,reason,detail,hint,timestamp
+solver,lotka_volterra_hill_competition,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:26:43.934
+solver,theta_logistic_hill_kill,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:28:05.771
+solver,pkpd_inhibition,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:28:11.095

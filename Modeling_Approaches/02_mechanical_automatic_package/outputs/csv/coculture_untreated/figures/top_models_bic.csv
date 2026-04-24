@@ -1,0 +1,4 @@
+model,bic
+null_coculture,10773.90974058965
+lotka_volterra_competition,10786.346940829033
+lotka_volterra_hill_competition,10817.439941427492

@@ -57,13 +57,10 @@ function condition_output_dirs(condition::AbstractString; start::AbstractString 
 end
 
 function _coerce_float(v)
-    if v === missing || v === nothing
-        return missing
-    end
+    (v === missing || v === nothing) && return missing
     txt = strip(string(v))
     isempty(txt) && return missing
-    x = tryparse(Float64, txt)
-    x === nothing ? missing : x
+    return something(tryparse(Float64, txt), missing)
 end
 
 function _normalize_columns(df::DataFrame)
@@ -98,7 +95,7 @@ function decode_condition_dataframe(condition::AbstractString; start::AbstractSt
 
         cols = names(df)
         tcol = _first_existing_column(cols, [:day, :time, :t, :days])
-        ycol = _first_existing_column(cols, [:mean_cells, :cell_count, :count, :cells, :total_cells, :mean_count])
+        ycol = _first_existing_column(cols, [:mean_cells, :cell_count, :count, :cells, :total_cells, :mean_count, :day_mean_value, :mean_value])
 
         if tcol === nothing || ycol === nothing
             continue

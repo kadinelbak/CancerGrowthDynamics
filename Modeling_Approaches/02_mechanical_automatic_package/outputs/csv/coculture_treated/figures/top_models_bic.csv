@@ -1,0 +1,4 @@
+model,bic
+theta_logistic_hill_kill,46776.1136737065
+pkpd_inhibition,46783.87669501552
+lotka_volterra_hill_competition,46814.9287802516

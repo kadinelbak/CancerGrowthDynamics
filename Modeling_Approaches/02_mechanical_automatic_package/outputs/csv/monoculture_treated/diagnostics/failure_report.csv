@@ -1,0 +1,6 @@
+stage,model,condition,reason,detail,hint,timestamp
+solver,theta_logistic_hill_kill,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:18:23.455
+solver,pkpd_inhibition,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:18:28.583
+solver,transit_chain_erlang,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:18:28.783
+solver,adaptive_ic50,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:18:28.899
+solver,sensitive_resistant,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:18:29.024
