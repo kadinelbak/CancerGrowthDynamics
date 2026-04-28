@@ -1,4 +1,4 @@
 key,value
 best_model,logistic_growth
-best_bic,529.9462756696912
-generated_at,2026-04-26T22:15:54.475
+best_cell_line,A2780Naive
+best_density,20k

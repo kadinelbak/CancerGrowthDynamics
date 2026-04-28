@@ -1,0 +1,8 @@
+metric,value
+untreated_model,logistic_growth
+untreated_r,0.7473858776110882
+untreated_K,3873.3816294744283
+assumed_ec50,1.0
+best_emax,0.45625
+best_hill_n,0.5
+pooled_sse,2.0128282191109367e7

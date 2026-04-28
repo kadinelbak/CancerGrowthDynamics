@@ -47,10 +47,46 @@ function run_condition_analysis!(decoded::DataFrame, fit_result, condition::Abst
     bic_plot_path = joinpath(out.images, "$(condition)_automatic_top_bic_bar.png")
     savefig(bic_plot, bic_plot_path)
 
+    # Coverage diagnostics: ensure all experimental groups are represented and visualized.
+    group_cols = Symbol[]
+    :cell_line in names(decoded) && push!(group_cols, :cell_line)
+    :density in names(decoded) && push!(group_cols, :density)
+    :dose in names(decoded) && push!(group_cols, :dose)
+
+    coverage_df = if isempty(group_cols)
+        DataFrame(group = ["pooled"], n_rows = [nrow(decoded)], n_replicates = [length(unique(decoded.replicate))])
+    else
+        combine(groupby(decoded, group_cols), nrow => :n_rows, :replicate => (x -> length(unique(x))) => :n_replicates)
+    end
+    coverage_path = joinpath(out.metrics, "$(condition)_group_coverage_counts.csv")
+    CSV.write(coverage_path, coverage_df)
+
+    # Mean trajectory plot by available groups.
+    p_cov = plot(
+        xlabel = "Time (day)",
+        ylabel = "Cell count",
+        title = "$(condition) mean trajectories by group",
+        legend = :outertopright,
+    )
+    if isempty(group_cols)
+        mean_df = combine(groupby(decoded, :time), :count => mean => :mean_count)
+        sort!(mean_df, :time)
+        plot!(p_cov, mean_df.time, mean_df.mean_count; lw = 2.5, label = "pooled")
+    else
+        for grp in groupby(decoded, group_cols)
+            mean_df = combine(groupby(grp, :time), :count => mean => :mean_count)
+            sort!(mean_df, :time)
+            label = join(["$(c)=$(first(grp[!, c]))" for c in group_cols], " | ")
+            plot!(p_cov, mean_df.time, mean_df.mean_count; lw = 2, label = label)
+        end
+    end
+    coverage_plot_path = joinpath(out.images, "$(condition)_group_mean_coverage_plot.png")
+    savefig(p_cov, coverage_plot_path)
+
     IOUtils.write_manifest_row(
         condition = condition,
         step = "analysis",
-        outputs = [top_path, sens_path, bic_plot_path],
+        outputs = [top_path, sens_path, bic_plot_path, coverage_path, coverage_plot_path],
         start = start,
     )
 
@@ -58,6 +94,8 @@ function run_condition_analysis!(decoded::DataFrame, fit_result, condition::Abst
         top_path = top_path,
         sensitivity_path = sens_path,
         image_path = bic_plot_path,
+        coverage_path = coverage_path,
+        coverage_plot_path = coverage_plot_path,
         sensitivity = sens_df,
     )
 end

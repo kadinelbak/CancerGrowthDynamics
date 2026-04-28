@@ -1,2 +1,2 @@
 model,note
-theta_logistic_hill_kill,Sensitivity call not available with current signature; update wrapper.
+one_stage_transit_linear_kill,Sensitivity call not available with current signature; update wrapper.

@@ -44,6 +44,40 @@ function _transit_hill_combined!(du, u, p, t, exposure)
     du[2] = damage_flux - clearance_flux
 end
 
+function _adaptive_ic50_hill!(du, u, p, t, exposure)
+    r, K, emax, ic50_0, hill_n, adapt_rate, relax_rate = p
+    N = max(u[1], 0.0)
+    A = max(u[2], 0.0)
+    C = max(exposure(t), 0.0)
+
+    # Drug tolerance state A increases under drug and relaxes off-drug.
+    ic50_eff = ic50_0 * (1 + A)
+    kill = emax * (C^hill_n / (ic50_eff^hill_n + C^hill_n + 1e-12))
+    growth = r * N * max(0.0, 1 - N / max(K, 1e-8))
+
+    du[1] = growth - kill * N
+    du[2] = adapt_rate * C - relax_rate * A
+end
+
+function _population_balance_sensitive_resistant!(du, u, p, t, exposure)
+    r, K, emax_s, emax_r, ec50, hill_n, k_sr, k_rs = p
+    S = max(u[1], 0.0)
+    R = max(u[2], 0.0)
+    N = S + R
+    C = max(exposure(t), 0.0)
+
+    hill = C^hill_n / (ec50^hill_n + C^hill_n + 1e-12)
+    kill_s = emax_s * hill
+    kill_r = emax_r * hill
+    growth_common = max(0.0, 1 - N / max(K, 1e-8))
+
+    dS_growth = r * S * growth_common
+    dR_growth = r * R * growth_common
+
+    du[1] = dS_growth - kill_s * S - k_sr * C * S + k_rs * R
+    du[2] = dR_growth - kill_r * R + k_sr * C * S - k_rs * R
+end
+
 # ---------------------------------------------------------------------------
 # Local model spec: stores everything needed for fitting without using the
 # package's (non-existent) register_model / ModelSpec API.
@@ -87,6 +121,24 @@ function local_model_specs()::Vector{LocalModelSpec}
             2,
             u -> u[1] + u[2],
             (r0, K0, dose) -> [r0, K0, 0.3, max(dose, 0.1), 1.0, 5.0],
+        ),
+        LocalModelSpec(
+            "adaptive_ic50_hill",
+            _adaptive_ic50_hill!,
+            [:r, :K, :emax, :ic50_0, :hill_n, :adapt_rate, :relax_rate],
+            [(1e-6, 5.0), (1e-3, 1e7), (0.0, 1.5), (1e-3, 20.0), (0.1, 6.0), (0.0, 2.0), (0.0, 2.0)],
+            2,
+            u -> u[1],
+            (r0, K0, dose) -> [r0, K0, 0.5, max(dose, 0.1), 1.2, 0.2, 0.1],
+        ),
+        LocalModelSpec(
+            "population_balance_sr",
+            _population_balance_sensitive_resistant!,
+            [:r, :K, :emax_s, :emax_r, :ec50, :hill_n, :k_sr, :k_rs],
+            [(1e-6, 5.0), (1e-3, 1e7), (0.0, 2.0), (0.0, 0.6), (1e-3, 20.0), (0.1, 6.0), (0.0, 2.0), (0.0, 1.0)],
+            2,
+            u -> u[1] + u[2],
+            (r0, K0, dose) -> [r0, K0, 0.8, 0.2, max(dose, 0.1), 1.0, 0.05, 0.01],
         ),
     ]
 end
