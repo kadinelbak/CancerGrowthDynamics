@@ -1,2 +1,4 @@
 condition,n_rows,n_replicates,min_time,max_time,monotone_time
-cell_line= | treatment_amount=0.0 | density= | replicate=1,239,1,1.0,18.0,true
+cell_line=A2780cis | treatment_amount=0.0 | density=30k | replicate=1,16,1,1.0,18.0,true
+cell_line=A2780cis | treatment_amount=0.0 | density=30k | replicate=2,16,1,1.0,18.0,true
+cell_line=A2780cis | treatment_amount=0.0 | density=30k | replicate=3,16,1,1.0,18.0,true

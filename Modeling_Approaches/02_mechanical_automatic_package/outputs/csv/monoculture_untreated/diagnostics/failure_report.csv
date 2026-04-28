@@ -1,3 +1,1 @@
 stage,model,condition,reason,detail,hint,timestamp
-solver,logistic_growth,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:11:10.277
-solver,gompertz_growth,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-23T19:11:19.363

@@ -1,0 +1,5 @@
+condition,decode_ok,fit_ok,analysis_ok,summary_ok,decoded_rows,fit_rows,sensitivity_rows,message
+monoculture_untreated,true,true,true,true,239,2,1,ok
+monoculture_treated,true,true,true,true,672,5,1,ok
+coculture_untreated,true,true,true,true,502,3,1,ok
+coculture_treated,true,true,true,true,2352,3,1,ok

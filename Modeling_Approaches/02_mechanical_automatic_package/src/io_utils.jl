@@ -19,6 +19,14 @@ const CONDITION_DIRS = Dict(
     "coculture_treated" => joinpath("Processed_Datasets", "Treated Coculture"),
 )
 
+# Treated monoculture dose mapping derived from IC50 = 1.0 uM.
+const TREATED_MONOCULTURE_IC50_UM = 1.0
+const TREATED_MONOCULTURE_IC_DOSE_MAP = Dict(
+    25 => 0.67,
+    50 => 1.0,
+    75 => 1.47,
+)
+
 function find_repo_root(start::AbstractString = pwd())
     current = abspath(start)
     for _ in 1:10
@@ -76,6 +84,67 @@ function _first_existing_column(cols, candidates::Vector{Symbol})
     return nothing
 end
 
+function _replicate_from_values(vals)
+    labels = [strip(string(v)) for v in vals]
+    idx = Dict{String,Int}()
+    next_id = 1
+    reps = Vector{Int}(undef, length(labels))
+    for i in eachindex(labels)
+        key = labels[i]
+        if isempty(key)
+            reps[i] = 1
+            continue
+        end
+        if !haskey(idx, key)
+            idx[key] = next_id
+            next_id += 1
+        end
+        reps[i] = idx[key]
+    end
+    return reps
+end
+
+function _infer_metadata_from_path(f::AbstractString)
+    lf = lowercase(f)
+    parts = splitpath(f)
+
+    density = ""
+    for p in parts
+        pl = lowercase(p)
+        if occursin(r"^\d+k$", pl)
+            density = p
+            break
+        end
+    end
+
+    cell_line = ""
+    if occursin("a2780cis", lf)
+        cell_line = "A2780cis"
+    elseif occursin("a2780naive", lf)
+        cell_line = "A2780Naive"
+    elseif occursin("a2780", lf)
+        cell_line = "A2780"
+    end
+
+    dose = 0.0
+    m_ic = match(r"ic(\d+)"i, lf)
+    if m_ic !== nothing
+        ic_level = parse(Int, m_ic.captures[1])
+        if occursin("treated monoculture", lf)
+            dose = get(TREATED_MONOCULTURE_IC_DOSE_MAP, ic_level, TREATED_MONOCULTURE_IC50_UM)
+        else
+            dose = Float64(ic_level)
+        end
+    else
+        m_um = match(r"([0-9]+(?:\.[0-9]+)?)um"i, lf)
+        if m_um !== nothing
+            dose = parse(Float64, m_um.captures[1])
+        end
+    end
+
+    return (density = density, cell_line = cell_line, dose = dose)
+end
+
 function decode_condition_dataframe(condition::AbstractString; start::AbstractString = pwd())
     pdir = condition_processed_dir(condition; start)
     files = String[]
@@ -90,10 +159,20 @@ function decode_condition_dataframe(condition::AbstractString; start::AbstractSt
 
     parts = DataFrame[]
     for f in files
+        lf = lowercase(f)
+        if endswith(lf, "_day_averages.csv")
+            paired_sample = replace(f, r"(?i)_day_averages\.csv$" => "_sample_averages.csv")
+            if isfile(paired_sample)
+                continue
+            end
+        end
+
         df = CSV.read(f, DataFrame)
         _normalize_columns(df)
+        inferred = _infer_metadata_from_path(f)
 
         cols = names(df)
+        colset = Set(Symbol.(cols))
         tcol = _first_existing_column(cols, [:day, :time, :t, :days])
         ycol = _first_existing_column(cols, [:mean_cells, :cell_count, :count, :cells, :total_cells, :mean_count, :day_mean_value, :mean_value])
 
@@ -108,36 +187,51 @@ function decode_condition_dataframe(condition::AbstractString; start::AbstractSt
             condition = fill(condition, nrow(df)),
         )
 
-        if :density in cols
+        if :density in colset
             out.density = df[!, :density]
-        elseif :seed_density in cols
+        elseif :seed_density in colset
             out.density = df[!, :seed_density]
         else
-            out.density = fill("", nrow(df))
+            out.density = fill(inferred.density, nrow(df))
         end
 
-        if :cell_line in cols
+        if :cell_line in colset
             out.cell_line = df[!, :cell_line]
-        elseif :cellline in cols
+        elseif :cellline in colset
             out.cell_line = df[!, :cellline]
         else
-            out.cell_line = fill("", nrow(df))
+            out.cell_line = fill(inferred.cell_line, nrow(df))
         end
 
-        if :dose in cols
+        if :dose in colset
             out.dose = [_coerce_float(v) for v in df[!, :dose]]
-        elseif :dose_um in cols
+        elseif :dose_um in colset
             out.dose = [_coerce_float(v) for v in df[!, :dose_um]]
         else
-            out.dose = fill(0.0, nrow(df))
+            out.dose = fill(inferred.dose, nrow(df))
         end
 
-        if :mix in cols
+        if :mix in colset
             out.mix = df[!, :mix]
-        elseif :mix_label in cols
+        elseif :mix_label in colset
             out.mix = df[!, :mix_label]
+        elseif :well in colset
+            out.mix = df[!, :well]
         else
             out.mix = fill("", nrow(df))
+        end
+
+        if :replicate in colset
+            reps = [_coerce_float(v) for v in df[!, :replicate]]
+            out.replicate = [ismissing(v) ? 1 : max(1, Int(round(v))) for v in reps]
+        elseif :well in colset
+            out.replicate = _replicate_from_values(df[!, :well])
+        elseif :mix in colset
+            out.replicate = _replicate_from_values(df[!, :mix])
+        elseif :mix_label in colset
+            out.replicate = _replicate_from_values(df[!, :mix_label])
+        else
+            out.replicate = fill(1, nrow(df))
         end
 
         filter!(row -> !ismissing(row.time) && !ismissing(row.count), out)

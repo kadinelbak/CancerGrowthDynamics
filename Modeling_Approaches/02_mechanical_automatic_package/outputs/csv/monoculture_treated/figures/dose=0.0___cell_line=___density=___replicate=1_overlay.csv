@@ -1,4 +1,4 @@
-time,observed,pred_theta_logistic_hill_kill,pred_transit_chain_erlang,pred_adaptive_ic50,pred_pkpd_inhibition,pred_sensitive_resistant
+time,observed,pred_one_stage_transit_linear_kill,pred_hill_death_instantaneous,pred_transit_hill_combined,pred_theta_logistic_hill_kill,pred_transit_chain_erlang
 1.0,470.381366,NaN,NaN,NaN,NaN,NaN
 1.0,164.837076,NaN,NaN,NaN,NaN,NaN
 1.0,305.189622,NaN,NaN,NaN,NaN,NaN

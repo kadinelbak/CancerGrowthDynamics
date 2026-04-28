@@ -2,5 +2,6 @@
     "chat.allowAnonymousAccess": true,
     "chat.alternativeToolAction.enabled": true,
     "chat.tools.terminal.autoReplyToPrompts": true,
-    "chat.tools.terminal.ignoreDefaultAutoApproveRules": true
+    "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+    "julia.environmentPath": "\\Users\\elbak\\Desktop\\CancerGrowthDynamics\\Modeling_Approaches\\02_mechanical_automatic_package"
 }

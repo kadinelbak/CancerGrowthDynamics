@@ -1,6 +1,6 @@
 model,bic
+one_stage_transit_linear_kill,14219.193618434521
+hill_death_instantaneous,14225.703876775044
+transit_hill_combined,14232.214135115568
 theta_logistic_hill_kill,14232.214135115568
 transit_chain_erlang,14232.214135115568
-adaptive_ic50,14232.214135115568
-pkpd_inhibition,14238.72439345609
-sensitive_resistant,14238.72439345609
