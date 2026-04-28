@@ -78,6 +78,20 @@ function _population_balance_sensitive_resistant!(du, u, p, t, exposure)
     du[2] = dR_growth - kill_r * R + k_sr * C * S - k_rs * R
 end
 
+function _theta_hill_kill!(du, u, p, t, exposure)
+    r, K, theta, emax, ec50, hill_n = p
+    N = max(u[1], 0.0)
+    C = max(exposure(t), 0.0)
+
+    # Theta term generalizes crowding pressure in growth dynamics.
+    carrying = max(K, 1e-8)
+    crowding = max(0.0, 1 - (N / carrying)^max(theta, 1e-8))
+    growth = r * N * crowding
+    kill = emax * (C^hill_n / (ec50^hill_n + C^hill_n + 1e-12))
+
+    du[1] = growth - kill * N
+end
+
 # ---------------------------------------------------------------------------
 # Local model spec: stores everything needed for fitting without using the
 # package's (non-existent) register_model / ModelSpec API.
@@ -139,6 +153,15 @@ function local_model_specs()::Vector{LocalModelSpec}
             2,
             u -> u[1] + u[2],
             (r0, K0, dose) -> [r0, K0, 0.8, 0.2, max(dose, 0.1), 1.0, 0.05, 0.01],
+        ),
+        LocalModelSpec(
+            "theta_hill_kill",
+            _theta_hill_kill!,
+            [:r, :K, :theta, :emax, :ec50, :hill_n],
+            [(1e-6, 5.0), (1e-3, 1e7), (0.1, 4.0), (0.0, 2.0), (1e-3, 20.0), (0.1, 6.0)],
+            1,
+            u -> u[1],
+            (r0, K0, dose) -> [r0, K0, 1.0, 0.6, max(dose, 0.1), 1.0],
         ),
     ]
 end

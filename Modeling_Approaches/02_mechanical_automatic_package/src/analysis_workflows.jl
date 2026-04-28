@@ -4,6 +4,7 @@ using CSV
 using DataFrames
 using GrowthParameterEstimation
 using Plots
+using Statistics
 
 using ..IOUtils
 

@@ -1,0 +1,5 @@
+cell_line,density,n_rows,n_replicates
+A2780Naive,20k,41,3
+A2780Naive,30k,42,3
+A2780cis,20k,48,3
+A2780cis,30k,48,3

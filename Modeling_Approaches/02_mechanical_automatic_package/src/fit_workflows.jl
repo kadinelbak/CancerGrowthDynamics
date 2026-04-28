@@ -445,6 +445,102 @@ function _run_treated_fitting(
 end
 
 # ---------------------------------------------------------------------------
+# Untreated custom model fitting
+# ---------------------------------------------------------------------------
+
+function _fit_untreated_model(
+    model_name::String,
+    x::Vector{Float64},
+    y::Vector{Float64};
+    solver = Rodas5(),
+    max_time::Float64 = 8.0,
+)
+    function model_spec(name::String)
+        if name == "logistic_growth"
+            ode! = function (du, u, p, t)
+                r, K = p
+                N = max(u[1], 0.0)
+                du[1] = r * N * max(0.0, 1 - N / max(K, 1e-8))
+            end
+            return (ode! = ode!, p0 = [0.3, max(y[end], 100.0)], bounds = [(1e-6, 5.0), (1.0, 1e7)])
+        elseif name == "gompertz_growth"
+            ode! = function (du, u, p, t)
+                r, K = p
+                N = max(u[1], 1e-8)
+                du[1] = r * N * log(max(K, 1e-8) / N)
+            end
+            return (ode! = ode!, p0 = [0.3, max(y[end], 100.0)], bounds = [(1e-6, 5.0), (1.0, 1e7)])
+        elseif name == "logistic_simple_death"
+            ode! = function (du, u, p, t)
+                r, K, d = p
+                N = max(u[1], 0.0)
+                growth = r * N * max(0.0, 1 - N / max(K, 1e-8))
+                du[1] = growth - d * N
+            end
+            return (ode! = ode!, p0 = [0.4, max(y[end], 100.0), 0.05], bounds = [(1e-6, 5.0), (1.0, 1e7), (0.0, 2.0)])
+        elseif name == "allee_growth"
+            ode! = function (du, u, p, t)
+                r, K, A = p
+                N = max(u[1], 0.0)
+                allee_term = (N / max(A, 1e-8)) - 1
+                du[1] = r * N * max(0.0, 1 - N / max(K, 1e-8)) * allee_term
+            end
+            return (ode! = ode!, p0 = [0.4, max(y[end], 100.0), max(0.2 * y[1], 1.0)], bounds = [(1e-6, 5.0), (1.0, 1e7), (1e-6, 1e6)])
+        elseif name == "theta_logistic_growth"
+            ode! = function (du, u, p, t)
+                r, K, theta = p
+                N = max(u[1], 0.0)
+                du[1] = r * N * max(0.0, 1 - (N / max(K, 1e-8))^max(theta, 1e-8))
+            end
+            return (ode! = ode!, p0 = [0.3, max(y[end], 100.0), 1.0], bounds = [(1e-6, 5.0), (1.0, 1e7), (0.1, 4.0)])
+        else
+            error("Unsupported untreated model: $(name)")
+        end
+    end
+
+    spec = model_spec(model_name)
+    u0 = [max(y[1], 1.0)]
+    prob = ODEProblem(spec.ode!, u0, (x[1], x[end]), spec.p0)
+
+    function loss(p_vec)
+        pv = Vector{Float64}(p_vec)
+        try
+            sol = solve(remake(prob; p = pv), solver;
+                        reltol = 1e-6, abstol = 1e-6,
+                        saveat = x, maxiters = 50_000)
+            sol.retcode == ReturnCode.Success || return 1e12
+            yhat = first.(sol.u)
+            return sum((y .- yhat) .^ 2)
+        catch
+            return 1e12
+        end
+    end
+
+    result = bboptimize(
+        loss;
+        SearchRange = spec.bounds,
+        NumDimensions = length(spec.p0),
+        Method = :de_rand_1_bin,
+        MaxTime = max_time,
+        TraceMode = :silent,
+    )
+    p_opt = Vector{Float64}(result.archive_output.best_candidate)
+
+    bic, ssr = try
+        sol2 = solve(remake(prob; p = p_opt), solver;
+                     reltol = 1e-10, abstol = 1e-10, saveat = x)
+        yhat2 = first.(sol2.u)
+        ssr2 = sum((y .- yhat2) .^ 2)
+        n, k = length(x), length(p_opt)
+        n * log(max(ssr2, 1e-20) / n) + k * log(n), ssr2
+    catch
+        1e12, 1e12
+    end
+
+    return (params = p_opt, bic = bic, ssr = ssr)
+end
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -496,7 +592,13 @@ function run_condition_fit!(
     # Untreated conditions: fit per experimental subgroup so r/K can carry over
     # to treated fits by cell line and density.
     model_map = Dict(
-        "monoculture_untreated" => ["logistic_growth"],
+        "monoculture_untreated" => [
+            "logistic_growth",
+            "gompertz_growth",
+            "logistic_simple_death",
+            "allee_growth",
+            "theta_logistic_growth",
+        ],
         "coculture_untreated"   => ["logistic_growth"],
     )
     include_models = get(model_map, condition, ["logistic_growth"])
@@ -507,11 +609,6 @@ function run_condition_fit!(
     meta_cols = Set([:dose, :time, :day, :replicate, :cell_line, :density, :sample_id, :file])
     numeric_cols = [c for c in propertynames(decoded) if !(c in meta_cols) && eltype(decoded[!, c]) <: Real]
     area_col = isempty(numeric_cols) ? error("No numeric measurement column") : numeric_cols[1]
-
-    builtin_map = Dict(
-        "logistic_growth" => GrowthParameterEstimation.logistic_growth!,
-        "gompertz_growth" => GrowthParameterEstimation.gompertz_growth!,
-    )
 
     colset = Set(Symbol.(names(decoded)))
     cell_col = :cell_line in colset ? :cell_line : (:cellline in colset ? :cellline : nothing)
@@ -530,23 +627,23 @@ function run_condition_fit!(
         x = Float64.(grouped[!, time_col])
         y = Float64.(grouped[!, :y_mean])
 
-        specs_dict = Dict{String,NamedTuple}()
+        fits = Dict{String,NamedTuple}()
         for mname in include_models
-            haskey(builtin_map, mname) || continue
-            specs_dict[mname] = (
-                model  = builtin_map[mname],
-                p0     = [0.3, max(y[end], 100.0)],
-                bounds = [(1e-6, 5.0), (1.0, 1e7)],
-            )
+            println("  Fitting $(mname) for untreated subgroup $(idx)...")
+            fit = _fit_untreated_model(mname, x, y; max_time = min(max_time_per_fit, 8.0))
+            fits[mname] = (bic = fit.bic, ssr = fit.ssr, params = fit.params)
         end
 
         subgroup_tmp = joinpath(out.csv, "tables", "subgroup_$(condition)_$(idx)_ranking.csv")
         mkpath(dirname(subgroup_tmp))
-        fits = GrowthParameterEstimation.compare_models_dict(
-            x, y, specs_dict;
-            show_stats = false,
-            output_csv = subgroup_tmp,
+        subgroup_rank = DataFrame(
+            model = String[k for k in keys(fits)],
+            bic = Float64[v.bic for v in values(fits)],
+            ssr = Float64[v.ssr for v in values(fits)],
+            params = String[string(v.params) for v in values(fits)],
         )
+        sort!(subgroup_rank, :bic)
+        CSV.write(subgroup_tmp, subgroup_rank)
 
         cell_label = cell_col === nothing ? "pooled" : String(first(subdf[!, cell_col]))
         den_label = density_col === nothing ? "pooled" : String(first(subdf[!, density_col]))
