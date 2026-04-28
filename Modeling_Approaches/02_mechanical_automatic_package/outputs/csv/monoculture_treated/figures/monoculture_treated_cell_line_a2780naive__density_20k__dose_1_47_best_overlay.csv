@@ -1,0 +1,15 @@
+time,observed,prediction,best_model,cell_line,density,dose
+1.0,305.18962200000004,305.18962200000004,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+2.0,465.63738433333333,494.2485194249232,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+3.0,790.214892,724.7240321499442,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+4.0,880.948534,990.4079377012067,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+5.0,1277.0010803333332,1279.5120144521563,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+6.0,1612.01223,1578.049915215594,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+7.0,2016.4244216666668,1873.8015995362884,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+8.0,2081.411111,2158.617531951458,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+9.0,2395.0547066666663,2428.4966922294943,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+10.0,2537.1984183333334,2682.3887714543125,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+11.0,3073.8874999999994,2920.841752970565,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+12.0,3042.368325666667,3145.039444195185,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+13.0,3537.7463733333334,3356.2784559452302,one_stage_transit_linear_kill,A2780Naive,20k,1.47
+14.0,3458.3808643333336,3555.7459077289795,one_stage_transit_linear_kill,A2780Naive,20k,1.47
