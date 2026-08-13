@@ -1,4 +1,4 @@
-﻿module StagedA2780Workflow
+module StagedA2780Workflow
 
 using CSV
 using BlackBoxOptim
@@ -766,7 +766,7 @@ const REPORT_MODEL_EQUATIONS = Dict(
     "gompertz_growth" => raw"\(\displaystyle \frac{dX}{dt}=rX\ln\!\left(\frac{K}{X}\right)\)",
     "joint_ic_effect_hill_ramp_onset" => raw"\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t>t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)",
     "joint_ic_effect_transit_death" => raw"\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)",
-    "joint_ic_effect_two_population" => raw"\(\displaystyle \frac{dS}{dt}=G(S+T)\frac{S}{S+T}-A(t)H_S(z)S,\quad \frac{dT}{dt}=G(S+T)\frac{T}{S+T}-A(t)H_T(z)T\)",
+    "joint_ic_effect_two_population" => raw"\(\displaystyle \frac{dS}{dt}=G(S+T)\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\quad \frac{dT}{dt}=G(S+T)\frac{T}{S+T}-A_C(t)H_{CT}(z)T\)",
     "independent_onset_gradual" => raw"\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on},C})\)",
     "shared_onset_gradual" => raw"\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on}}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on}})\)",
     "partial_onset_0_5day" => raw"\(t_{\mathrm{on},N}=\bar t_{\mathrm{on}}-\delta_t,\quad t_{\mathrm{on},C}=\bar t_{\mathrm{on}}+\delta_t,\quad |\delta_t|\le 0.5\,\mathrm{d}\)",
@@ -884,7 +884,10 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(S(t),T(t)\)</dt><dd>Drug-sensitive and drug-tolerant latent A2780cis subpopulations used only by the population-balance model; \(C=S+T\).</dd>
 <dt>\(\widehat y_i(t)\)</dt><dd>Predicted observable: \(X_i\), \(P_i+\tfrac12D_i\), or \(S+T\), depending on the candidate.</dd>
 <dt>\(G_i\)</dt><dd>The exact growth family and effective density-specific parameters inherited from Stage 1.</dd>
-<dt>\(A_i(t),H_i(z)\)</dt><dd>Time activation and Hill dose-response terms; their product is the active per-capita treatment effect.</dd>
+<dt>\(A_i(t)\)</dt><dd>Dimensionless time-activation term. It is 0 before onset and then turns drug action on either abruptly or gradually, depending on the timing candidate.</dd>
+<dt>\(R(t;\lambda_i,t_{\mathrm{on},i})\)</dt><dd>Delayed ramp shorthand: \(\mathbf{1}_{t>t_{\mathrm{on},i}}[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}]\).</dd>
+<dt>\(H_i(z)\)</dt><dd>Hill dose-response term: \(H_i(z)=E_{\max,i}z^{h_i}/(EC_{50,i}^{h_i}+z^{h_i}+\varepsilon)\). It sets dose strength, not timing.</dd>
+<dt>\(A_i(t)H_i(z)\)</dt><dd>The active per-capita treatment effect applied to a live/proliferating state. Transit models route this effect into a damaged-visible compartment before clearance.</dd>
 </dl><p><strong>Why the derivatives differ:</strong> \(dX/dt\), \(dP/dt\), and \(dS/dt\) are rates for different biological state variables, not interchangeable names for the same quantity.</p></div>
 """,
             ranking = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_cell_line_top5.csv"),
@@ -920,7 +923,8 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(N(t),C(t)\)</dt><dd>Total A2780Naive and A2780cis populations. For the resistant population-balance model, \(C=S+T\).</dd>
 <dt>\(X_i(t)\)</dt><dd>Compact lineage placeholder used in the BIC table: \(X_i=N\) for \(i=N\), and \(X_i=C\) for \(i=C\).</dd>
 <dt>\(M_N,M_C\)</dt><dd>Dimensionless coculture modifiers multiplying the inherited Stage-2 drug effects.</dd>
-<dt>\(A_N,A_C\)</dt><dd>Cell-line-specific treatment timing rules selected in Stage 2.</dd>
+<dt>\(A_N(t),A_C(t)\)</dt><dd>Cell-line-specific treatment timing rules selected in Stage 2. A2780Naive uses delayed ramp activation; A2780cis uses the BIC-selected timing rule from the Stage 2 audit.</dd>
+<dt>\(H_N(z),H_{CS}(z),H_{CT}(z)\)</dt><dd>Inherited Stage-2 Hill dose-response terms for Naive, cis sensitive-like, and cis tolerant-like treatment effects. Their products with \(A_i(t)\) are the actual time- and dose-dependent kill/damage rates.</dd>
 <dt>\(f_{T0}^{\mathrm{co}},H_{CT}^{\mathrm{co}}\)</dt><dd>Coculture-adjusted initial tolerant fraction and tolerant-state Hill kill term.</dd>
 <dt>\(\rho_T\)</dt><dd>Multiplier on tolerant-state growth in treated coculture; \(\rho_T=1\) means no growth-context change.</dd>
 </dl></div>
