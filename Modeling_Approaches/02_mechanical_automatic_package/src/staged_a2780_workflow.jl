@@ -951,7 +951,14 @@ function render_a2780_report_html(; start::AbstractString = pwd())
                 "Treated monoculture timing hypotheses",
                 "The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is $(get(REPORT_MODEL_LABELS, timing_winner, timing_winner)).",
             )
-            push!(sections, "<section><div class=\"stage-heading\"><span>Stage 2 timing audit</span><h2>Onset and gradual-effect combinations</h2></div><p>All five timing hypotheses use one joint objective over the same 12 treated-monoculture trajectories. The A2780Naive delayed Hill-ramp and A2780cis sensitive/tolerant population model are otherwise unchanged. Boundary flags and multistart results remain in <code>outputs/csv/monoculture_treated</code>.</p>$(timing_table)$(timing_graph)</section>")
+            timing_notation = raw"""
+<div class="notation-key"><h3>Timing-audit notation key</h3><dl>
+<dt>\(R(t;\lambda_i,t_{\mathrm{on},i})\)</dt><dd>Delayed gradual activation: \(R(t;\lambda_i,t_{\mathrm{on},i})=\mathbf{1}_{t>t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\). It equals 0 before onset and approaches 1 after onset.</dd>
+<dt>\(\mathbf{1}_{t>t_{\mathrm{on},i}}\)</dt><dd>Pure onset switch. It is 0 before the fitted onset time and 1 after onset, with no gradual ramp.</dd>
+<dt>\(\lambda_i\)</dt><dd>Activation speed in day\(^{-1}\). Larger \(\lambda_i\) means the delayed effect reaches full strength faster.</dd>
+</dl></div>
+"""
+            push!(sections, "<section><div class=\"stage-heading\"><span>Stage 2 timing audit</span><h2>Onset and gradual-effect combinations</h2></div><p>All five timing hypotheses use one joint objective over the same 12 treated-monoculture trajectories. The A2780Naive delayed Hill-ramp and A2780cis sensitive/tolerant population model are otherwise unchanged. Boundary flags and multistart results remain in <code>outputs/csv/monoculture_treated</code>.</p>$(timing_notation)$(timing_table)$(timing_graph)</section>")
         end
     end
     push!(sections, """
