@@ -1,0 +1,3 @@
+cell_line,model,pooling_mode,parameter,original_upper,candidate_upper,original_bic,candidate_bic,bic_improvement,estimate,upper_margin_fraction,accepted
+A2780Naive,allee_growth,shared,r,2.0,3.0,-50.426318901592566,-50.426318901593845,1.2789769243681803e-12,1.7137406340046515,0.42876741424559106,false
+A2780Naive,allee_growth,shared,r,2.0,4.0,-50.426318901592566,-50.426318901593845,1.2789769243681803e-12,1.9726915839871764,0.5068397749975809,false

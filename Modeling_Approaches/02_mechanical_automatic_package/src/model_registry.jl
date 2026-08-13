@@ -92,6 +92,38 @@ function _theta_hill_kill!(du, u, p, t, exposure)
     du[1] = growth - kill * N
 end
 
+function _simeoni_transit_compartment!(du, u, p, t, exposure)
+    r, K, k_kill, k_transit = p
+    live = max(u[1], 0.0)
+    damaged_1 = max(u[2], 0.0)
+    damaged_2 = max(u[3], 0.0)
+    C = max(exposure(t), 0.0)
+
+    growth = r * live * max(0.0, 1 - live / max(K, 1e-8))
+    damage_flux = k_kill * C * live
+
+    du[1] = growth - damage_flux
+    du[2] = damage_flux - k_transit * damaged_1
+    du[3] = k_transit * (damaged_1 - damaged_2)
+end
+
+function _time_decay_kill_fixed!(du, u, p, t, exposure)
+    r, K, k_kill, lambda = p
+    N = max(u[1], 0.0)
+    growth = r * N * max(0.0, 1 - N / max(K, 1e-8))
+    kill = k_kill * exp(-lambda * max(t, 0.0))
+    du[1] = growth - kill * N
+end
+
+function _time_decay_kill_dose_scaled!(du, u, p, t, exposure)
+    r, K, k_kill, lambda = p
+    N = max(u[1], 0.0)
+    C = max(exposure(t), 0.0)
+    growth = r * N * max(0.0, 1 - N / max(K, 1e-8))
+    kill = k_kill * C * exp(-lambda * max(t, 0.0))
+    du[1] = growth - kill * N
+end
+
 # ---------------------------------------------------------------------------
 # Local model spec: stores everything needed for fitting without using the
 # package's (non-existent) register_model / ModelSpec API.
@@ -162,6 +194,33 @@ function local_model_specs()::Vector{LocalModelSpec}
             1,
             u -> u[1],
             (r0, K0, dose) -> [r0, K0, 1.0, 0.6, max(dose, 0.1), 1.0],
+        ),
+        LocalModelSpec(
+            "simeoni_transit_compartment",
+            _simeoni_transit_compartment!,
+            [:r, :K, :k_kill, :k_transit],
+            [(1e-6, 5.0), (1e-3, 1e7), (0.0, 8.0), (1e-3, 5.0)],
+            3,
+            u -> u[1] + u[2],
+            (r0, K0, dose) -> [r0, K0, 0.5, 0.5],
+        ),
+        LocalModelSpec(
+            "time_decay_kill_fixed",
+            _time_decay_kill_fixed!,
+            [:r, :K, :k_kill, :lambda],
+            [(1e-6, 5.0), (1e-3, 1e7), (0.0, 4.0), (0.0, 2.0)],
+            1,
+            u -> u[1],
+            (r0, K0, dose) -> [r0, K0, 0.2, 0.1],
+        ),
+        LocalModelSpec(
+            "time_decay_kill_dose_scaled",
+            _time_decay_kill_dose_scaled!,
+            [:r, :K, :k_kill, :lambda],
+            [(1e-6, 5.0), (1e-3, 1e7), (0.0, 4.0), (0.0, 2.0)],
+            1,
+            u -> u[1],
+            (r0, K0, dose) -> [r0, K0, 0.2, 0.1],
         ),
     ]
 end

@@ -19,18 +19,23 @@ const CONDITION_DIRS = Dict(
     "coculture_treated" => joinpath("Processed_Datasets", "Treated Coculture"),
 )
 
-# Treated monoculture dose mapping derived from IC50 = 1.0 uM.
+# The historical splitter wrote the 1.47 uM source into folders named IC25.
+# Apply the later user-confirmed biological labels while leaving source files intact:
+# legacy IC25 -> 1.47 uM (IC75), legacy IC75 -> 0.67 uM (IC25).
 const TREATED_MONOCULTURE_IC50_UM = 1.0
 const TREATED_MONOCULTURE_IC_DOSE_MAP = Dict(
-    25 => 0.67,
+    25 => 1.47,
     50 => 1.0,
-    75 => 1.47,
+    75 => 0.67,
 )
 
 function find_repo_root(start::AbstractString = pwd())
     current = abspath(start)
     for _ in 1:10
         if isdir(joinpath(current, "Processed_Datasets")) && isdir(joinpath(current, "Modeling_Approaches"))
+            return current
+        end
+        if isdir(joinpath(current, "Modeling_Approaches")) && isdir(joinpath(current, "Processing Files"))
             return current
         end
         parent = dirname(current)
@@ -122,6 +127,8 @@ function _infer_metadata_from_path(f::AbstractString)
         cell_line = "A2780cis"
     elseif occursin("a2780naive", lf)
         cell_line = "A2780Naive"
+    elseif occursin("a2780", lf) && occursin("coculture", lf)
+        cell_line = "A2780Naive"
     elseif occursin("a2780", lf)
         cell_line = "A2780"
     end
@@ -132,6 +139,8 @@ function _infer_metadata_from_path(f::AbstractString)
         ic_level = parse(Int, m_ic.captures[1])
         if occursin("treated monoculture", lf)
             dose = get(TREATED_MONOCULTURE_IC_DOSE_MAP, ic_level, TREATED_MONOCULTURE_IC50_UM)
+        elseif occursin("ic50", lf) || occursin("1um", lf)
+            dose = 1.0
         else
             dose = Float64(ic_level)
         end
@@ -142,7 +151,13 @@ function _infer_metadata_from_path(f::AbstractString)
         end
     end
 
-    return (density = density, cell_line = cell_line, dose = dose)
+    mix = ""
+    m_mix = match(r"(\d{2})-(\d{2})", lf)
+    if m_mix !== nothing
+        mix = "$(m_mix.captures[1])-$(m_mix.captures[2])"
+    end
+
+    return (density = density, cell_line = cell_line, dose = dose, mix = mix)
 end
 
 function decode_condition_dataframe(condition::AbstractString; start::AbstractString = pwd())
@@ -211,14 +226,15 @@ function decode_condition_dataframe(condition::AbstractString; start::AbstractSt
             out.dose = fill(inferred.dose, nrow(df))
         end
 
+        is_coculture = occursin("coculture", lowercase(condition))
         if :mix in colset
             out.mix = df[!, :mix]
         elseif :mix_label in colset
             out.mix = df[!, :mix_label]
-        elseif :well in colset
-            out.mix = df[!, :well]
+        elseif :well in colset && is_coculture
+            out.mix = fill(inferred.mix, nrow(df))
         else
-            out.mix = fill("", nrow(df))
+            out.mix = fill(inferred.mix, nrow(df))
         end
 
         if :replicate in colset

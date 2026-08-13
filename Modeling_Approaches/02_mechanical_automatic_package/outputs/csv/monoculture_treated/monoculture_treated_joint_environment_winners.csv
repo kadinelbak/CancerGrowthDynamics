@@ -1,0 +1,3 @@
+environment,winning_model,winning_bic
+A2780Naive | 20k/30k,joint_ic_effect_hill_ramp,-330.4635712569623
+A2780cis | 20k/30k,joint_ic_effect_transit_death,-394.43919455113513

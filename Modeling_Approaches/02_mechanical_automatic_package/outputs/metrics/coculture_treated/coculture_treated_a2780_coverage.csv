@@ -1,0 +1,7 @@
+condition,cell_line,density,dose,mix,n_rows
+coculture_treated,A2780Naive,unknown_density,1.0,25-75,196
+coculture_treated,A2780cis,unknown_density,1.0,25-75,196
+coculture_treated,A2780Naive,unknown_density,1.0,50-50,196
+coculture_treated,A2780cis,unknown_density,1.0,50-50,196
+coculture_treated,A2780Naive,unknown_density,1.0,75-25,196
+coculture_treated,A2780cis,unknown_density,1.0,75-25,196

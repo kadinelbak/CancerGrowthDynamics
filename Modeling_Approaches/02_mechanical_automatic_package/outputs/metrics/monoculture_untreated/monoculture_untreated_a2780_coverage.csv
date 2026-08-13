@@ -1,0 +1,13 @@
+condition,cell_line,density,dose,mix,replicate,n_rows
+monoculture_untreated,A2780Naive,20k,0.0,,1,14
+monoculture_untreated,A2780Naive,30k,0.0,,1,14
+monoculture_untreated,A2780Naive,20k,0.0,,2,13
+monoculture_untreated,A2780Naive,30k,0.0,,2,14
+monoculture_untreated,A2780Naive,20k,0.0,,3,14
+monoculture_untreated,A2780Naive,30k,0.0,,3,14
+monoculture_untreated,A2780cis,20k,0.0,,1,16
+monoculture_untreated,A2780cis,30k,0.0,,1,16
+monoculture_untreated,A2780cis,20k,0.0,,2,16
+monoculture_untreated,A2780cis,30k,0.0,,2,16
+monoculture_untreated,A2780cis,20k,0.0,,3,16
+monoculture_untreated,A2780cis,30k,0.0,,3,16

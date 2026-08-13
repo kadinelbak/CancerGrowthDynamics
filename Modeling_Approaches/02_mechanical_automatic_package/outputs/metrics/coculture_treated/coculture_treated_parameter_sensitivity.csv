@@ -1,2 +1,2 @@
 model,note
-theta_logistic_hill_kill,Sensitivity call not available with current signature; update wrapper.
+time_decay_kill_dose_scaled,Sensitivity call not available with current signature; update wrapper.
