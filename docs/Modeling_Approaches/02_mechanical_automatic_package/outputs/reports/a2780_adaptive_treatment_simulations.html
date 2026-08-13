@@ -435,8 +435,11 @@
       return {schedule: scheduleName, series: out, metrics: {finalTotal: last.total, finalTolerant: last.T, aucTotal, doseDays}};
     }
     function axes(ctx, w, h, maxY, maxT) {
-      const pad = {l: 64, r: 34, t: 24, b: 54};
       ctx.clearRect(0, 0, w, h);
+      ctx.font = "13px Arial";
+      const tickLabels = Array.from({length: 6}, (_, i) => Math.round(maxY * (1 - i / 5)).toString());
+      const widestTick = Math.max(...tickLabels.map(label => ctx.measureText(label).width));
+      const pad = {l: Math.max(86, Math.ceil(widestTick) + 46), r: 34, t: 24, b: 58};
       ctx.strokeStyle = "#cbd2d9";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -445,17 +448,24 @@
       ctx.lineTo(w - pad.r, h - pad.b);
       ctx.stroke();
       ctx.fillStyle = "#52606d";
-      ctx.font = "13px Arial";
-      ctx.fillText("Cells", 18, 28);
-      ctx.fillText("Time (days)", w / 2 - 32, h - 14);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.save();
+      ctx.translate(20, pad.t + (h - pad.t - pad.b) / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText("Cell count", 0, 0);
+      ctx.restore();
+      ctx.fillText("Time (days)", pad.l + (w - pad.l - pad.r) / 2, h - 18);
+      ctx.textAlign = "right";
       for (let i = 0; i <= 5; i++) {
         const y = pad.t + (h - pad.t - pad.b) * i / 5;
-        const value = maxY * (1 - i / 5);
         ctx.strokeStyle = "#eef2f6";
         ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
         ctx.fillStyle = "#52606d";
-        ctx.fillText(Math.round(value).toString(), 10, y + 4);
+        ctx.fillText(tickLabels[i], pad.l - 10, y);
       }
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
       return {
         x: t => pad.l + (w - pad.l - pad.r) * t / maxT,
         y: v => h - pad.b - (h - pad.t - pad.b) * v / maxY,
