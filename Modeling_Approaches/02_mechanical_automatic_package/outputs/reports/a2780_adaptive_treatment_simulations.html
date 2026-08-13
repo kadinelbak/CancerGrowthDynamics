@@ -50,6 +50,7 @@
     canvas { width: 100%; height: 440px; border: 1px solid var(--line); background: white; display: block; }
     .legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; padding: 10px; border: 1px solid var(--line); border-top: 0; background: white; font-size: 14px; }
     .legend-item { display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: currentColor; }
     .line { width: 28px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
     .dash { border-top-style: dashed; }
     .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
@@ -62,10 +63,14 @@
     .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .tabs button { background: white; color: var(--ink); border-color: var(--line); }
     .tabs button.active { background: var(--ink); color: white; border-color: var(--ink); }
+    .library { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+    .library button { background: white; color: var(--ink); border: 1px solid var(--line); padding: 8px 9px; font-size: 13px; }
+    .library button.active { background: var(--ink); color: white; border-color: var(--ink); }
     .hidden { display: none; }
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .library { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -73,6 +78,11 @@
   <header>
     <h1>A2780 Adaptive Treatment Simulations</h1>
     <p class="note">Research sandbox for exploring hypothetical A2780Naive and A2780cis sensitive/tolerant growth under fixed, pulsed, and adaptive cisplatin schedules. This is not a clinical dosing tool.</p>
+    <section class="panel" style="margin-top:16px">
+      <h2>Original Data Library</h2>
+      <p class="note">Choose one of the original treated coculture conditions. The simulator sets the starting composition from day-1 observed means and overlays the original Naive/cis data as points.</p>
+      <div class="library" id="dataLibrary"></div>
+    </section>
   </header>
   <main>
     <div class="layout">
@@ -136,6 +146,8 @@
             <span class="legend-item" style="color:var(--tolerant)"><span class="line"></span>cis tolerant/resistant</span>
             <span class="legend-item" style="color:var(--total)"><span class="line"></span>Total cells</span>
             <span class="legend-item" style="color:var(--dose)"><span class="line dash"></span>Dose intensity</span>
+            <span class="legend-item" style="color:var(--naive)"><span class="dot"></span>Original Naive</span>
+            <span class="legend-item" style="color:var(--tolerant)"><span class="dot"></span>Original cis</span>
           </div>
         </div>
         <div id="compareView" class="hidden">
@@ -172,6 +184,8 @@
     </section>
   </main>
   <script>
+    const originalDataLibrary = {"20k__25-75":{"label":"20k, mix 25-75","naive":[{"t":1,"y":99.62},{"t":2,"y":151.65},{"t":3,"y":256.71},{"t":4,"y":308.39},{"t":5,"y":458.41},{"t":6,"y":443.2},{"t":7,"y":684.74},{"t":8,"y":381.45},{"t":9,"y":434.43},{"t":10,"y":381.81},{"t":11,"y":827.93},{"t":12,"y":564.25},{"t":13,"y":1105.27},{"t":14,"y":404.8}],"cis":[{"t":1,"y":88.59},{"t":2,"y":143.34},{"t":3,"y":247.63},{"t":4,"y":494.31},{"t":5,"y":903.37},{"t":6,"y":1360.1},{"t":7,"y":2438.38},{"t":8,"y":1945.32},{"t":9,"y":3250.29},{"t":10,"y":3135.64},{"t":11,"y":3987.59},{"t":12,"y":2308.25},{"t":13,"y":3826.77},{"t":14,"y":2159.37}]},"30k__25-75":{"label":"30k, mix 25-75","naive":[{"t":1,"y":92.29},{"t":2,"y":166.94},{"t":3,"y":254.02},{"t":4,"y":304.33},{"t":5,"y":467.27},{"t":6,"y":478.99},{"t":7,"y":644.63},{"t":8,"y":433.01},{"t":9,"y":360.13},{"t":10,"y":420.39},{"t":11,"y":492.48},{"t":12,"y":788.84},{"t":13,"y":1077.72},{"t":14,"y":921.54}],"cis":[{"t":1,"y":87.41},{"t":2,"y":146.07},{"t":3,"y":261.51},{"t":4,"y":490.8},{"t":5,"y":872.21},{"t":6,"y":1398.2},{"t":7,"y":2656.33},{"t":8,"y":2187.63},{"t":9,"y":3209.31},{"t":10,"y":3193.9},{"t":11,"y":3624.11},{"t":12,"y":2743.47},{"t":13,"y":3918.68},{"t":14,"y":3231.24}]},"20k__50-50":{"label":"20k, mix 50-50","naive":[{"t":1,"y":154.28},{"t":2,"y":285.21},{"t":3,"y":425.08},{"t":4,"y":562.62},{"t":5,"y":850.45},{"t":6,"y":932.26},{"t":7,"y":1392.04},{"t":8,"y":999.73},{"t":9,"y":1287.63},{"t":10,"y":1285.18},{"t":11,"y":1589.92},{"t":12,"y":1183.66},{"t":13,"y":1283.01},{"t":14,"y":1010.31}],"cis":[{"t":1,"y":51.28},{"t":2,"y":89.81},{"t":3,"y":141.96},{"t":4,"y":269.67},{"t":5,"y":503.14},{"t":6,"y":640.24},{"t":7,"y":1228.76},{"t":8,"y":1159.74},{"t":9,"y":2141.54},{"t":10,"y":2331.9},{"t":11,"y":3319.13},{"t":12,"y":1939.12},{"t":13,"y":3037.84},{"t":14,"y":1923.26}]},"30k__50-50":{"label":"30k, mix 50-50","naive":[{"t":1,"y":165.46},{"t":2,"y":282.02},{"t":3,"y":432.84},{"t":4,"y":607.82},{"t":5,"y":879},{"t":6,"y":947.11},{"t":7,"y":1412.78},{"t":8,"y":1018.18},{"t":9,"y":1172.49},{"t":10,"y":1294.57},{"t":11,"y":1082.5},{"t":12,"y":1456.92},{"t":13,"y":1700.33},{"t":14,"y":1370.07}],"cis":[{"t":1,"y":53.36},{"t":2,"y":85.84},{"t":3,"y":136.94},{"t":4,"y":278.04},{"t":5,"y":439.58},{"t":6,"y":738.22},{"t":7,"y":1333.67},{"t":8,"y":1333.73},{"t":9,"y":2235.38},{"t":10,"y":2239.67},{"t":11,"y":2711.56},{"t":12,"y":2136.78},{"t":13,"y":3352.32},{"t":14,"y":2315.28}]},"20k__75-25":{"label":"20k, mix 75-25","naive":[{"t":1,"y":216.95},{"t":2,"y":395.04},{"t":3,"y":575.9},{"t":4,"y":750.96},{"t":5,"y":1098.77},{"t":6,"y":1222.95},{"t":7,"y":1636.88},{"t":8,"y":1417.09},{"t":9,"y":1830.37},{"t":10,"y":2137.61},{"t":11,"y":2132.98},{"t":12,"y":1500.2},{"t":13,"y":1762.65},{"t":14,"y":1454.53}],"cis":[{"t":1,"y":26.93},{"t":2,"y":42.1},{"t":3,"y":64.44},{"t":4,"y":128},{"t":5,"y":186.15},{"t":6,"y":262.4},{"t":7,"y":430.88},{"t":8,"y":525.69},{"t":9,"y":900.48},{"t":10,"y":1261.5},{"t":11,"y":1896.8},{"t":12,"y":1271.07},{"t":13,"y":2274.65},{"t":14,"y":1507.98}]},"30k__75-25":{"label":"30k, mix 75-25","naive":[{"t":1,"y":218.08},{"t":2,"y":356.53},{"t":3,"y":545.95},{"t":4,"y":755.78},{"t":5,"y":1013.16},{"t":6,"y":1191.63},{"t":7,"y":1758.69},{"t":8,"y":1400.46},{"t":9,"y":1660.71},{"t":10,"y":2107.13},{"t":11,"y":1744.18},{"t":12,"y":1827.71},{"t":13,"y":1923.91},{"t":14,"y":1647.07}],"cis":[{"t":1,"y":28.45},{"t":2,"y":45.68},{"t":3,"y":72.72},{"t":4,"y":127.53},{"t":5,"y":211.36},{"t":6,"y":311.86},{"t":7,"y":585.29},{"t":8,"y":720.13},{"t":9,"y":1168.52},{"t":10,"y":1358.17},{"t":11,"y":1719.3},{"t":12,"y":1458.72},{"t":13,"y":2386.66},{"t":14,"y":1738.67}]}};
+    let activeLibraryKey = "20k__50-50";
     const ids = ["initialTotal","cisFraction","tolerantFraction","days","maxDose","pulseOn","pulseOff","totalThreshold","tolerantThreshold"];
     const defaults = {
       initialTotal: 3000, cisFraction: 0.50, tolerantFraction: 0.25, days: 60, maxDose: 0.75,
@@ -185,6 +199,7 @@
       continuous: "Continuous", pulse: "Pulse", adaptiveTotal: "Adaptive total", adaptiveTolerant: "Adaptive tolerant", holiday: "Response holidays"
     };
     function val(id) { return Number(document.getElementById(id).value); }
+    function activeLibrary() { return originalDataLibrary[activeLibraryKey]; }
     function params() {
       return {
         schedule: document.getElementById("schedule").value,
@@ -215,6 +230,31 @@
         tolerantThreshold: x => Math.round(x).toString()
       };
       ids.forEach(id => document.getElementById(id + "Value").textContent = format[id](val(id)));
+    }
+    function applyLibraryPreset(key) {
+      activeLibraryKey = key;
+      const lib = activeLibrary();
+      const naive0 = lib.naive[0].y;
+      const cis0 = lib.cis[0].y;
+      const total0 = naive0 + cis0;
+      document.getElementById("initialTotal").value = Math.max(200, Math.min(8000, Math.round(total0 / 50) * 50));
+      document.getElementById("cisFraction").value = Math.max(0, Math.min(1, cis0 / Math.max(total0, 1))).toFixed(2);
+      document.getElementById("days").value = 14;
+      document.getElementById("maxDose").value = 1.0;
+      document.getElementById("schedule").value = "continuous";
+      document.querySelectorAll("#dataLibrary button").forEach(button => {
+        button.classList.toggle("active", button.dataset.libraryKey === key);
+      });
+      renderSingle();
+    }
+    function renderLibraryButtons() {
+      const holder = document.getElementById("dataLibrary");
+      holder.innerHTML = Object.entries(originalDataLibrary).map(([key, lib]) =>
+        `<button type="button" data-library-key="${key}">${lib.label}</button>`
+      ).join("");
+      holder.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => applyLibraryPreset(button.dataset.libraryKey));
+      });
     }
     function doseAt(t, state, p, schedule) {
       const total = state.N + state.S + state.T;
@@ -320,13 +360,30 @@
       ctx.stroke();
       ctx.restore();
     }
+    function drawObservedPoints(ctx, scale, lib) {
+      function points(series, color) {
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.78;
+        series.forEach(d => {
+          ctx.beginPath();
+          ctx.arc(scale.x(d.t), scale.y(d.y), 4.2, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+      points(lib.naive, colors.naive);
+      points(lib.cis, colors.tolerant);
+    }
     function renderSingle() {
       updateLabels();
       const result = simulate(document.getElementById("schedule").value);
-      document.getElementById("plotTitle").textContent = labels[result.schedule] + " schedule";
+      const lib = activeLibrary();
+      document.getElementById("plotTitle").textContent = labels[result.schedule] + " schedule over " + lib.label + " original data";
       const canvas = document.getElementById("plot");
       const ctx = canvas.getContext("2d");
-      const maxY = Math.max(...result.series.map(d => d.total), 1000) * 1.08;
+      const observedMax = Math.max(...lib.naive.map(d => d.y), ...lib.cis.map(d => d.y), 1000);
+      const maxY = Math.max(...result.series.map(d => d.total), observedMax) * 1.08;
       const maxT = Math.max(...result.series.map(d => d.t));
       const scale = axes(ctx, canvas.width, canvas.height, maxY, maxT);
       drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.N), colors.naive);
@@ -334,6 +391,7 @@
       drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.T), colors.tolerant);
       drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.total), colors.total, 3);
       drawLine(ctx, result.series, d => scale.x(d.t), d => scale.yDose(d.dose), colors.dose, 2, [8, 6]);
+      drawObservedPoints(ctx, scale, lib);
       updateMetrics(result.metrics);
       updateTable([result]);
     }
@@ -391,7 +449,8 @@
       Object.entries(defaults).forEach(([k, v]) => { if (document.getElementById(k)) document.getElementById(k).value = v; });
       renderSingle();
     });
-    renderSingle();
+    renderLibraryButtons();
+    applyLibraryPreset(activeLibraryKey);
   </script>
 </body>
 </html>
