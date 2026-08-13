@@ -1,38 +1,45 @@
 using MechanicalAutomaticModeling
+using CSV
+using DataFrames
+using Dates
 
 conditions = ["monoculture_untreated", "monoculture_treated", "coculture_untreated", "coculture_treated"]
+notebook_start = joinpath(@__DIR__, "notebooks")
 
 for cond in conditions
     println("\n" * "="^60)
     println("CONDITION: $cond")
     println("="^60)
 
-    state = Dict{String,Any}()
     try
-        decode_condition_dataframe!(state, cond)
-        println("  decode_ok  : true  (rows=$(nrow(state["data"])))")
-    catch e
-        println("  decode_ok  : false  ($(e))")
-        continue
-    end
+        decoded = MechanicalAutomaticModeling.IOUtils.decode_condition_dataframe(cond; start = notebook_start)
+        out = MechanicalAutomaticModeling.IOUtils.condition_output_dirs(cond; start = notebook_start)
+        decoded_path = joinpath(out.csv, "$(cond)_automatic_decoded.csv")
+        CSV.write(decoded_path, decoded)
+        MechanicalAutomaticModeling.IOUtils.write_manifest_row(condition = cond, step = "decode", outputs = [decoded_path], start = notebook_start)
+        println("  decode_ok  : true  (rows=$(nrow(decoded)))")
 
-    try
-        run_condition_fit!(state, cond)
-        n = nrow(state["fit_results"])
-        best = state["fit_results"][argmin(state["fit_results"].bic), :]
-        println("  fit_ok     : true  (fit_rows=$n)")
-        println("  best_model : $(best.model_name)  BIC=$(round(best.bic, digits=2))")
-    catch e
-        println("  fit_ok     : false  ($(e))")
-        continue
-    end
+        fit_artifacts = MechanicalAutomaticModeling.FitWorkflows.run_condition_fit!(decoded, cond; start = notebook_start)
+        ranking = sort(fit_artifacts.ranking, :bic)
+        best = first(ranking, 1)
+        println("  fit_ok     : true  (fit_rows=$(nrow(ranking)))")
+        println("  best_model : $(best.model[1])  BIC=$(round(best.bic[1], digits=2))")
 
-    try
-        run_condition_analysis!(state, cond)
-        n = nrow(state["sensitivity_results"])
-        println("  analysis_ok: true  (sensitivity_rows=$n)")
+        analysis_artifacts = MechanicalAutomaticModeling.AnalysisWorkflows.run_condition_analysis!(decoded, fit_artifacts, cond; start = notebook_start)
+        println("  analysis_ok: true  (sensitivity_rows=$(nrow(analysis_artifacts.sensitivity)))")
+
+        summary = DataFrame(
+            condition = [cond],
+            decoded_rows = [nrow(decoded)],
+            fit_rows = [nrow(ranking)],
+            sensitivity_rows = [nrow(analysis_artifacts.sensitivity)],
+            generated_at = [Dates.format(now(UTC), dateformat"yyyy-mm-ddTHH:MM:SS")],
+        )
+        summary_path = joinpath(out.metrics, "$(cond)_automatic_summary.csv")
+        CSV.write(summary_path, summary)
+        MechanicalAutomaticModeling.IOUtils.write_manifest_row(condition = cond, step = "summary", outputs = [summary_path], start = notebook_start)
     catch e
-        println("  analysis_ok: false  ($(e))")
+        println("  condition_ok: false  ($(e))")
     end
 
     println("  DONE")

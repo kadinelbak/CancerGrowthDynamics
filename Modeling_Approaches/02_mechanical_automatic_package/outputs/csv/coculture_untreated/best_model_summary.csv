@@ -1,4 +1,4 @@
 key,value
-best_model,null_coculture
-best_bic,10773.90974058965
-generated_at,2026-04-26T10:49:20.831
+best_model,logistic_growth
+best_cell_line,A2780cis
+best_density,unknown_density

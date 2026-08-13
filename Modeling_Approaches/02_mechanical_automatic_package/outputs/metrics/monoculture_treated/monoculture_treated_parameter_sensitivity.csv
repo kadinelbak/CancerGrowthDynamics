@@ -1,2 +1,2 @@
 model,note
-one_stage_transit_linear_kill,Sensitivity call not available with current signature; update wrapper.
+simeoni_transit_compartment,Sensitivity call not available with current signature; update wrapper.

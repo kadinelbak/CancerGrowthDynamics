@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cancer Growth Dynamics Reports</title>
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #52606d;
+      --line: #cbd2d9;
+      --bg: #f7f9fb;
+      --panel: #ffffff;
+      --accent: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+    header, main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 24px;
+    }
+    header { padding-top: 42px; }
+    h1 { margin: 0 0 8px; font-size: 34px; }
+    p { margin: 8px 0; }
+    .note { color: var(--muted); max-width: 820px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      min-height: 230px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    h2 { margin: 0 0 8px; font-size: 21px; }
+    .tag {
+      display: inline-block;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    a.button {
+      display: inline-block;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-weight: 700;
+      margin-top: 16px;
+    }
+    .details {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 18px;
+    }
+    code {
+      background: #eef2f6;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cancer Growth Dynamics Reports</h1>
+    <p class="note">Shareable A2780 modeling reports and interactive simulation tools for lab review. These pages are research artifacts, not clinical decision tools.</p>
+  </header>
+  <main>
+    <section class="grid">
+      <article class="card">
+        <div>
+          <span class="tag">Best Coculture Treated Models</span>
+          <h2>A2780 Staged Model Comparison</h2>
+          <p>Full staged analysis showing untreated growth, treated monoculture timing, untreated coculture competition, and treated coculture linked-treatment results.</p>
+        </div>
+        <a class="button" href="Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_staged_model_comparison.html">Open Report</a>
+      </article>
+      <article class="card">
+        <div>
+          <span class="tag">Modeling Stages</span>
+          <h2>Delay vs Compartment</h2>
+          <p>Teaching-style walkthrough comparing time-delay-only and transit/compartment hypotheses, with staged equations and overlay plots.</p>
+        </div>
+        <a class="button" href="Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_delay_compartment_comparison.html">Open Report</a>
+      </article>
+      <article class="card">
+        <div>
+          <span class="tag">Interactive Tool</span>
+          <h2>Adaptive Treatment Simulations</h2>
+          <p>Browser-based simulator for initial tumor composition and continuous, pulsed, threshold-adaptive, and response-guided treatment schedules.</p>
+        </div>
+        <a class="button" href="Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_adaptive_treatment_simulations.html">Open Simulator</a>
+      </article>
+    </section>
+    <section class="details">
+      <h2>How To Use</h2>
+      <p>For a lab meeting, start with the staged model comparison, then use the delay-vs-compartment report to explain the competing mechanisms. Use the simulator last to explore hypothetical schedules and initial tumor compositions.</p>
+      <p class="note">The simulator is intentionally lightweight and runs entirely in the browser. It should be connected to fitted parameter exports before treating any schedule ranking as a scientific conclusion.</p>
+    </section>
+  </main>
+</body>
+</html>

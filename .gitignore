@@ -1,3 +1,3 @@
-# Large/raw data directories (kept locally, not tracked)
-Datasets/
-Processed_Datasets/
+opencode.json
+.julia_depot/
+Modeling_Approaches/02_mechanical_automatic_package/.julia_depot/

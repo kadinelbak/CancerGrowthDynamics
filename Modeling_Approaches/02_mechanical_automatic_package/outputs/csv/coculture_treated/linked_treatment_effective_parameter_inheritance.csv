@@ -1,0 +1,21 @@
+lineage,density,parameter,treated_monoculture_value,treated_coculture_intrinsic_value,ratio,inheritance_mode
+A2780Naive,20k,naive_emax,4.964445070797512,4.964445070797512,1.0,same parameter index in one combined global objective
+A2780Naive,20k,naive_ec50,1.625856539504498,1.625856539504498,1.0,same parameter index in one combined global objective
+A2780Naive,20k,naive_hill,1.7426644196675973,1.7426644196675973,1.0,same parameter index in one combined global objective
+A2780Naive,20k,naive_lambda,0.842774282785131,0.842774282785131,1.0,same parameter index in one combined global objective
+A2780Naive,20k,naive_onset,2.8726408785264996,2.8726408785264996,1.0,same parameter index in one combined global objective
+A2780cis,20k,cis_emax_sensitive,4.7655988140372845,4.7655988140372845,1.0,same parameter index in one combined global objective
+A2780cis,20k,cis_emax_tolerant,0.28948818106233976,0.005449946402719706,0.0188261447590708,same parameter index in one combined global objective
+A2780cis,20k,cis_lambda,NaN,NaN,NaN,same parameter index in one combined global objective
+A2780cis,20k,cis_onset,6.919734099916775,6.919734099916775,1.0,same parameter index in one combined global objective
+A2780cis,20k,cis_f_tolerant0,0.6756249137099752,0.9762252734467264,1.4449219583779138,same parameter index in one combined global objective
+A2780Naive,30k,naive_emax,4.503007825933341,4.503007825933341,1.0,same parameter index in one combined global objective
+A2780Naive,30k,naive_ec50,1.625856539504498,1.625856539504498,1.0,same parameter index in one combined global objective
+A2780Naive,30k,naive_hill,1.7426644196675973,1.7426644196675973,1.0,same parameter index in one combined global objective
+A2780Naive,30k,naive_lambda,0.842774282785131,0.842774282785131,1.0,same parameter index in one combined global objective
+A2780Naive,30k,naive_onset,2.8726408785264996,2.8726408785264996,1.0,same parameter index in one combined global objective
+A2780cis,30k,cis_emax_sensitive,5.2459304644698905,5.2459304644698905,1.0,same parameter index in one combined global objective
+A2780cis,30k,cis_emax_tolerant,0.31866611676704654,0.0059992544440673765,0.0188261447590708,same parameter index in one combined global objective
+A2780cis,30k,cis_lambda,NaN,NaN,NaN,same parameter index in one combined global objective
+A2780cis,30k,cis_onset,6.919734099916775,6.919734099916775,1.0,same parameter index in one combined global objective
+A2780cis,30k,cis_f_tolerant0,0.6756249137099752,0.9762252734467264,1.4449219583779138,same parameter index in one combined global objective

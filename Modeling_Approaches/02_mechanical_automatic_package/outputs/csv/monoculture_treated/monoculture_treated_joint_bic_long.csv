@@ -1,0 +1,17 @@
+model,environment,bic,delta_bic,environment_rank
+joint_ic_effect_transit_death,A2780cis | 20k/30k,-394.43919455113513,0.0,1
+joint_ic_effect_two_population,A2780cis | 20k/30k,-386.6462840531571,7.792910497978028,2
+joint_ic_effect_hill_ramp,A2780cis | 20k/30k,-376.1874641497315,18.25173040140362,3
+joint_anchored_linear_kill,A2780cis | 20k/30k,-374.269145192942,20.170049358193125,4
+joint_anchored_hill_kill,A2780cis | 20k/30k,-374.0606321191622,20.37856243197291,5
+joint_ic_effect_hill_ramp_onset,A2780cis | 20k/30k,-373.81097829099105,20.628216260144086,6
+joint_ic_effect_logistic_hill,A2780cis | 20k/30k,-372.79357272880753,21.6456218223276,7
+joint_time_decay_dose_scaled,A2780cis | 20k/30k,-369.8383281508622,24.600866400272935,8
+joint_ic_effect_hill_ramp,A2780Naive | 20k/30k,-330.4635712569623,0.0,1
+joint_ic_effect_hill_ramp_onset,A2780Naive | 20k/30k,-326.03275296619586,4.430818290766467,2
+joint_ic_effect_transit_death,A2780Naive | 20k/30k,-283.36603315838215,47.09753809858017,3
+joint_ic_effect_two_population,A2780Naive | 20k/30k,-276.2831791704834,54.180392086478946,4
+joint_anchored_hill_kill,A2780Naive | 20k/30k,-251.42652579110052,79.03704546586181,5
+joint_ic_effect_logistic_hill,A2780Naive | 20k/30k,-242.50596859854826,87.95760265841406,6
+joint_anchored_linear_kill,A2780Naive | 20k/30k,-223.9869102597803,106.47666099718202,7
+joint_time_decay_dose_scaled,A2780Naive | 20k/30k,-219.5560934425019,110.90747781446044,8

@@ -1,4 +1,2 @@
-stage,model,condition,reason,detail,hint,timestamp
-solver,lotka_volterra_competition,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-26T10:49:05.109
-solver,lotka_volterra_hill_competition,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-26T10:49:14.710
-solver,null_coculture,dose=0.0 | cell_line= | density= | replicate=1,unknown_failure,Simulation failed during best-fit evaluation,"Inspect condition-specific time range, bounds, and observation scaling.",2026-04-26T10:49:20.646
+condition,message,timestamp_utc
+coculture_untreated,Prior stage did not produce a finite valid fit.,2026-08-05T01:34:12
