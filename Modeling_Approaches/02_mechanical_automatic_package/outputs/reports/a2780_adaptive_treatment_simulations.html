@@ -43,6 +43,36 @@
     label { display: grid; gap: 5px; font-weight: 600; font-size: 13px; }
     input, select { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; }
     input[type="range"] { padding: 0; }
+    .composition-control { gap: 7px; }
+    .composition-labels { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 700; }
+    .composition-labels span { font-variant-numeric: tabular-nums; }
+    .composition-slider {
+      appearance: none;
+      height: 10px;
+      border: 0;
+      border-radius: 5px;
+      background: linear-gradient(90deg, var(--left-color), var(--right-color));
+    }
+    .composition-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      border: 3px solid white;
+      background: var(--ink);
+      box-shadow: 0 0 0 1px #667085;
+      cursor: pointer;
+    }
+    .composition-slider::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      border: 3px solid white;
+      background: var(--ink);
+      box-shadow: 0 0 0 1px #667085;
+      cursor: pointer;
+    }
+    .composition-note { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.4; }
     .row { display: grid; grid-template-columns: 1fr 86px; gap: 8px; align-items: center; }
     .value { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
     .button-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -116,11 +146,15 @@
           <label>Initial total cells
             <div class="row"><input id="initialTotal" type="range" min="100" max="8000" step="25" value="3000"><span class="value" id="initialTotalValue"></span></div>
           </label>
-          <label>Initial cis fraction
-            <div class="row"><input id="cisFraction" type="range" min="0" max="1" step="0.01" value="0.50"><span class="value" id="cisFractionValue"></span></div>
+          <label class="composition-control">Initial lineage composition
+            <div class="composition-labels"><span id="naiveFractionValue" style="color:#dc143c"></span><span id="cisFractionValue" style="color:#2563eb"></span></div>
+            <input id="cisFraction" class="composition-slider" style="--left-color:#dc143c;--right-color:#2563eb" type="range" min="0" max="1" step="0.01" value="0.50" aria-label="Initial cis fraction">
+            <span class="composition-note">The slider divides all starting cells between Naive and A2780cis.</span>
           </label>
-          <label>Initial tolerant fraction within cis
-            <div class="row"><input id="tolerantFraction" type="range" min="0" max="1" step="0.01" value="0.25"><span class="value" id="tolerantFractionValue"></span></div>
+          <label class="composition-control">Composition within A2780cis
+            <div class="composition-labels"><span id="sensitiveFractionValue" style="color:#f59e0b"></span><span id="tolerantFractionValue" style="color:#2563eb"></span></div>
+            <input id="tolerantFraction" class="composition-slider" style="--left-color:#f59e0b;--right-color:#2563eb" type="range" min="0" max="1" step="0.01" value="0.25" aria-label="Initial tolerant fraction within cis">
+            <span class="composition-note">This second slider divides only the cis cells into sensitive-like and tolerant-like states.</span>
           </label>
           <label>Simulation days
             <div class="row"><input id="days" type="range" min="14" max="120" step="1" value="60"><span class="value" id="daysValue"></span></div>
@@ -265,8 +299,8 @@
     function updateLabels() {
       const format = {
         initialTotal: x => Math.round(x).toString(),
-        cisFraction: x => (100 * x).toFixed(0) + "%",
-        tolerantFraction: x => (100 * x).toFixed(0) + "%",
+        cisFraction: x => "cis " + (100 * x).toFixed(0) + "%",
+        tolerantFraction: x => "Tolerant-like " + (100 * x).toFixed(0) + "%",
         days: x => Math.round(x) + " d",
         maxDose: x => x.toFixed(2),
         refreshInterval: x => x.toFixed(1) + " d",
@@ -276,6 +310,8 @@
         tolerantThreshold: x => Math.round(x).toString()
       };
       ids.forEach(id => document.getElementById(id + "Value").textContent = format[id](val(id)));
+      document.getElementById("naiveFractionValue").textContent = "Naive " + (100 * (1 - val("cisFraction"))).toFixed(0) + "%";
+      document.getElementById("sensitiveFractionValue").textContent = "Sensitive-like " + (100 * (1 - val("tolerantFraction"))).toFixed(0) + "%";
     }
     function applyLibraryPreset(key) {
       activeLibraryKey = key;
