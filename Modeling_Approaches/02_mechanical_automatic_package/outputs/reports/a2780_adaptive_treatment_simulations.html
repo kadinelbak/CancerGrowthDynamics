@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>A2780 Adaptive Treatment Simulations</title>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
     :root {
       --ink: #1f2933;
@@ -27,6 +34,7 @@
     h3 { margin: 12px 0 8px; font-size: 16px; }
     p { margin: 8px 0; }
     code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
+    .math { overflow-x: auto; padding: 6px 0; }
     .note { color: var(--muted); }
     .layout { display: grid; grid-template-columns: 360px 1fr; gap: 18px; align-items: start; }
     .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
@@ -145,12 +153,15 @@
     </div>
     <section class="panel" style="margin-top:18px">
       <h2>Mechanistic Model Used For The Sandbox</h2>
-      <p>The simulator uses a simplified teaching model based on the staged A2780 equations. Naive cells are <code>N</code>; A2780cis is split into sensitive-like <code>S</code> and tolerant/resistant-like <code>T</code>, with <code>C = S + T</code>.</p>
-      <p><code>L_N = N + alpha_NC * C</code> and <code>L_C = C + alpha_CN * N</code>. Treatment intensity <code>u(t)</code> ranges from 0 to 1 and scales kill pressure.</p>
-      <p><code>dN/dt = G_N(N,L_N) - u(t) * k_N * N</code></p>
-      <p><code>dS/dt = G_C(C,L_C) * S/C - u(t) * k_S * S - q_ST * u(t) * S</code></p>
-      <p><code>dT/dt = rho_T * G_C(C,L_C) * T/C - u(t) * k_T * T + q_ST * u(t) * S</code></p>
-      <p class="note">The optional <code>q_ST</code> term is a stress-induced shift from cis sensitive-like to tolerant-like behavior. Set by the script as a small value so schedules can reveal resistant selection pressure. It is hypothetical and should be fit/validated before scientific claims.</p>
+      <p>The simulator uses a simplified teaching model based on the staged A2780 equations. Naive cells are \(N\); A2780cis is split into sensitive-like \(S\) and tolerant/resistant-like \(T\).</p>
+      <div class="math">\[C=S+T\]</div>
+      <p>Each lineage feels an effective coculture load:</p>
+      <div class="math">\[L_N=N+\alpha_{NC}C,\qquad L_C=C+\alpha_{CN}N\]</div>
+      <p>Treatment intensity \(u(t)\) ranges from 0 to 1 and scales kill pressure. The sandbox equations are:</p>
+      <div class="math">\[\frac{dN}{dt}=G_N(N,L_N)-u(t)k_NN\]</div>
+      <div class="math">\[\frac{dS}{dt}=G_C(C,L_C)\frac{S}{C}-u(t)k_SS-q_{ST}u(t)S\]</div>
+      <div class="math">\[\frac{dT}{dt}=\rho_TG_C(C,L_C)\frac{T}{C}-u(t)k_TT+q_{ST}u(t)S\]</div>
+      <p class="note">The optional \(q_{ST}\) term is a stress-induced shift from cis sensitive-like to tolerant-like behavior. It is set to a small value in the script so schedules can reveal resistant selection pressure. It is hypothetical and should be fit or validated before scientific claims.</p>
     </section>
     <section class="panel" style="margin-top:18px">
       <h2>Current Schedule Metrics</h2>
