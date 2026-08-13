@@ -67,6 +67,7 @@
     .library button { background: white; color: var(--ink); border: 1px solid var(--line); padding: 8px 9px; font-size: 13px; }
     .library button.active { background: var(--ink); color: white; border-color: var(--ink); }
     .hidden { display: none; }
+    .control-hidden { display: none; }
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -117,22 +118,22 @@
           <label>Simulation days
             <div class="row"><input id="days" type="range" min="14" max="120" step="1" value="60"><span class="value" id="daysValue"></span></div>
           </label>
-          <label>Maximum dose intensity
+          <label data-control="dose">Maximum dose intensity
             <div class="row"><input id="maxDose" type="range" min="0" max="1" step="0.01" value="0.75"><span class="value" id="maxDoseValue"></span></div>
           </label>
-          <label>Media/treatment refresh interval
+          <label data-control="refresh">Media/treatment refresh interval
             <div class="row"><input id="refreshInterval" type="range" min="1" max="7" step="0.5" value="2"><span class="value" id="refreshIntervalValue"></span></div>
           </label>
-          <label>Pulse on-days
+          <label data-control="pulse">Pulse on-days
             <div class="row"><input id="pulseOn" type="range" min="1" max="14" step="1" value="5"><span class="value" id="pulseOnValue"></span></div>
           </label>
-          <label>Pulse off-days
+          <label data-control="pulse">Pulse off-days
             <div class="row"><input id="pulseOff" type="range" min="1" max="21" step="1" value="9"><span class="value" id="pulseOffValue"></span></div>
           </label>
-          <label>Total-cell trigger threshold
+          <label data-control="totalThreshold">Total-cell trigger threshold
             <div class="row"><input id="totalThreshold" type="range" min="500" max="10000" step="50" value="4500"><span class="value" id="totalThresholdValue"></span></div>
           </label>
-          <label>Tolerant/resistant trigger threshold
+          <label data-control="tolerantThreshold">Tolerant/resistant trigger threshold
             <div class="row"><input id="tolerantThreshold" type="range" min="50" max="5000" step="25" value="900"><span class="value" id="tolerantThresholdValue"></span></div>
           </label>
         </div>
@@ -222,6 +223,20 @@
         rhoT: 0.92, qST: 0.012
       };
     }
+    function updateControlVisibility() {
+      const schedule = document.getElementById("schedule").value;
+      const visible = {
+        dose: schedule !== "none",
+        refresh: schedule === "originalRefresh",
+        pulse: schedule === "pulse",
+        totalThreshold: schedule === "adaptiveTotal" || schedule === "holiday",
+        tolerantThreshold: schedule === "adaptiveTolerant" || schedule === "holiday"
+      };
+      document.querySelectorAll("[data-control]").forEach(control => {
+        const key = control.dataset.control;
+        control.classList.toggle("control-hidden", !visible[key]);
+      });
+    }
     function updateLabels() {
       const format = {
         initialTotal: x => Math.round(x).toString(),
@@ -250,6 +265,7 @@
       document.getElementById("maxDose").value = lib.treated ? Math.max(0.01, Math.min(1, (lib.dose || 1) / 1.47)).toFixed(2) : "0.00";
       document.getElementById("refreshInterval").value = 2;
       document.getElementById("schedule").value = lib.treated ? "originalRefresh" : "none";
+      updateControlVisibility();
       renderLibraryButtons();
       renderSingle();
     }
@@ -412,6 +428,7 @@
       document.getElementById("singleLegend").innerHTML = items.join("");
     }
     function renderSingle() {
+      updateControlVisibility();
       updateLabels();
       const result = simulate(document.getElementById("schedule").value);
       const lib = activeLibrary();
@@ -439,6 +456,7 @@
       document.getElementById("doseDays").textContent = m.doseDays.toFixed(1);
     }
     function renderCompare() {
+      updateControlVisibility();
       updateLabels();
       const schedules = ["none", "originalRefresh", "continuous", "pulse", "adaptiveTotal", "adaptiveTolerant", "holiday"];
       const results = schedules.map(simulate);
@@ -474,16 +492,18 @@
       if (view === "single") renderSingle(); else renderCompare();
     }
     ids.forEach(id => document.getElementById(id).addEventListener("input", () => {
+      updateControlVisibility();
       updateLabels();
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
     }));
-    document.getElementById("schedule").addEventListener("change", renderSingle);
+    document.getElementById("schedule").addEventListener("change", () => { updateControlVisibility(); renderSingle(); });
     document.getElementById("run").addEventListener("click", () => show("single"));
     document.getElementById("compare").addEventListener("click", () => show("compare"));
     document.getElementById("singleTab").addEventListener("click", () => show("single"));
     document.getElementById("compareTab").addEventListener("click", () => show("compare"));
     document.getElementById("reset").addEventListener("click", () => {
       Object.entries(defaults).forEach(([k, v]) => { if (document.getElementById(k)) document.getElementById(k).value = v; });
+      updateControlVisibility();
       renderSingle();
     });
     renderLibraryButtons();
