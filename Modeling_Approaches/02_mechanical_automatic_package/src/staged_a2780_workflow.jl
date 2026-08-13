@@ -722,6 +722,8 @@ figcaption { color: #536267; font-size: 12px; margin-top: 6px; overflow-wrap: an
   body { margin: 16px; }
   .graph-grid { grid-template-columns: minmax(0, 1fr); }
 }
+    .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
+    .back-home:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -954,7 +956,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     ]
 
     sections = String[
-        "<header><h1>A2780 staged model comparison</h1><p>Top-five mechanistic equations, BIC rankings, and fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Detailed parameters, diagnostics, provenance, and inheritance audits are retained in <code>outputs/csv</code>.</p></header>",
+        "<header><a class=\"back-home\" href=\"../../../../index.html\">Back to reports home</a><h1>A2780 staged model comparison</h1><p>Top-five mechanistic equations, BIC rankings, and fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Detailed parameters, diagnostics, provenance, and inheritance audits are retained in <code>outputs/csv</code>.</p></header>",
     ]
     for stage in stages
         table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line)
@@ -1292,6 +1294,8 @@ code { font-family: Consolas, "Courier New", monospace; }
   dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   dd { margin-bottom: 8px; }
 }
+    .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
+    .back-home:hover { text-decoration: underline; }
 </style>
 </head>
 <body>

@@ -66,10 +66,12 @@ code { font-family: Consolas, "Courier New", monospace; }
   dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   dd { margin-bottom: 8px; }
 }
+    .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
+    .back-home:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
-<header><h1>A2780 staged model comparison</h1><p>Top-five mechanistic equations, BIC rankings, and fitted graph grids for the four-stage analysis.</p><p class="artifact-note">Detailed parameters, diagnostics, provenance, and inheritance audits are retained in <code>outputs/csv</code>.</p></header>
+<header><a class="back-home" href="../../../../index.html">Back to reports home</a><h1>A2780 staged model comparison</h1><p>Top-five mechanistic equations, BIC rankings, and fitted graph grids for the four-stage analysis.</p><p class="artifact-note">Detailed parameters, diagnostics, provenance, and inheritance audits are retained in <code>outputs/csv</code>.</p></header>
 <section><div class="stage-heading"><span>Stage 1</span><h2>Untreated monoculture</h2></div><p>Top five model and pooling combinations per cell line. Both seeding densities are fitted jointly with fixed day-zero populations.</p><div class="notation-key"><h3>Stage 1 notation key</h3><dl>
 <dt>\(X_i(t)\)</dt><dd>Observed total population for cell line \(i\); \(i=N\) means A2780Naive and \(i=C\) means A2780cis.</dd>
 <dt>\(\dot X_i=dX_i/dt\)</dt><dd>Rate of change of that total population, in measured cells per day.</dd>

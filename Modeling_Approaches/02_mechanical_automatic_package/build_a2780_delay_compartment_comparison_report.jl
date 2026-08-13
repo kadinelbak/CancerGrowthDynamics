@@ -364,11 +364,15 @@ function write_report(image_paths, metrics)
         img { max-width: 100%; height: auto; border: 1px solid var(--line); background: white; }
         figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
         .note { color: var(--muted); }
+    .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
+    .back-home:hover { text-decoration: underline; }
       </style>
     </head>
     <body>
       <header>
-        <h1>A2780 Treated Coculture: Time Delay vs Transit / Compartment</h1>
+
+        <a class="back-home" href="../../../../index.html">Back to reports home</a>
+<h1>A2780 Treated Coculture: Time Delay vs Transit / Compartment</h1>
         <p class="note">Generated $(html_escape(generated)). This report uses existing fitted prediction overlays; it does not refit the models.</p>
       </header>
       <main>

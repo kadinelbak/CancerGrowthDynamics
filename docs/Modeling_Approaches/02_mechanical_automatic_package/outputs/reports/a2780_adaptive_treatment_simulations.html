@@ -72,11 +72,15 @@
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .library { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
+    .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
+    .back-home:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <header>
-    <h1>A2780 Adaptive Treatment Simulations</h1>
+
+    <a class="back-home" href="../../../../index.html">Back to reports home</a>
+<h1>A2780 Adaptive Treatment Simulations</h1>
     <p class="note">Research sandbox for recreating original A2780 monoculture and coculture data, then exploring hypothetical A2780Naive and A2780cis sensitive/tolerant growth under adaptive cisplatin schedules. This is not a clinical dosing tool.</p>
     <section class="panel" style="margin-top:16px">
       <h2>Original Data Library</h2>
