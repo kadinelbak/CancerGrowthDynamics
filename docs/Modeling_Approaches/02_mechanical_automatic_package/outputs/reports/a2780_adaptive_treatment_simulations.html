@@ -51,6 +51,11 @@
     canvas { width: 100%; height: 440px; border: 1px solid var(--line); background: white; display: block; }
     .legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; padding: 10px; border: 1px solid var(--line); border-top: 0; background: white; font-size: 14px; }
     .legend-item { display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
+    .comparison-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+    .comparison-controls span { color: var(--muted); font-size: 13px; font-weight: 700; }
+    .comparison-controls button { background: white; color: var(--ink); border-color: var(--line); padding: 7px 10px; }
+    .comparison-controls button.active { background: var(--ink); color: white; border-color: var(--ink); }
+    .schedule-help { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.45; }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: currentColor; }
     .line { width: 28px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
     .dash { border-top-style: dashed; }
@@ -104,8 +109,9 @@
               <option value="pulse">Fixed pulse schedule</option>
               <option value="adaptiveTotal">Adaptive: hold total below threshold</option>
               <option value="adaptiveTolerant">Adaptive: target tolerant/resistant burden</option>
-              <option value="holiday">Response-guided holidays</option>
+              <option value="holiday">Threshold-guided treatment breaks</option>
             </select>
+            <span class="schedule-help" id="scheduleHelp"></span>
           </label>
           <label>Initial total cells
             <div class="row"><input id="initialTotal" type="range" min="100" max="8000" step="25" value="3000"><span class="value" id="initialTotalValue"></span></div>
@@ -156,6 +162,12 @@
         </div>
         <div id="compareView" class="hidden">
           <h2>Adaptive Treatment Schedule Comparison</h2>
+          <div class="comparison-controls" aria-label="Schedules shown on graph">
+            <span>Show:</span>
+            <button id="showSelectedSchedule" class="active" type="button">Selected schedule</button>
+            <button id="showAllSchedules" type="button">All schedules</button>
+          </div>
+          <p class="note" id="comparisonSummary"></p>
           <canvas id="comparePlot" width="1000" height="520"></canvas>
           <div class="legend" id="compareLegend"></div>
         </div>
@@ -203,8 +215,18 @@
       none: "#52606d", originalRefresh: "#7c3aed", continuous: "#111827", pulse: "#f59e0b", adaptiveTotal: "#2563eb", adaptiveTolerant: "#dc143c", holiday: "#059669"
     };
     const labels = {
-      none: "No treatment", originalRefresh: "Original 2-day refresh", continuous: "Continuous", pulse: "Pulse", adaptiveTotal: "Adaptive total", adaptiveTolerant: "Adaptive tolerant", holiday: "Response holidays"
+      none: "No treatment", originalRefresh: "Original 2-day refresh", continuous: "Continuous", pulse: "Pulse", adaptiveTotal: "Adaptive total", adaptiveTolerant: "Adaptive tolerant", holiday: "Threshold-guided treatment breaks"
     };
+    const scheduleDescriptions = {
+      none: "No treatment is applied.",
+      originalRefresh: "Treatment is refreshed at the selected interval; the sandbox approximates waning intensity between refreshes.",
+      continuous: "The selected maximum treatment intensity is applied continuously.",
+      pulse: "Treatment alternates between the selected on-days and off-days.",
+      adaptiveTotal: "Full treatment is applied only while total cells exceed the selected total-cell threshold.",
+      adaptiveTolerant: "Full treatment is applied only while the modeled tolerant burden exceeds its threshold.",
+      holiday: "Full treatment starts when either threshold is exceeded. It falls to 25% between thresholds and pauses completely only when both burdens are below 55% of their thresholds."
+    };
+    let comparisonMode = "selected";
     function val(id) { return Number(document.getElementById(id).value); }
     function activeLibrary() { return originalDataLibrary[activeLibraryKey]; }
     function params() {
@@ -227,6 +249,7 @@
     }
     function updateControlVisibility() {
       const schedule = document.getElementById("schedule").value;
+      document.getElementById("scheduleHelp").textContent = scheduleDescriptions[schedule];
       const visible = {
         dose: schedule !== "none",
         refresh: schedule === "originalRefresh",
@@ -457,8 +480,10 @@
     function renderCompare() {
       updateControlVisibility();
       updateLabels();
-      const schedules = ["none", "originalRefresh", "continuous", "pulse", "adaptiveTotal", "adaptiveTolerant", "holiday"];
-      const results = schedules.map(simulate);
+      const allSchedules = ["none", "originalRefresh", "continuous", "pulse", "adaptiveTotal", "adaptiveTolerant", "holiday"];
+      const selectedSchedule = document.getElementById("schedule").value;
+      const visibleSchedules = comparisonMode === "all" ? allSchedules : [selectedSchedule];
+      const results = visibleSchedules.map(simulate);
       const canvas = document.getElementById("comparePlot");
       const ctx = canvas.getContext("2d");
       const maxY = Math.max(...results.flatMap(r => r.series.map(d => Math.max(d.total, d.T))), 1000) * 1.08;
@@ -468,13 +493,22 @@
         drawLine(ctx, r.series, d => scale.x(d.t), d => scale.y(d.total), colors[r.schedule], 2.8);
         drawLine(ctx, r.series, d => scale.x(d.t), d => scale.y(d.T), colors[r.schedule], 2.2, [8, 5]);
       });
-      document.getElementById("compareLegend").innerHTML = schedules.map(s =>
+      document.getElementById("compareLegend").innerHTML = visibleSchedules.map(s =>
         `<span class="legend-item" style="color:${colors[s]}"><span class="line"></span>${labels[s]} total</span>` +
         `<span class="legend-item" style="color:${colors[s]}"><span class="line dash"></span>${labels[s]} tolerant</span>`
       ).join("");
-      const best = results.slice().sort((a, b) => (a.metrics.finalTolerant + 0.25 * a.metrics.finalTotal) - (b.metrics.finalTolerant + 0.25 * b.metrics.finalTotal))[0];
-      updateMetrics(best.metrics);
+      document.getElementById("comparisonSummary").textContent = comparisonMode === "all"
+        ? "All seven schedules are drawn; the legend contains one solid total line and one dashed tolerant line for each schedule."
+        : `${labels[selectedSchedule]} is the only schedule drawn. Change the Schedule control to replace it.`;
+      document.getElementById("showSelectedSchedule").classList.toggle("active", comparisonMode === "selected");
+      document.getElementById("showAllSchedules").classList.toggle("active", comparisonMode === "all");
+      const highlighted = results.slice().sort((a, b) => (a.metrics.finalTolerant + 0.25 * a.metrics.finalTotal) - (b.metrics.finalTolerant + 0.25 * b.metrics.finalTotal))[0];
+      updateMetrics(highlighted.metrics);
       updateTable(results);
+    }
+    function setComparisonMode(mode) {
+      comparisonMode = mode;
+      renderCompare();
     }
     function updateTable(results) {
       const tbody = document.querySelector("#scheduleTable tbody");
@@ -508,6 +542,8 @@
     document.getElementById("compare").addEventListener("click", () => show("compare"));
     document.getElementById("singleTab").addEventListener("click", () => show("single"));
     document.getElementById("compareTab").addEventListener("click", () => show("compare"));
+    document.getElementById("showSelectedSchedule").addEventListener("click", () => setComparisonMode("selected"));
+    document.getElementById("showAllSchedules").addEventListener("click", () => setComparisonMode("all"));
     document.getElementById("reset").addEventListener("click", () => {
       Object.entries(defaults).forEach(([k, v]) => { if (document.getElementById(k)) document.getElementById(k).value = v; });
       updateControlVisibility();
