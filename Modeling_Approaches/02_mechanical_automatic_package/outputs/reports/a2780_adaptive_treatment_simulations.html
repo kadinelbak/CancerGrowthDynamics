@@ -73,6 +73,9 @@
       cursor: pointer;
     }
     .composition-note { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.4; }
+    .treatment-context { margin: -2px 0 12px; padding-left: 2px; font-size: 13px; line-height: 1.45; }
+    .overlay-toggle { display: inline-flex; grid-template-columns: none; align-items: center; gap: 8px; width: auto; color: var(--ink); font-size: 13px; cursor: pointer; }
+    .overlay-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
     .row { display: grid; grid-template-columns: 1fr 86px; gap: 8px; align-items: center; }
     .value { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
     .button-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -118,7 +121,7 @@
 
     <a class="back-home" href="../../../../index.html">Back to reports home</a>
 <h1>A2780 Adaptive Treatment Simulations</h1>
-    <p class="note">The first tab reproduces the saved condition-specific fits from the staged A2780 pipeline. The second tab is a hypothetical adaptive-treatment sandbox built on the fitted baseline growth laws. This is not a clinical dosing tool.</p>
+    <p class="note">The first tab reproduces the saved condition-specific fits from the staged A2780 pipeline. For treated conditions, the second tab compares hypothetical schedules against the same simulated untreated baseline. This is not a clinical dosing tool.</p>
     <section class="panel" style="margin-top:16px">
       <h2>Original Data Library</h2>
       <p class="note">Choose an original condition to overlay its measured data with the saved winning-model prediction. These curves are loaded from the staged fit exports and are not refit in the browser.</p>
@@ -133,7 +136,7 @@
         <div class="control-grid">
           <label>Schedule
             <select id="schedule">
-              <option value="none">No treatment</option>
+              <option value="none">Untreated reference (u(t) = 0)</option>
               <option value="originalRefresh">Original experiment: 2-day media refresh</option>
               <option value="continuous">Continuous treatment</option>
               <option value="pulse">Fixed pulse schedule</option>
@@ -187,8 +190,9 @@
       <section class="panel">
         <div class="tabs">
           <button id="singleTab" class="active" type="button">1. Fitted model reproduction</button>
-          <button id="compareTab" type="button">2. Try treatment schedules</button>
+          <button id="compareTab" type="button">2. Treatment schedule sandbox</button>
         </div>
+        <p class="note treatment-context" id="treatmentContext"></p>
         <div id="singleView">
           <h2 id="plotTitle">Fitted Model Over Original Data</h2>
           <canvas id="plot" width="1000" height="520"></canvas>
@@ -200,6 +204,7 @@
             <span>Show:</span>
             <button id="showSelectedSchedule" class="active" type="button">Selected schedule</button>
             <button id="showAllSchedules" type="button">All schedules</button>
+            <label class="overlay-toggle"><input id="showUntreatedReference" type="checkbox" checked>Overlay simulated untreated reference</label>
           </div>
           <p class="note" id="comparisonSummary"></p>
           <canvas id="comparePlot" width="1000" height="520"></canvas>
@@ -249,10 +254,10 @@
       none: "#52606d", originalRefresh: "#7c3aed", continuous: "#111827", pulse: "#f59e0b", adaptiveTotal: "#2563eb", adaptiveTolerant: "#dc143c", holiday: "#059669"
     };
     const labels = {
-      none: "No treatment", originalRefresh: "Original 2-day refresh", continuous: "Continuous", pulse: "Pulse", adaptiveTotal: "Adaptive total", adaptiveTolerant: "Adaptive tolerant", holiday: "Threshold-guided treatment breaks"
+      none: "Simulated untreated reference", originalRefresh: "Original 2-day refresh", continuous: "Continuous", pulse: "Pulse", adaptiveTotal: "Adaptive total", adaptiveTolerant: "Adaptive tolerant", holiday: "Threshold-guided treatment breaks"
     };
     const scheduleDescriptions = {
-      none: "No treatment is applied.",
+      none: "Simulated untreated counterfactual: treatment intensity is fixed at u(t) = 0 while all initial conditions and growth parameters remain unchanged.",
       originalRefresh: "Treatment is refreshed at the selected interval; the sandbox approximates waning intensity between refreshes.",
       continuous: "The selected maximum treatment intensity is applied continuously.",
       pulse: "Treatment alternates between the selected on-days and off-days.",
@@ -328,7 +333,16 @@
       document.getElementById("schedule").value = lib.treated ? "originalRefresh" : "none";
       updateControlVisibility();
       renderLibraryButtons();
-      document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
+      updateTreatmentContext();
+      if (!lib.treated) show("single");
+      else document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
+    }
+    function updateTreatmentContext() {
+      const lib = activeLibrary();
+      document.getElementById("compareTab").classList.toggle("hidden", !lib.treated);
+      document.getElementById("treatmentContext").textContent = lib.treated
+        ? "Treatment schedules begin from the selected condition's day-0 state. The optional untreated overlay uses the same initial state and growth law with u(t) fixed at 0, so it is a model counterfactual rather than additional observed data."
+        : "This is an untreated reference condition, so only its fitted reproduction is shown. Select a treated condition to open the treatment schedule sandbox.";
     }
     function renderLibraryButtons() {
       const categories = [...new Set(Object.values(originalDataLibrary).map(lib => lib.category))];
@@ -516,9 +530,11 @@
     function renderCompare() {
       updateControlVisibility();
       updateLabels();
-      const allSchedules = ["none", "originalRefresh", "continuous", "pulse", "adaptiveTotal", "adaptiveTolerant", "holiday"];
+      const treatmentSchedules = ["originalRefresh", "continuous", "pulse", "adaptiveTotal", "adaptiveTolerant", "holiday"];
       const selectedSchedule = document.getElementById("schedule").value;
-      const visibleSchedules = comparisonMode === "all" ? allSchedules : [selectedSchedule];
+      const showUntreated = document.getElementById("showUntreatedReference").checked;
+      const requestedSchedules = comparisonMode === "all" ? treatmentSchedules : [selectedSchedule];
+      const visibleSchedules = [...new Set(showUntreated ? ["none", ...requestedSchedules] : requestedSchedules)];
       const results = visibleSchedules.map(simulate);
       const canvas = document.getElementById("comparePlot");
       const ctx = canvas.getContext("2d");
@@ -533,12 +549,15 @@
         `<span class="legend-item" style="color:${colors[s]}"><span class="line"></span>${labels[s]} total</span>` +
         `<span class="legend-item" style="color:${colors[s]}"><span class="line dash"></span>${labels[s]} tolerant</span>`
       ).join("");
+      const referenceNote = showUntreated && selectedSchedule !== "none"
+        ? " The gray untreated counterfactual uses the same day-0 state with u(t) = 0."
+        : "";
       document.getElementById("comparisonSummary").textContent = comparisonMode === "all"
-        ? "All seven schedules are drawn; the legend contains one solid total line and one dashed tolerant line for each schedule."
-        : `${labels[selectedSchedule]} is the only schedule drawn. Change the Schedule control to replace it.`;
+        ? `${visibleSchedules.length} schedules are drawn, including the untreated reference only when its overlay is enabled.`
+        : `${labels[selectedSchedule]} is the selected intervention.${referenceNote}`;
       document.getElementById("showSelectedSchedule").classList.toggle("active", comparisonMode === "selected");
       document.getElementById("showAllSchedules").classList.toggle("active", comparisonMode === "all");
-      const highlighted = results.slice().sort((a, b) => (a.metrics.finalTolerant + 0.25 * a.metrics.finalTotal) - (b.metrics.finalTolerant + 0.25 * b.metrics.finalTotal))[0];
+      const highlighted = results.find(r => r.schedule === selectedSchedule) || results[0];
       updateMetrics(highlighted.metrics);
       updateTable(results);
     }
@@ -580,6 +599,7 @@
     document.getElementById("compareTab").addEventListener("click", () => show("compare"));
     document.getElementById("showSelectedSchedule").addEventListener("click", () => setComparisonMode("selected"));
     document.getElementById("showAllSchedules").addEventListener("click", () => setComparisonMode("all"));
+    document.getElementById("showUntreatedReference").addEventListener("change", renderCompare);
     document.getElementById("reset").addEventListener("click", () => {
       Object.entries(defaults).forEach(([k, v]) => { if (document.getElementById(k)) document.getElementById(k).value = v; });
       updateControlVisibility();
