@@ -828,6 +828,23 @@ function _report_stage_figure(path::AbstractString, report_dir::AbstractString, 
     return "<figure><img src=\"$relative_path\" alt=\"$(_html_escape(alt))\"><figcaption>$(_html_escape(caption))</figcaption></figure>"
 end
 
+function _report_stage4_expanded_equations_html()
+    return raw"""
+<div class="notation-key equation-detail"><h3>Stage 4 expanded treated-coculture equations</h3>
+<p>The BIC table below names the candidate-specific change. The full linked system inherits Stage 1 growth, Stage 2 treatment timing/Hill response, and Stage 3 coculture competition/death.</p>
+<div class="math">\[C=S+T,\qquad L_N=N+\alpha_{NC,d}C,\qquad L_C=C+\alpha_{CN,d}N\]</div>
+<div class="math">\[G_N^{\mathrm{co}}=r_{N,d}N\left(1-\frac{L_N}{K_{N,d}}\right)-d_NN\]</div>
+<div class="math">\[G_C^{\mathrm{co}}=r_CC\left[1-\left(\frac{L_C}{K_C}\right)^{\theta_C}\right]-d_CC\]</div>
+<div class="math">\[M_N=e^{\beta_NL_N/K_{N,d}},\qquad M_C=e^{\beta_CL_C/K_C}\]</div>
+<div class="math">\[f_{T0}^{\mathrm{co}}=\operatorname{logit}^{-1}\!\left(\operatorname{logit}(f_{T0})+\delta_f\right),\qquad H_{CT}^{\mathrm{co}}(z)=e^{\gamma_T}H_{CT}(z),\qquad \rho_T=e^{\gamma_{r,T}}\]</div>
+<div class="math">\[\frac{dN}{dt}=G_N^{\mathrm{co}}-M_NA_N(t)H_N(z)N\]</div>
+<div class="math">\[\frac{dS}{dt}=G_C^{\mathrm{co}}\frac{S}{C}-M_CA_C(t)H_{CS}(z)S\]</div>
+<div class="math">\[\frac{dT}{dt}=\rho_TG_C^{\mathrm{co}}\frac{T}{C}-M_CA_C(t)H_{CT}^{\mathrm{co}}(z)T\]</div>
+<p><strong>How to read the candidate rows:</strong> strict inheritance sets the extra coculture modifiers to their neutral values; load-scaled candidates estimate one or more \(\beta\) terms; tolerant-state candidates also estimate \(\delta_f\), \(\gamma_T\), and/or \(\gamma_{r,T}\).</p>
+</div>
+"""
+end
+
 function render_a2780_report_html(; start::AbstractString = pwd())
     root = IOUtils.package_root(start)
     report_dir = joinpath(root, "outputs", "reports")
@@ -942,7 +959,8 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     for stage in stages
         table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line)
         graph = _report_stage_figure(stage.figure, report_dir, stage.title, stage.caption)
-        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(table)$(graph)</section>")
+        stage_details = stage.number == 4 ? _report_stage4_expanded_equations_html() : ""
+        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(stage_details)$(table)$(graph)</section>")
         if stage.number == 2 && isfile(timing_ranking_path)
             timing_table = _report_top_five_html(timing_ranking_path)
             timing_graph = _report_stage_figure(
@@ -1156,7 +1174,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <p class="equation-label"><strong>Transit damage</strong></p><div class="math">\\[\\frac{dP}{dt}=G(P)-A(t)H(z)P,\\qquad \\frac{dD}{dt}=A(t)H(z)P-k_{\\mathrm{clear}}D\\]</div>
     <div class="math">\\[\\widehat y=P+\\frac12D\\]</div>
     <p>Cells leave the proliferating live compartment, remain partly visible while damaged, and are cleared later. The candidate fixes Hill <code>EC50=0.5</code> and <code>h=4</code>.</p>
-    <p class="equation-label"><strong>Sensitive/tolerant populations</strong></p><div class="math">\\[\\frac{dS}{dt}=G(S+T)\\frac{S}{S+T}-A(t)H_S(z)S,\\qquad \\frac{dT}{dt}=G(S+T)\\frac{T}{S+T}-A(t)H_T(z)T\\]</div>
+    <p class="equation-label"><strong>Sensitive/tolerant populations</strong></p><div class="math">\\[\\frac{dS}{dt}=G(S+T)\\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\\qquad \\frac{dT}{dt}=G(S+T)\\frac{T}{S+T}-A_C(t)H_{CT}(z)T\\]</div>
     <div class="math">\\[\\widehat y=S+T\\]</div>
     <p>Both latent states share one inherited total-growth law but have different kill amplitudes. Their initial split is controlled by <code>f_T0</code>. This is the selected A2780cis mechanism.</p>
     <p><strong>Timing audit:</strong> independent onset plus ramp; shared onset plus ramp; onset differences bounded within 0.5 day; resistant gradual-only; and resistant onset-only.</p>
