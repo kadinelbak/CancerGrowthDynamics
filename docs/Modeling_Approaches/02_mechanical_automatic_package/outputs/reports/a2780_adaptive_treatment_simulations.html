@@ -147,7 +147,7 @@
             <span class="schedule-help" id="scheduleHelp"></span>
           </label>
           <label>Initial total cells
-            <div class="row"><input id="initialTotal" type="range" min="100" max="8000" step="25" value="3000"><span class="value" id="initialTotalValue"></span></div>
+            <div class="row"><input id="initialTotal" type="range" min="100" max="100000" step="100" value="3000"><span class="value" id="initialTotalValue"></span></div>
           </label>
           <label class="composition-control">Initial lineage composition
             <div class="composition-labels"><span id="naiveFractionValue" style="color:#dc143c"></span><span id="cisFractionValue" style="color:#2563eb"></span></div>
@@ -160,7 +160,16 @@
             <span class="composition-note">This second slider divides only the cis cells into sensitive-like and tolerant-like states.</span>
           </label>
           <label>Simulation days
-            <div class="row"><input id="days" type="range" min="14" max="120" step="1" value="60"><span class="value" id="daysValue"></span></div>
+            <div class="row"><input id="days" type="range" min="1" max="1825" step="1" value="60"><span class="value" id="daysValue"></span></div>
+            <span class="composition-note">Explore intervals from 1 day to 5 years.</span>
+          </label>
+          <label>Hypothetical intrinsic growth-rate multiplier
+            <div class="row"><input id="growthMultiplier" type="range" min="0.01" max="1" step="0.01" value="1"><span class="value" id="growthMultiplierValue"></span></div>
+            <span class="composition-note">Scales the fitted in-vitro growth rates. Lower values stretch growth over a longer timescale.</span>
+          </label>
+          <label>Hypothetical carrying-capacity multiplier
+            <div class="row"><input id="capacityMultiplier" type="range" min="1" max="100" step="1" value="1"><span class="value" id="capacityMultiplierValue"></span></div>
+            <span class="composition-note">Scales the fitted dish carrying capacities. This changes the population ceiling, not the time unit.</span>
           </label>
           <label data-control="dose">Maximum dose intensity
             <div class="row"><input id="maxDose" type="range" min="0" max="1" step="0.01" value="0.75"><span class="value" id="maxDoseValue"></span></div>
@@ -175,10 +184,10 @@
             <div class="row"><input id="pulseOff" type="range" min="1" max="21" step="1" value="9"><span class="value" id="pulseOffValue"></span></div>
           </label>
           <label data-control="totalThreshold">Total-cell trigger threshold
-            <div class="row"><input id="totalThreshold" type="range" min="500" max="10000" step="50" value="4500"><span class="value" id="totalThresholdValue"></span></div>
+            <div class="row"><input id="totalThreshold" type="range" min="500" max="500000" step="500" value="4500"><span class="value" id="totalThresholdValue"></span></div>
           </label>
           <label data-control="tolerantThreshold">Tolerant/resistant trigger threshold
-            <div class="row"><input id="tolerantThreshold" type="range" min="50" max="5000" step="25" value="900"><span class="value" id="tolerantThresholdValue"></span></div>
+            <div class="row"><input id="tolerantThreshold" type="range" min="50" max="250000" step="50" value="900"><span class="value" id="tolerantThresholdValue"></span></div>
           </label>
         </div>
         <div class="button-row">
@@ -222,6 +231,9 @@
       <h2>Fitted Baseline And Exploratory Schedule Model</h2>
       <p>The reproduction tab displays saved predictions from the winning model for each condition. The schedule sandbox inherits the fitted untreated growth laws: logistic growth for Naive and theta-logistic growth for total A2780cis. Only the schedule sandbox splits cis into exploratory high-kill \(S\) and low-kill \(T\) response components.</p><div class="math">\[G_N=r_NN\left(1-\frac{N}{K_N}\right),\qquad r_N=0.872,\quad K_N=4032\]</div><div class="math">\[G_C=r_CC\left[1-\left(\frac{C}{K_C}\right)^{\theta_C}\right],\qquad r_C=0.487,\quad K_C=3803,\quad \theta_C=3.084\]</div>
       <div class="math">\[C=S+T\]</div>
+      <p>The sandbox can apply explicit scenario multipliers without changing the saved fitted reproductions:</p>
+      <div class="math">\[r_N^{*}=m_r r_N,\qquad r_C^{*}=m_r r_C,\qquad K_N^{*}=m_K K_N,\qquad K_C^{*}=m_K K_C\]</div>
+      <p class="note">Here \(m_r\) and \(m_K\) are hypothetical scaling assumptions. They are not estimates of human tumor growth or human carrying capacity.</p>
       <p>Each lineage feels an effective coculture load:</p>
       <div class="math">\[L_N=N+\alpha_{NC}C,\qquad L_C=C+\alpha_{CN}N\]</div>
       <p>Treatment intensity \(u(t)\) ranges from 0 to 1 and scales kill pressure. The original reference schedule refreshes media/treatment every 2 days, so the default reference simulation uses a two-day refresh interval.</p>
@@ -244,9 +256,10 @@
     let activeLibraryKey = "coculture_treated__20k__50-50__1";
     let activeCategory = originalDataLibrary[activeLibraryKey].category;
     Object.values(originalDataLibrary).forEach(lib => { lib.naive = lib.naive || []; lib.cis = lib.cis || []; });
-    const ids = ["initialTotal","cisFraction","tolerantFraction","days","maxDose","refreshInterval","pulseOn","pulseOff","totalThreshold","tolerantThreshold"];
+    const ids = ["initialTotal","cisFraction","tolerantFraction","days","growthMultiplier","capacityMultiplier","maxDose","refreshInterval","pulseOn","pulseOff","totalThreshold","tolerantThreshold"];
     const defaults = {
-      initialTotal: 3000, cisFraction: 0.50, tolerantFraction: 0.25, days: 60, maxDose: 0.75,
+      initialTotal: 3000, cisFraction: 0.50, tolerantFraction: 0.25, days: 60,
+      growthMultiplier: 1, capacityMultiplier: 1, maxDose: 0.75,
       refreshInterval: 2, pulseOn: 5, pulseOff: 9, totalThreshold: 4500, tolerantThreshold: 900, schedule: "originalRefresh"
     };
     const colors = {
@@ -275,6 +288,8 @@
         cisFraction: val("cisFraction"),
         tolerantFraction: val("tolerantFraction"),
         days: val("days"),
+        growthMultiplier: val("growthMultiplier"),
+        capacityMultiplier: val("capacityMultiplier"),
         maxDose: val("maxDose"),
         refreshInterval: val("refreshInterval"),
         pulseOn: val("pulseOn"),
@@ -307,6 +322,8 @@
         cisFraction: x => "cis " + (100 * x).toFixed(0) + "%",
         tolerantFraction: x => "Tolerant-like " + (100 * x).toFixed(0) + "%",
         days: x => Math.round(x) + " d",
+        growthMultiplier: x => x.toFixed(2) + "x",
+        capacityMultiplier: x => Math.round(x) + "x",
         maxDose: x => x.toFixed(2),
         refreshInterval: x => x.toFixed(1) + " d",
         pulseOn: x => Math.round(x) + " d",
@@ -325,7 +342,7 @@
       const naive0 = lib.naive.length ? lib.naive[0].y : 0;
       const cis0 = lib.cis.length ? lib.cis[0].y : 0;
       const total0 = Math.max(naive0 + cis0, 1);
-      document.getElementById("initialTotal").value = Math.max(100, Math.min(8000, Math.round(total0 / 25) * 25));
+      document.getElementById("initialTotal").value = Math.max(100, Math.min(100000, Math.round(total0 / 100) * 100));
       document.getElementById("cisFraction").value = Math.max(0, Math.min(1, cis0 / total0)).toFixed(2);
       document.getElementById("days").value = Math.max(14, Math.round(Math.max(...lib.naive.map(d => d.t), ...lib.cis.map(d => d.t), 14)));
       document.getElementById("maxDose").value = lib.treated ? Math.max(0.01, Math.min(1, (lib.dose || 1) / 1.47)).toFixed(2) : "0.00";
@@ -389,8 +406,10 @@
       const isCoculture = activeLibrary().culture === "coculture";
       const LN = Math.max(state.N + (isCoculture ? p.alphaNC * C : 0), 0);
       const LC = Math.max(C + (isCoculture ? p.alphaCN * state.N : 0), 0);
-      const GN = p.rN * state.N * Math.max(1 - Math.pow(LN / p.KN, p.thetaN), -1.5);
-      const GC = p.rC * C * Math.max(1 - Math.pow(LC / p.KC, p.thetaC), -1.5);
+      const scaledKN = p.capacityMultiplier * p.KN;
+      const scaledKC = p.capacityMultiplier * p.KC;
+      const GN = p.growthMultiplier * p.rN * state.N * Math.max(1 - Math.pow(LN / scaledKN, p.thetaN), -1.5);
+      const GC = p.growthMultiplier * p.rC * C * Math.max(1 - Math.pow(LC / scaledKC, p.thetaC), -1.5);
       const sShare = state.S / C;
       const tShare = state.T / C;
       const shift = p.qST * dose * state.S;
