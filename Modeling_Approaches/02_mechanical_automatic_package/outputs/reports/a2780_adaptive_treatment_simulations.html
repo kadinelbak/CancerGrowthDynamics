@@ -80,7 +80,7 @@
     <p class="note">Research sandbox for first recreating the original A2780 treated coculture data, then exploring hypothetical A2780Naive and A2780cis sensitive/tolerant growth under adaptive cisplatin schedules. This is not a clinical dosing tool.</p>
     <section class="panel" style="margin-top:16px">
       <h2>Original Data Library</h2>
-      <p class="note">Choose one of the original treated coculture conditions. The simulator sets the starting composition from day-1 observed means and overlays the original Naive/cis data as points.</p>
+      <p class="note">Choose one of the original treated coculture conditions. The simulator sets the starting composition from day-1 observed means and overlays the original Naive/cis data as points. In this recreation view, cis sensitive and tolerant states are summed into one simulated cis curve to match the original measurements.</p>
       <div class="library" id="dataLibrary"></div>
     </section>
   </header>
@@ -145,11 +145,8 @@
           <h2 id="plotTitle">Simulated Data Over Original Data</h2>
           <canvas id="plot" width="1000" height="520"></canvas>
           <div class="legend">
-            <span class="legend-item" style="color:var(--naive)"><span class="line"></span>Naive</span>
-            <span class="legend-item" style="color:var(--sensitive)"><span class="line"></span>cis sensitive</span>
-            <span class="legend-item" style="color:var(--tolerant)"><span class="line"></span>cis tolerant/resistant</span>
-            <span class="legend-item" style="color:var(--total)"><span class="line"></span>Total cells</span>
-            <span class="legend-item" style="color:var(--dose)"><span class="line dash"></span>Dose intensity</span>
+            <span class="legend-item" style="color:var(--naive)"><span class="line"></span>Simulated Naive</span>
+            <span class="legend-item" style="color:var(--tolerant)"><span class="line"></span>Simulated cis</span>
             <span class="legend-item" style="color:var(--naive)"><span class="dot"></span>Original Naive</span>
             <span class="legend-item" style="color:var(--tolerant)"><span class="dot"></span>Original cis</span>
           </div>
@@ -394,14 +391,11 @@
       const canvas = document.getElementById("plot");
       const ctx = canvas.getContext("2d");
       const observedMax = Math.max(...lib.naive.map(d => d.y), ...lib.cis.map(d => d.y), 1000);
-      const maxY = Math.max(...result.series.map(d => d.total), observedMax) * 1.08;
+      const maxY = Math.max(...result.series.map(d => Math.max(d.N, d.S + d.T)), observedMax) * 1.08;
       const maxT = Math.max(...result.series.map(d => d.t));
       const scale = axes(ctx, canvas.width, canvas.height, maxY, maxT);
       drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.N), colors.naive);
-      drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.S), colors.sensitive);
-      drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.T), colors.tolerant);
-      drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.total), colors.total, 3);
-      drawLine(ctx, result.series, d => scale.x(d.t), d => scale.yDose(d.dose), colors.dose, 2, [8, 6]);
+      drawLine(ctx, result.series, d => scale.x(d.t), d => scale.y(d.S + d.T), colors.tolerant);
       drawObservedPoints(ctx, scale, lib);
       updateMetrics(result.metrics);
       updateTable([result]);
