@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Research Foundations for the A2780 Modeling Program</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #52606d;
+      --line: #c7d0d9;
+      --bg: #f6f8fa;
+      --panel: #ffffff;
+      --blue: #1d4ed8;
+      --green: #16794b;
+      --amber: #9a5b00;
+      --red: #a61b34;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.58;
+    }
+    header, main, footer { max-width: 1220px; margin: 0 auto; padding: 28px 26px; }
+    header { padding-top: 34px; padding-bottom: 16px; }
+    h1 { margin: 12px 0 8px; font-size: 36px; line-height: 1.15; }
+    h2 { margin: 0 0 12px; font-size: 27px; }
+    h3 { margin: 22px 0 8px; font-size: 20px; }
+    p { margin: 8px 0; }
+    a { color: var(--blue); }
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--ink);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .lede { max-width: 980px; color: var(--muted); font-size: 18px; }
+    .notice {
+      margin-top: 18px;
+      border-left: 5px solid var(--red);
+      background: #fff;
+      padding: 14px 17px;
+    }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    nav a {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 8px 11px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    section { padding: 28px 0; border-top: 1px solid var(--line); }
+    .band { background: #fff; border: 1px solid var(--line); padding: 19px; }
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .evidence-item { border-top: 4px solid var(--line); padding-top: 10px; }
+    .evidence-item strong { display: block; }
+    .established { border-color: var(--blue); }
+    .ovarian { border-color: var(--green); }
+    .cross { border-color: var(--amber); }
+    .hypothesis { border-color: var(--red); }
+    .badge {
+      display: inline-block;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge.established { color: var(--blue); }
+    .badge.ovarian { color: var(--green); }
+    .badge.cross { color: var(--amber); }
+    .badge.hypothesis { color: var(--red); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: #fff; }
+    table { width: 100%; min-width: 1040px; border-collapse: collapse; }
+    th, td { padding: 12px 13px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { background: #edf2f5; font-size: 14px; }
+    tr:last-child td { border-bottom: 0; }
+    td.model { min-width: 190px; font-weight: 700; }
+    td.math { min-width: 250px; }
+    td.source { min-width: 235px; }
+    .equation { overflow-x: auto; padding: 7px 0; }
+    dl { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 8px 18px; }
+    dt { font-weight: 700; }
+    dd { margin: 0; color: var(--muted); }
+    ol.references { padding-left: 24px; }
+    ol.references li { margin: 0 0 12px; padding-left: 5px; }
+    .small { font-size: 14px; color: var(--muted); }
+    .takeaway { font-weight: 700; }
+    footer { color: var(--muted); padding-top: 10px; padding-bottom: 42px; }
+    @media (max-width: 850px) {
+      header, main, footer { padding-left: 16px; padding-right: 16px; }
+      h1 { font-size: 29px; }
+      .evidence-grid { grid-template-columns: 1fr 1fr; }
+      dl { grid-template-columns: 1fr; gap: 2px; }
+      dd { margin-bottom: 10px; }
+    }
+    @media (max-width: 520px) { .evidence-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../../../../index.html" aria-label="Back to reports home">&#8592; Back to reports home</a>
+    <h1>Research Foundations for the A2780 Modeling Program</h1>
+    <p class="lede">A model-by-model guide to the mathematical, ovarian-cancer, and prostate-cancer literature behind the staged A2780 analysis and adaptive-treatment simulator.</p>
+    <div class="notice"><strong>Scientific boundary:</strong> a citation beside an equation means that the paper supports the model class or biological idea. It does not prove that the paper's mechanism is the mechanism operating in this A2780 data set. In particular, total A2780cis counts cannot by themselves prove latent sensitive-like and tolerant-like subpopulations.</div>
+    <nav aria-label="Page sections">
+      <a href="#reading">How to read this page</a>
+      <a href="#biology">Biological grounding</a>
+      <a href="#models">Every model and reference</a>
+      <a href="#methods">Fitting and identifiability</a>
+      <a href="#translation">Dish-to-patient limits</a>
+      <a href="#bibliography">Bibliography</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="reading">
+      <h2>How To Read The Evidence</h2>
+      <p>The page separates mathematical precedent from biological evidence so that a good fit is not mistaken for mechanistic proof.</p>
+      <div class="evidence-grid">
+        <div class="evidence-item established"><strong>Established model class</strong><span class="small">The equation is standard and has been tested on tumor-growth or pharmacodynamic data.</span></div>
+        <div class="evidence-item ovarian"><strong>Ovarian evidence</strong><span class="small">A primary ovarian study directly supports the biological effect or scheduling concept.</span></div>
+        <div class="evidence-item cross"><strong>Cross-cancer precedent</strong><span class="small">The mechanism has clinical or experimental support in another cancer, especially prostate cancer.</span></div>
+        <div class="evidence-item hypothesis"><strong>Project-specific hypothesis</strong><span class="small">The exact A2780 term is a testable parameterization introduced by this project.</span></div>
+      </div>
+    </section>
+
+    <section id="biology">
+      <h2>Biological Grounding</h2>
+      <div class="band">
+        <h3>What ovarian research supports</h3>
+        <p>Platinum-sensitive and platinum-resistant ovarian cells can change one another's growth and drug response in direct coculture. In isogenic OVCAR5/CisR and PE01/PE04 pairs, coculture increased sensitive-cell proliferation and altered platinum response; under resource limitation, OVCAR4 sensitive and resistant populations displayed competition and a resistant fitness cost. These observations justify testing interaction and density-context models, but they do not uniquely select one competition equation. <a href="#ref-7">[7]</a> <a href="#ref-8">[8]</a></p>
+        <p>Ovarian treatment response can also be delayed by cell-state transitions. An OVCAR3/OVCAR4 PARP-inhibitor study selected a generalized-logistic untreated law and a cycling-to-arrested compartment model with a Hill dose response. Ovarian xenograft modeling has independently used proliferating and arrested compartments to represent delayed treatment effects. <a href="#ref-4">[4]</a> <a href="#ref-5">[5]</a></p>
+        <p>A2780 and resistant derivatives are valid experimental systems for platinum response, while stromal and three-dimensional context can alter apparent sensitivity. That supports keeping context effects in the candidate set rather than treating a monoculture drug coefficient as universal. <a href="#ref-9">[9]</a> <a href="#ref-10">[10]</a></p>
+
+        <h3>What prostate research contributes</h3>
+        <p>Prostate adaptive therapy supplies the clearest patient-level precedent for threshold-guided treatment holidays. The abiraterone pilot used tumor-burden feedback to stop and restart therapy, and later analysis linked outcomes to sensitive/resistant competition and pretreatment composition. These studies support the simulator's adaptive-scheduling logic, not its ovarian parameter values. <a href="#ref-12">[12]</a> <a href="#ref-13">[13]</a></p>
+
+        <h3>What remains unproven here</h3>
+        <p>The labels <em>sensitive-like</em> and <em>tolerant-like</em> are latent mathematical states unless lineage-resolved markers, sorting, or single-cell measurements distinguish them. Likewise, the fitted exponential load modifier says that drug action covaries with modeled load; it does not identify the molecular pathway responsible for that covariance.</p>
+      </div>
+    </section>
+
+    <section id="models">
+      <h2>Every Model And Its Research Foundation</h2>
+      <p>Each named candidate used in the staged report appears below. The final column states exactly how far the literature permits interpretation.</p>
+
+      <h3>Stage 1: Untreated monoculture growth</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <tbody>
+          <tr><td class="model">Exponential growth</td><td class="math">\(dX/dt=rX\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-1">Benzekry et al. [1]</a></td><td>Short-horizon, unconstrained growth baseline. It should not be extrapolated indefinitely.</td></tr>
+          <tr><td class="model">Logistic growth</td><td class="math">\(dX/dt=rX(1-X/K)\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-1">Benzekry et al. [1]</a>; ovarian resource competition <a href="#ref-8">[8]</a></td><td>Represents a fixed assay-scale carrying capacity. It is descriptive, not a claim that only one resource limits growth.</td></tr>
+          <tr><td class="model">Theta-logistic growth</td><td class="math">\(dX/dt=rX[1-(X/K)^\theta]\)</td><td><span class="badge established">Established</span> <span class="badge ovarian">Ovarian</span></td><td class="source"><a href="#ref-1">Benzekry et al. [1]</a>; OVCAR3/4 model selection <a href="#ref-4">[4]</a></td><td>The shape parameter \(\theta\) changes how density dependence emerges. It does not by itself name a molecular mechanism.</td></tr>
+          <tr><td class="model">Gompertz growth</td><td class="math">\(dX/dt=rX\ln(K/X)\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-1">Benzekry et al. [1]</a></td><td>A declining per-capita growth law. As with logistic growth, \(K\) belongs to the measurement context.</td></tr>
+          <tr><td class="model">Growth plus first-order death</td><td class="math">\(dX/dt=G(X)-dX\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-1">Benzekry et al. [1]</a>; turnover analysis <a href="#ref-15">[15]</a></td><td>A diagnostic net-loss term. Growth and death may be weakly separable from total counts without independent death measurements.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Stage 2: Treated monoculture response</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <tbody>
+          <tr><td class="model">Anchored concentration-Hill kill</td><td class="math">\(dX/dt=G(X)-E_{\max}D^h/(EC_{50}^h+D^h)\,X\)</td><td><span class="badge established">Established</span></td><td class="source">Dose-response measurement <a href="#ref-2">Hafner et al. [2]</a></td><td>Maps concentration to effect magnitude. A Hill curve is phenomenological unless receptor/cooperativity biology is measured.</td></tr>
+          <tr><td class="model">Immediate IC-Hill effect</td><td class="math">\(dX/dt=G(X)-H(z)X\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-2">Hafner et al. [2]</a>; ovarian Hill response <a href="#ref-4">[4]</a></td><td>Assumes the full dose-dependent effect begins immediately.</td></tr>
+          <tr><td class="model">Hill ramp</td><td class="math">\(dX/dt=G(X)-(1-e^{-\lambda t})H(z)X\)</td><td><span class="badge ovarian">Ovarian</span> <span class="badge hypothesis">Project form</span></td><td class="source">Delayed ovarian drug response <a href="#ref-4">West et al. [4]</a></td><td>The literature supports delayed treatment action; this exact one-parameter activation curve is a project-specific approximation.</td></tr>
+          <tr><td class="model">Delayed Hill-ramp kill</td><td class="math">\(A(t)=\mathbf{1}_{t>t_{on}}[1-e^{-\lambda(t-t_{on})}]\), \(dX/dt=G(X)-A(t)H(z)X\)</td><td><span class="badge ovarian">Ovarian</span> <span class="badge hypothesis">Project form</span></td><td class="source"><a href="#ref-4">West et al. [4]</a></td><td>Separates onset from gradual activation. Data may identify an effective delay without identifying its cellular cause.</td></tr>
+          <tr><td class="model">Transit damage/death</td><td class="math">\(dP/dt=G(P)-AH P\); \(dD/dt=AH P-k_{clear}D\); \(\hat y=P+\tfrac12D\)</td><td><span class="badge established">Established</span> <span class="badge ovarian">Ovarian</span></td><td class="source"><a href="#ref-3">Simeoni et al. [3]</a>; ovarian compartments <a href="#ref-4">[4]</a> <a href="#ref-5">[5]</a></td><td>Biologically plausible delayed visibility/clearance. The fixed one-half visibility coefficient is an observation assumption and needs imaging validation.</td></tr>
+          <tr><td class="model">Sensitive/tolerant population balance</td><td class="math">\(dS/dt=G(C)S/C-AH_S S\); \(dT/dt=G(C)T/C-AH_T T\), \(C=S+T\)</td><td><span class="badge ovarian">Ovarian</span> <span class="badge hypothesis">Latent states</span></td><td class="source">Ovarian sensitive/resistant mixtures <a href="#ref-7">[7]</a> <a href="#ref-8">[8]</a>; ovarian virtual populations <a href="#ref-11">[11]</a></td><td>Supports testing heterogeneous drug response. Total cis counts do not prove two discrete states or estimate their fractions uniquely.</td></tr>
+          <tr><td class="model">Timing audit variants</td><td class="math">Immediate, separate onset/ramp, shared onset/ramp, or bounded onset differences</td><td><span class="badge hypothesis">Competing hypotheses</span></td><td class="source">Ovarian schedule-dependent delay <a href="#ref-4">[4]</a></td><td>These are alternative empirical timing architectures compared on the same trajectories, not separate biological discoveries.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Stage 3: Untreated coculture</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <tbody>
+          <tr><td class="model">Symmetric competition</td><td class="math">\(L_N=N+\alpha C\), \(L_C=C+\alpha N\); \(dN/dt=G_N(L_N)\), \(dC/dt=G_C(L_C)\)</td><td><span class="badge established">Established class</span> <span class="badge ovarian">Ovarian</span></td><td class="source">Ovarian resource competition <a href="#ref-8">[8]</a>; LV cancer precedent <a href="#ref-12">[12]</a></td><td>Tests equal cross-lineage effects. \(L_i\) is effective density, not a hidden compartment.</td></tr>
+          <tr><td class="model">Asymmetric competition</td><td class="math">\(L_N=N+\alpha_{NC}C\), \(L_C=C+\alpha_{CN}N\)</td><td><span class="badge ovarian">Ovarian</span> <span class="badge cross">Prostate precedent</span></td><td class="source">Direction-dependent ovarian interaction <a href="#ref-7">[7]</a> <a href="#ref-8">[8]</a>; fitted asymmetric competition <a href="#ref-13">[13]</a></td><td>Allows one lineage to affect the other more strongly. Coefficients summarize net interaction and do not identify contact, nutrient, or signaling pathways.</td></tr>
+          <tr><td class="model">Asymmetric competition plus death</td><td class="math">\(dN/dt=G_N(L_N)-d_NN\); \(dC/dt=G_C(L_C)-d_CC\)</td><td><span class="badge ovarian">Ovarian</span> <span class="badge hypothesis">Project combination</span></td><td class="source">Competition and declining resistant abundance <a href="#ref-7">[7]</a> <a href="#ref-8">[8]</a></td><td>The selected fit needs explicit net loss. Without death markers, the loss term cannot distinguish death, detachment, misclassification, or model misspecification.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Stage 4: Treated coculture context</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model</th><th>Candidate-specific change</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <tbody>
+          <tr><td class="model">Strict inheritance</td><td class="math">Use Stage 1 growth, Stage 2 treatment, and Stage 3 interaction without new context parameters.</td><td><span class="badge established">Null model</span></td><td class="source">Stepwise ovarian model selection <a href="#ref-4">[4]</a></td><td>A necessary baseline: coculture should earn extra parameters by improving fit enough to overcome the complexity penalty.</td></tr>
+          <tr><td class="model">Total-load-scaled drug effect</td><td class="math">\(M_i=e^{\beta_iL_i/K_i}\); treatment effect becomes \(M_iE_i(t,z)\)</td><td><span class="badge ovarian">Context evidence</span> <span class="badge hypothesis">Project form</span></td><td class="source">Density-dependent ovarian response <a href="#ref-4">[4]</a>; A2780 stromal protection <a href="#ref-9">[9]</a></td><td>Tests whether effective density predicts altered drug action. The exponential guarantees a positive multiplier; it is not a molecular law.</td></tr>
+          <tr><td class="model">Subpopulation-specific load scaling</td><td class="math">\(M_{CS}=e^{\beta_{CS}L_C/K_C}\), \(M_{CT}=e^{\beta_{CT}L_C/K_C}\)</td><td><span class="badge ovarian">Heterogeneity evidence</span> <span class="badge hypothesis">Latent states</span></td><td class="source"><a href="#ref-7">[7]</a> <a href="#ref-8">[8]</a></td><td>Tests different context responses for latent cis states. It is especially vulnerable to non-identifiability without state-resolved observations.</td></tr>
+          <tr><td class="model">Load plus tolerant-state shift</td><td class="math">\(f_{T0}^{co}=\operatorname{logit}^{-1}[\operatorname{logit}(f_{T0})+\delta_f]\), \(H_{CT}^{co}=e^{\gamma_T}H_{CT}\)</td><td><span class="badge ovarian">Heterogeneity evidence</span> <span class="badge hypothesis">Project form</span></td><td class="source">Ovarian composition and context effects <a href="#ref-7">[7]</a> <a href="#ref-8">[8]</a></td><td>The logit shift keeps a fraction between 0 and 1; \(\delta_f\) is an odds-scale shift, not direct proof of phenotype conversion.</td></tr>
+          <tr><td class="model">Load plus tolerant growth plasticity</td><td class="math">\(\rho_T=e^{\gamma_{r,T}}\); tolerant growth contribution is multiplied by \(\rho_T\)</td><td><span class="badge ovarian">Plasticity precedent</span> <span class="badge hypothesis">Selected project model</span></td><td class="source">Coculture-altered ovarian proliferation <a href="#ref-7">[7]</a>; resource-dependent resistant fitness <a href="#ref-8">[8]</a></td><td>The best BIC model says a growth-context adjustment improves prediction. It does not identify a reversible tolerant phenotype without direct measurements.</td></tr>
+          <tr><td class="model">Fully free context diagnostic</td><td class="math">Refit a separate treated-coculture drug vector instead of inheriting Stage 2.</td><td><span class="badge established">Diagnostic</span></td><td class="source">Model-selection discipline <a href="#ref-4">[4]</a> <a href="#ref-18">[18]</a></td><td>Checks whether inheritance is too restrictive. Its flexibility weakens mechanistic interpretability and increases overfitting risk.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Adaptive-treatment schedules</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Schedule</th><th>Mathematical rule</th><th>Evidence</th><th>Primary reference</th><th>Boundary</th></tr></thead>
+        <tbody>
+          <tr><td class="model">Continuous treatment</td><td class="math">\(u(t)=u_{max}\)</td><td><span class="badge established">Comparator</span></td><td class="source">Ovarian and prostate comparators <a href="#ref-6">[6]</a> <a href="#ref-12">[12]</a></td><td>Standard comparator, not necessarily clinically identical to continuous cisplatin exposure.</td></tr>
+          <tr><td class="model">Fixed pulse / refresh</td><td class="math">Treatment alternates on/off on a predetermined clock.</td><td><span class="badge ovarian">Ovarian</span></td><td class="source">Intermittent PARPi schedules <a href="#ref-4">[4]</a></td><td>The laboratory two-day media refresh is represented as an exposure rule, not a measured pharmacokinetic profile.</td></tr>
+          <tr><td class="model">Threshold adaptive therapy</td><td class="math">Stop below a response threshold; restart near baseline or an upper threshold.</td><td><span class="badge cross">Prostate clinical</span> <span class="badge ovarian">Ovarian preclinical</span></td><td class="source"><a href="#ref-12">Zhang et al. [12]</a>; ovarian carboplatin <a href="#ref-6">[6]</a> <a href="#ref-8">[8]</a></td><td>Strong scheduling precedent, but current A2780 simulator outputs remain hypotheses until treatment parameters and exposure are experimentally calibrated.</td></tr>
+          <tr><td class="model">Response-guided holidays</td><td class="math">Treatment state changes according to measured burden or response trend.</td><td><span class="badge cross">Prostate clinical</span></td><td class="source"><a href="#ref-13">Cunningham et al. [13]</a>; patient prediction <a href="#ref-14">[14]</a></td><td>A holiday means a planned off-treatment interval. Its benefit depends on competition, turnover, burden, and measurement timing.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="methods">
+      <h2>Fitting, Pooling, BIC, And Identifiability</h2>
+      <dl>
+        <dt>Raw SSE</dt><dd>\(\mathrm{SSE}_{raw}=\sum_j\sum_t[y_j(t)-\hat y_j(t)]^2\). This is reported in original measurement units but allows large trajectories to dominate.</dd>
+        <dt>Trajectory-scaled SSE</dt><dd>\(\mathrm{SSE}_{scaled}=\sum_j\sum_t[(y_j(t)-\hat y_j(t))/s_j]^2\). The first sum runs over trajectories \(j\); the second runs over observation times within each trajectory. Scaling makes differently sized trajectories more comparable.</dd>
+        <dt>Joint fitting</dt><dd>All relevant trajectories contribute to one objective. Shared parameters represent a common cell-line mechanism; partial pooling permits only prespecified, bounded condition differences.</dd>
+        <dt>BIC</dt><dd>\(\mathrm{BIC}=n\ln(\mathrm{SSE}_{scaled}/n)+k\ln n\). Lower is preferred. The joint count \(k\) must include every shared and trajectory-specific fitted parameter exactly once. Schwarz introduced the criterion; its use here is an approximate Gaussian-error comparison, not proof that the winning mechanism is true. <a href="#ref-17">[17]</a></dd>
+        <dt>Multistart fitting</dt><dd>Repeated optimization from dispersed initial guesses tests whether the same optimum is recovered. Agreement raises confidence in numerical stability but cannot repair structural non-identifiability. <a href="#ref-18">[18]</a></dd>
+        <dt>Profile bounds</dt><dd>One parameter is fixed across a grid while all others are reoptimized. A bounded, bowl-shaped profile supports practical identifiability; a flat or one-sided profile warns that many parameter values explain the data similarly. <a href="#ref-16">[16]</a></dd>
+        <dt>Parameter stability</dt><dd>Variation across successful multistart fits detects weakly constrained directions. Stable predictions can coexist with unstable individual parameters.</dd>
+        <dt>Fixed \(u_0\) and time zero</dt><dd>The measured starting population is an initial condition, not a kinetic parameter. Changing seeding density changes the trajectory from day 0; it does not require interpreting unobserved negative days.</dd>
+        <dt>Staged inheritance</dt><dd>Untreated growth is learned before drug response; interaction is learned before treated coculture context. This reduces confounding, but uncertainty from earlier stages should ultimately be propagated rather than treating point estimates as exact.</dd>
+      </dl>
+      <p class="takeaway">Most important identifiability lesson: a low BIC can select the best predictive candidate in the tested set while the biological names attached to hidden states remain unproven.</p>
+    </section>
+
+    <section id="translation">
+      <h2>What Must Change Before Human-Tumor Simulation</h2>
+      <p>A larger carrying capacity can create a longer growth horizon, but simply raising the dish-scale \(K\) does not produce a clinically calibrated tumor. At least five new layers are required:</p>
+      <ol>
+        <li><strong>Units and observation model:</strong> connect cells or confluence to tumor volume, imaging burden, ctDNA, CA-125, or another measured clinical signal.</li>
+        <li><strong>Patient-scale growth calibration:</strong> estimate growth and turnover from longitudinal human data; do not transfer plate-day parameters unchanged.</li>
+        <li><strong>Pharmacokinetics and pharmacodynamics:</strong> replace a media-refresh waveform with drug concentration, clearance, tissue penetration, and dose-limiting constraints.</li>
+        <li><strong>Spatial and environmental capacity:</strong> vascular supply, immune/stromal interactions, and metastatic sites make carrying capacity dynamic rather than one fixed plate limit.</li>
+        <li><strong>Prospective validation:</strong> freeze the model and predict new schedules or new experiments before using it to rank therapies.</li>
+      </ol>
+      <p>Prostate adaptive therapy demonstrates that patient-specific feedback control is feasible when a longitudinal biomarker is available. Ovarian studies show encouraging preclinical adaptive-therapy results, but the appropriate ovarian feedback marker, drug exposure model, and stopping rules still require disease-specific validation. <a href="#ref-6">[6]</a> <a href="#ref-12">[12]</a> <a href="#ref-13">[13]</a></p>
+    </section>
+
+    <section id="bibliography">
+      <h2>Bibliography</h2>
+      <p class="small">Primary research is prioritized. Links open the article, PubMed record, or DOI landing page.</p>
+      <ol class="references">
+        <li id="ref-1">Benzekry S, et al. <em>Classical mathematical models for description and prediction of experimental tumor growth.</em> PLOS Computational Biology. 2014;10:e1003800. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4148196/">Full text</a> | <a href="https://doi.org/10.1371/journal.pcbi.1003800">DOI</a></li>
+        <li id="ref-2">Hafner M, et al. <em>Growth rate inhibition metrics correct for confounders in measuring sensitivity to cancer drugs.</em> Nature Methods. 2016;13:521-527. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4887336/">Full text</a> | <a href="https://doi.org/10.1038/nmeth.3853">DOI</a></li>
+        <li id="ref-3">Simeoni M, et al. <em>Predictive pharmacokinetic-pharmacodynamic modeling of tumor growth kinetics in xenograft models after administration of anticancer agents.</em> Cancer Research. 2004;64:1094-1101. <a href="https://pubmed.ncbi.nlm.nih.gov/14871843/">PubMed</a> | <a href="https://doi.org/10.1158/0008-5472.CAN-03-2524">DOI</a></li>
+        <li id="ref-4">West J, et al. <em>Adaptive therapy for ovarian cancer: An integrated approach to PARP inhibitor scheduling.</em> eLife. 2023. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10055330/">Full text</a></li>
+        <li id="ref-5"><em>Exploiting the synergy between carboplatin and ABT-737 in the treatment of ovarian carcinomas.</em> PLOS ONE. 2014. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3882219/">Full text</a></li>
+        <li id="ref-6">Enriquez-Navas PM, et al. <em>Adaptive therapy.</em> Cancer Research. 2012. OVCAR-3 carboplatin xenograft study. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3728826/">Full text</a></li>
+        <li id="ref-7"><em>E2F1 mediates competition, proliferation and response to cisplatin in cohabitating resistant and sensitive ovarian cancer cells.</em> 2024. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10853425/">Full text</a></li>
+        <li id="ref-8"><em>Adaptive therapy achieves long-term control of chemotherapy resistance in high grade ovarian cancer.</em> 2023. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10401956/">Full text</a></li>
+        <li id="ref-9"><em>Effector T cells abrogate stroma-mediated chemoresistance in ovarian cancer.</em> 2016. Includes A2780 cisplatin experiments. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4874853/">Full text</a></li>
+        <li id="ref-10"><em>Formation of stable small cell number three-dimensional ovarian cancer spheroids using hanging drop arrays for preclinical drug sensitivity assays.</em> 2015. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4480341/">Full text</a></li>
+        <li id="ref-11">Salgado M, et al. <em>Virtual clinical trials identify effective combination therapies in ovarian cancer.</em> Scientific Reports. 2019. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6904444/">Full text</a></li>
+        <li id="ref-12">Zhang J, et al. <em>Integrating evolutionary dynamics into treatment of metastatic castrate-resistant prostate cancer.</em> Nature Communications. 2017;8:1816. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5703947/">Full text</a> | <a href="https://doi.org/10.1038/s41467-017-01968-5">DOI</a></li>
+        <li id="ref-13">Cunningham JJ, et al. <em>Evolution-based mathematical models significantly prolong response to abiraterone in metastatic castrate-resistant prostate cancer and identify strategies to further improve outcomes.</em> eLife. 2022. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9239688/">Full text</a></li>
+        <li id="ref-14">Brady-Nicholls R, et al. <em>Prostate-specific antigen dynamics predict individual responses to intermittent androgen deprivation.</em> Nature Communications. 2020. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7145869/">Full text</a></li>
+        <li id="ref-15">Strobl MAR, et al. <em>Turnover modulates the need for a cost of resistance in adaptive therapy.</em> Cancer Research. 2021. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8455086/">Full text</a></li>
+        <li id="ref-16">Raue A, et al. <em>Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood.</em> Bioinformatics. 2009;25:1923-1929. <a href="https://pubmed.ncbi.nlm.nih.gov/19505944/">PubMed</a> | <a href="https://doi.org/10.1093/bioinformatics/btp358">DOI</a></li>
+        <li id="ref-17">Schwarz G. <em>Estimating the dimension of a model.</em> The Annals of Statistics. 1978;6:461-464. <a href="https://doi.org/10.1214/aos/1176344136">DOI</a></li>
+        <li id="ref-18"><em>Parameter estimation and uncertainty quantification for systems biology models.</em> 2020. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7384601/">Full text</a></li>
+        <li id="ref-19"><em>Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer to achieve long-term tumor control.</em> Cancer Research. 2025. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12434395/">Full text</a></li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Prepared as a research companion to the A2780 staged model comparison and adaptive-treatment simulator. This page is an interpretive map of the literature, not a clinical protocol.</p>
+  </footer>
+</body>
+</html>
