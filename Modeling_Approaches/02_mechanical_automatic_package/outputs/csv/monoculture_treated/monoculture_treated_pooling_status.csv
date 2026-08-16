@@ -1,3 +1,3 @@
 cell_line,winning_model,winning_pooling_mode,winning_bic,best_independent_bic,independent_bic_improvement,inadequacy_delta,inadequate_pooling,inheritance_allowed
 A2780Naive,joint_ic_effect_hill_ramp_onset,partial_5pct,-297.5391781275575,-260.8270616140969,-36.71211651346056,10.0,false,true
-A2780cis,joint_ic_effect_two_population,partial_5pct,-365.2951998536487,-336.6548400884403,-28.64035976520836,10.0,false,true
+A2780cis,joint_ic_effect_two_population,partial_5pct,-365.2951998536487,-340.4047338319733,-24.890466021675365,10.0,false,true

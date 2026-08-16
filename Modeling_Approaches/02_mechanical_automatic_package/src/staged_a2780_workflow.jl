@@ -39,6 +39,7 @@ const JOINT_MODEL_LABELS = Dict(
     "joint_ic_effect_hill_ramp_onset" => "Delayed Hill ramp",
     "joint_ic_effect_transit_death" => "Transit damage/death",
     "joint_ic_effect_two_population" => "Sensitive/tolerant",
+    "joint_intracellular_platinum_pkpd" => "Intracellular platinum PK/PD",
 )
 
 function _is_valid_metric(x)
@@ -743,6 +744,7 @@ const REPORT_MODEL_LABELS = Dict(
     "joint_ic_effect_hill_ramp_onset" => "Delayed Hill-ramp kill",
     "joint_ic_effect_transit_death" => "Transit damage/death",
     "joint_ic_effect_two_population" => "Sensitive/tolerant populations",
+    "joint_intracellular_platinum_pkpd" => "Intracellular platinum PK/PD",
     "independent_onset_gradual" => "Independent onset plus gradual activation",
     "shared_onset_gradual" => "Shared onset plus gradual activation",
     "partial_onset_0_5day" => "Onsets within 0.5 day plus gradual activation",
@@ -769,6 +771,7 @@ const REPORT_MODEL_EQUATIONS = Dict(
     "joint_ic_effect_hill_ramp_onset" => raw"\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t>t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)",
     "joint_ic_effect_transit_death" => raw"\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)",
     "joint_ic_effect_two_population" => raw"\(\displaystyle \frac{dS}{dt}=G(S+T)\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\quad \frac{dT}{dt}=G(S+T)\frac{T}{S+T}-A_C(t)H_{CT}(z)T\)",
+    "joint_intracellular_platinum_pkpd" => raw"\(\displaystyle \frac{dc_i}{dt}=D-k_{\mathrm{efflux}}c_i,\quad \frac{dc_k}{dt}=c_i-k_{\mathrm{repair}}c_k,\quad \frac{dX}{dt}=G_i(X)-H(c_k)X\)",
     "independent_onset_gradual" => raw"\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on},C})\)",
     "shared_onset_gradual" => raw"\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on}}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on}})\)",
     "partial_onset_0_5day" => raw"\(t_{\mathrm{on},N}=\bar t_{\mathrm{on}}-\delta_t,\quad t_{\mathrm{on},C}=\bar t_{\mathrm{on}}+\delta_t,\quad |\delta_t|\le 0.5\,\mathrm{d}\)",
@@ -1179,6 +1182,8 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <p class="equation-label"><strong>Sensitive/tolerant populations</strong></p><div class="math">\\[\\frac{dS}{dt}=G(S+T)\\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\\qquad \\frac{dT}{dt}=G(S+T)\\frac{T}{S+T}-A_C(t)H_{CT}(z)T\\]</div>
     <div class="math">\\[\\widehat y=S+T\\]</div>
     <p>Both latent states share one inherited total-growth law but have different kill amplitudes. Their initial split is controlled by <code>f_T0</code>. This is the selected A2780cis mechanism.</p>
+    <p class="equation-label"><strong>Intracellular platinum PK/PD</strong></p><div class="math">\\[\\frac{dc_i}{dt}=D-k_{\\mathrm{efflux}}c_i,\\qquad \\frac{dc_k}{dt}=c_i-k_{\\mathrm{repair}}c_k,\\qquad \\frac{dX}{dt}=G(X)-H(c_k)X\\]</div>
+    <p>This literature-grounded diagnostic candidate adds lumped intracellular platinum and DNA-bound platinum states. Uptake and binding scales are fixed because cell-count-only trajectories cannot separately identify them from kill amplitude; intracellular platinum or DNA-adduct measurements would be needed for a fully mechanistic fit.</p>
     <p><strong>Timing audit:</strong> independent onset plus ramp; shared onset plus ramp; onset differences bounded within 0.5 day; resistant gradual-only; and resistant onset-only.</p>
     <p>These timing candidates refit the same 12-trajectory objective through <code>GrowthParameterEstimation.run_joint_multistart</code>. BIC therefore compares the timing architectures with their different parameter counts on an identical data set.</p>
   </article>

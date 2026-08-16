@@ -404,6 +404,12 @@ function _joint_treated_model_specs(
     ramp_onset = pooled_spec([1.8, 0.5, 4.0, 0.8, 2.0], [(0.0, 5.0), (0.05, 1.0), (0.2, 12.0), (0.01, 5.0), (0.0, 7.0)], [:emax, :ec50_effect, :hill_n, :lambda, :t_onset], [1])
     transit = pooled_spec([1.8, 0.8, 1.5, 0.5], [(0.0, 5.0), (0.01, 5.0), (0.0, 7.0), (0.01, 5.0)], [:emax, :lambda, :t_onset, :k_clear], [1])
     populations = pooled_spec([2.0, 0.5, 0.8, 1.5, 0.1], [(0.0, 5.0), (0.0, 3.0), (0.01, 5.0), (0.0, 7.0), (0.0, 0.95)], [:emax_sensitive, :emax_tolerant, :lambda, :t_onset, :f_tolerant0], [1, 2])
+    platinum_pkpd = pooled_spec(
+        [1.5, 0.5, 3.0, 1.0, 0.5],
+        [(0.0, 5.0), (0.01, 5.0), (0.2, 10.0), (0.02, 5.0), (0.02, 5.0)],
+        [:emax, :ec50_bound, :hill_n, :k_efflux, :k_repair],
+        [1],
+    )
 
     function linear_kill!(du, u, p, t)
         for i in eachindex(doses)
@@ -507,6 +513,27 @@ function _joint_treated_model_specs(
             tolerant_share = total > 0 ? tolerant / total : zero(total)
             du[sensitive_idx] = total_growth * sensitive_share - kill_sensitive * sensitive
             du[tolerant_idx] = total_growth * tolerant_share - kill_tolerant * tolerant
+        end
+    end
+
+    # Lumped adaptation of El-Kareh and Secomb (2003). Uptake and DNA binding
+    # scales are fixed to one because cell-count trajectories alone cannot
+    # separately identify both scales and the downstream kill amplitude.
+    function intracellular_platinum_pkpd!(du, u, p, t)
+        for i in eachindex(doses)
+            emax, ec50_bound, hill_n, k_efflux, k_repair = platinum_pkpd.local_parameters(p, i)
+            live_idx = 3i - 2
+            intracellular_idx = live_idx + 1
+            bound_idx = live_idx + 2
+            live = max(u[live_idx], zero(u[live_idx]))
+            intracellular = max(u[intracellular_idx], zero(u[intracellular_idx]))
+            dna_bound = max(u[bound_idx], zero(u[bound_idx]))
+            extracellular = max(doses[i], 0.0)
+            kill = _hill_effect(dna_bound, emax, ec50_bound, hill_n)
+
+            du[live_idx] = untreated_growth(live, i) - kill * live
+            du[intracellular_idx] = extracellular - max(k_efflux, 1e-8) * intracellular
+            du[bound_idx] = intracellular - max(k_repair, 1e-8) * dna_bound
         end
     end
 
@@ -615,6 +642,19 @@ function _joint_treated_model_specs(
             dose_basis = "IC_effect_level",
             behavior = "sensitive/tolerant populations; EC50=0.5 and Hill n=4 fixed",
         ),
+        "joint_intracellular_platinum_pkpd" => (
+            model = intracellular_platinum_pkpd!,
+            p0 = platinum_pkpd.p0,
+            bounds = platinum_pkpd.bounds,
+            layout = :platinum_pkpd,
+            param_names = platinum_pkpd.param_names,
+            base_param_names = platinum_pkpd.base_param_names,
+            base_bounds = platinum_pkpd.base_bounds,
+            amplitude_indices = platinum_pkpd.amplitude_indices,
+            local_parameters = platinum_pkpd.local_parameters,
+            dose_basis = "extracellular_cisplatin_uM",
+            behavior = "lumped cisplatin uptake, DNA binding/repair, and DNA-bound Hill kill",
+        ),
     )
 end
 
@@ -656,6 +696,17 @@ function _joint_model_inputs(spec, datasets, initial_counts, density_indices)
             end for (i, n0) in enumerate(initial_counts)]))
         end
         return mapped, u0, u0_builder
+    elseif spec.layout == :platinum_pkpd
+        mapped = [(
+            x = datasets[i].x,
+            y = datasets[i].y,
+            residual_scale = datasets[i].residual_scale,
+            observable = let live_idx = 3i - 2
+                (u, p, t) -> u[live_idx]
+            end,
+        ) for i in eachindex(datasets)]
+        u0 = reduce(vcat, ([n0, 0.0, 0.0] for n0 in initial_counts))
+        return mapped, u0, nothing
     end
     error("Unknown joint model layout: $(spec.layout)")
 end
@@ -675,6 +726,10 @@ function _joint_ic75_long_term_fate(model_name::String, p, r_anchor::Float64)
             r_anchor - _hill_effect(signal, p[1], 0.5, 4.0),
             r_anchor - _hill_effect(signal, p[2], 0.5, 4.0),
         ]
+    elseif model_name == "joint_intracellular_platinum_pkpd"
+        emax, ec50_bound, hill_n, k_efflux, k_repair = p[1:5]
+        steady_bound = 1.47 / max(k_efflux * k_repair, 1e-12)
+        [r_anchor - _hill_effect(steady_bound, emax, ec50_bound, hill_n)]
     elseif model_name == "joint_time_decay_dose_scaled"
         [r_anchor]
     else
@@ -974,6 +1029,7 @@ function _run_joint_treated_monoculture_fitting(
             "joint_ic_effect_hill_ramp_onset" => "Delayed Hill ramp",
             "joint_ic_effect_transit_death" => "Transit damage/death",
             "joint_ic_effect_two_population" => "Sensitive/tolerant",
+            "joint_intracellular_platinum_pkpd" => "Intracellular platinum PK/PD",
         )
         for grp in groupby(overlay_df, [:cell_line, :density])
             cell_label = _safe_string(first(grp.cell_line); default = "pooled")
@@ -1408,6 +1464,7 @@ function _run_density_aware_treated_monoculture_fitting(
                     n_points = sum(length(dataset.x) for dataset in datasets),
                     n_densities = 2,
                     n_doses = length(unique(doses)),
+                    ic_mapping = join(unique(["$(doses[i])=$(ic_labels[i])" for i in eachindex(doses)]), ";"),
                     joint_group = joint_group,
                     growth_family = first(growth_families),
                     growth_inheritance = "exact_density_specific_untreated_family_and_parameters",

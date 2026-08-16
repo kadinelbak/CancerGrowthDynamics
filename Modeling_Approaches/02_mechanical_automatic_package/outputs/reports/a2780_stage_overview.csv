@@ -1,5 +1,5 @@
 condition,status,decoded_rows,fit_rows,best_model,best_bic,best_ssr,message
 monoculture_untreated,completed,179,30,theta_logistic_growth,-181.569368706612,1.3836237102720826e6,Reused validated executed outputs.
-monoculture_treated,completed,504,48,joint_ic_effect_two_population,-365.2951998536487,1.1687176617724039e7,Reused validated executed outputs.
+monoculture_treated,completed,504,54,joint_ic_effect_two_population,-365.2951998536487,1.1687176617724039e7,Reused validated executed outputs.
 coculture_untreated,completed,502,9,lv_asymmetric_competition_death,-684.7362328692607,1.3889242992032653e7,Reused validated executed outputs.
 coculture_treated,completed,1176,21,dual_transit_load_scaled,-617.7818828967949,2.5994323121657025e7,Reused validated executed outputs.

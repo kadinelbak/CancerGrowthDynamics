@@ -104,7 +104,15 @@ finite_metric(values) = all(value -> isfinite(Float64(value)) && abs(Float64(val
     @test occursin("Onset and gradual-effect combinations", html)
     @test occursin("load_plus_tolerant_growth_context", html)
     @test occursin("tex-chtml.js", html)
-    @test count("notation key", html) == 4
+    for key in (
+        "Stage 1 notation key",
+        "Stage 2 notation key",
+        "Timing-audit notation key",
+        "Stage 3 notation key",
+        "Stage 4 notation key",
+    )
+        @test occursin(key, html)
+    end
     @test occursin(raw"\frac{dX}{dt}", html)
     @test occursin(raw"\frac{dP}{dt}", html)
     @test occursin(raw"\frac{dN}{dt}", html)

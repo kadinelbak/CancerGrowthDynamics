@@ -171,6 +171,14 @@
             <div class="row"><input id="capacityMultiplier" type="range" min="1" max="100" step="1" value="1"><span class="value" id="capacityMultiplierValue"></span></div>
             <span class="composition-note">Scales the fitted dish carrying capacities. This changes the population ceiling, not the time unit.</span>
           </label>
+          <label>Background cell-turnover rate
+            <div class="row"><input id="turnoverRate" type="range" min="0" max="0.20" step="0.005" value="0.02"><span class="value" id="turnoverRateValue"></span></div>
+            <span class="composition-note">Density-independent loss applied to every modeled population. This is exploratory unless measured with death or clearance markers.</span>
+          </label>
+          <label>Tolerant/resistant fitness ratio
+            <div class="row"><input id="resistantFitness" type="range" min="0.50" max="1.20" step="0.01" value="0.92"><span class="value" id="resistantFitnessValue"></span></div>
+            <span class="composition-note">A value below 1 assigns the tolerant/resistant state a growth cost when treatment is absent.</span>
+          </label>
           <label data-control="dose">Maximum dose intensity
             <div class="row"><input id="maxDose" type="range" min="0" max="1" step="0.01" value="0.75"><span class="value" id="maxDoseValue"></span></div>
           </label>
@@ -188,6 +196,10 @@
           </label>
           <label data-control="tolerantThreshold">Tolerant/resistant trigger threshold
             <div class="row"><input id="tolerantThreshold" type="range" min="50" max="250000" step="50" value="900"><span class="value" id="tolerantThresholdValue"></span></div>
+          </label>
+          <label data-control="monitor">Treatment-decision interval
+            <div class="row"><input id="monitorInterval" type="range" min="0.5" max="14" step="0.5" value="2"><span class="value" id="monitorIntervalValue"></span></div>
+            <span class="composition-note">Adaptive treatment is reconsidered only at these discrete monitoring times, then held constant until the next decision.</span>
           </label>
         </div>
         <div class="button-row">
@@ -236,11 +248,14 @@
       <p class="note">Here \(m_r\) and \(m_K\) are hypothetical scaling assumptions. They are not estimates of human tumor growth or human carrying capacity.</p>
       <p>Each lineage feels an effective coculture load:</p>
       <div class="math">\[L_N=N+\alpha_{NC}C,\qquad L_C=C+\alpha_{CN}N\]</div>
-      <p>Treatment intensity \(u(t)\) ranges from 0 to 1 and scales kill pressure. The original reference schedule refreshes media/treatment every 2 days, so the default reference simulation uses a two-day refresh interval.</p>
-      <div class="math">\[\frac{dN}{dt}=G_N(N,L_N)-u(t)k_NN\]</div>
-      <div class="math">\[\frac{dS}{dt}=G_C(C,L_C)\frac{S}{C}-u(t)k_SS-q_{ST}u(t)S\]</div>
-      <div class="math">\[\frac{dT}{dt}=\rho_TG_C(C,L_C)\frac{T}{C}-u(t)k_TT+q_{ST}u(t)S\]</div>
-      <p class="note">The fitted-reproduction curves contain no added \(q_{ST}\) mechanism. In the schedule sandbox, \(q_{ST}\) is an optional hypothetical stress-induced shift and \(\rho_T\) is applied only under treatment in coculture. Schedule results remain exploratory until those terms and treatment waveforms are experimentally fitted or validated.</p>
+      <p>Treatment intensity \(u(t)\) ranges from 0 to 1. Following the lumped cisplatin pharmacodynamic structure of El-Kareh and Secomb, the sandbox first tracks intracellular platinum \(c_i\) and DNA-bound platinum \(c_k\). The kill signal \(H(c_k)\) therefore persists and decays after extracellular treatment is paused.</p>
+      <div class="math">\[\frac{dc_i}{dt}=k_{in}u(t)-k_{out}c_i,\qquad \frac{dc_k}{dt}=k_{bind}c_i-k_{repair}c_k\]</div>
+      <div class="math">\[H(c_k)=\frac{c_k^h}{EC_{50,k}^{h}+c_k^h}\]</div>
+      <div class="math">\[\frac{dN}{dt}=G_N(N,L_N)-d_TN-H(c_k)k_NN\]</div>
+      <div class="math">\[\frac{dS}{dt}=G_C(C,L_C)\frac{S}{C}-d_TS-H(c_k)k_SS-q_{ST}H(c_k)S\]</div>
+      <div class="math">\[\frac{dT}{dt}=\rho_TG_C(C,L_C)\frac{T}{C}-d_TT-H(c_k)k_TT+q_{ST}H(c_k)S\]</div>
+      <p>Adaptive schedules evaluate their threshold rule only at \(t_m=m\tau_{monitor}\), then hold the chosen dose until the next observation. This prevents the browser model from assuming continuous, perfectly informed clinical decisions.</p>
+      <p class="note">The fitted-reproduction curves contain no added \(q_{ST}\), \(d_T\), or intracellular-platinum mechanism. In the schedule sandbox these are literature-motivated hypotheses, not fitted A2780 parameters. The latent \(S/T\) split remains unproven without state-resolved measurements.</p>
     </section>
     <section class="panel" style="margin-top:18px" id="scheduleMetricsPanel">
       <h2>Current Schedule Metrics</h2>
@@ -256,11 +271,11 @@
     let activeLibraryKey = "coculture_treated__20k__50-50__1";
     let activeCategory = originalDataLibrary[activeLibraryKey].category;
     Object.values(originalDataLibrary).forEach(lib => { lib.naive = lib.naive || []; lib.cis = lib.cis || []; });
-    const ids = ["initialTotal","cisFraction","tolerantFraction","days","growthMultiplier","capacityMultiplier","maxDose","refreshInterval","pulseOn","pulseOff","totalThreshold","tolerantThreshold"];
+    const ids = ["initialTotal","cisFraction","tolerantFraction","days","growthMultiplier","capacityMultiplier","turnoverRate","resistantFitness","maxDose","refreshInterval","pulseOn","pulseOff","totalThreshold","tolerantThreshold","monitorInterval"];
     const defaults = {
       initialTotal: 3000, cisFraction: 0.50, tolerantFraction: 0.25, days: 60,
-      growthMultiplier: 1, capacityMultiplier: 1, maxDose: 0.75,
-      refreshInterval: 2, pulseOn: 5, pulseOff: 9, totalThreshold: 4500, tolerantThreshold: 900, schedule: "originalRefresh"
+      growthMultiplier: 1, capacityMultiplier: 1, turnoverRate: 0.02, resistantFitness: 0.92, maxDose: 0.75,
+      refreshInterval: 2, pulseOn: 5, pulseOff: 9, totalThreshold: 4500, tolerantThreshold: 900, monitorInterval: 2, schedule: "originalRefresh"
     };
     const colors = {
       naive: "#dc143c", sensitive: "#f59e0b", tolerant: "#2563eb", total: "#111827", dose: "#7c3aed",
@@ -290,15 +305,18 @@
         days: val("days"),
         growthMultiplier: val("growthMultiplier"),
         capacityMultiplier: val("capacityMultiplier"),
+        turnoverRate: val("turnoverRate"),
+        resistantFitness: val("resistantFitness"),
         maxDose: val("maxDose"),
         refreshInterval: val("refreshInterval"),
         pulseOn: val("pulseOn"),
         pulseOff: val("pulseOff"),
         totalThreshold: val("totalThreshold"),
         tolerantThreshold: val("tolerantThreshold"),
+        monitorInterval: val("monitorInterval"),
         rN: 0.8717175226, rC: 0.4868642252, KN: 4031.664864, KC: 3802.902823, thetaN: 1.0, thetaC: 3.083910326,
         alphaNC: 0.58, alphaCN: 0.72, kN: 0.030, kS: 0.155, kT: 0.045,
-        rhoT: 0.92, qST: 0.012
+        qST: 0.012, kUptake: 1.0, kEfflux: 1.0, kBind: 1.0, kRepair: 0.5, boundEc50: 0.5, boundHill: 3.0
       };
     }
     function updateControlVisibility() {
@@ -309,7 +327,8 @@
         refresh: schedule === "originalRefresh",
         pulse: schedule === "pulse",
         totalThreshold: schedule === "adaptiveTotal" || schedule === "holiday",
-        tolerantThreshold: schedule === "adaptiveTolerant" || schedule === "holiday"
+        tolerantThreshold: schedule === "adaptiveTolerant" || schedule === "holiday",
+        monitor: schedule === "adaptiveTotal" || schedule === "adaptiveTolerant" || schedule === "holiday"
       };
       document.querySelectorAll("[data-control]").forEach(control => {
         const key = control.dataset.control;
@@ -324,12 +343,15 @@
         days: x => Math.round(x) + " d",
         growthMultiplier: x => x.toFixed(2) + "x",
         capacityMultiplier: x => Math.round(x) + "x",
+        turnoverRate: x => x.toFixed(3) + " /d",
+        resistantFitness: x => x.toFixed(2) + "x",
         maxDose: x => x.toFixed(2),
         refreshInterval: x => x.toFixed(1) + " d",
         pulseOn: x => Math.round(x) + " d",
         pulseOff: x => Math.round(x) + " d",
         totalThreshold: x => Math.round(x).toString(),
-        tolerantThreshold: x => Math.round(x).toString()
+        tolerantThreshold: x => Math.round(x).toString(),
+        monitorInterval: x => x.toFixed(1) + " d"
       };
       ids.forEach(id => document.getElementById(id + "Value").textContent = format[id](val(id)));
       document.getElementById("naiveFractionValue").textContent = "Naive " + (100 * (1 - val("cisFraction"))).toFixed(0) + "%";
@@ -383,7 +405,7 @@
         button.addEventListener("click", () => applyLibraryPreset(button.dataset.libraryKey));
       });
     }
-    function doseAt(t, state, p, schedule) {
+    function requestedDoseAt(t, state, p, schedule) {
       if (schedule === "none") return 0;
       const total = state.N + state.S + state.T;
       if (schedule === "originalRefresh") {
@@ -412,21 +434,25 @@
       const GC = p.growthMultiplier * p.rC * C * Math.max(1 - Math.pow(LC / scaledKC, p.thetaC), -1.5);
       const sShare = state.S / C;
       const tShare = state.T / C;
-      const shift = p.qST * dose * state.S;
+      const boundPower = Math.pow(Math.max(state.Ck, 0), p.boundHill);
+      const killSignal = boundPower / (Math.pow(p.boundEc50, p.boundHill) + boundPower + 1e-12);
+      const shift = p.qST * killSignal * state.S;
       return {
-        N: GN - dose * p.kN * state.N,
-        S: GC * sShare - dose * p.kS * state.S - shift,
-        T: (isCoculture && dose > 0 ? p.rhoT : 1) * GC * tShare - dose * p.kT * state.T + shift
+        N: GN - p.turnoverRate * state.N - killSignal * p.kN * state.N,
+        S: GC * sShare - p.turnoverRate * state.S - killSignal * p.kS * state.S - shift,
+        T: p.resistantFitness * GC * tShare - p.turnoverRate * state.T - killSignal * p.kT * state.T + shift,
+        Ci: p.kUptake * dose - p.kEfflux * state.Ci,
+        Ck: p.kBind * state.Ci - p.kRepair * state.Ck
       };
     }
-    function stepEuler(state, t, dt, p, schedule) {
-      const dose = doseAt(t, state, p, schedule);
+    function stepEuler(state, dt, p, dose) {
       const d = deriv(state, dose, p);
       return {
         N: Math.max(0, state.N + dt * d.N),
         S: Math.max(0, state.S + dt * d.S),
         T: Math.max(0, state.T + dt * d.T),
-        dose
+        Ci: Math.max(0, state.Ci + dt * d.Ci),
+        Ck: Math.max(0, state.Ck + dt * d.Ck)
       };
     }
     function simulate(scheduleName) {
@@ -435,20 +461,29 @@
       let state = {
         N: p.initialTotal * (1 - p.cisFraction),
         S: initialC * (1 - p.tolerantFraction),
-        T: initialC * p.tolerantFraction
+        T: initialC * p.tolerantFraction,
+        Ci: 0,
+        Ck: 0
       };
       const dt = 0.05;
       const out = [];
       let aucTotal = 0, doseDays = 0;
+      let heldDose = requestedDoseAt(0, state, p, scheduleName);
+      let nextDecision = Math.max(p.monitorInterval, dt);
+      const adaptiveSchedule = ["adaptiveTotal", "adaptiveTolerant", "holiday"].includes(scheduleName);
       for (let t = 0; t <= p.days + 1e-9; t += dt) {
         const total = state.N + state.S + state.T;
-        const dose = doseAt(t, state, p, scheduleName);
+        if (adaptiveSchedule && t + dt / 2 >= nextDecision) {
+          heldDose = requestedDoseAt(t, state, p, scheduleName);
+          nextDecision += Math.max(p.monitorInterval, dt);
+        }
+        const dose = adaptiveSchedule ? heldDose : requestedDoseAt(t, state, p, scheduleName);
         if (Math.abs(t - Math.round(t)) < dt / 2) {
-          out.push({t: Math.round(t), N: state.N, S: state.S, T: state.T, total, dose});
+          out.push({t: Math.round(t), N: state.N, S: state.S, T: state.T, total, dose, intracellular: state.Ci, dnaBound: state.Ck});
         }
         aucTotal += total * dt;
         doseDays += dose > 1e-9 ? dt : 0;
-        state = stepEuler(state, t, dt, p, scheduleName);
+        state = stepEuler(state, dt, p, dose);
       }
       const last = out[out.length - 1];
       return {schedule: scheduleName, series: out, metrics: {finalTotal: last.total, finalTolerant: last.T, aucTotal, doseDays}};
