@@ -129,6 +129,7 @@
     <div class="notice"><strong>Scientific boundary:</strong> a citation beside an equation means that the paper supports the model class or biological idea. It does not prove that the paper's mechanism is the mechanism operating in this A2780 data set. In particular, total A2780cis counts cannot by themselves prove latent sensitive-like and tolerant-like subpopulations.</div>
     <nav aria-label="Page sections">
       <a href="#reading">How to read this page</a>
+      <a href="#foundational">Foundational papers</a>
       <a href="#biology">Biological grounding</a>
       <a href="#models">Every model and reference</a>
       <a href="#methods">Fitting and identifiability</a>
@@ -149,6 +150,20 @@
       </div>
     </section>
 
+    <section id="foundational">
+      <h2>Foundational Research Selected For This Project</h2>
+      <p>These six unique papers, supplied by the project lead, define the primary research framework for the current A2780 modeling program. They anchor cisplatin pharmacodynamics, ovarian dose-response heterogeneity, resistant-cell fitness and turnover, adaptive-treatment timing, and model credibility. Other papers on this page provide model-specific or cross-cancer support and are treated as supplementary.</p>
+      <div class="evidence-grid">
+        <div class="evidence-item established"><strong>Cisplatin pharmacodynamics</strong><span class="small">El-Kareh and Secomb motivate intracellular and DNA-bound platinum states. <a href="#ref-20">[20]</a></span></div>
+        <div class="evidence-item cross"><strong>Turnover and resistance cost</strong><span class="small">Strobl et al. motivate explicit turnover and resistant-fitness assumptions in adaptive therapy. <a href="#ref-15">[15]</a></span></div>
+        <div class="evidence-item ovarian"><strong>Ovarian dose-response diversity</strong><span class="small">Bicaku et al. ground heterogeneous platinum response across ovarian cancer cell lines. <a href="#ref-21">[21]</a></span></div>
+        <div class="evidence-item ovarian"><strong>Ovarian adaptive therapy</strong><span class="small">Hockings et al. ground the resistant-fitness-cost and treatment-withdrawal rationale in ovarian cancer. <a href="#ref-19">[19]</a></span></div>
+        <div class="evidence-item hypothesis"><strong>Adaptive decision timing</strong><span class="small">Gallagher et al. motivate discrete monitoring intervals; this source is a preprint and is not peer reviewed. <a href="#ref-22">[22]</a></span></div>
+        <div class="evidence-item established"><strong>Model credibility</strong><span class="small">Braakman et al. define the evaluation and validation framework; they do not validate a specific A2780 mechanism. <a href="#ref-23">[23]</a></span></div>
+      </div>
+      <p class="small">The two supplied turnover URLs are publisher and PMC routes to the same Strobl et al. paper, so they are represented once. The supplied Cancer Research link is the Hockings et al. ovarian fitness-deficit study listed as reference 19.</p>
+    </section>
+
     <section id="biology">
       <h2>Biological Grounding</h2>
       <div class="band">
@@ -163,9 +178,9 @@
         <h3>What remains unproven here</h3>
         <p>The labels <em>sensitive-like</em> and <em>tolerant-like</em> are latent mathematical states unless lineage-resolved markers, sorting, or single-cell measurements distinguish them. Likewise, the fitted exponential load modifier says that drug action covaries with modeled load; it does not identify the molecular pathway responsible for that covariance.</p>
 
-        <h3>How the newly supplied papers changed the project</h3>
+        <h3>How the foundational papers changed the project</h3>
         <p>The cisplatin pharmacodynamics paper motivated a new fitted diagnostic candidate with intracellular and DNA-bound platinum states. The turnover paper motivated an explicit background-loss control and resistant-fitness control in the schedule sandbox. The adaptive-timing preprint motivated discrete monitoring times rather than continuously updated treatment decisions. The ovarian cell-line study strengthens the use of dose-response heterogeneity but does not identify hidden states from total counts. The systems-model framework was added as validation guidance, not as biological evidence. <a href="#ref-20">[20]</a> <a href="#ref-15">[15]</a> <a href="#ref-22">[22]</a> <a href="#ref-21">[21]</a> <a href="#ref-23">[23]</a></p>
-        <p class="small">Two supplied URLs point to the same turnover article (PMC and AACR), and the supplied 2025 Cancer Research article is the same ovarian fitness-deficit study already listed as reference 19.</p>
+        <p class="small">Additional papers cited below supply equations, comparison models, ovarian context, clinical precedent, and fitting methodology. They supplement this foundational corpus rather than replacing it.</p>
       </div>
     </section>
 
@@ -175,7 +190,7 @@
 
       <h3>Stage 1: Untreated monoculture growth</h3>
       <div class="table-wrap"><table>
-        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Research support</th><th>Interpretation in this project</th></tr></thead>
         <tbody>
           <tr><td class="model">Exponential growth</td><td class="math">\(dX/dt=rX\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-1">Benzekry et al. [1]</a></td><td>Short-horizon, unconstrained growth baseline. It should not be extrapolated indefinitely.</td></tr>
           <tr><td class="model">Logistic growth</td><td class="math">\(dX/dt=rX(1-X/K)\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-1">Benzekry et al. [1]</a>; ovarian resource competition <a href="#ref-8">[8]</a></td><td>Represents a fixed assay-scale carrying capacity. It is descriptive, not a claim that only one resource limits growth.</td></tr>
@@ -187,7 +202,7 @@
 
       <h3>Stage 2: Treated monoculture response</h3>
       <div class="table-wrap"><table>
-        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Research support</th><th>Interpretation in this project</th></tr></thead>
         <tbody>
           <tr><td class="model">Anchored concentration-Hill kill</td><td class="math">\(dX/dt=G(X)-E_{\max}D^h/(EC_{50}^h+D^h)\,X\)</td><td><span class="badge established">Established</span></td><td class="source">Dose-response measurement <a href="#ref-2">Hafner et al. [2]</a></td><td>Maps concentration to effect magnitude. A Hill curve is phenomenological unless receptor/cooperativity biology is measured.</td></tr>
           <tr><td class="model">Immediate IC-Hill effect</td><td class="math">\(dX/dt=G(X)-H(z)X\)</td><td><span class="badge established">Established</span></td><td class="source"><a href="#ref-2">Hafner et al. [2]</a>; ovarian Hill response <a href="#ref-4">[4]</a></td><td>Assumes the full dose-dependent effect begins immediately.</td></tr>
@@ -202,7 +217,7 @@
 
       <h3>Stage 3: Untreated coculture</h3>
       <div class="table-wrap"><table>
-        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <thead><tr><th>Model</th><th>Core equation</th><th>Evidence</th><th>Research support</th><th>Interpretation in this project</th></tr></thead>
         <tbody>
           <tr><td class="model">Symmetric competition</td><td class="math">\(L_N=N+\alpha C\), \(L_C=C+\alpha N\); \(dN/dt=G_N(L_N)\), \(dC/dt=G_C(L_C)\)</td><td><span class="badge established">Established class</span> <span class="badge ovarian">Ovarian</span></td><td class="source">Ovarian resource competition <a href="#ref-8">[8]</a>; LV cancer precedent <a href="#ref-12">[12]</a></td><td>Tests equal cross-lineage effects. \(L_i\) is effective density, not a hidden compartment.</td></tr>
           <tr><td class="model">Asymmetric competition</td><td class="math">\(L_N=N+\alpha_{NC}C\), \(L_C=C+\alpha_{CN}N\)</td><td><span class="badge ovarian">Ovarian</span> <span class="badge cross">Prostate precedent</span></td><td class="source">Direction-dependent ovarian interaction <a href="#ref-7">[7]</a> <a href="#ref-8">[8]</a>; fitted asymmetric competition <a href="#ref-13">[13]</a></td><td>Allows one lineage to affect the other more strongly. Coefficients summarize net interaction and do not identify contact, nutrient, or signaling pathways.</td></tr>
@@ -212,7 +227,7 @@
 
       <h3>Stage 4: Treated coculture context</h3>
       <div class="table-wrap"><table>
-        <thead><tr><th>Model</th><th>Candidate-specific change</th><th>Evidence</th><th>Primary reference</th><th>Interpretation in this project</th></tr></thead>
+        <thead><tr><th>Model</th><th>Candidate-specific change</th><th>Evidence</th><th>Research support</th><th>Interpretation in this project</th></tr></thead>
         <tbody>
           <tr><td class="model">Strict inheritance</td><td class="math">Use Stage 1 growth, Stage 2 treatment, and Stage 3 interaction without new context parameters.</td><td><span class="badge established">Null model</span></td><td class="source">Stepwise ovarian model selection <a href="#ref-4">[4]</a></td><td>A necessary baseline: coculture should earn extra parameters by improving fit enough to overcome the complexity penalty.</td></tr>
           <tr><td class="model">Total-load-scaled drug effect</td><td class="math">\(M_i=e^{\beta_iL_i/K_i}\); treatment effect becomes \(M_iE_i(t,z)\)</td><td><span class="badge ovarian">Context evidence</span> <span class="badge hypothesis">Project form</span></td><td class="source">Density-dependent ovarian response <a href="#ref-4">[4]</a>; A2780 stromal protection <a href="#ref-9">[9]</a></td><td>Tests whether effective density predicts altered drug action. The exponential guarantees a positive multiplier; it is not a molecular law.</td></tr>
@@ -225,7 +240,7 @@
 
       <h3>Adaptive-treatment schedules</h3>
       <div class="table-wrap"><table>
-        <thead><tr><th>Schedule</th><th>Mathematical rule</th><th>Evidence</th><th>Primary reference</th><th>Boundary</th></tr></thead>
+        <thead><tr><th>Schedule</th><th>Mathematical rule</th><th>Evidence</th><th>Research support</th><th>Boundary</th></tr></thead>
         <tbody>
           <tr><td class="model">Continuous treatment</td><td class="math">\(u(t)=u_{max}\)</td><td><span class="badge established">Comparator</span></td><td class="source">Ovarian and prostate comparators <a href="#ref-6">[6]</a> <a href="#ref-12">[12]</a></td><td>Standard comparator, not necessarily clinically identical to continuous cisplatin exposure.</td></tr>
           <tr><td class="model">Fixed pulse / refresh</td><td class="math">Treatment alternates on/off on a predetermined clock.</td><td><span class="badge ovarian">Ovarian</span></td><td class="source">Intermittent PARPi schedules <a href="#ref-4">[4]</a></td><td>The laboratory two-day media refresh is represented as an exposure rule, not a measured pharmacokinetic profile.</td></tr>
@@ -268,7 +283,17 @@
 
     <section id="bibliography">
       <h2>Bibliography</h2>
-      <p class="small">Primary research is prioritized. Links open the article, PubMed record, or DOI landing page.</p>
+      <p class="small">The project-lead reading set is presented first as the foundational corpus. All other sources are supplementary research used to support individual equations, biological interpretations, clinical comparisons, or fitting methods. Links open the article, PubMed record, or DOI landing page.</p>
+      <h3>Foundational papers supplied for this project</h3>
+      <ol class="references">
+        <li id="ref-20" value="20">El-Kareh AW, Secomb TW. <em>A mathematical model for cisplatin cellular pharmacodynamics.</em> Neoplasia. 2003;5:161-169. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1502402/">Full text</a> | <a href="https://doi.org/10.1016/S1476-5586(03)80008-8">DOI</a></li>
+        <li id="ref-15" value="15">Strobl MAR, et al. <em>Turnover modulates the need for a cost of resistance in adaptive therapy.</em> Cancer Research. 2021. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8455086/">Full text</a> | <a href="https://aacrjournals.org/cancerres/article-abstract/81/4/1135/649183/Turnover-Modulates-the-Need-for-a-Cost-of">Publisher record</a></li>
+        <li id="ref-21" value="21">Bicaku E, et al. <em>In vitro analysis of ovarian cancer response to cisplatin, carboplatin, and paclitaxel identifies common pathways that are also associated with overall patient survival.</em> British Journal of Cancer. 2012;106:1967-1975. <a href="https://www.nature.com/articles/bjc2012207">Full text</a></li>
+        <li id="ref-19" value="19">Hockings C, et al. <em>Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer to achieve long-term tumor control.</em> Cancer Research. 2025. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12434395/">Full text</a> | <a href="https://aacrjournals.org/cancerres/article/85/18/3503/764448/Adaptive-Therapy-Exploits-Fitness-Deficits-in">Publisher record</a></li>
+        <li id="ref-22" value="22">Gallagher K, Strobl MAR, Anderson ARA, Maini PK. <em>Deriving optimal treatment timing for adaptive therapy: Matching the model to the tumor dynamics.</em> medRxiv. 2025. <strong>Preprint; not peer reviewed.</strong> <a href="https://www.medrxiv.org/content/10.1101/2025.04.01.25325056v1">Full text</a> | <a href="https://doi.org/10.1101/2025.04.01.25325056">DOI</a></li>
+        <li id="ref-23" value="23">Braakman S, Pathmanathan P, Moore H. <em>Evaluation framework for systems models.</em> CPT: Pharmacometrics &amp; Systems Pharmacology. 2022;11:264-289. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8923730/">Full text</a> | <a href="https://doi.org/10.1002/psp4.12755">DOI</a></li>
+      </ol>
+      <h3>Supplementary model and biological support</h3>
       <ol class="references">
         <li id="ref-1">Benzekry S, et al. <em>Classical mathematical models for description and prediction of experimental tumor growth.</em> PLOS Computational Biology. 2014;10:e1003800. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4148196/">Full text</a> | <a href="https://doi.org/10.1371/journal.pcbi.1003800">DOI</a></li>
         <li id="ref-2">Hafner M, et al. <em>Growth rate inhibition metrics correct for confounders in measuring sensitivity to cancer drugs.</em> Nature Methods. 2016;13:521-527. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4887336/">Full text</a> | <a href="https://doi.org/10.1038/nmeth.3853">DOI</a></li>
@@ -284,15 +309,9 @@
         <li id="ref-12">Zhang J, et al. <em>Integrating evolutionary dynamics into treatment of metastatic castrate-resistant prostate cancer.</em> Nature Communications. 2017;8:1816. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5703947/">Full text</a> | <a href="https://doi.org/10.1038/s41467-017-01968-5">DOI</a></li>
         <li id="ref-13">Cunningham JJ, et al. <em>Evolution-based mathematical models significantly prolong response to abiraterone in metastatic castrate-resistant prostate cancer and identify strategies to further improve outcomes.</em> eLife. 2022. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9239688/">Full text</a></li>
         <li id="ref-14">Brady-Nicholls R, et al. <em>Prostate-specific antigen dynamics predict individual responses to intermittent androgen deprivation.</em> Nature Communications. 2020. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7145869/">Full text</a></li>
-        <li id="ref-15">Strobl MAR, et al. <em>Turnover modulates the need for a cost of resistance in adaptive therapy.</em> Cancer Research. 2021. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8455086/">Full text</a></li>
-        <li id="ref-16">Raue A, et al. <em>Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood.</em> Bioinformatics. 2009;25:1923-1929. <a href="https://pubmed.ncbi.nlm.nih.gov/19505944/">PubMed</a> | <a href="https://doi.org/10.1093/bioinformatics/btp358">DOI</a></li>
-        <li id="ref-17">Schwarz G. <em>Estimating the dimension of a model.</em> The Annals of Statistics. 1978;6:461-464. <a href="https://doi.org/10.1214/aos/1176344136">DOI</a></li>
-        <li id="ref-18"><em>Parameter estimation and uncertainty quantification for systems biology models.</em> 2020. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7384601/">Full text</a></li>
-        <li id="ref-19"><em>Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer to achieve long-term tumor control.</em> Cancer Research. 2025. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12434395/">Full text</a></li>
-        <li id="ref-20">El-Kareh AW, Secomb TW. <em>A mathematical model for cisplatin cellular pharmacodynamics.</em> Neoplasia. 2003;5:161-169. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1502402/">Full text</a> | <a href="https://doi.org/10.1016/S1476-5586(03)80008-8">DOI</a></li>
-        <li id="ref-21">Bicaku E, et al. <em>In vitro analysis of ovarian cancer response to cisplatin, carboplatin, and paclitaxel identifies common pathways that are also associated with overall patient survival.</em> British Journal of Cancer. 2012;106:1967-1975. <a href="https://www.nature.com/articles/bjc2012207">Full text</a></li>
-        <li id="ref-22">Gallagher K, Strobl MAR, Anderson ARA, Maini PK. <em>Deriving optimal treatment timing for adaptive therapy: Matching the model to the tumor dynamics.</em> medRxiv. 2025. <strong>Preprint; not peer reviewed.</strong> <a href="https://www.medrxiv.org/content/10.1101/2025.04.01.25325056v1">Full text</a> | <a href="https://doi.org/10.1101/2025.04.01.25325056">DOI</a></li>
-        <li id="ref-23">Braakman S, Pathmanathan P, Moore H. <em>Evaluation framework for systems models.</em> CPT: Pharmacometrics &amp; Systems Pharmacology. 2022;11:264-289. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8923730/">Full text</a> | <a href="https://doi.org/10.1002/psp4.12755">DOI</a></li>
+        <li id="ref-16" value="16">Raue A, et al. <em>Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood.</em> Bioinformatics. 2009;25:1923-1929. <a href="https://pubmed.ncbi.nlm.nih.gov/19505944/">PubMed</a> | <a href="https://doi.org/10.1093/bioinformatics/btp358">DOI</a></li>
+        <li id="ref-17" value="17">Schwarz G. <em>Estimating the dimension of a model.</em> The Annals of Statistics. 1978;6:461-464. <a href="https://doi.org/10.1214/aos/1176344136">DOI</a></li>
+        <li id="ref-18" value="18"><em>Parameter estimation and uncertainty quantification for systems biology models.</em> 2020. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7384601/">Full text</a></li>
       </ol>
     </section>
   </main>
