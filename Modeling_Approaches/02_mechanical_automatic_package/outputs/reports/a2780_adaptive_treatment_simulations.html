@@ -28,19 +28,31 @@
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.45; }
-    header, main { max-width: 1240px; margin: 0 auto; padding: 24px; }
-    header { padding-top: 30px; }
-    h1 { margin: 0 0 8px; font-size: 30px; }
+    header, main { max-width: 1280px; margin: 0 auto; padding: 20px 24px; }
+    header { padding-top: 18px; padding-bottom: 8px; }
+    h1 { margin: 0; font-size: 30px; line-height: 1.15; }
     h2 { margin: 0 0 12px; font-size: 20px; }
     h3 { margin: 12px 0 8px; font-size: 16px; }
     p { margin: 8px 0; }
     code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
     .math { overflow-x: auto; padding: 6px 0; }
     .note { color: var(--muted); }
-    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 18px; align-items: start; }
+    .app-topbar { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .title-row { display: flex; justify-content: space-between; gap: 24px; align-items: end; }
+    .title-copy { max-width: 790px; }
+    .eyebrow { margin: 0 0 5px; color: #1d4ed8; font-size: 12px; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 16px; }
+    .research-notice { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+    .research-notice::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
+    .layout { display: grid; grid-template-columns: minmax(300px, 350px) minmax(0, 1fr); gap: 16px; align-items: start; }
     .layout.recreation-mode { grid-template-columns: minmax(0, 1fr); }
     .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+    .visual-panel { min-width: 0; }
+    .controls-header { padding-bottom: 12px; border-bottom: 1px solid #e5e9ee; margin-bottom: 12px; }
+    .controls-header h2 { margin-bottom: 4px; }
+    .controls-header p { margin: 0; font-size: 12px; }
     .control-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .control-section-title { margin: 5px -16px -2px; padding: 11px 16px 6px; border-top: 1px solid #e5e9ee; color: var(--ink); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     label { display: grid; gap: 5px; font-weight: 600; font-size: 13px; }
     input, select { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; }
     input[type="range"] { padding: 0; }
@@ -79,10 +91,10 @@
     .overlay-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
     .row { display: grid; grid-template-columns: 1fr 86px; gap: 8px; align-items: center; }
     .value { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
-    .button-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .button-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e5e9ee; }
     button { border: 1px solid var(--accent); background: var(--accent); color: white; border-radius: 6px; padding: 9px 12px; font-weight: 700; cursor: pointer; }
     button.secondary { background: white; color: var(--accent); }
-    canvas { width: 100%; height: 440px; border: 1px solid var(--line); background: white; display: block; }
+    canvas { width: 100%; height: 470px; border: 1px solid var(--line); background: white; display: block; }
     .legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; padding: 10px; border: 1px solid var(--line); border-top: 0; background: white; font-size: 14px; }
     .legend-item { display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
     .comparison-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
@@ -101,26 +113,45 @@
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: currentColor; }
     .line { width: 28px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
     .dash { border-top-style: dashed; }
-    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
     .metric { background: #f2f6fa; border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
     .metric strong { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
     .metric span { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .schedule-table { width: 100%; border-collapse: collapse; margin-top: 14px; background: white; }
     .schedule-table th, .schedule-table td { border: 1px solid var(--line); padding: 8px; text-align: left; font-size: 14px; vertical-align: top; }
     .schedule-table th { background: #e8edf2; }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
     .tabs button { background: white; color: var(--ink); border-color: var(--line); }
     .tabs button.active { background: var(--ink); color: white; border-color: var(--ink); }
-    .library { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
-    .library button { background: white; color: var(--ink); border: 1px solid var(--line); padding: 8px 9px; font-size: 13px; }
-    .library button.active { background: var(--ink); color: white; border-color: var(--ink); }
+    .workflow-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+    .workflow-tabs { margin: 0; flex-wrap: nowrap; }
+    .workflow-tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: 11px 14px 10px; color: var(--muted); }
+    .workflow-tabs button.active { background: transparent; color: var(--ink); border-color: var(--accent); }
+    .workflow-context { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+    .dataset-toolbar { margin-bottom: 16px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .dataset-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+    .dataset-heading h2 { margin: 0; font-size: 16px; }
+    .dataset-heading span { color: var(--muted); font-size: 12px; }
+    .dataset-controls { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 12px; align-items: end; }
+    .data-tabs { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+    .data-tabs button { border: 0; border-right: 1px solid var(--line); border-radius: 0; padding: 9px 8px; font-size: 12px; }
+    .data-tabs button:last-child { border-right: 0; }
+    .data-tabs button.active { background: var(--ink); color: white; }
+    .library label { gap: 4px; }
+    .library-label { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; }
     .hidden { display: none; }
     .control-hidden { display: none; }
-    .status-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
-    .status-item { border: 1px solid var(--line); padding: 10px; background: #fff; min-width: 0; }
+    .model-provenance { margin-top: 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: white; }
+    .model-provenance summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; font-size: 13px; }
+    .model-provenance summary::-webkit-details-marker { display: none; }
+    .model-provenance summary::after { content: "View details"; margin-left: auto; color: var(--accent); font-weight: 700; }
+    .model-provenance[open] summary::after { content: "Hide details"; }
+    .status-badge { padding: 3px 7px; border-radius: 4px; color: #166534; background: #dcfce7; font-size: 11px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
+    .status-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; padding: 0 12px 12px; }
+    .status-item { border-top: 1px solid #e5e9ee; padding: 9px 0; background: transparent; min-width: 0; }
     .status-item strong { display: block; font-size: 12px; color: var(--muted); }
     .status-item span { display: block; margin-top: 3px; font-weight: 700; overflow-wrap: anywhere; }
-    .mode-switch { display: inline-flex; gap: 0; border: 1px solid var(--line); padding: 3px; background: white; }
+    .mode-switch { display: inline-flex; gap: 0; border: 1px solid var(--line); padding: 3px; background: white; flex-shrink: 0; }
     .mode-switch button { border: 0; background: white; color: var(--ink); border-radius: 3px; }
     .mode-switch button.active { background: var(--ink); color: white; }
     .window-grid { display: grid; grid-template-columns: repeat(5, minmax(74px, 1fr)) auto; gap: 7px; align-items: end; }
@@ -133,57 +164,101 @@
     .advanced-table th { background: #e8edf2; }
     .table-scroll { max-width: 100%; overflow-x: auto; }
     .extrapolation { color: #8a4b08; font-weight: 700; }
-    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .primary-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .secondary-metrics { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 9px; }
+    .secondary-metrics summary { cursor: pointer; color: var(--accent); font-size: 13px; font-weight: 700; }
+    .secondary-metrics .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .model-scope { margin-top: 18px; padding: 0; overflow: hidden; }
+    .model-scope > summary, .result-details > summary { cursor: pointer; list-style: none; padding: 15px 16px; font-size: 16px; font-weight: 800; }
+    .model-scope > summary::-webkit-details-marker, .result-details > summary::-webkit-details-marker { display: none; }
+    .model-scope > summary::after, .result-details > summary::after { content: "+"; float: right; color: var(--accent); font-size: 20px; line-height: 1; }
+    .model-scope[open] > summary::after, .result-details[open] > summary::after { content: "-"; }
+    .model-scope-body, .result-details-body { padding: 0 16px 16px; border-top: 1px solid #e5e9ee; }
+    .result-details { margin-top: 18px; padding: 0; overflow: hidden; }
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .library { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .dataset-controls { grid-template-columns: 1fr; }
       .status-strip { grid-template-columns: 1fr 1fr; }
       .window-grid { grid-template-columns: 1fr 1fr; }
       .interval-entry { grid-template-columns: 1fr 1fr; }
       .interval-entry button { grid-column: 1 / -1; }
     }
-    .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
+    @media (max-width: 680px) {
+      header, main { padding-left: 14px; padding-right: 14px; }
+      .app-topbar, .title-row, .dataset-heading { align-items: flex-start; }
+      .title-row { flex-direction: column; gap: 14px; }
+      h1 { font-size: 26px; }
+      .subtitle { font-size: 14px; }
+      .mode-switch { width: 100%; }
+      .mode-switch button { flex: 1; padding: 8px 6px; font-size: 12px; }
+      .workflow-bar { align-items: stretch; }
+      .workflow-tabs { width: 100%; }
+      .workflow-tabs button { flex: 1; min-width: 0; padding: 10px 6px 9px; font-size: 12px; }
+      .data-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .data-tabs button:nth-child(2) { border-right: 0; }
+      .data-tabs button:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .dataset-heading { display: block; }
+      .dataset-heading span { display: block; margin-top: 3px; }
+      .status-strip { grid-template-columns: 1fr; }
+      .model-provenance summary { align-items: flex-start; flex-wrap: wrap; }
+      .model-provenance summary::after { width: 100%; margin-left: 0; }
+      canvas { height: 370px; }
+      .primary-metrics, .secondary-metrics .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .legend { gap: 10px 14px; justify-content: flex-start; font-size: 12px; }
+    }
+    .back-home { display: inline-block; color: var(--accent, #2563eb); font-size: 13px; font-weight: 700; text-decoration: none; }
     .back-home:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <header>
-
-    <a class="back-home" href="../../../../index.html">Back to reports home</a>
-<h1>A2780 Adaptive Treatment Simulations</h1>
-    <p class="note">The default is resolved from the staged A2780 ranking and status exports every time this report is built. Simulations are a laboratory research tool, not a clinical dosing recommendation.</p>
-    <div class="mode-switch" aria-label="Simulation context">
-      <button id="experimentalMode" class="active" type="button">Experimental (uM)</button>
-      <button id="translationalMode" type="button">Translational research (relative exposure)</button>
+    <div class="app-topbar">
+      <a class="back-home" href="../../../../index.html">&larr; All reports</a>
+      <span class="research-notice">Research and teaching use only</span>
     </div>
-    <div class="status-strip" id="modelStatus" aria-live="polite"></div>
-    <section class="panel" style="margin-top:16px">
-      <h2>Original Data Library</h2>
-      <p class="note">Choose an original condition to overlay its measured data with the saved winning-model prediction. These curves are loaded from the staged fit exports and are not refit in the browser.</p>
-      <div class="tabs data-tabs" id="conditionTabs"></div>
-      <div class="library" id="dataLibrary"></div>
-    </section>
+    <div class="title-row">
+      <div class="title-copy">
+        <p class="eyebrow">A2780 research simulator</p>
+        <h1>Explore fitted growth and treatment schedules</h1>
+        <p class="subtitle">Start with an experimental dataset, inspect its fitted trajectory, then test treatment timing against the untreated coculture baseline.</p>
+      </div>
+      <div class="mode-switch" aria-label="Dose display mode">
+        <button id="experimentalMode" class="active" type="button">In vitro dose (uM)</button>
+        <button id="translationalMode" type="button">Relative exposure</button>
+      </div>
+    </div>
+    <details class="model-provenance">
+      <summary><span class="status-badge">Data-selected</span><span>The simulator loaded the highest-ranked eligible model from the staged fit exports.</span></summary>
+      <div class="status-strip" id="modelStatus" aria-live="polite"></div>
+    </details>
   </header>
   <main>
+    <nav class="workflow-bar" aria-label="Simulator workflow">
+      <div class="tabs workflow-tabs">
+        <button id="singleTab" class="active" type="button">1. Reproduce fitted data</button>
+        <button id="compareTab" type="button">2. Design a treatment schedule</button>
+      </div>
+    </nav>
+    <section class="dataset-toolbar" aria-labelledby="datasetHeading">
+      <div class="dataset-heading">
+        <h2 id="datasetHeading">Choose an experimental dataset</h2>
+        <span>Saved observations and fitted predictions; no browser refitting</span>
+      </div>
+      <div class="dataset-controls">
+        <div class="tabs data-tabs" id="conditionTabs" aria-label="Experimental condition"></div>
+        <div class="library" id="dataLibrary"></div>
+      </div>
+    </section>
+    <p class="workflow-context" id="treatmentContext"></p>
     <div class="layout recreation-mode" id="workspaceLayout">
       <section class="panel" id="controlsPanel">
-        <h2>Exploratory Schedule Controls</h2>
+        <div class="controls-header">
+          <h2>Schedule setup</h2>
+          <p class="note">The graph updates as you change each setting.</p>
+        </div>
         <div class="control-grid">
-          <label>Schedule
-            <select id="schedule">
-              <option value="none">Untreated reference (u(t) = 0)</option>
-              <option value="custom">Custom treatment-day windows</option>
-              <option value="originalRefresh">Original experiment: 2-day media refresh</option>
-              <option value="continuous">Continuous treatment</option>
-              <option value="pulse">Fixed pulse schedule</option>
-              <option value="at50">AT50: stop at 50% of starting burden</option>
-              <option value="hysteresis">Stop/restart hysteresis</option>
-              <option value="doseModulation">Adaptive dose modulation</option>
-              <option value="timeVarying">Monitoring-aware time-varying thresholds</option>
-            </select>
-            <span class="schedule-help" id="scheduleHelp"></span>
-          </label>
+          <div class="control-section-title">Starting population</div>
           <label>Initial total cells
             <div class="row"><input id="initialTotal" type="range" min="100" max="100000" step="100" value="3000"><span class="value" id="initialTotalValue"></span></div>
           </label>
@@ -201,6 +276,21 @@
             <div class="row"><input id="days" type="number" min="1" max="1825" step="1" value="60"><span class="value" id="daysValue"></span></div>
             <span class="composition-note">Explore intervals from 1 day to 5 years.</span>
           </label>
+          <div class="control-section-title">Treatment strategy</div>
+          <label>Schedule
+            <select id="schedule">
+              <option value="none">No treatment</option>
+              <option value="custom">Custom treatment windows</option>
+              <option value="originalRefresh">Original 2-day media refresh</option>
+              <option value="continuous">Continuous treatment</option>
+              <option value="pulse">Fixed on/off pulses</option>
+              <option value="at50">AT50: pause at 50% of starting burden</option>
+              <option value="hysteresis">Stop/restart thresholds</option>
+              <option value="doseModulation">Adaptive dose levels</option>
+              <option value="timeVarying">Time-varying thresholds</option>
+            </select>
+            <span class="schedule-help" id="scheduleHelp"></span>
+          </label>
           <label data-control="advancedScenario" class="control-hidden">Hypothetical intrinsic growth-rate multiplier
             <div class="row"><input id="growthMultiplier" type="range" min="0.01" max="1" step="0.01" value="1"><span class="value" id="growthMultiplierValue"></span></div>
             <span class="composition-note">Scales the fitted in-vitro growth rates. Lower values stretch growth over a longer timescale.</span>
@@ -217,7 +307,8 @@
             <div class="row"><input id="resistantFitness" type="range" min="0.50" max="1.20" step="0.01" value="1"><span class="value" id="resistantFitnessValue"></span></div>
             <span class="composition-note">The fitted-baseline value is 1 so splitting cis does not alter untreated total-cis growth. Values below 1 deliberately test a hypothetical resistance cost.</span>
           </label>
-          <label data-control="dose">Default cisplatin dose
+          <div class="control-section-title" data-control="dose">Treatment delivery</div>
+          <label data-control="dose">Cisplatin dose
             <div class="row"><input id="maxDose" type="range" min="0" max="2" step="0.01" value="1"><span class="value" id="maxDoseValue"></span></div>
             <span class="dose-status" id="doseStatus"></span>
           </label>
@@ -248,6 +339,7 @@
           <label data-control="pulse">Pulse off-days
             <div class="row"><input id="pulseOff" type="range" min="1" max="21" step="1" value="9"><span class="value" id="pulseOffValue"></span></div>
           </label>
+          <div class="control-section-title" data-control="monitor">Adaptive decision rules</div>
           <label data-control="totalThreshold">Upper total-cell trigger threshold
             <div class="row"><input id="totalThreshold" type="range" min="500" max="500000" step="500" value="4500"><span class="value" id="totalThresholdValue"></span></div>
           </label>
@@ -260,9 +352,9 @@
           </label>
         </div>
         <div class="button-row">
-          <button id="run">Show fitted reproduction</button>
-          <button id="compare" class="secondary">Compare schedules</button>
-          <button id="reset" class="secondary">Reset</button>
+          <button id="run" class="secondary">Back to fitted data</button>
+          <button id="compare">Compare all schedules</button>
+          <button id="reset" class="secondary">Reset defaults</button>
         </div>
         <details class="advanced" id="advancedModels">
           <summary>Advanced Models and diagnostics</summary>
@@ -273,19 +365,14 @@
           <div id="advancedModelTable"></div>
         </details>
       </section>
-      <section class="panel">
-        <div class="tabs">
-          <button id="singleTab" class="active" type="button">1. Fitted model reproduction</button>
-          <button id="compareTab" type="button">2. Build treatment schedule</button>
-        </div>
-        <p class="note treatment-context" id="treatmentContext"></p>
+      <section class="panel visual-panel">
         <div id="singleView">
-          <h2 id="plotTitle">Fitted Model Over Original Data</h2>
+          <h2 id="plotTitle">Fitted model over original data</h2>
           <canvas id="plot" width="1000" height="520"></canvas>
           <div class="legend" id="singleLegend"></div>
         </div>
         <div id="compareView" class="hidden">
-          <h2>Untreated Coculture To Treatment Schedule</h2>
+          <h2>Untreated baseline versus treatment schedule</h2>
           <div class="comparison-controls" aria-label="Schedules shown on graph">
             <span>Show:</span>
             <button id="showSelectedSchedule" class="active" type="button">Selected schedule</button>
@@ -296,24 +383,33 @@
           <canvas id="comparePlot" width="1000" height="520"></canvas>
           <div class="legend" id="compareLegend"></div>
         </div>
-        <div class="metrics metric-grid" id="scheduleMetrics">
-          <div class="metric"><strong>Final total</strong><span id="finalTotal"></span></div>
-          <div class="metric"><strong>Final A2780cis</strong><span id="finalTolerant"></span></div>
-          <div class="metric"><strong>Total-cell AUC</strong><span id="aucTotal"></span></div>
-          <div class="metric"><strong>A2780cis AUC</strong><span id="aucCis"></span></div>
-          <div class="metric"><strong>Time to progression</strong><span id="timeToProgression"></span></div>
-          <div class="metric"><strong>Ensemble control</strong><span id="probabilityControl"></span></div>
-          <div class="metric"><strong>Dose days</strong><span id="doseDays"></span></div>
-          <div class="metric"><strong>Exposure AUC</strong><span id="exposureAuc"></span></div>
-          <div class="metric"><strong>Time off treatment</strong><span id="timeOffTreatment"></span></div>
-          <div class="metric"><strong>Cycles / refreshes</strong><span id="cycleCount"></span></div>
-          <div class="metric"><strong>Threshold overshoot</strong><span id="thresholdOvershoot"></span></div>
-          <div class="metric"><strong>Equivalent untreated time</strong><span id="equivalentTime"></span></div>
+        <div id="scheduleMetrics">
+          <div class="metrics primary-metrics">
+            <div class="metric"><strong>Final total</strong><span id="finalTotal"></span></div>
+            <div class="metric"><strong>Final A2780cis</strong><span id="finalTolerant"></span></div>
+            <div class="metric"><strong>Time to progression</strong><span id="timeToProgression"></span></div>
+            <div class="metric"><strong>Dose days</strong><span id="doseDays"></span></div>
+            <div class="metric"><strong>Time off treatment</strong><span id="timeOffTreatment"></span></div>
+          </div>
+          <details class="secondary-metrics">
+            <summary>Show additional outcome metrics</summary>
+            <div class="metrics">
+              <div class="metric"><strong>Total-cell AUC</strong><span id="aucTotal"></span></div>
+              <div class="metric"><strong>A2780cis AUC</strong><span id="aucCis"></span></div>
+              <div class="metric"><strong>Ensemble control</strong><span id="probabilityControl"></span></div>
+              <div class="metric"><strong>Exposure AUC</strong><span id="exposureAuc"></span></div>
+              <div class="metric"><strong>Cycles / refreshes</strong><span id="cycleCount"></span></div>
+              <div class="metric"><strong>Threshold overshoot</strong><span id="thresholdOvershoot"></span></div>
+              <div class="metric"><strong>Equivalent untreated time</strong><span id="equivalentTime"></span></div>
+            </div>
+          </details>
         </div>
       </section>
     </div>
-    <section class="panel" style="margin-top:18px">
-      <h2>Data-Selected Model And Scope</h2>
+    <details class="panel model-scope">
+      <summary>Model equations, assumptions, and extrapolation limits</summary>
+      <div class="model-scope-body">
+      <h2>Data-selected model and scope</h2>
       <p>The reproduction tab displays saved predictions from the winning model for each condition. The schedule sandbox starts from the winning untreated-coculture model: logistic growth for Naive, theta-logistic growth for total A2780cis, asymmetric competition, and lineage-specific death. The values below are the shared center of the fitted 20k/30k model. Only the schedule sandbox splits cis into exploratory high-kill \(S\) and low-kill \(T\) response components.</p><div class="math">\[G_N(N,L_N)=r_NN\left(1-\frac{L_N}{K_N}\right),\qquad r_N=0.872,\quad K_N=4032\]</div><div class="math">\[G_C(C,L_C)=r_CC\left[1-\left(\frac{L_C}{K_C}\right)^{\theta_C}\right],\qquad r_C=0.487,\quad K_C=3803,\quad \theta_C=3.084\]</div>
       <div class="math">\[C=S+T\]</div>
       <p>The observable cis population is always \(C(t)\). Internal \(S(t)\) and \(T(t)\) states support the selected equation but are not separately measured populations. They remain hidden unless the advanced diagnostic is enabled.</p>
@@ -335,14 +431,17 @@
       <p class="note">The intracellular states \(c_i\) and \(c_k\) above are used only when the El-Kareh and Secomb-inspired advanced PK/PD candidate is selected. The default model does not silently inherit those unfitted constants.</p>
       <p>Adaptive schedules evaluate their threshold rule only at \(t_m=m\tau_{monitor}\), then hold the chosen dose until the next observation. This prevents the browser model from assuming continuous, perfectly informed clinical decisions.</p>
       <p class="extrapolation">Day 14 is the end of calibration. Later predictions are extrapolation and are shown with an ensemble sensitivity band. Reversible phenotype switching is default-off and advanced-only; it never represents A2780Naive converting into the established A2780cis cell line.</p>
-    </section>
-    <section class="panel" style="margin-top:18px" id="scheduleMetricsPanel">
-      <h2>Current Schedule Metrics</h2>
+      </div>
+    </details>
+    <details class="panel result-details" id="scheduleMetricsPanel">
+      <summary>Detailed schedule comparison</summary>
+      <div class="result-details-body">
       <table class="schedule-table" id="scheduleTable">
         <thead><tr><th>Schedule</th><th>Final total</th><th>Final A2780cis</th><th>Total AUC</th><th>Dose days</th><th>Exposure AUC</th><th>Interpretation</th></tr></thead>
         <tbody></tbody>
       </table>
-    </section>
+      </div>
+    </details>
   </main>
   <script>
     const originalDataLibrary = {"monoculture_untreated__20k__A2780cis__0":{"key":"monoculture_untreated__20k__A2780cis__0","label":"Untreated monoculture | A2780cis | 20k","category":"Untreated monoculture","condition":"monoculture_untreated","culture":"monoculture","treated":false,"density":"20k","mix":"","cellLine":"A2780cis","dose":0,"components":["cis"],"naive":null,"cis":[{"t":1,"y":67.72},{"t":2,"y":107.03},{"t":3,"y":202.74},{"t":4,"y":377.44},{"t":5,"y":752.27},{"t":6,"y":1296.43},{"t":7,"y":2096.34},{"t":8,"y":3102.89},{"t":9,"y":3584.22},{"t":10,"y":3430.94},{"t":11,"y":4001.26},{"t":12,"y":3726.28},{"t":13,"y":4170.57},{"t":14,"y":3349.45},{"t":16,"y":3744.94},{"t":18,"y":4091.92}]},"monoculture_untreated__20k__A2780Naive__0":{"key":"monoculture_untreated__20k__A2780Naive__0","label":"Untreated monoculture | A2780Naive | 20k","category":"Untreated monoculture","condition":"monoculture_untreated","culture":"monoculture","treated":false,"density":"20k","mix":"","cellLine":"A2780Naive","dose":0,"components":["naive"],"naive":[{"t":1,"y":280.68},{"t":2,"y":415.71},{"t":3,"y":908.84},{"t":4,"y":1701.12},{"t":5,"y":2629.39},{"t":6,"y":3264.79},{"t":7,"y":3641.57},{"t":8,"y":3601.85},{"t":9,"y":3866.17},{"t":10,"y":3884.25},{"t":11,"y":4153.04},{"t":12,"y":3981.53},{"t":13,"y":4213.67},{"t":14,"y":4195.75}],"cis":null},"monoculture_untreated__30k__A2780cis__0":{"key":"monoculture_untreated__30k__A2780cis__0","label":"Untreated monoculture | A2780cis | 30k","category":"Untreated monoculture","condition":"monoculture_untreated","culture":"monoculture","treated":false,"density":"30k","mix":"","cellLine":"A2780cis","dose":0,"components":["cis"],"naive":null,"cis":[{"t":1,"y":80.44},{"t":2,"y":140.19},{"t":3,"y":246.18},{"t":4,"y":504.27},{"t":5,"y":917.92},{"t":6,"y":1707.49},{"t":7,"y":2472.93},{"t":8,"y":3185.56},{"t":9,"y":3761.65},{"t":10,"y":3510.29},{"t":11,"y":4178.48},{"t":12,"y":3520.71},{"t":13,"y":4140.54},{"t":14,"y":3732.04},{"t":16,"y":3716.15},{"t":18,"y":3651.25}]},"monoculture_untreated__30k__A2780Naive__0":{"key":"monoculture_untreated__30k__A2780Naive__0","label":"Untreated monoculture | A2780Naive | 30k","category":"Untreated monoculture","condition":"monoculture_untreated","culture":"monoculture","treated":false,"density":"30k","mix":"","cellLine":"A2780Naive","dose":0,"components":["naive"],"naive":[{"t":1,"y":246.85},{"t":2,"y":386.62},{"t":3,"y":921.05},{"t":4,"y":1594.85},{"t":5,"y":2628.86},{"t":6,"y":3034.91},{"t":7,"y":3462.91},{"t":8,"y":3405.06},{"t":9,"y":3755.23},{"t":10,"y":3652.79},{"t":11,"y":4085.14},{"t":12,"y":4010.55},{"t":13,"y":4137.96},{"t":14,"y":4169.73}],"cis":null},"monoculture_treated__20k__A2780cis__0.67":{"key":"monoculture_treated__20k__A2780cis__0.67","label":"Treated monoculture | A2780cis | 20k, 0.67 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"20k","mix":"","cellLine":"A2780cis","dose":0.67,"components":["cis"],"naive":null,"cis":[{"t":1,"y":79.83},{"t":2,"y":136.68},{"t":3,"y":256.03},{"t":4,"y":551.49},{"t":5,"y":932.25},{"t":6,"y":1630.14},{"t":7,"y":2349.25},{"t":8,"y":2344.2},{"t":9,"y":3261.81},{"t":10,"y":2744.4},{"t":11,"y":3624.01},{"t":12,"y":2656.84},{"t":13,"y":3902.58},{"t":14,"y":2987.77}]},"monoculture_treated__20k__A2780cis__1":{"key":"monoculture_treated__20k__A2780cis__1","label":"Treated monoculture | A2780cis | 20k, 1 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"20k","mix":"","cellLine":"A2780cis","dose":1,"components":["cis"],"naive":null,"cis":[{"t":1,"y":82.57},{"t":2,"y":153.75},{"t":3,"y":298.62},{"t":4,"y":584.29},{"t":5,"y":1028.86},{"t":6,"y":1728.47},{"t":7,"y":2346.51},{"t":8,"y":2305.37},{"t":9,"y":3049.63},{"t":10,"y":3134.86},{"t":11,"y":3720.54},{"t":12,"y":2824.67},{"t":13,"y":3906.99},{"t":14,"y":4011.98}]},"monoculture_treated__20k__A2780cis__1.47":{"key":"monoculture_treated__20k__A2780cis__1.47","label":"Treated monoculture | A2780cis | 20k, 1.47 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"20k","mix":"","cellLine":"A2780cis","dose":1.47,"components":["cis"],"naive":null,"cis":[{"t":1,"y":66.08},{"t":2,"y":136.02},{"t":3,"y":262.41},{"t":4,"y":627.19},{"t":5,"y":1055.71},{"t":6,"y":1644.43},{"t":7,"y":1888.79},{"t":8,"y":1640.85},{"t":9,"y":2390.45},{"t":10,"y":1885.21},{"t":11,"y":2693.79},{"t":12,"y":2554.91},{"t":13,"y":3229.31},{"t":14,"y":3171.78}]},"monoculture_treated__20k__A2780Naive__0.67":{"key":"monoculture_treated__20k__A2780Naive__0.67","label":"Treated monoculture | A2780Naive | 20k, 0.67 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"20k","mix":"","cellLine":"A2780Naive","dose":0.67,"components":["naive"],"naive":[{"t":1,"y":305.19},{"t":2,"y":465.64},{"t":3,"y":790.21},{"t":4,"y":880.95},{"t":5,"y":1277},{"t":6,"y":1612.01},{"t":7,"y":2016.42},{"t":8,"y":2081.41},{"t":9,"y":2395.05},{"t":10,"y":2537.2},{"t":11,"y":3073.89},{"t":12,"y":3042.37},{"t":13,"y":3537.75},{"t":14,"y":3458.38}],"cis":null},"monoculture_treated__20k__A2780Naive__1":{"key":"monoculture_treated__20k__A2780Naive__1","label":"Treated monoculture | A2780Naive | 20k, 1 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"20k","mix":"","cellLine":"A2780Naive","dose":1,"components":["naive"],"naive":[{"t":1,"y":164.84},{"t":2,"y":310.33},{"t":3,"y":498.46},{"t":4,"y":690.71},{"t":5,"y":804.91},{"t":6,"y":1188.29},{"t":7,"y":1563.54},{"t":8,"y":1634.13},{"t":9,"y":1556.19},{"t":10,"y":1522.99},{"t":11,"y":1608.25},{"t":12,"y":1500.93},{"t":13,"y":2011.23},{"t":14,"y":2445.41}],"cis":null},"monoculture_treated__20k__A2780Naive__1.47":{"key":"monoculture_treated__20k__A2780Naive__1.47","label":"Treated monoculture | A2780Naive | 20k, 1.47 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"20k","mix":"","cellLine":"A2780Naive","dose":1.47,"components":["naive"],"naive":[{"t":1,"y":470.38},{"t":2,"y":658.35},{"t":3,"y":910.89},{"t":4,"y":928.76},{"t":5,"y":914.77},{"t":6,"y":867.73},{"t":7,"y":681.91},{"t":8,"y":481.74},{"t":9,"y":333.68},{"t":10,"y":232.34},{"t":11,"y":155.32},{"t":12,"y":103.91},{"t":13,"y":71.53},{"t":14,"y":36.61}],"cis":null},"monoculture_treated__30k__A2780cis__0.67":{"key":"monoculture_treated__30k__A2780cis__0.67","label":"Treated monoculture | A2780cis | 30k, 0.67 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"30k","mix":"","cellLine":"A2780cis","dose":0.67,"components":["cis"],"naive":null,"cis":[{"t":1,"y":119.12},{"t":2,"y":208.11},{"t":3,"y":381.19},{"t":4,"y":731.65},{"t":5,"y":1291.68},{"t":6,"y":1980.23},{"t":7,"y":2670.85},{"t":8,"y":2545.01},{"t":9,"y":3548.8},{"t":10,"y":2897.71},{"t":11,"y":3797.83},{"t":12,"y":2884.93},{"t":13,"y":4146.37},{"t":14,"y":3326.88}]},"monoculture_treated__30k__A2780cis__1":{"key":"monoculture_treated__30k__A2780cis__1","label":"Treated monoculture | A2780cis | 30k, 1 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"30k","mix":"","cellLine":"A2780cis","dose":1,"components":["cis"],"naive":null,"cis":[{"t":1,"y":117.62},{"t":2,"y":206.53},{"t":3,"y":392.8},{"t":4,"y":793.16},{"t":5,"y":1328.35},{"t":6,"y":1947.66},{"t":7,"y":2594.51},{"t":8,"y":2352.01},{"t":9,"y":3220.09},{"t":10,"y":2953.81},{"t":11,"y":3595.11},{"t":12,"y":2534.66},{"t":13,"y":3853.45},{"t":14,"y":4116.67}]},"monoculture_treated__30k__A2780cis__1.47":{"key":"monoculture_treated__30k__A2780cis__1.47","label":"Treated monoculture | A2780cis | 30k, 1.47 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"30k","mix":"","cellLine":"A2780cis","dose":1.47,"components":["cis"],"naive":null,"cis":[{"t":1,"y":73.88},{"t":2,"y":143.64},{"t":3,"y":301.88},{"t":4,"y":670.11},{"t":5,"y":1170.91},{"t":6,"y":1348.34},{"t":7,"y":1881.76},{"t":8,"y":1606.19},{"t":9,"y":2421.26},{"t":10,"y":1957.24},{"t":11,"y":2537.1},{"t":12,"y":2244.32},{"t":13,"y":2827.44},{"t":14,"y":3433.94}]},"monoculture_treated__30k__A2780Naive__0.67":{"key":"monoculture_treated__30k__A2780Naive__0.67","label":"Treated monoculture | A2780Naive | 30k, 0.67 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"30k","mix":"","cellLine":"A2780Naive","dose":0.67,"components":["naive"],"naive":[{"t":1,"y":507.5},{"t":2,"y":801.89},{"t":3,"y":1336.28},{"t":4,"y":1623.1},{"t":5,"y":2076.85},{"t":6,"y":2482.37},{"t":7,"y":2895.9},{"t":8,"y":2949.13},{"t":9,"y":3220.3},{"t":10,"y":2758.77},{"t":11,"y":3434.97},{"t":12,"y":3115.5},{"t":13,"y":3633.65},{"t":14,"y":3423.78}],"cis":null},"monoculture_treated__30k__A2780Naive__1":{"key":"monoculture_treated__30k__A2780Naive__1","label":"Treated monoculture | A2780Naive | 30k, 1 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"30k","mix":"","cellLine":"A2780Naive","dose":1,"components":["naive"],"naive":[{"t":1,"y":277.2},{"t":2,"y":512.55},{"t":3,"y":810.47},{"t":4,"y":1072.6},{"t":5,"y":1220.34},{"t":6,"y":1524.24},{"t":7,"y":1784.32},{"t":8,"y":1754.77},{"t":9,"y":1630.94},{"t":10,"y":1765.7},{"t":11,"y":1797.06},{"t":12,"y":1664.88},{"t":13,"y":1869.52},{"t":14,"y":2521.75}],"cis":null},"monoculture_treated__30k__A2780Naive__1.47":{"key":"monoculture_treated__30k__A2780Naive__1.47","label":"Treated monoculture | A2780Naive | 30k, 1.47 uM","category":"Treated monoculture","condition":"monoculture_treated","culture":"monoculture","treated":true,"density":"30k","mix":"","cellLine":"A2780Naive","dose":1.47,"components":["naive"],"naive":[{"t":1,"y":683.09},{"t":2,"y":962.6},{"t":3,"y":1293.42},{"t":4,"y":1242.38},{"t":5,"y":1196.67},{"t":6,"y":1151.7},{"t":7,"y":908.64},{"t":8,"y":684.3},{"t":9,"y":451.47},{"t":10,"y":351.64},{"t":11,"y":239.05},{"t":12,"y":153.48},{"t":13,"y":115.13},{"t":14,"y":60.4}],"cis":null},"coculture_untreated____25-75__0":{"key":"coculture_untreated____25-75__0","label":"Untreated coculture | mix 25-75","category":"Untreated coculture","condition":"coculture_untreated","culture":"coculture","treated":false,"density":"","mix":"25-75","cellLine":"","dose":0,"components":["naive","cis"],"naive":[{"t":1,"y":12.95},{"t":2,"y":37.94},{"t":3,"y":114.37},{"t":4,"y":286.06},{"t":5,"y":820.59},{"t":6,"y":793.16},{"t":7,"y":1435.8},{"t":8,"y":1645.15},{"t":9,"y":1541.84},{"t":10,"y":1869.72},{"t":11,"y":2328.51},{"t":12,"y":2009.16},{"t":13,"y":2589.03},{"t":14,"y":2341.04}],"cis":[{"t":1,"y":46.16},{"t":2,"y":78.87},{"t":3,"y":135.03},{"t":4,"y":276.04},{"t":5,"y":574.37},{"t":6,"y":847.9},{"t":7,"y":1205.6},{"t":8,"y":1492.69},{"t":9,"y":1893.12},{"t":10,"y":1453.19},{"t":11,"y":2492.45},{"t":12,"y":1309.04},{"t":13,"y":2069.73},{"t":14,"y":1385.29}]},"coculture_untreated____50-50__0":{"key":"coculture_untreated____50-50__0","label":"Untreated coculture | mix 50-50","category":"Untreated coculture","condition":"coculture_untreated","culture":"coculture","treated":false,"density":"","mix":"50-50","cellLine":"","dose":0,"components":["naive","cis"],"naive":[{"t":1,"y":23.79},{"t":2,"y":68.49},{"t":3,"y":179.1},{"t":4,"y":489.16},{"t":5,"y":1278.78},{"t":6,"y":951.02},{"t":7,"y":1730.83},{"t":8,"y":2029.47},{"t":9,"y":2017.86},{"t":10,"y":2398.92},{"t":11,"y":2681.75},{"t":12,"y":2650.05},{"t":13,"y":2913.75},{"t":14,"y":2860.12}],"cis":[{"t":1,"y":31.55},{"t":2,"y":53.28},{"t":3,"y":95.16},{"t":4,"y":190.54},{"t":5,"y":359.15},{"t":6,"y":363.94},{"t":7,"y":536.54},{"t":8,"y":757.67},{"t":9,"y":854.08},{"t":10,"y":640.34},{"t":11,"y":956.7},{"t":12,"y":557.58},{"t":13,"y":752.63},{"t":14,"y":470.72}]},"coculture_untreated____75-25__0":{"key":"coculture_untreated____75-25__0","label":"Untreated coculture | mix 75-25","category":"Untreated coculture","condition":"coculture_untreated","culture":"coculture","treated":false,"density":"","mix":"75-25","cellLine":"","dose":0,"components":["naive","cis"],"naive":[{"t":1,"y":25.8},{"t":2,"y":80.46},{"t":3,"y":207.43},{"t":4,"y":603.73},{"t":5,"y":1275.83},{"t":6,"y":647.6},{"t":7,"y":1823.62},{"t":8,"y":2211.86},{"t":9,"y":2262.99},{"t":10,"y":2547.04},{"t":11,"y":2569.85},{"t":12,"y":2769.7},{"t":13,"y":2964.23},{"t":14,"y":2906.16}],"cis":[{"t":1,"y":18.3},{"t":2,"y":31.87},{"t":3,"y":48.92},{"t":4,"y":97.36},{"t":5,"y":173.98},{"t":6,"y":177.49},{"t":7,"y":249.43},{"t":8,"y":372.12},{"t":9,"y":395.82},{"t":10,"y":322.2},{"t":11,"y":419.2},{"t":12,"y":365.95},{"t":13,"y":318.21},{"t":14,"y":203.4}]},"coculture_treated__20k__25-75__1":{"key":"coculture_treated__20k__25-75__1","label":"Treated coculture | 20k, mix 25-75, 1 uM","category":"Treated coculture","condition":"coculture_treated","culture":"coculture","treated":true,"density":"20k","mix":"25-75","cellLine":"","dose":1,"components":["naive","cis"],"naive":[{"t":1,"y":99.62},{"t":2,"y":151.65},{"t":3,"y":256.71},{"t":4,"y":308.39},{"t":5,"y":458.41},{"t":6,"y":443.2},{"t":7,"y":684.74},{"t":8,"y":381.45},{"t":9,"y":434.43},{"t":10,"y":381.81},{"t":11,"y":827.93},{"t":12,"y":564.25},{"t":13,"y":1105.27},{"t":14,"y":404.8}],"cis":[{"t":1,"y":88.59},{"t":2,"y":143.34},{"t":3,"y":247.63},{"t":4,"y":494.31},{"t":5,"y":903.37},{"t":6,"y":1360.1},{"t":7,"y":2438.38},{"t":8,"y":1945.32},{"t":9,"y":3250.29},{"t":10,"y":3135.64},{"t":11,"y":3987.59},{"t":12,"y":2308.25},{"t":13,"y":3826.77},{"t":14,"y":2159.37}]},"coculture_treated__20k__50-50__1":{"key":"coculture_treated__20k__50-50__1","label":"Treated coculture | 20k, mix 50-50, 1 uM","category":"Treated coculture","condition":"coculture_treated","culture":"coculture","treated":true,"density":"20k","mix":"50-50","cellLine":"","dose":1,"components":["naive","cis"],"naive":[{"t":1,"y":154.28},{"t":2,"y":285.21},{"t":3,"y":425.08},{"t":4,"y":562.62},{"t":5,"y":850.45},{"t":6,"y":932.26},{"t":7,"y":1392.04},{"t":8,"y":999.73},{"t":9,"y":1287.63},{"t":10,"y":1285.18},{"t":11,"y":1589.92},{"t":12,"y":1183.66},{"t":13,"y":1283.01},{"t":14,"y":1010.31}],"cis":[{"t":1,"y":51.28},{"t":2,"y":89.81},{"t":3,"y":141.96},{"t":4,"y":269.67},{"t":5,"y":503.14},{"t":6,"y":640.24},{"t":7,"y":1228.76},{"t":8,"y":1159.74},{"t":9,"y":2141.54},{"t":10,"y":2331.9},{"t":11,"y":3319.13},{"t":12,"y":1939.12},{"t":13,"y":3037.84},{"t":14,"y":1923.26}]},"coculture_treated__20k__75-25__1":{"key":"coculture_treated__20k__75-25__1","label":"Treated coculture | 20k, mix 75-25, 1 uM","category":"Treated coculture","condition":"coculture_treated","culture":"coculture","treated":true,"density":"20k","mix":"75-25","cellLine":"","dose":1,"components":["naive","cis"],"naive":[{"t":1,"y":216.95},{"t":2,"y":395.04},{"t":3,"y":575.9},{"t":4,"y":750.96},{"t":5,"y":1098.77},{"t":6,"y":1222.95},{"t":7,"y":1636.88},{"t":8,"y":1417.09},{"t":9,"y":1830.37},{"t":10,"y":2137.61},{"t":11,"y":2132.98},{"t":12,"y":1500.2},{"t":13,"y":1762.65},{"t":14,"y":1454.53}],"cis":[{"t":1,"y":26.93},{"t":2,"y":42.1},{"t":3,"y":64.44},{"t":4,"y":128},{"t":5,"y":186.15},{"t":6,"y":262.4},{"t":7,"y":430.88},{"t":8,"y":525.69},{"t":9,"y":900.48},{"t":10,"y":1261.5},{"t":11,"y":1896.8},{"t":12,"y":1271.07},{"t":13,"y":2274.65},{"t":14,"y":1507.98}]},"coculture_treated__30k__25-75__1":{"key":"coculture_treated__30k__25-75__1","label":"Treated coculture | 30k, mix 25-75, 1 uM","category":"Treated coculture","condition":"coculture_treated","culture":"coculture","treated":true,"density":"30k","mix":"25-75","cellLine":"","dose":1,"components":["naive","cis"],"naive":[{"t":1,"y":92.29},{"t":2,"y":166.94},{"t":3,"y":254.02},{"t":4,"y":304.33},{"t":5,"y":467.27},{"t":6,"y":478.99},{"t":7,"y":644.63},{"t":8,"y":433.01},{"t":9,"y":360.13},{"t":10,"y":420.39},{"t":11,"y":492.48},{"t":12,"y":788.84},{"t":13,"y":1077.72},{"t":14,"y":921.54}],"cis":[{"t":1,"y":87.41},{"t":2,"y":146.07},{"t":3,"y":261.51},{"t":4,"y":490.8},{"t":5,"y":872.21},{"t":6,"y":1398.2},{"t":7,"y":2656.33},{"t":8,"y":2187.63},{"t":9,"y":3209.31},{"t":10,"y":3193.9},{"t":11,"y":3624.11},{"t":12,"y":2743.47},{"t":13,"y":3918.68},{"t":14,"y":3231.24}]},"coculture_treated__30k__50-50__1":{"key":"coculture_treated__30k__50-50__1","label":"Treated coculture | 30k, mix 50-50, 1 uM","category":"Treated coculture","condition":"coculture_treated","culture":"coculture","treated":true,"density":"30k","mix":"50-50","cellLine":"","dose":1,"components":["naive","cis"],"naive":[{"t":1,"y":165.46},{"t":2,"y":282.02},{"t":3,"y":432.84},{"t":4,"y":607.82},{"t":5,"y":879},{"t":6,"y":947.11},{"t":7,"y":1412.78},{"t":8,"y":1018.18},{"t":9,"y":1172.49},{"t":10,"y":1294.57},{"t":11,"y":1082.5},{"t":12,"y":1456.92},{"t":13,"y":1700.33},{"t":14,"y":1370.07}],"cis":[{"t":1,"y":53.36},{"t":2,"y":85.84},{"t":3,"y":136.94},{"t":4,"y":278.04},{"t":5,"y":439.58},{"t":6,"y":738.22},{"t":7,"y":1333.67},{"t":8,"y":1333.73},{"t":9,"y":2235.38},{"t":10,"y":2239.67},{"t":11,"y":2711.56},{"t":12,"y":2136.78},{"t":13,"y":3352.32},{"t":14,"y":2315.28}]},"coculture_treated__30k__75-25__1":{"key":"coculture_treated__30k__75-25__1","label":"Treated coculture | 30k, mix 75-25, 1 uM","category":"Treated coculture","condition":"coculture_treated","culture":"coculture","treated":true,"density":"30k","mix":"75-25","cellLine":"","dose":1,"components":["naive","cis"],"naive":[{"t":1,"y":218.08},{"t":2,"y":356.53},{"t":3,"y":545.95},{"t":4,"y":755.78},{"t":5,"y":1013.16},{"t":6,"y":1191.63},{"t":7,"y":1758.69},{"t":8,"y":1400.46},{"t":9,"y":1660.71},{"t":10,"y":2107.13},{"t":11,"y":1744.18},{"t":12,"y":1827.71},{"t":13,"y":1923.91},{"t":14,"y":1647.07}],"cis":[{"t":1,"y":28.45},{"t":2,"y":45.68},{"t":3,"y":72.72},{"t":4,"y":127.53},{"t":5,"y":211.36},{"t":6,"y":311.86},{"t":7,"y":585.29},{"t":8,"y":720.13},{"t":9,"y":1168.52},{"t":10,"y":1358.17},{"t":11,"y":1719.3},{"t":12,"y":1458.72},{"t":13,"y":2386.66},{"t":14,"y":1738.67}]}};
@@ -505,10 +604,10 @@
       const canSchedule = lib.treated || lib.culture === "coculture";
       document.getElementById("compareTab").classList.toggle("hidden", !canSchedule);
       document.getElementById("treatmentContext").textContent = lib.treated
-        ? "Schedules begin from this condition's fitted day-0 state. The untreated overlay uses the same state and growth law with no treatment."
+        ? "Treatment schedules begin from this dataset's fitted day-0 state. The optional untreated overlay starts from the same population."
         : lib.culture === "coculture"
-          ? "This fitted untreated coculture is the baseline. Open the schedule builder to choose when treatment starts and stops; no drug acts before the first selected window."
-          : "This untreated monoculture is shown only as a fitted reproduction. Select untreated or treated coculture to build a treatment schedule.";
+          ? "This untreated coculture is the schedule baseline. No drug acts before the first treatment window."
+          : "This monoculture dataset supports fitted-data reproduction only. Choose a coculture dataset to design a treatment schedule.";
     }
     function renderLibraryButtons() {
       const categories = [...new Set(Object.values(originalDataLibrary).map(lib => lib.category))];
@@ -524,13 +623,11 @@
         });
       });
       const holder = document.getElementById("dataLibrary");
-      holder.innerHTML = Object.entries(originalDataLibrary)
-        .filter(([, lib]) => lib.category === activeCategory)
-        .map(([key, lib]) => `<button type="button" data-library-key="${key}" class="${key === activeLibraryKey ? "active" : ""}">${lib.label.replace(lib.category + " | ", "")}</button>`)
-        .join("");
-      holder.querySelectorAll("button").forEach(button => {
-        button.addEventListener("click", () => applyLibraryPreset(button.dataset.libraryKey));
-      });
+      const choices = Object.entries(originalDataLibrary).filter(([, lib]) => lib.category === activeCategory);
+      holder.innerHTML = `<label><span class="library-label">Dataset</span><select id="datasetSelect" aria-label="Dataset within ${activeCategory}">
+        ${choices.map(([key, lib]) => `<option value="${key}" ${key === activeLibraryKey ? "selected" : ""}>${lib.label.replace(lib.category + " | ", "")}</option>`).join("")}
+      </select></label>`;
+      document.getElementById("datasetSelect").addEventListener("change", event => applyLibraryPreset(event.target.value));
     }
     function normalizedCustomIntervals() {
       const maxDay = Math.max(val("days"), 0);
@@ -733,12 +830,25 @@
         timeToProgression: progression ? progression.t : Infinity
       }};
     }
+    function prepareCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(300, Math.round(rect.width));
+      canvas.height = Math.max(320, Math.round(rect.height));
+      return canvas.getContext("2d");
+    }
     function axes(ctx, w, h, maxY, maxT, options = {}) {
+      const compact = w < 520;
       ctx.clearRect(0, 0, w, h);
-      ctx.font = "13px Arial";
+      ctx.font = compact ? "10px Arial" : "13px Arial";
       const tickLabels = Array.from({length: 6}, (_, i) => Math.round(maxY * (1 - i / 5)).toString());
       const widestTick = Math.max(...tickLabels.map(label => ctx.measureText(label).width));
-      const pad = {l: Math.max(86, Math.ceil(widestTick) + 46), r: options.rightPad || 34, t: options.topPad || 24, b: 58};
+      const requestedRightPad = options.rightPad || (compact ? 24 : 34);
+      const pad = {
+        l: Math.max(compact ? 58 : 86, Math.ceil(widestTick) + (compact ? 30 : 46)),
+        r: compact ? Math.min(requestedRightPad, 52) : requestedRightPad,
+        t: compact ? Math.min(options.topPad || 30, 54) : (options.topPad || 24),
+        b: compact ? 48 : 58
+      };
       ctx.strokeStyle = "#cbd2d9";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -750,7 +860,7 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.save();
-      ctx.translate(20, pad.t + (h - pad.t - pad.b) / 2);
+      ctx.translate(compact ? 12 : 20, pad.t + (h - pad.t - pad.b) / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.fillText("Cell count", 0, 0);
       ctx.restore();
@@ -806,16 +916,17 @@
         ctx.beginPath(); ctx.moveTo(x0, scale.pad.t); ctx.lineTo(x0, scale.y(0)); ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = "#1d4ed8";
-        ctx.font = "bold 12px Arial";
+        const compact = ctx.canvas.width < 520;
+        ctx.font = compact ? "bold 9px Arial" : "bold 12px Arial";
         ctx.textAlign = "center";
-        ctx.fillText("Treatment ON", (x0 + x1) / 2, scale.pad.t - 18);
+        ctx.fillText(compact ? "ON" : "Treatment ON", (x0 + x1) / 2, scale.pad.t - (compact ? 10 : 18));
       });
       ctx.restore();
     }
     function drawExposureAxis(ctx, scale, w, h) {
       ctx.save();
       ctx.fillStyle = colors.dose;
-      ctx.font = "12px Arial";
+      ctx.font = w < 520 ? "9px Arial" : "12px Arial";
       ctx.textAlign = "left";
       [0, 0.5, 1].forEach(value => ctx.fillText(value.toFixed(1), w - scale.pad.r + 8, scale.yDose(value) + 4));
       ctx.save();
@@ -883,7 +994,7 @@
       if (!fitted) throw new Error(`No saved fitted prediction for ${activeLibraryKey}`);
       document.getElementById("plotTitle").textContent = `${fitted.model} over ${lib.label}`;
       const canvas = document.getElementById("plot");
-      const ctx = canvas.getContext("2d");
+      const ctx = prepareCanvas(canvas);
       const observedValues = [...lib.naive.map(d => d.y), ...lib.cis.map(d => d.y), 1000];
       const fittedValues = [...fitted.naive.map(d => d.y), ...fitted.cis.map(d => d.y)];
       const allTimes = [...lib.naive, ...lib.cis, ...fitted.naive, ...fitted.cis].map(d => d.t);
@@ -920,7 +1031,7 @@
       const selectedResult = results.find(result => result.schedule === selectedSchedule) || results[0];
       const ensemble = [-4,-3,-2,-1,0,1,2,3,4].map(member => simulate(selectedSchedule, member));
       const canvas = document.getElementById("comparePlot");
-      const ctx = canvas.getContext("2d");
+      const ctx = prepareCanvas(canvas);
       const maxY = Math.max(...results.flatMap(r => r.series.map(d => Math.max(d.total, d.N, d.S + d.T))), ...ensemble.flatMap(r => r.series.map(d => d.total)), 1000) * 1.08;
       const maxT = Math.max(...results[0].series.map(d => d.t));
       const detailedView = comparisonMode === "selected";
@@ -940,7 +1051,7 @@
           drawLine(ctx, selectedResult.series, d => scale.x(d.t), d => scale.y(d.T), "#0f766e", 1.8, [3, 4]);
         }
         drawLine(ctx, selectedResult.series, d => scale.x(d.t), d => scale.yDose(Math.min(Math.max(d.exposure, 0), 1)), colors.dose, 2.0, [3, 4]);
-        ctx.save(); ctx.strokeStyle = "#b45309"; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(scale.x(adaptiveConfig.calibration_end_day), scale.pad.t); ctx.lineTo(scale.x(adaptiveConfig.calibration_end_day), scale.y(0)); ctx.stroke(); ctx.fillStyle = "#8a4b08"; ctx.fillText("Day 14: extrapolation begins", scale.x(adaptiveConfig.calibration_end_day) + 5, scale.pad.t + 13); ctx.restore();
+        ctx.save(); ctx.strokeStyle = "#b45309"; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(scale.x(adaptiveConfig.calibration_end_day), scale.pad.t); ctx.lineTo(scale.x(adaptiveConfig.calibration_end_day), scale.y(0)); ctx.stroke(); ctx.fillStyle = "#8a4b08"; ctx.fillText(canvas.width < 520 ? "Day 14" : "Day 14: extrapolation begins", scale.x(adaptiveConfig.calibration_end_day) + 5, scale.pad.t + 13); ctx.restore();
         drawExposureAxis(ctx, scale, canvas.width, canvas.height);
         document.getElementById("compareLegend").innerHTML =
           (showUntreated && selectedSchedule !== "none" ? `<span class="legend-item" style="color:${colors.none}"><span class="line dash"></span>Untreated coculture total</span>` : "") +
@@ -1055,7 +1166,7 @@
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
     });
     document.getElementById("run").addEventListener("click", () => show("single"));
-    document.getElementById("compare").addEventListener("click", () => show("compare"));
+    document.getElementById("compare").addEventListener("click", () => { show("compare"); setComparisonMode("all"); });
     document.getElementById("singleTab").addEventListener("click", () => show("single"));
     document.getElementById("compareTab").addEventListener("click", () => show("compare"));
     document.getElementById("showSelectedSchedule").addEventListener("click", () => setComparisonMode("selected"));
@@ -1083,6 +1194,13 @@
       renderIntervalList();
       updateControlVisibility();
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
+    });
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
+      }, 120);
     });
     renderModelStatus();
     renderLibraryButtons();
