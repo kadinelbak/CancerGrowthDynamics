@@ -109,8 +109,13 @@
     .interval-entry input[type="number"] { min-width: 0; }
     .interval-entry button { padding: 8px 10px; white-space: nowrap; }
     .interval-list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; margin-top: 9px; }
-    .interval-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 1px solid #9db5d1; background: #eef5ff; padding: 5px 7px; font-size: 12px; overflow-wrap: anywhere; white-space: normal; }
-    .interval-chip button { flex: 0 0 auto; border: 0; background: transparent; color: var(--muted); padding: 0 2px; font-size: 16px; line-height: 1; }
+    .interval-chip { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; max-width: 100%; border: 1px solid #9db5d1; background: #eef5ff; padding: 6px 7px; font-size: 12px; overflow-wrap: anywhere; white-space: normal; }
+    .interval-chip.editing { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+    .interval-chip-copy { min-width: 0; }
+    .interval-chip-actions { display: inline-flex; align-items: center; gap: 3px; }
+    .interval-chip button { flex: 0 0 auto; border: 0; background: transparent; color: var(--muted); padding: 2px 4px; line-height: 1; }
+    .interval-chip button[data-edit-interval] { color: var(--accent); font-size: 11px; }
+    .interval-chip button[data-remove-interval] { font-size: 16px; }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: currentColor; }
     .line { width: 28px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
     .dash { border-top-style: dashed; }
@@ -156,9 +161,11 @@
     .mode-switch button { border: 0; background: white; color: var(--ink); border-radius: 3px; }
     .mode-switch button.active { background: var(--ink); color: white; }
     .window-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; align-items: end; }
-    .window-grid label:nth-child(5), .window-grid > button { grid-column: 1 / -1; }
-    .window-grid > button { width: 100%; }
+    .window-grid label:nth-child(5), .window-actions { grid-column: 1 / -1; }
+    .window-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    .window-actions button { width: 100%; }
     .validation { min-height: 20px; margin-top: 7px; color: #a61b1b; font-weight: 700; font-size: 12px; }
+    .validation.editing { color: var(--accent); }
     .dose-status { min-width: 0; padding: 8px; border-left: 3px solid #2563eb; background: #eef5ff; font-size: 12px; overflow-wrap: anywhere; }
     details.advanced { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
     details.advanced summary { cursor: pointer; font-weight: 700; }
@@ -327,7 +334,10 @@
               <label>Dose (uM)<input id="intervalDose" type="number" min="0" max="10" step="0.01" value="1"></label>
               <label>Refresh (days)<input id="intervalRefresh" type="number" min="0.25" max="30" step="0.25" value="2"></label>
               <label>Label<input id="intervalLabel" type="text" maxlength="40" value="Cycle 1"></label>
-              <button id="addInterval" type="button">Add treatment window</button>
+              <div class="window-actions">
+                <button id="addInterval" type="button">Add treatment window</button>
+                <button id="cancelInterval" class="secondary hidden" type="button">Cancel</button>
+              </div>
             </div>
             <div class="interval-list" id="intervalList" aria-live="polite"></div>
             <div class="validation" id="intervalValidation" aria-live="assertive"></div>
@@ -465,6 +475,7 @@
       {start: 18, end: 22, dose: 0.67, refresh: 2, label: "Cycle 2"},
       {start: 30, end: 34, dose: 1.47, refresh: 2, label: "Cycle 3"}
     ];
+    let editingIntervalIndex = null;
     let researchMode = "experimental";
     let selectedAdvancedModel = adaptiveConfig.winners.stage4.model;
     const colors = {
@@ -645,16 +656,61 @@
         .filter(interval => interval.end > interval.start)
         .sort((a, b) => a.start - b.start);
     }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[character]);
+    }
+    function resetIntervalForm() {
+      editingIntervalIndex = null;
+      const intervals = normalizedCustomIntervals();
+      const maxDay = Math.max(val("days"), 1);
+      const lastEnd = intervals.length ? intervals[intervals.length - 1].end : -2;
+      const start = Math.min(Math.max(0, lastEnd + 2), Math.max(0, maxDay - 1));
+      const end = Math.min(maxDay, start + 4);
+      document.getElementById("intervalStart").value = Number(start.toFixed(1));
+      document.getElementById("intervalEnd").value = Number(end.toFixed(1));
+      document.getElementById("intervalDose").value = Math.max(val("maxDose"), 0).toFixed(2);
+      document.getElementById("intervalRefresh").value = Math.max(val("refreshInterval"), 0.25).toFixed(2);
+      document.getElementById("intervalLabel").value = `Cycle ${intervals.length + 1}`;
+      document.getElementById("addInterval").textContent = "Add treatment window";
+      document.getElementById("cancelInterval").classList.add("hidden");
+      document.getElementById("intervalValidation").textContent = "";
+      document.getElementById("intervalValidation").classList.remove("editing");
+      document.getElementById("intervalEnd").setCustomValidity("");
+      document.querySelectorAll(".interval-chip.editing").forEach(chip => chip.classList.remove("editing"));
+    }
+    function beginIntervalEdit(index) {
+      const interval = normalizedCustomIntervals()[index];
+      if (!interval) return;
+      editingIntervalIndex = index;
+      document.getElementById("intervalStart").value = interval.start;
+      document.getElementById("intervalEnd").value = interval.end;
+      document.getElementById("intervalDose").value = interval.dose;
+      document.getElementById("intervalRefresh").value = interval.refresh;
+      document.getElementById("intervalLabel").value = interval.label;
+      document.getElementById("addInterval").textContent = "Save changes";
+      document.getElementById("cancelInterval").classList.remove("hidden");
+      document.getElementById("intervalValidation").textContent = `Editing ${interval.label}`;
+      document.getElementById("intervalValidation").classList.add("editing");
+      document.querySelectorAll(".interval-chip").forEach((chip, chipIndex) => chip.classList.toggle("editing", chipIndex === index));
+      document.getElementById("intervalStart").focus();
+    }
     function renderIntervalList() {
       const intervals = normalizedCustomIntervals();
       document.getElementById("intervalList").innerHTML = intervals.length
-        ? intervals.map((interval, index) => `<span class="interval-chip">${interval.label}: day ${Number(interval.start.toFixed(1))}-${Number(interval.end.toFixed(1))}, ${interval.dose.toFixed(2)} ${researchMode === "experimental" ? "uM" : "relative"}, refresh ${interval.refresh} d<button type="button" data-remove-interval="${index}" aria-label="Remove ${interval.label}" title="Remove treatment window">&times;</button></span>`).join("")
+        ? intervals.map((interval, index) => {
+            const safeLabel = escapeHtml(interval.label);
+            return `<span class="interval-chip${index === editingIntervalIndex ? " editing" : ""}"><span class="interval-chip-copy">${safeLabel}: day ${Number(interval.start.toFixed(1))}-${Number(interval.end.toFixed(1))}, ${interval.dose.toFixed(2)} ${researchMode === "experimental" ? "uM" : "relative"}, refresh ${interval.refresh} d</span><span class="interval-chip-actions"><button type="button" data-edit-interval="${index}" aria-label="Edit ${safeLabel}">Edit</button><button type="button" data-remove-interval="${index}" aria-label="Remove ${safeLabel}" title="Remove treatment window">&times;</button></span></span>`;
+          }).join("")
         : '<span class="composition-note">No treatment windows: the full simulation is untreated.</span>';
+      document.querySelectorAll("[data-edit-interval]").forEach(button => {
+        button.addEventListener("click", () => beginIntervalEdit(Number(button.dataset.editInterval)));
+      });
       document.querySelectorAll("[data-remove-interval]").forEach(button => {
         button.addEventListener("click", () => {
           const visible = normalizedCustomIntervals();
           visible.splice(Number(button.dataset.removeInterval), 1);
           customIntervals = visible;
+          resetIntervalForm();
           renderIntervalList();
           if (!document.getElementById("compareView").classList.contains("hidden")) renderCompare();
         });
@@ -667,6 +723,7 @@
       const refresh = Number(document.getElementById("intervalRefresh").value);
       const label = document.getElementById("intervalLabel").value.trim() || "Treatment";
       const validation = document.getElementById("intervalValidation");
+      validation.classList.remove("editing");
       if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
         document.getElementById("intervalEnd").setCustomValidity("Stop day must be later than start day.");
         document.getElementById("intervalEnd").reportValidity();
@@ -676,15 +733,20 @@
         validation.textContent = "Dose must be nonnegative and refresh interval must be positive.";
         return;
       }
-      const overlaps = normalizedCustomIntervals().some(interval => dose > 0 && interval.dose > 0 && start < interval.end && end > interval.start);
+      const intervals = normalizedCustomIntervals();
+      const overlaps = intervals.some((interval, index) => index !== editingIntervalIndex && dose > 0 && interval.dose > 0 && start < interval.end && end > interval.start);
       if (overlaps) {
         validation.textContent = "Active windows cannot overlap. Adjacent windows and explicit zero-dose holidays are allowed.";
         return;
       }
       validation.textContent = "";
       document.getElementById("intervalEnd").setCustomValidity("");
-      customIntervals.push({start, end, dose, refresh, label});
+      const nextInterval = {start, end, dose, refresh, label};
+      if (editingIntervalIndex !== null && intervals[editingIntervalIndex]) intervals[editingIntervalIndex] = nextInterval;
+      else intervals.push(nextInterval);
+      customIntervals = intervals;
       customIntervals = normalizedCustomIntervals();
+      resetIntervalForm();
       renderIntervalList();
       if (!document.getElementById("compareView").classList.contains("hidden")) renderCompare();
     }
@@ -1165,6 +1227,7 @@
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
     }));
     document.getElementById("schedule").addEventListener("change", () => {
+      if (document.getElementById("schedule").value !== "custom" && editingIntervalIndex !== null) resetIntervalForm();
       updateControlVisibility();
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
     });
@@ -1181,6 +1244,7 @@
     document.getElementById("enableScenarioControls").addEventListener("change", () => { updateControlVisibility(); renderCompare(); });
     document.getElementById("enableSwitching").addEventListener("change", renderCompare);
     document.getElementById("addInterval").addEventListener("click", addCustomInterval);
+    document.getElementById("cancelInterval").addEventListener("click", resetIntervalForm);
     document.getElementById("intervalEnd").addEventListener("input", event => event.target.setCustomValidity(""));
     document.getElementById("reset").addEventListener("click", () => {
       Object.entries(defaults).forEach(([k, v]) => { if (document.getElementById(k)) document.getElementById(k).value = v; });
@@ -1194,6 +1258,7 @@
       document.getElementById("showLatent").checked = false;
       document.getElementById("enableScenarioControls").checked = false;
       document.getElementById("enableSwitching").checked = false;
+      resetIntervalForm();
       renderIntervalList();
       updateControlVisibility();
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
@@ -1207,8 +1272,9 @@
     });
     renderModelStatus();
     renderLibraryButtons();
-    renderIntervalList();
     applyLibraryPreset(activeLibraryKey);
+    resetIntervalForm();
+    renderIntervalList();
     show("single");
   </script>
 </body>
