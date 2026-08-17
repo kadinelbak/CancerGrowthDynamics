@@ -12,6 +12,15 @@ using GrowthParameterEstimation
     @test config.observables == ["A2780Naive", "Total A2780cis", "Total population"]
     @test "cis tolerant-like" in config.latent_states_hidden
     @test all(isfinite, values(config.winners.stage4.parameters))
+    @test length(config.experimental_library.original) == 6
+    @test length(config.experimental_library.fitted) == 6
+    @test haskey(config.experimental_library.original, "coculture_untreated__20k__50-50__0")
+    @test haskey(config.experimental_library.original, "coculture_untreated__30k__50-50__0")
+    untreated_20k = config.experimental_library.fitted["coculture_untreated__20k__50-50__0"]
+    untreated_30k = config.experimental_library.fitted["coculture_untreated__30k__50-50__0"]
+    @test untreated_20k.naive[1].t == 0
+    @test untreated_20k.naive[1].y + untreated_20k.cis[1].y == 67
+    @test untreated_30k.naive[1].y + untreated_30k.cis[1].y == 100
 
     zero_protocol = TreatmentProtocol([TreatmentWindow(0, 14, 0, 2)]; horizon = 14)
     zero_scenario = build_a2780_scenario(config, zero_protocol; initial_state = [50.0, 25.0, 25.0, 0.0, 0.0])

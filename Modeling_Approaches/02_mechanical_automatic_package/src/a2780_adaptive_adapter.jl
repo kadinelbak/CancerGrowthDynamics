@@ -28,6 +28,55 @@ struct RankedCandidate
     exclusion_reason::String
 end
 
+function _untreated_coculture_library(csv_root, winner::RankedCandidate)
+    overlay_path = joinpath(csv_root, "coculture_untreated", "figures", "coculture_untreated_joint_overlays.csv")
+    overlay = CSV.read(overlay_path, DataFrame)
+    selected = filter(row ->
+        String(row.model) == winner.model && String(row.pooling_mode) == winner.pooling,
+        overlay,
+    )
+    isempty(selected) && error("No untreated coculture overlays match the selected Stage 3 model")
+
+    original = Dict{String,Any}()
+    fitted = Dict{String,Any}()
+    point_rows(rows, column) = [
+        (t = Float64(row.time), y = Float64(row[column]))
+        for row in eachrow(sort(rows, :time))
+    ]
+    for density in sort(unique(String.(selected.density)))
+        density_rows = filter(row -> String(row.density) == density, selected)
+        for mix in sort(unique(String.(density_rows.mix)))
+            condition = filter(row -> String(row.mix) == mix, density_rows)
+            naive = filter(row -> String(row.component) == "sensitive", condition)
+            cis = filter(row -> String(row.component) == "resistant", condition)
+            isempty(naive) && error("Missing untreated Naive overlay for $density, mix $mix")
+            isempty(cis) && error("Missing untreated cis overlay for $density, mix $mix")
+            key = "coculture_untreated__$(density)__$(mix)__0"
+            original[key] = (
+                key = key,
+                label = "Untreated coculture | $density, mix $mix",
+                category = "Untreated coculture",
+                condition = "coculture_untreated",
+                culture = "coculture",
+                treated = false,
+                density = density,
+                mix = mix,
+                cellLine = "A2780Naive+A2780cis",
+                dose = 0.0,
+                components = ["naive", "cis"],
+                naive = point_rows(naive, :observed),
+                cis = point_rows(cis, :observed),
+            )
+            fitted[key] = (
+                model = "Asymmetric competition with loss and inherited monoculture growth",
+                naive = point_rows(naive, :predicted),
+                cis = point_rows(cis, :predicted),
+            )
+        end
+    end
+    return (original = original, fitted = fitted)
+end
+
 _bool(value) = lowercase(strip(string(value))) == "true"
 
 function _parse_parameters(text)
@@ -185,6 +234,7 @@ function load_a2780_adaptive_config(package_root)
         calibration_end_day = 14.0,
         observables = ["A2780Naive", "Total A2780cis", "Total population"],
         latent_states_hidden = ["cis sensitive-like", "cis tolerant-like"],
+        experimental_library = _untreated_coculture_library(csv_root, stage3_winner),
         dose = (
             drug = "cisplatin",
             unit = "uM",
