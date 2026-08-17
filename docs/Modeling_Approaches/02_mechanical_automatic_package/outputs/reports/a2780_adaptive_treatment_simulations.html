@@ -56,12 +56,16 @@
     .control-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; overflow-x: clip; }
     .control-grid > * { min-width: 0; max-width: 100%; }
     .control-section-title { margin: 5px -16px -2px; padding: 11px 16px 6px; border-top: 1px solid #e5e9ee; color: var(--ink); font-size: 12px; font-weight: 800; text-transform: uppercase; }
-    label { display: grid; gap: 5px; min-width: 0; font-weight: 600; font-size: 13px; }
+    label, .field-group { display: grid; gap: 5px; min-width: 0; font-weight: 600; font-size: 13px; }
     input, select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; }
     input[type="range"] { padding: 0; }
     .composition-control { gap: 7px; }
-    .composition-labels { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 700; }
+    .composition-labels { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; font-weight: 700; }
     .composition-labels span { font-variant-numeric: tabular-nums; }
+    .exact-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px; min-width: 0; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .exact-entry input { width: 100%; min-width: 0; padding: 6px 7px; text-align: right; font-variant-numeric: tabular-nums; background: white; color: var(--ink); }
+    .composition-exact { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; white-space: nowrap; }
+    .composition-exact input { width: 64px; padding: 5px 6px; text-align: right; font-variant-numeric: tabular-nums; background: white; color: var(--ink); }
     .composition-slider {
       appearance: none;
       height: 10px;
@@ -93,6 +97,7 @@
     .overlay-toggle { display: inline-flex; grid-template-columns: none; align-items: center; gap: 8px; width: auto; color: var(--ink); font-size: 13px; cursor: pointer; }
     .overlay-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
     .row { display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 8px; min-width: 0; align-items: center; }
+    .row.exact-row { grid-template-columns: minmax(0, 1fr) minmax(98px, 116px); }
     .value { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
     .button-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e5e9ee; }
     button { border: 1px solid var(--accent); background: var(--accent); color: white; border-radius: 6px; padding: 9px 12px; font-weight: 700; cursor: pointer; }
@@ -263,15 +268,18 @@
         <div class="experiment-match" id="experimentMatch" aria-live="polite"></div>
         <div class="control-grid">
           <div class="control-section-title">Starting population</div>
-          <label>Initial fitted cell count
-            <div class="row"><input id="initialTotal" type="range" min="1" max="100000" step="0.5" value="67"><span class="value" id="initialTotalValue"></span></div>
+          <div class="field-group" role="group" aria-labelledby="initialTotalLabel"><span id="initialTotalLabel">Initial fitted cell count</span>
+            <div class="row exact-row">
+              <input id="initialTotal" type="range" min="1" max="100000" step="0.5" value="67" aria-label="Initial fitted cell count slider">
+              <span class="exact-entry"><input id="initialTotalValue" type="number" min="1" max="100000" step="0.5" value="67" aria-label="Exact initial fitted cell count"><span>cells</span></span>
+            </div>
             <span class="composition-note">Loaded from the selected dataset's fitted day-0 state. This is the modeled image-derived count, not the plated seeding density.</span>
-          </label>
-          <label class="composition-control">Initial lineage composition
-            <div class="composition-labels"><span id="naiveFractionValue" style="color:#dc143c"></span><span id="cisFractionValue" style="color:#2563eb"></span></div>
+          </div>
+          <div class="field-group composition-control" role="group" aria-labelledby="initialCompositionLabel"><span id="initialCompositionLabel">Initial lineage composition</span>
+            <div class="composition-labels"><span id="naiveFractionValue" style="color:#dc143c"></span><span class="composition-exact" style="color:#2563eb">cis <input id="cisFractionValue" type="number" min="0" max="100" step="1" value="50" aria-label="Exact initial cis percentage">%</span></div>
             <input id="cisFraction" class="composition-slider" style="--left-color:#dc143c;--right-color:#2563eb" type="range" min="0" max="1" step="0.01" value="0.50" aria-label="Initial cis fraction">
-            <span class="composition-note">The slider divides all starting cells between Naive and A2780cis.</span>
-          </label>
+            <span class="composition-note">Drag the slider or type the cis percentage. Naive is calculated as the remainder so both lineages always total 100%.</span>
+          </div>
           <label class="composition-control control-hidden" data-control="latent">Composition within A2780cis (advanced diagnostic)
             <div class="composition-labels"><span id="sensitiveFractionValue" style="color:#f59e0b"></span><span id="tolerantFractionValue" style="color:#2563eb"></span></div>
             <input id="tolerantFraction" class="composition-slider" style="--left-color:#f59e0b;--right-color:#2563eb" type="range" min="0" max="1" step="0.001" value="0.976" aria-label="Initial tolerant fraction within cis">
@@ -571,7 +579,7 @@
       });
       document.getElementById("maxDoseLabel").textContent = schedule === "custom" ? "Default dose for new windows" : "Cisplatin dose";
     }
-    function updateLabels() {
+    function updateLabels({forceExact = false} = {}) {
       const format = {
         initialTotal: x => Number.isInteger(x) ? x.toFixed(0) : x.toFixed(1),
         cisFraction: x => "cis " + (100 * x).toFixed(0) + "%",
@@ -590,7 +598,13 @@
         tolerantThreshold: x => Math.round(x).toString(),
         monitorInterval: x => x.toFixed(1) + " d"
       };
-      ids.forEach(id => document.getElementById(id + "Value").textContent = format[id](val(id)));
+      ids.filter(id => id !== "initialTotal" && id !== "cisFraction").forEach(id => {
+        document.getElementById(id + "Value").textContent = format[id](val(id));
+      });
+      const exactTotal = document.getElementById("initialTotalValue");
+      const exactCis = document.getElementById("cisFractionValue");
+      if (forceExact || document.activeElement !== exactTotal) exactTotal.value = format.initialTotal(val("initialTotal"));
+      if (forceExact || document.activeElement !== exactCis) exactCis.value = (100 * val("cisFraction")).toFixed(0);
       document.getElementById("naiveFractionValue").textContent = "Naive " + (100 * (1 - val("cisFraction"))).toFixed(0) + "%";
       document.getElementById("sensitiveFractionValue").textContent = "Sensitive-like " + (100 * (1 - val("tolerantFraction"))).toFixed(0) + "%";
       const dose = val("maxDose");
@@ -603,6 +617,30 @@
         ? " This value initializes new windows only; edit every existing window below."
         : "";
       document.getElementById("doseStatus").textContent = (researchMode === "experimental" ? status : "Normalized exposure scenario; not a clinical prescription.") + customDoseNote;
+    }
+    function renderActiveView() {
+      document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
+    }
+    function bindExactInput(inputId, rangeId, toRangeValue) {
+      const input = document.getElementById(inputId);
+      const range = document.getElementById(rangeId);
+      const apply = forceExact => {
+        if (input.value.trim() === "") {
+          if (forceExact) updateLabels({forceExact: true});
+          return;
+        }
+        const typed = Number(input.value);
+        if (!Number.isFinite(typed)) return;
+        const minimum = Number(range.min);
+        const maximum = Number(range.max);
+        range.value = Math.max(minimum, Math.min(maximum, toRangeValue(typed)));
+        updateControlVisibility();
+        updateLabels({forceExact});
+        renderActiveView();
+      };
+      input.addEventListener("input", () => apply(false));
+      input.addEventListener("change", () => apply(true));
+      input.addEventListener("blur", () => apply(true));
     }
     function fittedStartValue(series, startTime) {
       if (!series || !series.length) return 0;
@@ -1363,8 +1401,10 @@
     ids.forEach(id => document.getElementById(id).addEventListener("input", () => {
       updateControlVisibility();
       updateLabels();
-      document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
+      renderActiveView();
     }));
+    bindExactInput("initialTotalValue", "initialTotal", value => value);
+    bindExactInput("cisFractionValue", "cisFraction", value => value / 100);
     document.getElementById("schedule").addEventListener("change", () => {
       updateControlVisibility();
       updateLabels();
