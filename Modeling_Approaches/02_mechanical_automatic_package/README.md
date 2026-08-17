@@ -38,6 +38,7 @@ Each notebook follows the same flow:
 - `src/coculture_joint.jl`: coupled sensitive/resistant fitting across seeding densities and mix ratios.
 - `src/linked_treatment_joint.jl`: linked treated-monoculture and treated-coculture hypothesis tests for A2780 drug-inheritance analysis.
 - `src/analysis_workflows.jl`: post-fit metrics, sensitivity export, and analysis plotting.
+- `src/sample_aware_report.jl`: well-preserving staged summaries, between-well variability bands, direction audits, and report rendering.
 - `src/adaptive_simulation_engine.jl`: model-agnostic treatment windows, feedback decisions, ensembles, reverse lookup, and outcome metrics.
 - `src/a2780_adaptive_adapter.jl`: strict staged-artifact selection and A2780 observable adapter for the simulator.
 - `src/MechanicalAutomaticModeling.jl`: entry module including all shared modules.
@@ -66,6 +67,25 @@ The JSON and JavaScript configuration files beside the report are generated
 from Julia artifacts. Results after day 14 are extrapolation and use an
 ensemble sensitivity band. Experimental dose values outside 0.67-1.47 uM are
 flagged as extrapolation; translational mode reports normalized exposure only.
+
+## Sample-Aware Staged Report
+
+The sample-aware companion report keeps image tiles averaged within each well,
+but does not average the replicate wells into a single observed trajectory. It
+shows each well, the across-well mean plus or minus one standard deviation, and
+the selected canonical staged fit. Its rankings and equations are inherited
+from the validated staged report; the well-level view audits reproducibility
+and does not recompute ordinary BIC with correlated measurements treated as
+independent.
+
+Rebuild the report, CSV findings, figures, and Pages mirror with:
+
+```julia
+julia --project=. scripts/build_sample_aware_report.jl
+```
+
+The generated report is
+`outputs/reports/a2780_sample_aware_staged_model_comparison.html`.
 
 ## Outputs
 All condition outputs are written under condition-specific subfolders:
