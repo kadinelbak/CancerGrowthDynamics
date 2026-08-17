@@ -38,7 +38,34 @@ Each notebook follows the same flow:
 - `src/coculture_joint.jl`: coupled sensitive/resistant fitting across seeding densities and mix ratios.
 - `src/linked_treatment_joint.jl`: linked treated-monoculture and treated-coculture hypothesis tests for A2780 drug-inheritance analysis.
 - `src/analysis_workflows.jl`: post-fit metrics, sensitivity export, and analysis plotting.
+- `src/adaptive_simulation_engine.jl`: model-agnostic treatment windows, feedback decisions, ensembles, reverse lookup, and outcome metrics.
+- `src/a2780_adaptive_adapter.jl`: strict staged-artifact selection and A2780 observable adapter for the simulator.
 - `src/MechanicalAutomaticModeling.jl`: entry module including all shared modules.
+
+## Adaptive Simulator
+
+`AdaptiveSimulationEngine` is deliberately independent of A2780 names, files,
+HTML, and ODE libraries. A `SimulationScenario` receives a segment-simulation
+callback so treatment, refresh, and monitoring events can be orchestrated
+without coupling the engine to a particular solver.
+
+The A2780 adapter resolves each default from ranking and status exports. It
+rejects candidates with missing/non-finite parameters, diagnostic-only status,
+or invalid inheritance and records why a higher-ranked candidate was skipped.
+The default browser output contains only A2780Naive, total A2780cis, and total
+population. Any internal cis substructure is hidden unless the user enables an
+advanced diagnostic view.
+
+Rebuild the browser configuration and Pages mirror with:
+
+```julia
+julia --project=. scripts/build_adaptive_simulator_report.jl
+```
+
+The JSON and JavaScript configuration files beside the report are generated
+from Julia artifacts. Results after day 14 are extrapolation and use an
+ensemble sensitivity band. Experimental dose values outside 0.67-1.47 uM are
+flagged as extrapolation; translational mode reports normalized exposure only.
 
 ## Outputs
 All condition outputs are written under condition-specific subfolders:
