@@ -46,15 +46,16 @@
     .research-notice::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
     .layout { display: grid; grid-template-columns: minmax(300px, 350px) minmax(0, 1fr); gap: 16px; align-items: start; }
     .layout.recreation-mode { grid-template-columns: minmax(0, 1fr); }
-    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+    .panel { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
     .visual-panel { min-width: 0; }
     .controls-header { padding-bottom: 12px; border-bottom: 1px solid #e5e9ee; margin-bottom: 12px; }
     .controls-header h2 { margin-bottom: 4px; }
     .controls-header p { margin: 0; font-size: 12px; }
-    .control-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .control-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; overflow-x: clip; }
+    .control-grid > * { min-width: 0; max-width: 100%; }
     .control-section-title { margin: 5px -16px -2px; padding: 11px 16px 6px; border-top: 1px solid #e5e9ee; color: var(--ink); font-size: 12px; font-weight: 800; text-transform: uppercase; }
-    label { display: grid; gap: 5px; font-weight: 600; font-size: 13px; }
-    input, select { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; }
+    label { display: grid; gap: 5px; min-width: 0; font-weight: 600; font-size: 13px; }
+    input, select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; }
     input[type="range"] { padding: 0; }
     .composition-control { gap: 7px; }
     .composition-labels { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 700; }
@@ -85,11 +86,11 @@
       box-shadow: 0 0 0 1px #667085;
       cursor: pointer;
     }
-    .composition-note { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.4; }
+    .composition-note { min-width: 0; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.4; overflow-wrap: anywhere; }
     .treatment-context { margin: -2px 0 12px; padding-left: 2px; font-size: 13px; line-height: 1.45; }
     .overlay-toggle { display: inline-flex; grid-template-columns: none; align-items: center; gap: 8px; width: auto; color: var(--ink); font-size: 13px; cursor: pointer; }
     .overlay-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
-    .row { display: grid; grid-template-columns: 1fr 86px; gap: 8px; align-items: center; }
+    .row { display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 8px; min-width: 0; align-items: center; }
     .value { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
     .button-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e5e9ee; }
     button { border: 1px solid var(--accent); background: var(--accent); color: white; border-radius: 6px; padding: 9px 12px; font-weight: 700; cursor: pointer; }
@@ -101,15 +102,15 @@
     .comparison-controls span { color: var(--muted); font-size: 13px; font-weight: 700; }
     .comparison-controls button { background: white; color: var(--ink); border-color: var(--line); padding: 7px 10px; }
     .comparison-controls button.active { background: var(--ink); color: white; border-color: var(--ink); }
-    .schedule-help { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.45; }
-    .interval-editor { border: 1px solid var(--line); padding: 10px; background: #f7f9fb; }
+    .schedule-help { min-width: 0; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.45; overflow-wrap: anywhere; }
+    .interval-editor { min-width: 0; max-width: 100%; border: 1px solid var(--line); padding: 10px; background: #f7f9fb; overflow: hidden; }
     .interval-entry { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
     .interval-entry label { margin: 0; }
     .interval-entry input[type="number"] { min-width: 0; }
     .interval-entry button { padding: 8px 10px; white-space: nowrap; }
-    .interval-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-    .interval-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #9db5d1; background: #eef5ff; padding: 5px 7px; font-size: 12px; }
-    .interval-chip button { border: 0; background: transparent; color: var(--muted); padding: 0 2px; font-size: 16px; line-height: 1; }
+    .interval-list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; margin-top: 9px; }
+    .interval-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 1px solid #9db5d1; background: #eef5ff; padding: 5px 7px; font-size: 12px; overflow-wrap: anywhere; white-space: normal; }
+    .interval-chip button { flex: 0 0 auto; border: 0; background: transparent; color: var(--muted); padding: 0 2px; font-size: 16px; line-height: 1; }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: currentColor; }
     .line { width: 28px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
     .dash { border-top-style: dashed; }
@@ -154,9 +155,11 @@
     .mode-switch { display: inline-flex; gap: 0; border: 1px solid var(--line); padding: 3px; background: white; flex-shrink: 0; }
     .mode-switch button { border: 0; background: white; color: var(--ink); border-radius: 3px; }
     .mode-switch button.active { background: var(--ink); color: white; }
-    .window-grid { display: grid; grid-template-columns: repeat(5, minmax(74px, 1fr)) auto; gap: 7px; align-items: end; }
+    .window-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; align-items: end; }
+    .window-grid label:nth-child(5), .window-grid > button { grid-column: 1 / -1; }
+    .window-grid > button { width: 100%; }
     .validation { min-height: 20px; margin-top: 7px; color: #a61b1b; font-weight: 700; font-size: 12px; }
-    .dose-status { padding: 8px; border-left: 3px solid #2563eb; background: #eef5ff; font-size: 12px; }
+    .dose-status { min-width: 0; padding: 8px; border-left: 3px solid #2563eb; background: #eef5ff; font-size: 12px; overflow-wrap: anywhere; }
     details.advanced { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
     details.advanced summary { cursor: pointer; font-weight: 700; }
     .advanced-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -180,7 +183,7 @@
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .dataset-controls { grid-template-columns: 1fr; }
       .status-strip { grid-template-columns: 1fr 1fr; }
-      .window-grid { grid-template-columns: 1fr 1fr; }
+      .window-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .interval-entry { grid-template-columns: 1fr 1fr; }
       .interval-entry button { grid-column: 1 / -1; }
     }
@@ -324,7 +327,7 @@
               <label>Dose (uM)<input id="intervalDose" type="number" min="0" max="10" step="0.01" value="1"></label>
               <label>Refresh (days)<input id="intervalRefresh" type="number" min="0.25" max="30" step="0.25" value="2"></label>
               <label>Label<input id="intervalLabel" type="text" maxlength="40" value="Cycle 1"></label>
-              <button id="addInterval" type="button">Add window</button>
+              <button id="addInterval" type="button">Add treatment window</button>
             </div>
             <div class="interval-list" id="intervalList" aria-live="polite"></div>
             <div class="validation" id="intervalValidation" aria-live="assertive"></div>
