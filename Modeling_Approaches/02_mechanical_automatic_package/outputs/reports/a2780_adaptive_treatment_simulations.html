@@ -106,18 +106,17 @@
     .comparison-controls button.active { background: var(--ink); color: white; border-color: var(--ink); }
     .schedule-help { min-width: 0; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.45; overflow-wrap: anywhere; }
     .interval-editor { min-width: 0; max-width: 100%; border: 1px solid var(--line); padding: 10px; background: #f7f9fb; overflow: hidden; }
-    .interval-entry { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
-    .interval-entry label { margin: 0; }
-    .interval-entry input[type="number"] { min-width: 0; }
-    .interval-entry button { padding: 8px 10px; white-space: nowrap; }
-    .interval-list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; margin-top: 9px; }
-    .interval-chip { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; max-width: 100%; border: 1px solid #9db5d1; background: #eef5ff; padding: 6px 7px; font-size: 12px; overflow-wrap: anywhere; white-space: normal; }
-    .interval-chip.editing { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-    .interval-chip-copy { min-width: 0; }
-    .interval-chip-actions { display: inline-flex; align-items: center; gap: 3px; }
-    .interval-chip button { flex: 0 0 auto; border: 0; background: transparent; color: var(--muted); padding: 2px 4px; line-height: 1; }
-    .interval-chip button[data-edit-interval] { color: var(--accent); font-size: 11px; }
-    .interval-chip button[data-remove-interval] { font-size: 16px; }
+    .interval-editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .interval-editor-heading strong { display: block; }
+    .interval-editor-heading .composition-note { display: block; margin-top: 2px; }
+    .interval-editor-heading button { flex: 0 0 auto; padding: 7px 9px; white-space: nowrap; }
+    .interval-list { min-width: 0; max-width: 100%; margin-top: 10px; border-top: 1px solid var(--line); }
+    .interval-window { padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .interval-window-head { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 8px; align-items: end; }
+    .interval-window-head label, .interval-window-fields label { margin: 0; gap: 3px; color: var(--muted); font-size: 11px; }
+    .interval-window-head input, .interval-window-fields input { min-width: 0; width: 100%; padding: 7px; color: var(--ink); font-size: 12px; font-weight: 600; }
+    .interval-window-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 8px; margin-top: 8px; }
+    .interval-remove { width: 32px; height: 32px; border-color: var(--line); background: white; color: #a61b1b; padding: 0; font-size: 20px; line-height: 1; }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: currentColor; }
     .line { width: 28px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
     .dash { border-top-style: dashed; }
@@ -162,12 +161,7 @@
     .mode-switch { display: inline-flex; gap: 0; border: 1px solid var(--line); padding: 3px; background: white; flex-shrink: 0; }
     .mode-switch button { border: 0; background: white; color: var(--ink); border-radius: 3px; }
     .mode-switch button.active { background: var(--ink); color: white; }
-    .window-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; align-items: end; }
-    .window-grid label:nth-child(5), .window-actions { grid-column: 1 / -1; }
-    .window-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-    .window-actions button { width: 100%; }
     .validation { min-height: 20px; margin-top: 7px; color: #a61b1b; font-weight: 700; font-size: 12px; }
-    .validation.editing { color: var(--accent); }
     .dose-status { min-width: 0; padding: 8px; border-left: 3px solid #2563eb; background: #eef5ff; font-size: 12px; overflow-wrap: anywhere; }
     details.advanced { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
     details.advanced summary { cursor: pointer; font-weight: 700; }
@@ -192,9 +186,6 @@
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .dataset-controls { grid-template-columns: 1fr; }
       .status-strip { grid-template-columns: 1fr 1fr; }
-      .window-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .interval-entry { grid-template-columns: 1fr 1fr; }
-      .interval-entry button { grid-column: 1 / -1; }
     }
     @media (max-width: 680px) {
       header, main { padding-left: 14px; padding-right: 14px; }
@@ -323,7 +314,7 @@
             <span class="composition-note">The fitted-baseline value is 1 so splitting cis does not alter untreated total-cis growth. Values below 1 deliberately test a hypothetical resistance cost.</span>
           </label>
           <div class="control-section-title" data-control="dose">Treatment delivery</div>
-          <label data-control="dose">Cisplatin dose
+          <label data-control="dose"><span id="maxDoseLabel">Cisplatin dose</span>
             <div class="row"><input id="maxDose" type="range" min="0" max="2" step="0.01" value="1"><span class="value" id="maxDoseValue"></span></div>
             <span class="dose-status" id="doseStatus"></span>
           </label>
@@ -332,17 +323,12 @@
             <span class="composition-note">Used only after treatment stops or during a treatment gap: (k_{decay}=\ln(2)/t_{1/2}). The fitted experimental protocol maintains its measured effect through day 14; this washout half-life is exploratory.</span>
           </label>
           <div class="interval-editor" data-control="custom">
-            <strong>Custom treatment windows</strong>
-            <div class="window-grid">
-              <label>Start day<input id="intervalStart" type="number" min="0" max="1825" step="0.5" value="6"></label>
-              <label>Stop day<input id="intervalEnd" type="number" min="0.5" max="1825" step="0.5" value="10"></label>
-              <label>Dose (uM)<input id="intervalDose" type="number" min="0" max="10" step="0.01" value="1"></label>
-              <label>Refresh (days)<input id="intervalRefresh" type="number" min="0.25" max="30" step="0.25" value="2"></label>
-              <label>Label<input id="intervalLabel" type="text" maxlength="40" value="Cycle 1"></label>
-              <div class="window-actions">
-                <button id="addInterval" type="button">Add treatment window</button>
-                <button id="cancelInterval" class="secondary hidden" type="button">Cancel</button>
+            <div class="interval-editor-heading">
+              <div>
+                <strong>Treatment windows</strong>
+                <span class="composition-note">Each window has its own dose and refresh settings.</span>
               </div>
+              <button id="addInterval" type="button">+ Add window</button>
             </div>
             <div class="interval-list" id="intervalList" aria-live="polite"></div>
             <div class="validation" id="intervalValidation" aria-live="assertive"></div>
@@ -491,7 +477,6 @@
       {start: 18, end: 22, dose: 0.67, refresh: 2, label: "Cycle 2"},
       {start: 30, end: 34, dose: 1.47, refresh: 2, label: "Cycle 3"}
     ];
-    let editingIntervalIndex = null;
     let researchMode = "experimental";
     let selectedAdvancedModel = adaptiveConfig.winners.stage4.model;
     const colors = {
@@ -504,7 +489,7 @@
     const scheduleDescriptions = {
       none: "Simulated untreated counterfactual: treatment intensity is fixed at u(t) = 0 while all initial conditions and growth parameters remain unchanged.",
       fittedTreatment: "Reproduces the selected experiment's fitted assumption: its measured dose acts from day 0 through the observed endpoint. Two-day media refreshes maintain that exposure; fitted treatment strength does not decay between refreshes.",
-      custom: "Add treatment start and stop days below. Cells grow untreated before the first window and between windows; effective exposure decays after each stop day according to the selected half-life.",
+      custom: "Edit each treatment window's start day, stop day, dose, and refresh interval below. Cells grow untreated before the first window and between windows; effective exposure decays after each stop day according to the selected half-life.",
       originalRefresh: "Extends the selected dose with media refreshed at the chosen interval. The fitted model treats exposure as maintained between refreshes; extending beyond day 14 is extrapolation.",
       continuous: "The selected maximum treatment intensity is applied continuously.",
       pulse: "Treatment alternates between the selected on-days and off-days.",
@@ -520,6 +505,8 @@
       const lib = activeLibrary();
       const density = lib.density || "20k";
       const isCoculture = lib.culture === "coculture";
+      const schedule = document.getElementById("schedule").value;
+      const customPeakDose = Math.max(val("maxDose"), ...normalizedCustomIntervals().map(interval => interval.dose), 1e-9);
       const baselines = adaptiveConfig.winners.stage1;
       const nBase = baselines.find(row => row.cell_line === "A2780Naive" && row.density === density) || baselines.find(row => row.cell_line === "A2780Naive");
       const cBase = baselines.find(row => row.cell_line === "A2780cis" && row.density === density) || baselines.find(row => row.cell_line === "A2780cis");
@@ -530,7 +517,7 @@
       const contextShift = isCoculture ? (treatment.cis_tolerant_logit_shift || 0) : 0;
       const latentFraction = 1 / (1 + Math.exp(-(Math.log(treatment.cis_f_tolerant0 / (1 - treatment.cis_f_tolerant0)) + contextShift)));
       return {
-        schedule: document.getElementById("schedule").value,
+        schedule,
         initialTotal: val("initialTotal"),
         cisFraction: val("cisFraction"),
         tolerantFraction: document.getElementById("showLatent").checked ? val("tolerantFraction") : latentFraction,
@@ -539,7 +526,7 @@
         capacityMultiplier: val("capacityMultiplier"),
         turnoverRate: val("turnoverRate"),
         resistantFitness: val("resistantFitness"),
-        maxDose: val("maxDose"),
+        maxDose: schedule === "custom" ? customPeakDose : val("maxDose"),
         drugHalfLife: val("drugHalfLife"),
         refreshInterval: val("refreshInterval"),
         pulseOn: val("pulseOn"),
@@ -582,6 +569,7 @@
         const key = control.dataset.control;
         control.classList.toggle("control-hidden", !visible[key]);
       });
+      document.getElementById("maxDoseLabel").textContent = schedule === "custom" ? "Default dose for new windows" : "Cisplatin dose";
     }
     function updateLabels() {
       const format = {
@@ -611,7 +599,10 @@
         : adaptiveConfig.dose.presets.some(value => Math.abs(value - dose) < 1e-6)
           ? "Measured-dose preset."
           : "Interpolation between measured doses.";
-      document.getElementById("doseStatus").textContent = researchMode === "experimental" ? status : "Normalized exposure scenario; not a clinical prescription.";
+      const customDoseNote = document.getElementById("schedule").value === "custom"
+        ? " This value initializes new windows only; edit every existing window below."
+        : "";
+      document.getElementById("doseStatus").textContent = (researchMode === "experimental" ? status : "Normalized exposure scenario; not a clinical prescription.") + customDoseNote;
     }
     function fittedStartValue(series, startTime) {
       if (!series || !series.length) return 0;
@@ -747,50 +738,35 @@
       return String(value).replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[character]);
     }
     function resetIntervalForm() {
-      editingIntervalIndex = null;
-      const intervals = normalizedCustomIntervals();
-      const maxDay = Math.max(val("days"), 1);
-      const lastEnd = intervals.length ? intervals[intervals.length - 1].end : -2;
-      const start = Math.min(Math.max(0, lastEnd + 2), Math.max(0, maxDay - 1));
-      const end = Math.min(maxDay, start + 4);
-      document.getElementById("intervalStart").value = Number(start.toFixed(1));
-      document.getElementById("intervalEnd").value = Number(end.toFixed(1));
-      document.getElementById("intervalDose").value = Math.max(val("maxDose"), 0).toFixed(2);
-      document.getElementById("intervalRefresh").value = Math.max(val("refreshInterval"), 0.25).toFixed(2);
-      document.getElementById("intervalLabel").value = `Cycle ${intervals.length + 1}`;
-      document.getElementById("addInterval").textContent = "Add treatment window";
-      document.getElementById("cancelInterval").classList.add("hidden");
       document.getElementById("intervalValidation").textContent = "";
-      document.getElementById("intervalValidation").classList.remove("editing");
-      document.getElementById("intervalEnd").setCustomValidity("");
-      document.querySelectorAll(".interval-chip.editing").forEach(chip => chip.classList.remove("editing"));
-    }
-    function beginIntervalEdit(index) {
-      const interval = normalizedCustomIntervals()[index];
-      if (!interval) return;
-      editingIntervalIndex = index;
-      document.getElementById("intervalStart").value = interval.start;
-      document.getElementById("intervalEnd").value = interval.end;
-      document.getElementById("intervalDose").value = interval.dose;
-      document.getElementById("intervalRefresh").value = interval.refresh;
-      document.getElementById("intervalLabel").value = interval.label;
-      document.getElementById("addInterval").textContent = "Save changes";
-      document.getElementById("cancelInterval").classList.remove("hidden");
-      document.getElementById("intervalValidation").textContent = `Editing ${interval.label}`;
-      document.getElementById("intervalValidation").classList.add("editing");
-      document.querySelectorAll(".interval-chip").forEach((chip, chipIndex) => chip.classList.toggle("editing", chipIndex === index));
-      document.getElementById("intervalStart").focus();
     }
     function renderIntervalList() {
       const intervals = normalizedCustomIntervals();
+      const maxDay = Math.max(val("days"), 1);
+      const doseLabel = researchMode === "experimental" ? "Dose (uM)" : "Relative exposure";
       document.getElementById("intervalList").innerHTML = intervals.length
         ? intervals.map((interval, index) => {
             const safeLabel = escapeHtml(interval.label);
-            return `<span class="interval-chip${index === editingIntervalIndex ? " editing" : ""}"><span class="interval-chip-copy">${safeLabel}: day ${Number(interval.start.toFixed(1))}-${Number(interval.end.toFixed(1))}, ${interval.dose.toFixed(2)} ${researchMode === "experimental" ? "uM" : "relative"}, refresh ${interval.refresh} d</span><span class="interval-chip-actions"><button type="button" data-edit-interval="${index}" aria-label="Edit ${safeLabel}">Edit</button><button type="button" data-remove-interval="${index}" aria-label="Remove ${safeLabel}" title="Remove treatment window">&times;</button></span></span>`;
+            return `<div class="interval-window" data-interval-row="${index}">
+              <div class="interval-window-head">
+                <label>Window name<input type="text" maxlength="40" value="${safeLabel}" data-interval-field="label" aria-label="Window ${index + 1} name"></label>
+                <button class="interval-remove" type="button" data-remove-interval="${index}" aria-label="Remove ${safeLabel}" title="Remove treatment window">&times;</button>
+              </div>
+              <div class="interval-window-fields">
+                <label>Start day<input type="number" min="0" max="${maxDay}" step="0.5" value="${Number(interval.start.toFixed(2))}" data-interval-field="start" aria-label="${safeLabel} start day"></label>
+                <label>Stop day<input type="number" min="0.5" max="${maxDay}" step="0.5" value="${Number(interval.end.toFixed(2))}" data-interval-field="end" aria-label="${safeLabel} stop day"></label>
+                <label>${doseLabel}<input type="number" min="0" max="10" step="0.01" value="${interval.dose.toFixed(2)}" data-interval-field="dose" aria-label="${safeLabel} dose"></label>
+                <label>Refresh (days)<input type="number" min="0.25" max="30" step="0.25" value="${Number(interval.refresh.toFixed(2))}" data-interval-field="refresh" aria-label="${safeLabel} refresh interval"></label>
+              </div>
+            </div>`;
           }).join("")
         : '<span class="composition-note">No treatment windows: the full simulation is untreated.</span>';
-      document.querySelectorAll("[data-edit-interval]").forEach(button => {
-        button.addEventListener("click", () => beginIntervalEdit(Number(button.dataset.editInterval)));
+      document.querySelectorAll("[data-interval-field]").forEach(input => {
+        input.addEventListener("change", () => updateCustomInterval(
+          Number(input.closest("[data-interval-row]").dataset.intervalRow),
+          input.dataset.intervalField,
+          input.value
+        ));
       });
       document.querySelectorAll("[data-remove-interval]").forEach(button => {
         button.addEventListener("click", () => {
@@ -803,36 +779,60 @@
         });
       });
     }
-    function addCustomInterval() {
-      const start = Number(document.getElementById("intervalStart").value);
-      const end = Number(document.getElementById("intervalEnd").value);
-      const dose = Number(document.getElementById("intervalDose").value);
-      const refresh = Number(document.getElementById("intervalRefresh").value);
-      const label = document.getElementById("intervalLabel").value.trim() || "Treatment";
-      const validation = document.getElementById("intervalValidation");
-      validation.classList.remove("editing");
-      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-        document.getElementById("intervalEnd").setCustomValidity("Stop day must be later than start day.");
-        document.getElementById("intervalEnd").reportValidity();
-        return;
-      }
-      if (!Number.isFinite(dose) || dose < 0 || !Number.isFinite(refresh) || refresh <= 0) {
-        validation.textContent = "Dose must be nonnegative and refresh interval must be positive.";
-        return;
-      }
+    function updateCustomInterval(index, field, rawValue) {
       const intervals = normalizedCustomIntervals();
-      const overlaps = intervals.some((interval, index) => index !== editingIntervalIndex && dose > 0 && interval.dose > 0 && start < interval.end && end > interval.start);
-      if (overlaps) {
-        validation.textContent = "Active windows cannot overlap. Adjacent windows and explicit zero-dose holidays are allowed.";
+      const validation = document.getElementById("intervalValidation");
+      if (!intervals[index]) return;
+      const candidate = {...intervals[index]};
+      if (field === "label") candidate.label = String(rawValue).trim() || `Window ${index + 1}`;
+      else candidate[field] = Number(rawValue);
+      const invalidNumber = ["start", "end", "dose", "refresh"].some(key => !Number.isFinite(candidate[key]));
+      const maxDay = Math.max(val("days"), 1);
+      const invalidRange = candidate.start < 0 || candidate.end <= candidate.start || candidate.end > maxDay || candidate.dose < 0 || candidate.refresh <= 0;
+      if (invalidNumber || invalidRange) {
+        validation.textContent = `Window values require 0 <= start < stop <= ${maxDay}, a nonnegative dose, and a positive refresh interval.`;
+        renderIntervalList();
         return;
       }
-      validation.textContent = "";
-      document.getElementById("intervalEnd").setCustomValidity("");
-      const nextInterval = {start, end, dose, refresh, label};
-      if (editingIntervalIndex !== null && intervals[editingIntervalIndex]) intervals[editingIntervalIndex] = nextInterval;
-      else intervals.push(nextInterval);
+      const overlaps = intervals.some((interval, otherIndex) => otherIndex !== index && candidate.start < interval.end && candidate.end > interval.start);
+      if (overlaps) {
+        validation.textContent = "Treatment windows cannot overlap. Adjacent windows and explicit zero-dose holidays are allowed.";
+        renderIntervalList();
+        return;
+      }
+      intervals[index] = candidate;
       customIntervals = intervals;
+      validation.textContent = "";
       customIntervals = normalizedCustomIntervals();
+      renderIntervalList();
+      if (!document.getElementById("compareView").classList.contains("hidden")) renderCompare();
+    }
+    function addCustomInterval() {
+      const intervals = normalizedCustomIntervals();
+      const maxDay = Math.max(val("days"), 1);
+      let start = 0;
+      let foundGap = false;
+      for (const interval of intervals) {
+        if (interval.start - start >= 1) {
+          foundGap = true;
+          break;
+        }
+        start = Math.max(start, interval.end);
+      }
+      if (!foundGap && maxDay - start >= 1) foundGap = true;
+      if (!foundGap) {
+        document.getElementById("intervalValidation").textContent = "No unused simulation time remains. Shorten a window or extend the simulation before adding another.";
+        return;
+      }
+      const end = Math.min(maxDay, start + 4);
+      intervals.push({
+        start,
+        end,
+        dose: Math.max(val("maxDose"), 0),
+        refresh: Math.max(val("refreshInterval"), 0.25),
+        label: `Window ${intervals.length + 1}`
+      });
+      customIntervals = intervals;
       resetIntervalForm();
       renderIntervalList();
       if (!document.getElementById("compareView").classList.contains("hidden")) renderCompare();
@@ -1344,7 +1344,6 @@
       researchMode = mode;
       document.getElementById("experimentalMode").classList.toggle("active", mode === "experimental");
       document.getElementById("translationalMode").classList.toggle("active", mode === "translational");
-      document.getElementById("intervalDose").previousSibling.textContent = mode === "experimental" ? "Dose (uM)" : "Relative exposure";
       updateLabels();
       renderIntervalList();
       if (!document.getElementById("compareView").classList.contains("hidden")) renderCompare();
@@ -1367,8 +1366,8 @@
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
     }));
     document.getElementById("schedule").addEventListener("change", () => {
-      if (document.getElementById("schedule").value !== "custom" && editingIntervalIndex !== null) resetIntervalForm();
       updateControlVisibility();
+      updateLabels();
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
     });
     document.getElementById("run").addEventListener("click", () => show("single"));
@@ -1384,8 +1383,6 @@
     document.getElementById("enableScenarioControls").addEventListener("change", () => { updateControlVisibility(); renderCompare(); });
     document.getElementById("enableSwitching").addEventListener("change", renderCompare);
     document.getElementById("addInterval").addEventListener("click", addCustomInterval);
-    document.getElementById("cancelInterval").addEventListener("click", resetIntervalForm);
-    document.getElementById("intervalEnd").addEventListener("input", event => event.target.setCustomValidity(""));
     document.getElementById("reset").addEventListener("click", () => {
       applyExperimentDefaults();
       document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
