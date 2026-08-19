@@ -14,7 +14,13 @@ using ..ModelRegistry
 export load_untreated_baseline, run_condition_fit!
 
 const DENSITY_LOG_CONTRAST_BOUND = log(1.05)
-const PRIMARY_UNTREATED_MODELS = Set(["logistic_growth", "gompertz_growth", "theta_logistic_growth"])
+const THETA_UNTREATED_MODELS = Set([
+    "theta_logistic_growth",
+    "lagged_theta_logistic_growth",
+    "baranyi_theta_logistic_growth",
+    "adaptation_theta_logistic_growth",
+])
+const PRIMARY_UNTREATED_MODELS = union(Set(["logistic_growth", "gompertz_growth"]), THETA_UNTREATED_MODELS)
 
 # ---------------------------------------------------------------------------
 # Untreated baseline loading
@@ -64,6 +70,7 @@ end
 
 _nonmissing_strings(vals) = String[v for v in vals if v !== nothing]
 _safe_string(v; default::AbstractString = "") = (v === missing || v === nothing) ? String(default) : string(v)
+_optional_float(row, columns, name::Symbol) = name in columns && !ismissing(row[name]) ? Float64(row[name]) : NaN
 
 function _load_untreated_monoculture_cellline_baselines(; start::AbstractString = pwd())
     root = IOUtils.find_repo_root(start)
@@ -89,6 +96,10 @@ function _load_untreated_monoculture_cellline_baselines(; start::AbstractString 
                     K = K,
                     shape_parameter = :shape_parameter in propertynames(df_auto) ? _safe_string(row.shape_parameter) : "",
                     shape_value = :shape_value in propertynames(df_auto) && !ismissing(row.shape_value) ? Float64(row.shape_value) : NaN,
+                    theta = _optional_float(row, propertynames(df_auto), :theta),
+                    lag_time = _optional_float(row, propertynames(df_auto), :lag_time),
+                    baranyi_q0 = _optional_float(row, propertynames(df_auto), :baranyi_q0),
+                    adaptation_rate = _optional_float(row, propertynames(df_auto), :adaptation_rate),
                     inheritance_allowed = :inheritance_allowed in propertynames(df_auto) ? Bool(row.inheritance_allowed) : true,
                 )
             end
@@ -146,6 +157,10 @@ function _load_untreated_monoculture_cellline_baselines(; start::AbstractString 
             K = values[2],
             shape_parameter = "",
             shape_value = NaN,
+            theta = NaN,
+            lag_time = NaN,
+            baranyi_q0 = NaN,
+            adaptation_rate = NaN,
             inheritance_allowed = true,
         ) for (key, values) in by_cell_density
     )
@@ -156,6 +171,44 @@ function _load_untreated_monoculture_cellline_baselines(; start::AbstractString 
         by_cell = by_cell,
         density_aware = false,
     )
+end
+
+function _growth_adjustment(model::AbstractString, t, r, lag_time, baranyi_q0, adaptation_rate)
+    elapsed = max(t, zero(t))
+    if model == "lagged_theta_logistic_growth"
+        return elapsed <= max(lag_time, zero(lag_time)) ? zero(t) : one(t)
+    elseif model == "baranyi_theta_logistic_growth"
+        q0 = max(baranyi_q0, oftype(baranyi_q0, 1e-8))
+        return q0 / (q0 + exp(-max(r, zero(r)) * elapsed))
+    elseif model == "adaptation_theta_logistic_growth"
+        rate = max(adaptation_rate, oftype(adaptation_rate, 1e-8))
+        return one(t) - exp(-rate * elapsed)
+    end
+    return one(t)
+end
+
+function _baseline_growth(population, competitive_load, baseline, t)
+    N = max(population, zero(population))
+    load = max(competitive_load, zero(competitive_load))
+    K = max(baseline.K, oftype(baseline.K, 1e-8))
+    model = String(baseline.model)
+    theta = hasproperty(baseline, :theta) && isfinite(baseline.theta) ? max(baseline.theta, 0.05) :
+        (hasproperty(baseline, :shape_value) && isfinite(baseline.shape_value) ? max(baseline.shape_value, 0.05) : 1.0)
+    lag_time = hasproperty(baseline, :lag_time) && isfinite(baseline.lag_time) ? baseline.lag_time : 0.0
+    baranyi_q0 = hasproperty(baseline, :baranyi_q0) && isfinite(baseline.baranyi_q0) ? baseline.baranyi_q0 : 1.0
+    adaptation_rate = hasproperty(baseline, :adaptation_rate) && isfinite(baseline.adaptation_rate) ? baseline.adaptation_rate : 1.0
+    adjustment = _growth_adjustment(model, t, baseline.r, lag_time, baranyi_q0, adaptation_rate)
+    if model == "gompertz_growth"
+        return adjustment * baseline.r * N * log(K / max(load, oftype(load, 1e-8)))
+    elseif model in THETA_UNTREATED_MODELS
+        return adjustment * baseline.r * N * max(zero(N), 1 - (load / K)^theta)
+    elseif model == "logistic_simple_death"
+        return baseline.r * N * max(zero(N), 1 - load / K) - max(baseline.shape_value, 0.0) * N
+    elseif model == "allee_growth"
+        threshold = max(baseline.shape_value, oftype(baseline.shape_value, 1e-8))
+        return baseline.r * N * max(zero(N), 1 - load / K) * ((N / threshold) - 1)
+    end
+    return baseline.r * N * max(zero(N), 1 - load / K)
 end
 
 function _baseline_rk_for_group(
@@ -330,23 +383,9 @@ function _joint_treated_model_specs(
 )
     length(doses) == length(baseline_specs) == length(density_indices) || error("Treated trajectory metadata is inconsistent")
 
-    function untreated_growth(N, trajectory_index)
+    function untreated_growth(N, trajectory_index, t)
         baseline = baseline_specs[trajectory_index]
-        r = baseline.r
-        K = max(baseline.K, 1e-8)
-        if baseline.model == "gompertz_growth"
-            positive_N = max(N, oftype(N, 1e-8))
-            return r * positive_N * log(K / positive_N)
-        elseif baseline.model == "theta_logistic_growth"
-            theta = max(baseline.shape_value, 1e-8)
-            return r * N * max(0.0, 1 - (N / K)^theta)
-        elseif baseline.model == "logistic_simple_death"
-            return r * N * max(0.0, 1 - N / K) - max(baseline.shape_value, 0.0) * N
-        elseif baseline.model == "allee_growth"
-            threshold = max(baseline.shape_value, 1e-8)
-            return r * N * max(0.0, 1 - N / K) * ((N / threshold) - 1)
-        end
-        return r * N * max(0.0, 1 - N / K)
+        return _baseline_growth(N, N, baseline, t)
     end
 
     function pooled_spec(base_p0, base_bounds, base_names, amplitude_indices)
@@ -415,7 +454,7 @@ function _joint_treated_model_specs(
         for i in eachindex(doses)
             k_kill = linear.local_parameters(p, i)[1]
             N = max(u[i], 0.0)
-            growth = untreated_growth(N, i)
+            growth = untreated_growth(N, i, t)
             du[i] = growth - k_kill * max(doses[i], 0.0) * N
         end
     end
@@ -427,7 +466,7 @@ function _joint_treated_model_specs(
             N = max(u[i], 0.0)
             C = max(doses[i], 0.0)
             effect = emax * (C^h / (max(ec50, 1e-8)^h + C^h + 1e-12))
-            growth = untreated_growth(N, i)
+            growth = untreated_growth(N, i, t)
             du[i] = growth - effect * N
         end
     end
@@ -437,7 +476,7 @@ function _joint_treated_model_specs(
         for i in eachindex(doses)
             k_kill, lambda = decay.local_parameters(p, i)
             N = max(u[i], 0.0)
-            growth = untreated_growth(N, i)
+            growth = untreated_growth(N, i, t)
             kill = k_kill * max(doses[i], 0.0) * exp(-max(lambda, 0.0) * elapsed)
             du[i] = growth - kill * N
         end
@@ -448,7 +487,7 @@ function _joint_treated_model_specs(
             emax, ec50, hill_n = logistic_hill.local_parameters(p, i)
             N = max(u[i], zero(u[i]))
             kill = _hill_effect(effect_levels[i], emax, ec50, hill_n)
-            growth = untreated_growth(N, i)
+            growth = untreated_growth(N, i, t)
             du[i] = growth - kill * N
         end
     end
@@ -459,7 +498,7 @@ function _joint_treated_model_specs(
             activation = _ramp_activation(t, t0, lambda)
             N = max(u[i], zero(u[i]))
             kill = activation * _hill_effect(effect_levels[i], emax, ec50, hill_n)
-            growth = untreated_growth(N, i)
+            growth = untreated_growth(N, i, t)
             du[i] = growth - kill * N
         end
     end
@@ -470,7 +509,7 @@ function _joint_treated_model_specs(
             activation = _ramp_activation(t, t0, lambda, onset)
             N = max(u[i], zero(u[i]))
             kill = activation * _hill_effect(effect_levels[i], emax, ec50, hill_n)
-            growth = untreated_growth(N, i)
+            growth = untreated_growth(N, i, t)
             du[i] = growth - kill * N
         end
     end
@@ -486,7 +525,7 @@ function _joint_treated_model_specs(
             live = max(u[live_idx], zero(u[live_idx]))
             damaged = max(u[damaged_idx], zero(u[damaged_idx]))
             damage_rate = activation * _hill_effect(effect_levels[i], emax, ec50, hill_n)
-            growth = untreated_growth(live, i)
+            growth = untreated_growth(live, i, t)
             damage_flux = damage_rate * live
             du[live_idx] = growth - damage_flux
             du[damaged_idx] = damage_flux - k_clear * damaged
@@ -508,7 +547,7 @@ function _joint_treated_model_specs(
             kill_sensitive = activation * _hill_effect(signal, emax_sensitive, ec50, hill_n)
             kill_tolerant = activation * _hill_effect(signal, emax_tolerant, ec50, hill_n)
             baseline = baseline_specs[i]
-            total_growth = untreated_growth(total, i)
+            total_growth = untreated_growth(total, i, t)
             sensitive_share = total > 0 ? sensitive / total : zero(total)
             tolerant_share = total > 0 ? tolerant / total : zero(total)
             du[sensitive_idx] = total_growth * sensitive_share - kill_sensitive * sensitive
@@ -531,7 +570,7 @@ function _joint_treated_model_specs(
             extracellular = max(doses[i], 0.0)
             kill = _hill_effect(dna_bound, emax, ec50_bound, hill_n)
 
-            du[live_idx] = untreated_growth(live, i) - kill * live
+            du[live_idx] = untreated_growth(live, i, t) - kill * live
             du[intracellular_idx] = extracellular - max(k_efflux, 1e-8) * intracellular
             du[bound_idx] = intracellular - max(k_repair, 1e-8) * dna_bound
         end
@@ -1294,6 +1333,10 @@ function _run_density_aware_treated_monoculture_fitting(
                 untreated_K = Float64(baseline.K),
                 untreated_shape_parameter = String(baseline.shape_parameter),
                 untreated_shape_value = Float64(baseline.shape_value),
+                untreated_theta = Float64(baseline.theta),
+                untreated_lag_time = Float64(baseline.lag_time),
+                untreated_baranyi_q0 = Float64(baseline.baranyi_q0),
+                untreated_adaptation_rate = Float64(baseline.adaptation_rate),
                 baseline_source = String(baseline_map.path),
                 inheritance_mode = "exact_fixed_family_and_density_specific_parameters",
             ))
@@ -1861,6 +1904,12 @@ function _untreated_base_spec(model_name::String, max_y::Float64, initial_counts
         return (param_names = [:r, :K], p0 = [0.5, k0], bounds = [(1e-4, 2.0), k_bounds])
     elseif model_name == "theta_logistic_growth"
         return (param_names = [:r, :K, :theta], p0 = [0.5, k0, 1.0], bounds = [(1e-4, 2.0), k_bounds, (0.1, 8.0)])
+    elseif model_name == "lagged_theta_logistic_growth"
+        return (param_names = [:r, :K, :theta, :lag_time], p0 = [0.5, k0, 1.0, 1.0], bounds = [(1e-4, 2.0), k_bounds, (0.1, 8.0), (0.0, 5.0)])
+    elseif model_name == "baranyi_theta_logistic_growth"
+        return (param_names = [:r, :K, :theta, :q0], p0 = [0.5, k0, 1.0, 0.1], bounds = [(1e-4, 2.0), k_bounds, (0.1, 8.0), (1e-4, 10.0)])
+    elseif model_name == "adaptation_theta_logistic_growth"
+        return (param_names = [:r, :K, :theta, :adaptation_rate], p0 = [0.5, k0, 1.0, 0.7], bounds = [(1e-4, 2.0), k_bounds, (0.1, 8.0), (0.01, 5.0)])
     elseif model_name == "logistic_simple_death"
         return (param_names = [:r, :K, :death_rate], p0 = [0.5, k0, 0.05], bounds = [(1e-4, 2.0), k_bounds, (0.0, 2.0)])
     elseif model_name == "allee_growth"
@@ -1893,6 +1942,22 @@ function _pooling_spec(base, pooling_mode::String, density_labels::AbstractVecto
     error("Unsupported pooling mode: $(pooling_mode)")
 end
 
+function _untreated_multistarts(pooled, base, model_name::String)
+    model_name in setdiff(THETA_UNTREATED_MODELS, Set(["theta_logistic_growth"])) ||
+        return [copy(pooled.p0)]
+    nbase = length(base.p0)
+    low = copy(pooled.p0)
+    high = copy(pooled.p0)
+    for index in eachindex(pooled.p0)
+        lower, upper = pooled.bounds[index]
+        if index <= nbase
+            low[index] = clamp(pooled.p0[index] * (index == 2 ? 0.9 : 0.5), lower, upper)
+            high[index] = clamp(pooled.p0[index] * (index == 2 ? 1.1 : 1.75), lower, upper)
+        end
+    end
+    return [copy(pooled.p0), low, high]
+end
+
 function _effective_untreated_params(p, base, pooling_mode::String, density_index::Int)
     nbase = length(base.p0)
     if pooling_mode == "shared"
@@ -1917,13 +1982,22 @@ function _untreated_joint_ode(model_name::String, base, pooling_mode::String)
             effective = _effective_untreated_params(p, base, pooling_mode, i)
             N = max(u[i], zero(u[i]))
             r, K = effective[1], max(effective[2], oftype(effective[2], 1e-8))
+            adjustment = if model_name == "lagged_theta_logistic_growth"
+                _growth_adjustment(model_name, t, r, effective[4], 1.0, 1.0)
+            elseif model_name == "baranyi_theta_logistic_growth"
+                _growth_adjustment(model_name, t, r, 0.0, effective[4], 1.0)
+            elseif model_name == "adaptation_theta_logistic_growth"
+                _growth_adjustment(model_name, t, r, 0.0, 1.0, effective[4])
+            else
+                one(t)
+            end
             if model_name == "logistic_growth"
                 du[i] = r * N * max(0.0, 1 - N / K)
             elseif model_name == "gompertz_growth"
                 du[i] = r * max(N, 1e-8) * log(K / max(N, 1e-8))
-            elseif model_name == "theta_logistic_growth"
+            elseif model_name in THETA_UNTREATED_MODELS
                 theta = max(effective[3], oftype(effective[3], 1e-8))
-                du[i] = r * N * max(0.0, 1 - (N / K)^theta)
+                du[i] = adjustment * r * N * max(0.0, 1 - (N / K)^theta)
             elseif model_name == "logistic_simple_death"
                 du[i] = r * N * max(0.0, 1 - N / K) - max(effective[3], 0.0) * N
             elseif model_name == "allee_growth"
@@ -2025,12 +2099,23 @@ function _run_density_aware_untreated_fitting(
 )
     time_col = :time in propertynames(decoded) ? :time : :day
     area_col = :count in propertynames(decoded) ? :count : error("Untreated monoculture fitting requires count")
-    model_names = ["logistic_growth", "gompertz_growth", "theta_logistic_growth", "logistic_simple_death", "allee_growth"]
+    model_names = [
+        "logistic_growth",
+        "gompertz_growth",
+        "theta_logistic_growth",
+        "lagged_theta_logistic_growth",
+        "baranyi_theta_logistic_growth",
+        "adaptation_theta_logistic_growth",
+        "logistic_simple_death",
+        "allee_growth",
+    ]
     pooling_modes = ["shared", "partial_5pct", "independent_diagnostic"]
     ranking_rows = NamedTuple[]
     parameter_rows = NamedTuple[]
     profile_parts = DataFrame[]
     identifiability_parts = DataFrame[]
+    multistart_parts = DataFrame[]
+    multistart_parameter_rows = NamedTuple[]
     initial_rows = NamedTuple[]
     overlay_parts = DataFrame[]
 
@@ -2075,8 +2160,43 @@ function _run_density_aware_untreated_fitting(
                 ode! = _untreated_joint_ode(model_name, base, pooling_mode)
                 biological_parameters = [name for name in pooled.param_names if !startswith(String(name), "log_contrast")]
                 println("  Density-aware untreated fit $(model_name), cell=$(cell_line), pooling=$(pooling_mode)...")
+                starts = _untreated_multistarts(pooled, base, model_name)
+                multistart = GrowthParameterEstimation.run_joint_multistart(
+                    ode!, datasets, initial_counts, starts;
+                    bounds = pooled.bounds,
+                    solver = Tsit5(),
+                    optimizer = :nelder_mead,
+                    maxiters = max(120, Int(round(max_time_per_fit * 45))),
+                    reltol = 1e-7,
+                    abstol = 1e-7,
+                    initial_time = 0.0,
+                )
+                start_summary = copy(multistart.summary)
+                insertcols!(
+                    start_summary,
+                    1,
+                    :cell_line => fill(cell_line, nrow(start_summary)),
+                    :model => fill(model_name, nrow(start_summary)),
+                    :pooling_mode => fill(pooling_mode, nrow(start_summary)),
+                )
+                push!(multistart_parts, start_summary)
+                stability_model = "$(cell_line)|$(model_name)|$(pooling_mode)"
+                for fit_result in multistart.fits
+                    fit_result === nothing && continue
+                    isfinite(fit_result.bic) && fit_result.scaled_sse < 9.99e11 || continue
+                    for (parameter_index, parameter_name) in enumerate(pooled.param_names)
+                        lower, upper = pooled.bounds[parameter_index]
+                        push!(multistart_parameter_rows, (
+                            model = stability_model,
+                            parameter = String(parameter_name),
+                            value = Float64(fit_result.params[parameter_index]),
+                            lower_bound = Float64(lower),
+                            upper_bound = Float64(upper),
+                        ))
+                    end
+                end
                 profiled = GrowthParameterEstimation.profile_joint_fit_bounds(
-                    ode!, datasets, initial_counts, pooled.p0;
+                    ode!, datasets, initial_counts, multistart.fit.params;
                     bounds = pooled.bounds,
                     parameter_names = pooled.param_names,
                     profile_parameters = biological_parameters,
@@ -2109,7 +2229,7 @@ function _run_density_aware_untreated_fitting(
                     parameter_count = length(fit.params),
                     boundary_issue = boundary_issue,
                     accepted_boundary_expansions = nrow(profiled.profile) == 0 ? 0 : count(profiled.profile.accepted),
-                    package_api = "GrowthParameterEstimation.profile_joint_fit_bounds",
+                    package_api = "GrowthParameterEstimation.run_joint_multistart/profile_joint_fit_bounds",
                 ))
                 append!(parameter_rows, _effective_parameter_rows(cell_line, model_name, pooling_mode, density_labels, base, profiled))
                 if nrow(profiled.profile) > 0
@@ -2172,7 +2292,11 @@ function _run_density_aware_untreated_fitting(
             density_parameters = winner_parameters[String.(winner_parameters.density) .== density, :]
             r_row = density_parameters[String.(density_parameters.parameter) .== "r", :]
             k_row = density_parameters[String.(density_parameters.parameter) .== "K", :]
-            shape_rows = density_parameters[.!in.(String.(density_parameters.parameter), Ref(["r", "K"])), :]
+            parameter_value(name) = begin
+                rows = density_parameters[String.(density_parameters.parameter) .== name, :]
+                isempty(rows) ? NaN : Float64(first(rows.effective_value))
+            end
+            shape_rows = density_parameters[in.(String.(density_parameters.parameter), Ref(["theta", "death_rate", "allee_threshold"])), :]
             push!(baseline_rows, (
                 cell_line = String(status_row.cell_line),
                 density = density,
@@ -2182,6 +2306,10 @@ function _run_density_aware_untreated_fitting(
                 K = Float64(first(k_row.effective_value)),
                 shape_parameter = isempty(shape_rows) ? "" : String(first(shape_rows.parameter)),
                 shape_value = isempty(shape_rows) ? NaN : Float64(first(shape_rows.effective_value)),
+                theta = parameter_value("theta"),
+                lag_time = parameter_value("lag_time"),
+                baranyi_q0 = parameter_value("q0"),
+                adaptation_rate = parameter_value("adaptation_rate"),
                 bic = Float64(first(winner.bic)),
                 ssr = Float64(first(winner.ssr)),
                 scaled_ssr = Float64(first(winner.scaled_ssr)),
@@ -2209,6 +2337,11 @@ function _run_density_aware_untreated_fitting(
     CSV.write(joinpath(out.csv, "untreated_group_baselines.csv"), baselines)
     CSV.write(joinpath(out.csv, "monoculture_untreated_boundary_profiles.csv"), isempty(profile_parts) ? DataFrame() : vcat(profile_parts...; cols = :union))
     CSV.write(joinpath(out.csv, "monoculture_untreated_identifiability.csv"), isempty(identifiability_parts) ? DataFrame() : vcat(identifiability_parts...; cols = :union))
+    CSV.write(joinpath(out.csv, "monoculture_untreated_multistart_summary.csv"), isempty(multistart_parts) ? DataFrame() : vcat(multistart_parts...; cols = :union))
+    multistart_parameters = DataFrame(multistart_parameter_rows)
+    multistart_stability = isempty(multistart_parameters) ? DataFrame() :
+        GrowthParameterEstimation.summarize_joint_parameter_stability(multistart_parameters)
+    CSV.write(joinpath(out.csv, "monoculture_untreated_multistart_parameter_stability.csv"), multistart_stability)
     overlay_df = vcat(overlay_parts...; cols = :union)
     CSV.write(joinpath(figures_csv, "monoculture_untreated_pooling_overlays.csv"), overlay_df)
     _render_untreated_pooling_graph_grid(overlay_df, pooling_summary.ranking, out)

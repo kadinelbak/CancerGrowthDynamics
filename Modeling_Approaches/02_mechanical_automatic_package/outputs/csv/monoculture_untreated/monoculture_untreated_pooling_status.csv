@@ -1,3 +1,3 @@
 cell_line,winning_model,winning_pooling_mode,winning_bic,best_independent_bic,independent_bic_improvement,inadequacy_delta,inadequate_pooling,inheritance_allowed
-A2780Naive,logistic_growth,partial_5pct,-168.78803545436128,-175.2345812468465,6.44654579248521,10.0,false,true
-A2780cis,theta_logistic_growth,shared,-181.569368706612,-175.58665532859982,-5.982713378012193,10.0,false,true
+A2780Naive,baranyi_theta_logistic_growth,partial_5pct,-177.5588224995718,-175.2345848644254,-2.324237635146403,10.0,false,true
+A2780cis,adaptation_theta_logistic_growth,shared,-186.40564973620323,-176.6376689231237,-9.767980813079532,10.0,false,true

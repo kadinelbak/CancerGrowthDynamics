@@ -1,2 +1,2 @@
 cell_line,winning_model,winning_pooling_mode,winning_bic,best_independent_bic,independent_bic_improvement,inadequacy_delta,inadequate_pooling,inheritance_allowed
-A2780Naive+A2780cis,dual_transit_load_scaled,shared,-617.7818828967949,-590.133853175677,-27.648029721117837,10.0,false,true
+A2780Naive+A2780cis,dual_transit_load_scaled,partial_5pct,-591.031803944551,-611.2527283702277,20.220924425676685,10.0,true,false

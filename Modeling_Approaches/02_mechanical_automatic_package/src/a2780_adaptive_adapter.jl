@@ -224,6 +224,10 @@ function load_a2780_adaptive_config(package_root)
         K = Float64(row.K),
         shape_parameter = ismissing(row.shape_parameter) ? nothing : String(row.shape_parameter),
         shape_value = ismissing(row.shape_value) || !isfinite(Float64(row.shape_value)) ? nothing : Float64(row.shape_value),
+        theta = :theta in propertynames(baselines) && !ismissing(row.theta) && isfinite(Float64(row.theta)) ? Float64(row.theta) : nothing,
+        lag_time = :lag_time in propertynames(baselines) && !ismissing(row.lag_time) && isfinite(Float64(row.lag_time)) ? Float64(row.lag_time) : nothing,
+        baranyi_q0 = :baranyi_q0 in propertynames(baselines) && !ismissing(row.baranyi_q0) && isfinite(Float64(row.baranyi_q0)) ? Float64(row.baranyi_q0) : nothing,
+        adaptation_rate = :adaptation_rate in propertynames(baselines) && !ismissing(row.adaptation_rate) && isfinite(Float64(row.adaptation_rate)) ? Float64(row.adaptation_rate) : nothing,
     ) for row in eachrow(baselines)]
 
     advanced = [_candidate_json(candidate) for candidate in vcat(stage2, stage4) if candidate.rank <= 8]
@@ -291,7 +295,27 @@ const A2780_PARAMETER_NAMES = [
     :cis_emax_sensitive, :cis_emax_tolerant, :tolerant_growth_scale,
     :exposure_clearance, :damage_accumulation, :damage_repair,
     :beta_naive, :beta_cis, :naive_lambda, :naive_onset, :cis_onset,
+    :naive_growth_adjustment_mode, :naive_growth_adjustment,
+    :cis_growth_adjustment_mode, :cis_growth_adjustment,
 ]
+
+function _growth_adjustment_encoding(row)
+    if row.model == "lagged_theta_logistic_growth"
+        return (1.0, something(row.lag_time, 0.0))
+    elseif row.model == "baranyi_theta_logistic_growth"
+        return (2.0, something(row.baranyi_q0, 1.0))
+    elseif row.model == "adaptation_theta_logistic_growth"
+        return (3.0, something(row.adaptation_rate, 1.0))
+    end
+    return (0.0, 1.0)
+end
+
+function _intrinsic_growth_adjustment(mode, parameter, r, t)
+    mode < 0.5 && return 1.0
+    mode < 1.5 && return t > max(parameter, 0.0) ? 1.0 : 0.0
+    mode < 2.5 && return max(parameter, 1e-8) / (max(parameter, 1e-8) + exp(-max(r, 0.0) * max(t, 0.0)))
+    return 1 - exp(-max(parameter, 1e-8) * max(t, 0.0))
+end
 
 function _parameter_vector(parameters)
     return [
@@ -302,6 +326,8 @@ function _parameter_vector(parameters)
         parameters.cis_emax_sensitive, parameters.cis_emax_tolerant, parameters.tolerant_growth_scale,
         parameters.exposure_clearance, parameters.damage_accumulation, parameters.damage_repair,
         parameters.beta_naive, parameters.beta_cis, parameters.naive_lambda, parameters.naive_onset, parameters.cis_onset,
+        parameters.naive.growth_adjustment_mode, parameters.naive.growth_adjustment,
+        parameters.cis.growth_adjustment_mode, parameters.cis.growth_adjustment,
     ]
 end
 
@@ -317,8 +343,10 @@ function a2780_model_spec()
         commanded_dose = exposure(t)
         naive_load = max(N + p[7] * C, 0.0)
         cis_load = max(C + p[8] * N, 0.0)
-        naive_growth = p[1] * N * (1 - (naive_load / p[2])^p[3]) - p[9] * N
-        cis_growth = p[4] * C * (1 - (cis_load / p[5])^p[6]) - p[10] * C
+        naive_adjustment = _intrinsic_growth_adjustment(p[25], p[26], p[1], t)
+        cis_adjustment = _intrinsic_growth_adjustment(p[27], p[28], p[4], t)
+        naive_growth = naive_adjustment * p[1] * N * max(0.0, 1 - (naive_load / p[2])^p[3]) - p[9] * N
+        cis_growth = cis_adjustment * p[4] * C * max(0.0, 1 - (cis_load / p[5])^p[6]) - p[10] * C
         sensitive_share = C > 0 ? S / C : 1.0
         tolerant_share = C > 0 ? T / C : 0.0
         pharmacodynamic_active = commanded_dose > 0 || effective_exposure > 0.01
@@ -384,9 +412,25 @@ function build_a2780_scenario(config, protocol; density = "20k", initial_state =
     density_sign = density == "20k" ? -1.0 : 1.0
     cis_density_scale = exp(density_sign * get(treatment, "cis_log_contrast_density", 0.0))
     tolerant_fraction = _shifted_fraction(treatment["cis_f_tolerant0"], get(treatment, "cis_tolerant_logit_shift", 0.0))
+    naive_growth_mode, naive_growth_adjustment = _growth_adjustment_encoding(naive_row)
+    cis_growth_mode, cis_growth_adjustment = _growth_adjustment_encoding(cis_row)
     parameters = (
-        naive = (model = naive_row.model, r = naive_row.r, K = naive_row.K, theta = something(naive_row.shape_value, 1.0)),
-        cis = (model = cis_row.model, r = cis_row.r, K = cis_row.K, theta = something(cis_row.shape_value, 1.0)),
+        naive = (
+            model = naive_row.model,
+            r = naive_row.r,
+            K = naive_row.K,
+            theta = something(naive_row.theta, something(naive_row.shape_value, 1.0)),
+            growth_adjustment_mode = naive_growth_mode,
+            growth_adjustment = naive_growth_adjustment,
+        ),
+        cis = (
+            model = cis_row.model,
+            r = cis_row.r,
+            K = cis_row.K,
+            theta = something(cis_row.theta, something(cis_row.shape_value, 1.0)),
+            growth_adjustment_mode = cis_growth_mode,
+            growth_adjustment = cis_growth_adjustment,
+        ),
         alpha_nc = competition["alpha_sr"] * exp(density_sign * contrast),
         alpha_cn = competition["alpha_rs"] * exp(density_sign * contrast),
         death_naive = competition["death_sensitive"],

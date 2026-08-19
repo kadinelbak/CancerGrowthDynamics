@@ -1,2 +1,2 @@
 cell_line,winning_model,winning_pooling_mode,winning_bic,fully_free_diagnostic_bic,fully_free_bic_improvement,inadequacy_delta,inadequate_inheritance,inheritance_allowed
-A2780Naive+A2780cis,load_plus_tolerant_growth_context,linked_global,-1257.2697136820505,-1114.3003693478718,-142.9693443341787,10.0,false,true
+A2780Naive+A2780cis,load_plus_tolerant_context,linked_global,-1145.7578845218889,-1066.9634338385147,-78.79445068337418,10.0,false,true

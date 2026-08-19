@@ -1,2 +1,2 @@
 model,pooling_mode,parameter_names,parameter_values,bic,ssr,scaled_ssr,monoculture_growth_inheritance
-lv_asymmetric_competition_death,partial_5pct,alpha_sr;alpha_rs;death_sensitive;death_resistant;log_contrast_density,0.5662624270048602;1.2207181371267246;0.2043099365576753;0.0798896325559348;0.0487895603036768,-684.7362328692607,1.3889242992032653e7,2.448937217111099,exact density-specific family/r/K; no carrying-capacity rescaling
+lv_asymmetric_competition_death,partial_5pct,alpha_sr;alpha_rs;death_sensitive;death_resistant;log_contrast_density,0.5096417838847659;1.3522313840194164;0.22137721014457323;1.923047556845251e-6;0.06947977059406192,-628.6081386168919,1.847696965769249e7,3.420374132742483,exact density-specific family/r/K; no carrying-capacity rescaling
