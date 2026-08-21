@@ -87,6 +87,21 @@ julia +1.10.4 --compiled-modules=no --startup-file=no --project=. scripts/build_
 The generated report is
 `outputs/reports/a2780_sample_aware_staged_model_comparison.html`.
 
+## Fitting Explanation Report
+
+The explanation-first report restricts Stage 1 inheritance to logistic or
+theta-logistic growth. It then assigns treatment timing and damage to Stage 2,
+competition and loss to Stage 3, and additional treatment-context effects to
+Stage 4. The page distinguishes this constrained teaching hierarchy from the
+canonical evidence-selected analysis and identifies the downstream refits that
+would be required before reporting constrained BIC values.
+
+Rebuild the report and Pages mirror with:
+
+```julia
+julia +1.10.4 --compiled-modules=no --startup-file=no --project=. scripts/build_fitting_explanation_report.jl
+```
+
 ## Outputs
 All condition outputs are written under condition-specific subfolders:
 - `outputs/csv/<condition>/`

@@ -1,0 +1,161 @@
+using CSV
+using DataFrames
+using Printf
+
+const PACKAGE_ROOT = normpath(joinpath(@__DIR__, ".."))
+const REPOSITORY_ROOT = normpath(joinpath(PACKAGE_ROOT, "..", ".."))
+const REPORT_NAME = "a2780_fitting_explanation.html"
+const RANKING_PATH = joinpath(PACKAGE_ROOT, "outputs", "csv", "monoculture_untreated", "monoculture_untreated_automatic_model_ranking.csv")
+
+function best_row(rows, cell_line, models)
+    eligible = collect(filter(row ->
+        row.cell_line == cell_line && row.model in models &&
+        row.pooling_mode != "independent_diagnostic" && row.eligible_for_inheritance,
+        eachrow(rows),
+    ))
+    isempty(eligible) && error("No eligible simple-growth fit for $(cell_line)")
+    return eligible[argmin([row.bic for row in eligible])]
+end
+
+function model_label(model)
+    labels = Dict(
+        "logistic_growth" => "Logistic",
+        "theta_logistic_growth" => "Theta-logistic",
+        "baranyi_theta_logistic_growth" => "Baranyi theta-logistic",
+        "adaptation_theta_logistic_growth" => "Smooth-adaptation theta-logistic",
+        "lagged_theta_logistic_growth" => "Hard-lag theta-logistic",
+    )
+    return get(labels, model, replace(model, '_' => ' '))
+end
+
+function selection_rows(ranking)
+    unrestricted = [
+        "logistic_growth", "theta_logistic_growth", "lagged_theta_logistic_growth",
+        "baranyi_theta_logistic_growth", "adaptation_theta_logistic_growth",
+    ]
+    return map(("A2780Naive", "A2780cis")) do cell_line
+        logistic = best_row(ranking, cell_line, ["logistic_growth"])
+        theta = best_row(ranking, cell_line, ["theta_logistic_growth"])
+        canonical = best_row(ranking, cell_line, unrestricted)
+        simple = logistic.bic <= theta.bic ? logistic : theta
+        (; cell_line, logistic, theta, canonical, simple,
+           theta_gain = logistic.bic - theta.bic,
+           simplicity_cost = simple.bic - canonical.bic)
+    end
+end
+
+function result_table(selections)
+    return join(map(selections) do result
+        interpretation = result.simplicity_cost < 2 ?
+            "Simple baseline is practically equivalent to the unrestricted winner." :
+            "The omitted early-time term has measurable support and remains a documented limitation."
+        boundary = result.simple.boundary_issue ? "Pooling boundary flagged" : "No boundary flag"
+        """
+        <tr>
+          <td><strong>$(result.cell_line)</strong></td>
+          <td>$(model_label(result.simple.model))<br><span class="muted">$(result.simple.pooling_mode)</span></td>
+          <td>$(@sprintf("%.3f", result.simple.bic))</td>
+          <td>$(@sprintf("%.3f", result.logistic.bic))</td>
+          <td>$(@sprintf("%.3f", result.theta.bic))</td>
+          <td>$(@sprintf("%.3f", result.theta_gain))</td>
+          <td>$(model_label(result.canonical.model))<br><span class="muted">simplification cost $(@sprintf("%.3f", result.simplicity_cost)) BIC</span></td>
+          <td><span class="status">$(boundary)</span><br>$(interpretation)</td>
+        </tr>
+        """
+    end, "\n")
+end
+
+function render_report(selections)
+    template = raw"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A2780 Fitting Explanation</title>
+  <script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root{--ink:#162230;--muted:#5d6975;--line:#cbd4dd;--soft:#f3f6f8;--blue:#315efb;--red:#b91f3f;--green:#247a52;--amber:#805600}
+    *{box-sizing:border-box} body{margin:0;color:var(--ink);background:#fff;font-family:Arial,Helvetica,sans-serif;line-height:1.55}
+    header{border-bottom:1px solid var(--line);background:var(--soft)} .header-inner,main{width:min(1180px,calc(100% - 32px));margin:0 auto}
+    .header-inner{padding:22px 0 26px}.back{color:var(--blue);font-weight:700;text-decoration:none}h1{margin:18px 0 6px;font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:0}
+    h2{margin:0 0 12px;font-size:28px;letter-spacing:0}h3{margin:22px 0 8px;font-size:20px;letter-spacing:0}p{margin:8px 0 14px}main{padding:26px 0 56px}
+    section{padding:30px 0;border-bottom:1px solid var(--line)}section:last-child{border-bottom:0}.eyebrow{color:var(--red);font-size:13px;font-weight:800;text-transform:uppercase}
+    .lede{max-width:920px;color:var(--muted);font-size:19px}.notice{margin-top:18px;padding:14px 16px;border-left:4px solid var(--amber);background:#fff8e7}
+    .rule{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:6px;background:var(--soft)}.flow{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);margin-top:22px}
+    .flow div{min-width:0;padding:15px;border-right:1px solid var(--line)}.flow div:last-child{border-right:0}.flow strong,.flow span{display:block}.flow span{margin-top:5px;color:var(--muted);font-size:14px}
+    .math{overflow-x:auto;padding:10px 0;font-size:18px}.equation-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.equation-grid article{min-width:0;padding-right:20px;border-right:1px solid var(--line)}
+    .equation-grid article:last-child{padding-right:0;border-right:0}.table-wrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line)}table{width:100%;min-width:1050px;border-collapse:collapse}
+    th,td{padding:10px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}
+    th{background:#e9eef2;font-size:13px}td{font-size:14px}.muted{color:var(--muted)}.status{color:var(--amber);font-weight:700}.stage-rule{border-left:4px solid var(--green);padding:10px 14px;background:#edf7f1}
+    figure{margin:22px 0 0}figure img{display:block;width:100%;height:auto;border:1px solid var(--line)}figcaption{padding:9px 0;color:var(--muted);font-size:14px}
+    .term-table{display:grid;grid-template-columns:210px 1fr;gap:8px 20px;margin-top:16px}.term-table dt{font-weight:700}.term-table dd{margin:0;color:var(--muted)}ol,ul{padding-left:24px}li{margin:7px 0}
+    @media(max-width:800px){.flow,.equation-grid{grid-template-columns:1fr}.flow div{border-right:0;border-bottom:1px solid var(--line)}.flow div:last-child{border-bottom:0}.equation-grid article{padding:0 0 20px;border-right:0;border-bottom:1px solid var(--line)}.equation-grid article:last-child{padding:0;border-bottom:0}.term-table{grid-template-columns:1fr;gap:2px}.term-table dd{margin-bottom:10px}}
+  </style>
+</head>
+<body>
+  <header><div class="header-inner"><a class="back" href="../../../../index.html">Back to reports home</a><h1>Fitting Explanation</h1>
+    <p class="lede">An explanation-first hierarchy for A2780 modeling. Intrinsic growth is deliberately restricted to logistic or theta-logistic form; treatment, competition, death, and coculture context are introduced only in the stage where they are tested.</p>
+    <div class="notice"><strong>Interpretation status:</strong> this is a constrained teaching hierarchy, not a replacement for the canonical evidence-selected ranking. Downstream stages must be refitted before constrained BIC values can be reported.</div>
+  </div></header>
+  <main>
+    <section><span class="eyebrow">The governing rule</span><h2>Start simple and add mechanisms only when the experiment introduces them</h2>
+      <div class="flow"><div><strong>1. Baseline growth</strong><span>Logistic or theta-logistic only</span></div><div><strong>2. Add treatment</strong><span>Dose response, onset, delay, damage, or latent drug response</span></div><div><strong>3. Add coculture</strong><span>Directional competition and lineage-specific loss</span></div><div><strong>4. Combine contexts</strong><span>Only extra treated-coculture terms</span></div></div>
+      <div class="rule"><strong>Strong simplicity preference.</strong> Logistic is fitted first. Theta-logistic is adopted only when its BIC improvement is at least 2 units and its parameters are finite. Lag, adaptation, death, and interaction candidates remain Stage 1 sensitivity diagnostics and are not inherited by this explanatory hierarchy.</div>
+    </section>
+    <section><span class="eyebrow">How fitting works</span><h2>One objective across trajectories, with scale and complexity controlled</h2>
+      <div class="math">\[\mathrm{SSE}_{\mathrm{scaled}}=\sum_j\sum_t\left[\frac{y_j(t)-\widehat y_j(t)}{s_j}\right]^2,\qquad s_j=\max_t y_j(t)\]</div>
+      <div class="math">\[\mathrm{BIC}=n\ln\left(\frac{\mathrm{SSE}_{\mathrm{scaled}}}{n}\right)+k\ln n\]</div>
+      <dl class="term-table"><dt>Trajectory scaling</dt><dd>Each trajectory is divided by its observed peak so high-count curves do not dominate solely because of their units.</dd><dt>Joint fitting</dt><dd>Both seeding densities are fitted together instead of estimating unrelated biology for every curve.</dd><dt>Fixed initial state</dt><dd>Measured day-zero populations are anchors, not kinetic parameters or negative-time shifts.</dd><dt>Parameter counting</dt><dd>Every freely optimized parameter contributes to \(k\); fixed inherited parameters are not counted again.</dd><dt>Fit validity</dt><dd>Non-finite parameters, predictions, or objectives and failure sentinels are rejected before ranking.</dd></dl>
+    </section>
+    <section><span class="eyebrow">Stage 1</span><h2>Untreated monoculture: intrinsic growth only</h2>
+      <p class="stage-rule"><strong>Allowed:</strong> \(r\), \(K\), and optionally \(\theta\). <strong>Deferred:</strong> time delay, adaptation, death, drug response, competition, and coculture modifiers.</p>
+      <div class="equation-grid"><article><h3>Logistic baseline</h3><div class="math">\[\frac{dX}{dt}=rX\left(1-\frac{X}{K}\right)\]</div><p>Growth is approximately exponential when \(X\ll K\), slows with density, and reaches zero net growth at \(X=K\).</p></article>
+      <article><h3>Theta-logistic baseline</h3><div class="math">\[\frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^\theta\right]\]</div><p>The shape parameter \(\theta\) changes how sharply density dependence appears. Logistic growth is the special case \(\theta=1\).</p></article></div>
+      <div class="table-wrap"><table><thead><tr><th>Cell line</th><th>Preferred simple baseline</th><th>Simple BIC</th><th>Best logistic BIC</th><th>Best theta BIC</th><th>Theta improvement</th><th>Unrestricted winner</th><th>Interpretation</th></tr></thead><tbody>{{SELECTION_ROWS}}</tbody></table></div>
+      <p><strong>Result:</strong> theta-logistic is the preferred simple baseline for both cell lines. For A2780Naive, the unrestricted Baranyi term improves BIC by only about 0.07. For A2780cis, smooth adaptation improves BIC by about 4.84; this constrained hierarchy accepts that early-time mismatch and reports it rather than embedding an adaptation story in intrinsic growth.</p>
+      <figure><img src="../images/monoculture_untreated/figures/monoculture_untreated_pooling_model_grid.png" alt="Untreated monoculture observations and canonical fits"><figcaption>Canonical untreated fits shown for context. A constrained rerun must regenerate this panel with theta-logistic-only Stage 1 predictions before it is presented as a constrained-fit result.</figcaption></figure>
+    </section>
+    <section><span class="eyebrow">Stage 2</span><h2>Treated monoculture: add drug-specific behavior</h2>
+      <p class="stage-rule"><strong>Fixed:</strong> Stage 1 growth. <strong>Estimated here:</strong> dose response, onset, gradual activation, damage clearance, or differential drug response.</p>
+      <div class="math">\[\frac{dX_i}{dt}=G_i(X_i)-A_i(t)H_i(z)X_i\]</div><div class="math">\[H_i(z)=\frac{E_{\max,i}z^{h_i}}{EC_{50,i}^{h_i}+z^{h_i}},\qquad A_i(t)=\mathbf 1_{t>t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\]</div>
+      <p>The Hill term answers how strongly a dose acts; activation answers when it acts. Transit-damage and sensitive/tolerant candidates belong here because they are treatment-response hypotheses.</p>
+      <figure><img src="../images/monoculture_treated/figures/monoculture_treated_best_joint_model_by_environment.png" alt="Treated monoculture observations and fits"><figcaption>Current canonical treated-monoculture fits. Mechanism families remain Stage 2 candidates, but parameters and BIC must be recomputed under the constrained baseline.</figcaption></figure>
+    </section>
+    <section><span class="eyebrow">Stage 3</span><h2>Untreated coculture: add interaction and loss</h2>
+      <p class="stage-rule"><strong>Fixed:</strong> each lineage's Stage 1 growth. <strong>Estimated here:</strong> directional competition and lineage-specific loss.</p>
+      <div class="math">\[L_N=N+\alpha_{NC}C,\qquad L_C=C+\alpha_{CN}N\]</div><div class="math">\[\frac{dN}{dt}=G_N(N,L_N)-d_NN,\qquad \frac{dC}{dt}=G_C(C,L_C)-d_CC\]</div>
+      <p>Competition can be asymmetric because \(\alpha_{NC}\) and \(\alpha_{CN}\) may differ. Loss is introduced here because decline occurs in coculture; it is not used to reshape monoculture baseline growth.</p>
+      <figure><img src="../images/coculture_untreated/figures/coculture_untreated_best_mechanistic_fit_grid.png" alt="Untreated coculture observations and fits"><figcaption>Current canonical untreated-coculture result. The constrained rerun must test whether competition and loss remain selected.</figcaption></figure>
+    </section>
+    <section><span class="eyebrow">Stage 4</span><h2>Treated coculture: test only the additional context effect</h2>
+      <p class="stage-rule"><strong>Inherited:</strong> Stage 1 growth, Stage 2 treatment, and Stage 3 interaction. <strong>Estimated here:</strong> only extra changes required when treatment and coculture occur together.</p>
+      <div class="math">\[C=S+T,\qquad M_N=e^{\beta_NL_N/K_N},\qquad M_C=e^{\beta_CL_C/K_C}\]</div><div class="math">\[\frac{dN}{dt}=G_N^{\mathrm{co}}-M_NA_N(t)H_N(z)N\]</div><div class="math">\[\frac{dS}{dt}=G_C^{\mathrm{co}}\frac{S}{C}-M_CA_C(t)H_{CS}(z)S\]</div><div class="math">\[\frac{dT}{dt}=\rho_TG_C^{\mathrm{co}}\frac{T}{C}-M_CA_C(t)H_{CT}^{\mathrm{co}}(z)T\]</div>
+      <p>The measured cis output is always \(C=S+T\). The internal \(S\) and \(T\) states are treatment-response hypotheses, not separately observed populations.</p>
+      <figure><img src="../images/coculture_treated/figures/linked_treatment_coculture_grid.png" alt="Treated coculture observations and fits"><figcaption>Current canonical linked fit. It remains canonical until all downstream stages are rerun under the constrained baseline.</figcaption></figure>
+    </section>
+    <section><span class="eyebrow">Scientific boundary</span><h2>What may be concluded now</h2><ul><li>The simple Stage 1 rule selects theta-logistic growth for both cell lines.</li><li>Naive's Baranyi modification is effectively unnecessary by BIC; cis adaptation has measurable support and remains an omitted early-time feature.</li><li>Current Stage 2–4 families show where later effects belong, but their numerical BIC values cannot be reused after changing Stage 1 inheritance.</li><li>A completed constrained analysis requires sequentially refitting Stages 2, 3, and 4 and regenerating all diagnostics.</li></ul>
+      <div class="notice"><strong>Do not say:</strong> “There is no lag.” <strong>Say:</strong> “For interpretability, intrinsic growth uses theta-logistic baselines; residual early-time mismatch is retained as a documented limitation and sensitivity result.”</div>
+    </section>
+  </main>
+</body></html>
+"""
+    return replace(template, "{{SELECTION_ROWS}}" => result_table(selections))
+end
+
+function build_report()
+    selections = selection_rows(CSV.read(RANKING_PATH, DataFrame))
+    html = render_report(selections)
+    destinations = [
+        joinpath(PACKAGE_ROOT, "outputs", "reports", REPORT_NAME),
+        joinpath(REPOSITORY_ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "reports", REPORT_NAME),
+    ]
+    for destination in destinations
+        mkpath(dirname(destination))
+        write(destination, html)
+    end
+    foreach(destination -> println("Wrote ", destination), destinations)
+    return destinations
+end
+
+abspath(PROGRAM_FILE) == abspath(@__FILE__) && build_report()
