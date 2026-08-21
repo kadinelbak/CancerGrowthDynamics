@@ -162,18 +162,8 @@ function _coculture_monoculture_baselines(start, density)
     return sensitive, resistant
 end
 
-function _anchored_component_growth(population, competitive_load, baseline)
-    N = max(population, zero(population))
-    load = max(competitive_load, zero(competitive_load))
-    K = max(baseline.K, 1e-8)
-    model = String(baseline.model)
-    if model == "gompertz_growth"
-        return baseline.r * N * log(K / max(load, 1e-8))
-    elseif model == "theta_logistic_growth"
-        theta = isfinite(baseline.shape_value) ? max(baseline.shape_value, 0.05) : 1.0
-        return baseline.r * N * (1 - (load / K)^theta)
-    end
-    return baseline.r * N * (1 - load / K)
+function _anchored_component_growth(population, competitive_load, baseline, t)
+    return _baseline_growth(population, competitive_load, baseline, t)
 end
 
 function _pooled_local_parameters(base_p0, base_bounds, base_names, pooling_mode, density_indices; contrast_indices = collect(eachindex(base_p0)))
@@ -241,8 +231,8 @@ function _untreated_coculture_specs(environments, baselines, pooling_mode)
                 sensitive_baseline, resistant_baseline = baselines[environment_index]
                 sensitive_load = sensitive + alpha_sr * resistant
                 resistant_load = resistant + alpha_rs * sensitive
-                du[sensitive_index] = _anchored_component_growth(sensitive, sensitive_load, sensitive_baseline) - death_sensitive * sensitive
-                du[resistant_index] = _anchored_component_growth(resistant, resistant_load, resistant_baseline) - death_resistant * resistant
+                du[sensitive_index] = _anchored_component_growth(sensitive, sensitive_load, sensitive_baseline, t) - death_sensitive * sensitive
+                du[resistant_index] = _anchored_component_growth(resistant, resistant_load, resistant_baseline, t) - death_resistant * resistant
             end
         end
         specs[model_name] = merge(pooled, (model = model!,))
@@ -460,8 +450,8 @@ function _treated_coculture_specs(environments, baselines, untreated_baseline, u
                 if layout == :live
                     sensitive = max(u[offset + 1], zero(u[offset + 1]))
                     resistant = max(u[offset + 2], zero(u[offset + 2]))
-                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline) - death_sensitive * sensitive
-                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline) - death_resistant * resistant
+                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline, t) - death_sensitive * sensitive
+                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline, t) - death_resistant * resistant
                     if model_name == "dual_constant_kill"
                         kill_sensitive, kill_resistant = values
                         exposure = 1.0
@@ -481,8 +471,8 @@ function _treated_coculture_specs(environments, baselines, untreated_baseline, u
                     damaged_resistant = max(u[offset + 4], zero(u[offset + 4]))
                     kill_sensitive, kill_resistant, lambda, onset, clearance = values[1:5]
                     exposure = elapsed <= onset ? 0.0 : 1 - exp(-lambda * (elapsed - onset))
-                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline) - death_sensitive * sensitive
-                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline) - death_resistant * resistant
+                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline, t) - death_sensitive * sensitive
+                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline, t) - death_resistant * resistant
                     effect_scale_sensitive = 1.0
                     effect_scale_resistant = 1.0
                     if model_name != "dual_transit_damage"
@@ -510,8 +500,8 @@ function _treated_coculture_specs(environments, baselines, untreated_baseline, u
                     naive_total = sensitive + tolerant
                     kill_sensitive, kill_tolerant, kill_resistant, lambda, onset, transition = values
                     exposure = elapsed <= onset ? 0.0 : 1 - exp(-lambda * (elapsed - onset))
-                    naive_growth = _anchored_component_growth(naive_total, naive_total + alpha_sr * resistant, sensitive_baseline) - death_sensitive * naive_total
-                    resistant_growth = _anchored_component_growth(resistant, resistant + alpha_rs * naive_total, resistant_baseline) - death_resistant * resistant
+                    naive_growth = _anchored_component_growth(naive_total, naive_total + alpha_sr * resistant, sensitive_baseline, t) - death_sensitive * naive_total
+                    resistant_growth = _anchored_component_growth(resistant, resistant + alpha_rs * naive_total, resistant_baseline, t) - death_resistant * resistant
                     sensitive_share = naive_total > 0 ? sensitive / naive_total : 1.0
                     tolerant_share = naive_total > 0 ? tolerant / naive_total : 0.0
                     du[offset + 1] = naive_growth * sensitive_share - exposure * kill_sensitive * sensitive - transition * sensitive

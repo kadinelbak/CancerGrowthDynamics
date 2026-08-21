@@ -147,7 +147,7 @@ function _treated_timing_problem(start, seed, hypothesis)
                 treatment.naive_ec50,
                 treatment.naive_hill,
             )
-            du[index] = _linked_intrinsic_growth(N, environment.baseline) - kill * N
+            du[index] = _linked_intrinsic_growth(N, environment.baseline, t) - kill * N
         end
         for (index, environment) in enumerate(cis_environments)
             sensitive_index = n_naive + 2index - 1
@@ -174,7 +174,7 @@ function _treated_timing_problem(start, seed, hypothesis)
                 0.5,
                 4.0,
             )
-            growth = _linked_intrinsic_growth(total, environment.baseline)
+            growth = _linked_intrinsic_growth(total, environment.baseline, t)
             sensitive_share = total > 0 ? sensitive / total : one(total)
             tolerant_share = total > 0 ? tolerant / total : zero(total)
             du[sensitive_index] = growth * sensitive_share - kill_sensitive * sensitive

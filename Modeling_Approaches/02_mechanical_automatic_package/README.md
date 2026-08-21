@@ -60,7 +60,7 @@ advanced diagnostic view.
 Rebuild the browser configuration and Pages mirror with:
 
 ```julia
-julia --project=. scripts/build_adaptive_simulator_report.jl
+julia +1.10.4 --compiled-modules=no --startup-file=no --project=. scripts/build_adaptive_simulator_report.jl
 ```
 
 The JSON and JavaScript configuration files beside the report are generated
@@ -81,7 +81,7 @@ independent.
 Rebuild the report, CSV findings, figures, and Pages mirror with:
 
 ```julia
-julia --project=. scripts/build_sample_aware_report.jl
+julia +1.10.4 --compiled-modules=no --startup-file=no --project=. scripts/build_sample_aware_report.jl
 ```
 
 The generated report is
@@ -127,6 +127,31 @@ legacy `coculture_treated_automatic_best_models_top10.csv` artifact.
 ## Environment
 Dependencies are defined in `Project.toml` and pinned to registered
 GrowthParameterEstimation `0.4.1`.
+
+The checked-in manifest was resolved with Julia `1.10.4`. Use that runtime for
+reproducible local validation.
+
+### Windows Application Control
+
+On Windows systems where Application Control blocks Julia-generated package
+image DLLs under `.julia/compiled`, run this project with compiled modules
+disabled. This bypasses Julia's cache files without changing Windows security
+policy or the scientific environment:
+
+```powershell
+./scripts/run_tests_windows.ps1
+```
+
+For report or validation scripts, use the same launch options:
+
+```powershell
+julia +1.10.4 --compiled-modules=no --startup-file=no --project=. path/to/script.jl
+```
+
+The first cache-free load is slower because code is compiled in memory. Do not
+use an unqualified Julia `1.12` invocation with this manifest: it re-resolves
+dependencies and can create native package images that the local Windows policy
+then rejects as `Bad Image` files.
 
 ## Validation
 Run `validate_density_pooling.jl` for monoculture pooling tests and

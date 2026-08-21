@@ -1,2 +1,2 @@
 cell_line,winning_model,winning_pooling_mode,winning_bic,best_independent_bic,independent_bic_improvement,inadequacy_delta,inadequate_pooling,inheritance_allowed
-A2780Naive+A2780cis,lv_asymmetric_competition_death,partial_5pct,-684.7362328692607,-648.6232919374672,-36.112940931793446,10.0,false,true
+A2780Naive+A2780cis,lv_asymmetric_competition_death,partial_5pct,-628.6081386168919,-623.2518061517798,-5.356332465112132,10.0,false,true

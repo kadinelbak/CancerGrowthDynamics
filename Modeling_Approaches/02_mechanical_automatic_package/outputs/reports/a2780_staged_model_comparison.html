@@ -64,7 +64,8 @@ code { font-family: Consolas, "Courier New", monospace; }
   .stage-heading { display: block; }
   .guide-grid { grid-template-columns: minmax(0, 1fr); }
   dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
-  dd { margin-bottom: 8px; }
+  .notation-key dl { grid-template-columns: minmax(0, 1fr); }
+  dd { max-width: 100%; margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; }
 }
     .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
     .back-home:hover { text-decoration: underline; }
@@ -75,19 +76,20 @@ code { font-family: Consolas, "Courier New", monospace; }
 <section><div class="stage-heading"><span>Stage 1</span><h2>Untreated monoculture</h2></div><p>Top five model and pooling combinations per cell line. Both seeding densities are fitted jointly with fixed day-zero populations.</p><div class="notation-key"><h3>Stage 1 notation key</h3><dl>
 <dt>\(X_i(t)\)</dt><dd>Observed total population for cell line \(i\); \(i=N\) means A2780Naive and \(i=C\) means A2780cis.</dd>
 <dt>\(\dot X_i=dX_i/dt\)</dt><dd>Rate of change of that total population, in measured cells per day.</dd>
-<dt>\(G_i(X_i)\)</dt><dd>Candidate intrinsic growth law: logistic, theta-logistic, or Gompertz.</dd>
+<dt>\(G_i(X_i,t)\)</dt><dd>Candidate intrinsic growth law: logistic, theta-logistic, Gompertz, hard-lag theta-logistic, Baranyi-adjusted theta-logistic, or smooth-adaptation theta-logistic.</dd>
 <dt>\(r_i,K_i,\theta_i\)</dt><dd>Intrinsic growth rate, carrying capacity, and optional theta-logistic shape.</dd>
+<dt>\(\tau_i,q_{0,i},\lambda_{A,i}\)</dt><dd>Optional hard-lag duration, Baranyi initial physiological-state parameter, or smooth adaptation rate. Only the parameter belonging to the candidate being fitted is used.</dd>
 </dl></div>
-<h3>A2780Naive</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=rX\left(1-\frac{X}{K}\right)\)</td><td>-168.788</td><td>0.0</td></tr>
-<tr><td>2</td><td>Theta-logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-168.547</td><td>0.241</td></tr>
-<tr><td>3</td><td>Logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=rX\left(1-\frac{X}{K}\right)\)</td><td>-165.519</td><td>3.269</td></tr>
-<tr><td>4</td><td>Gompertz growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=rX\ln\!\left(\frac{K}{X}\right)\)</td><td>-162.14</td><td>6.648</td></tr>
-<tr><td>5</td><td>Theta-logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-161.482</td><td>7.306</td></tr></tbody></table></div>
-<h3>A2780cis</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Theta-logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-181.569</td><td>0.0</td></tr>
-<tr><td>2</td><td>Theta-logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-174.721</td><td>6.849</td></tr>
-<tr><td>3</td><td>Logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=rX\left(1-\frac{X}{K}\right)\)</td><td>-167.207</td><td>14.363</td></tr>
-<tr><td>4</td><td>Logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=rX\left(1-\frac{X}{K}\right)\)</td><td>-160.376</td><td>21.193</td></tr>
-<tr><td>5</td><td>Gompertz growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=rX\ln\!\left(\frac{K}{X}\right)\)</td><td>-136.937</td><td>44.633</td></tr></tbody></table></div><figure><img src="../images/monoculture_untreated/figures/monoculture_untreated_pooling_model_grid.png" alt="Untreated monoculture"><figcaption>Joint 20k/30k untreated fits. Curves use the selected cell-line growth family and density-aware pooling mode.</figcaption></figure></section>
+<h3>A2780Naive</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Baranyi-adjusted theta-logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=\alpha_B(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad \alpha_B(t)=\frac{q_0}{q_0+e^{-rt}}\)</td><td>-177.559</td><td>0.0</td></tr>
+<tr><td>2</td><td>Theta-logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-177.493</td><td>0.066</td></tr>
+<tr><td>3</td><td>Smooth adaptation theta-logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=A(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad A(t)=1-e^{-\lambda_A t}\)</td><td>-177.182</td><td>0.377</td></tr>
+<tr><td>4</td><td>Logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=rX\left(1-\frac{X}{K}\right)\)</td><td>-174.36</td><td>3.199</td></tr>
+<tr><td>5</td><td>Hard-lag theta-logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=\mathbf{1}_{t&gt;\tau}\,rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-172.977</td><td>4.582</td></tr></tbody></table></div>
+<h3>A2780cis</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Smooth adaptation theta-logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=A(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad A(t)=1-e^{-\lambda_A t}\)</td><td>-186.406</td><td>0.0</td></tr>
+<tr><td>2</td><td>Baranyi-adjusted theta-logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=\alpha_B(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad \alpha_B(t)=\frac{q_0}{q_0+e^{-rt}}\)</td><td>-186.037</td><td>0.369</td></tr>
+<tr><td>3</td><td>Hard-lag theta-logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=\mathbf{1}_{t&gt;\tau}\,rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-185.704</td><td>0.701</td></tr>
+<tr><td>4</td><td>Theta-logistic growth</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-181.569</td><td>4.836</td></tr>
+<tr><td>5</td><td>Theta-logistic growth</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)</td><td>-180.096</td><td>6.309</td></tr></tbody></table></div><figure><img src="../images/monoculture_untreated/figures/monoculture_untreated_pooling_model_grid.png" alt="Untreated monoculture"><figcaption>Joint 20k/30k untreated fits. Curves use the selected cell-line growth family and density-aware pooling mode.</figcaption></figure></section>
 <section><div class="stage-heading"><span>Stage 2</span><h2>Treated monoculture</h2></div><p>Top five whole-cell-line fits per cell line. Each model fits 20k and 30k across IC25, IC50, and IC75 while inheriting untreated growth.</p><div class="notation-key"><h3>Stage 2 notation key</h3><dl>
 <dt>\(X_i(t)\)</dt><dd>Total population in a one-state treatment model for cell line \(i\).</dd>
 <dt>\(P_i(t),D_i(t)\)</dt><dd>Proliferating/live and damaged-but-still-visible compartments used only by the transit model.</dd>
@@ -99,26 +101,26 @@ code { font-family: Consolas, "Courier New", monospace; }
 <dt>\(H_i(z)\)</dt><dd>Hill dose-response term: \(H_i(z)=E_{\max,i}z^{h_i}/(EC_{50,i}^{h_i}+z^{h_i}+\varepsilon)\). It sets dose strength, not timing.</dd>
 <dt>\(A_i(t)H_i(z)\)</dt><dd>The active per-capita treatment effect applied to a live/proliferating state. Transit models route this effect into a damaged-visible compartment before clearance.</dd>
 </dl><p><strong>Why the derivatives differ:</strong> \(dX/dt\), \(dP/dt\), and \(dS/dt\) are rates for different biological state variables, not interchangeable names for the same quantity.</p></div>
-<h3>A2780Naive</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Delayed Hill-ramp kill</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)</td><td>-297.539</td><td>0.0</td></tr>
-<tr><td>2</td><td>Delayed Hill-ramp kill</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)</td><td>-293.113</td><td>4.426</td></tr>
-<tr><td>3</td><td>Intracellular platinum PK/PD</td><td>shared</td><td>\(\displaystyle \frac{dc_i}{dt}=D-k_{\mathrm{efflux}}c_i,\quad \frac{dc_k}{dt}=c_i-k_{\mathrm{repair}}c_k,\quad \frac{dX}{dt}=G_i(X)-H(c_k)X\)</td><td>-282.359</td><td>15.181</td></tr>
-<tr><td>4</td><td>Intracellular platinum PK/PD</td><td>partial_5pct</td><td>\(\displaystyle \frac{dc_i}{dt}=D-k_{\mathrm{efflux}}c_i,\quad \frac{dc_k}{dt}=c_i-k_{\mathrm{repair}}c_k,\quad \frac{dX}{dt}=G_i(X)-H(c_k)X\)</td><td>-275.445</td><td>22.094</td></tr>
-<tr><td>5</td><td>Transit damage/death</td><td>partial_5pct</td><td>\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)</td><td>-273.525</td><td>24.014</td></tr></tbody></table></div>
-<h3>A2780cis</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Sensitive/tolerant populations</td><td>partial_5pct</td><td>\(\displaystyle \frac{dS}{dt}=G(S+T)\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\quad \frac{dT}{dt}=G(S+T)\frac{T}{S+T}-A_C(t)H_{CT}(z)T\)</td><td>-365.295</td><td>0.0</td></tr>
-<tr><td>2</td><td>Sensitive/tolerant populations</td><td>shared</td><td>\(\displaystyle \frac{dS}{dt}=G(S+T)\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\quad \frac{dT}{dt}=G(S+T)\frac{T}{S+T}-A_C(t)H_{CT}(z)T\)</td><td>-365.139</td><td>0.156</td></tr>
-<tr><td>3</td><td>Transit damage/death</td><td>shared</td><td>\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)</td><td>-363.754</td><td>1.541</td></tr>
-<tr><td>4</td><td>Delayed Hill-ramp kill</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)</td><td>-362.863</td><td>2.432</td></tr>
-<tr><td>5</td><td>Transit damage/death</td><td>partial_5pct</td><td>\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)</td><td>-359.518</td><td>5.778</td></tr></tbody></table></div><figure><img src="../images/monoculture_treated/figures/monoculture_treated_best_joint_model_by_environment.png" alt="Treated monoculture"><figcaption>Best treated model in every cell-line, density, and dose environment; one joint BIC winner is used across each cell line.</figcaption></figure></section>
+<h3>A2780Naive</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Delayed Hill-ramp kill</td><td>partial_5pct</td><td>\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)</td><td>-269.656</td><td>0.0</td></tr>
+<tr><td>2</td><td>Intracellular platinum PK/PD</td><td>shared</td><td>\(\displaystyle \frac{dc_i}{dt}=D-k_{\mathrm{efflux}}c_i,\quad \frac{dc_k}{dt}=c_i-k_{\mathrm{repair}}c_k,\quad \frac{dX}{dt}=G_i(X)-H(c_k)X\)</td><td>-267.972</td><td>1.684</td></tr>
+<tr><td>3</td><td>Delayed Hill-ramp kill</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)</td><td>-265.831</td><td>3.825</td></tr>
+<tr><td>4</td><td>Intracellular platinum PK/PD</td><td>partial_5pct</td><td>\(\displaystyle \frac{dc_i}{dt}=D-k_{\mathrm{efflux}}c_i,\quad \frac{dc_k}{dt}=c_i-k_{\mathrm{repair}}c_k,\quad \frac{dX}{dt}=G_i(X)-H(c_k)X\)</td><td>-262.048</td><td>7.608</td></tr>
+<tr><td>5</td><td>Transit damage/death</td><td>partial_5pct</td><td>\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)</td><td>-253.489</td><td>16.167</td></tr></tbody></table></div>
+<h3>A2780cis</h3><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Transit damage/death</td><td>shared</td><td>\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)</td><td>-370.755</td><td>0.0</td></tr>
+<tr><td>2</td><td>Sensitive/tolerant populations</td><td>shared</td><td>\(\displaystyle \frac{dS}{dt}=G(S+T)\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\quad \frac{dT}{dt}=G(S+T)\frac{T}{S+T}-A_C(t)H_{CT}(z)T\)</td><td>-369.535</td><td>1.219</td></tr>
+<tr><td>3</td><td>Transit damage/death</td><td>partial_5pct</td><td>\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)</td><td>-368.285</td><td>2.47</td></tr>
+<tr><td>4</td><td>Sensitive/tolerant populations</td><td>partial_5pct</td><td>\(\displaystyle \frac{dS}{dt}=G(S+T)\frac{S}{S+T}-A_C(t)H_{CS}(z)S,\quad \frac{dT}{dt}=G(S+T)\frac{T}{S+T}-A_C(t)H_{CT}(z)T\)</td><td>-365.385</td><td>5.37</td></tr>
+<tr><td>5</td><td>Delayed Hill-ramp kill</td><td>shared</td><td>\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)</td><td>-363.852</td><td>6.903</td></tr></tbody></table></div><figure><img src="../images/monoculture_treated/figures/monoculture_treated_best_joint_model_by_environment.png" alt="Treated monoculture"><figcaption>Best treated model in every cell-line, density, and dose environment; one joint BIC winner is used across each cell line.</figcaption></figure></section>
 <section><div class="stage-heading"><span>Stage 2 timing audit</span><h2>Onset and gradual-effect combinations</h2></div><p>All five timing hypotheses use one joint objective over the same 12 treated-monoculture trajectories. The A2780Naive delayed Hill-ramp and A2780cis sensitive/tolerant population model are otherwise unchanged. Boundary flags and multistart results remain in <code>outputs/csv/monoculture_treated</code>.</p><div class="notation-key"><h3>Timing-audit notation key</h3><dl>
 <dt>\(R(t;\lambda_i,t_{\mathrm{on},i})\)</dt><dd>Delayed gradual activation: \(R(t;\lambda_i,t_{\mathrm{on},i})=\mathbf{1}_{t>t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\). It equals 0 before onset and approaches 1 after onset.</dd>
 <dt>\(\mathbf{1}_{t>t_{\mathrm{on},i}}\)</dt><dd>Pure onset switch. It is 0 before the fitted onset time and 1 after onset, with no gradual ramp.</dd>
 <dt>\(\lambda_i\)</dt><dd>Activation speed in day\(^{-1}\). Larger \(\lambda_i\) means the delayed effect reaches full strength faster.</dd>
 </dl></div>
-<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Resistant onset only</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},C}}\)</td><td>-646.537</td><td>0.0</td></tr>
-<tr><td>2</td><td>Independent onset plus gradual activation</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on},C})\)</td><td>-641.279</td><td>5.258</td></tr>
-<tr><td>3</td><td>Shared onset plus gradual activation</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on}}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on}})\)</td><td>-629.058</td><td>17.479</td></tr>
-<tr><td>4</td><td>Resistant gradual activation only</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=1-e^{-\lambda_Ct}\)</td><td>-623.366</td><td>23.171</td></tr>
-<tr><td>5</td><td>Onsets within 0.5 day plus gradual activation</td><td></td><td>\(t_{\mathrm{on},N}=\bar t_{\mathrm{on}}-\delta_t,\quad t_{\mathrm{on},C}=\bar t_{\mathrm{on}}+\delta_t,\quad |\delta_t|\le 0.5\,\mathrm{d}\)</td><td>-622.405</td><td>24.132</td></tr></tbody></table></div><figure><img src="../images/monoculture_treated/figures/monoculture_treated_timing_hypothesis_grid.png" alt="Treated monoculture timing hypotheses"><figcaption>The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is Resistant onset only.</figcaption></figure></section>
+<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Resistant onset only</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=\mathbf{1}_{t&gt;t_{\mathrm{on},C}}\)</td><td>-606.055</td><td>0.0</td></tr>
+<tr><td>2</td><td>Independent onset plus gradual activation</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on},C})\)</td><td>-600.694</td><td>5.361</td></tr>
+<tr><td>3</td><td>Shared onset plus gradual activation</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on}}),\quad A_C(t)=R(t;\lambda_C,t_{\mathrm{on}})\)</td><td>-590.198</td><td>15.857</td></tr>
+<tr><td>4</td><td>Onsets within 0.5 day plus gradual activation</td><td></td><td>\(t_{\mathrm{on},N}=\bar t_{\mathrm{on}}-\delta_t,\quad t_{\mathrm{on},C}=\bar t_{\mathrm{on}}+\delta_t,\quad |\delta_t|\le 0.5\,\mathrm{d}\)</td><td>-585.229</td><td>20.826</td></tr>
+<tr><td>5</td><td>Resistant gradual activation only</td><td></td><td>\(A_N(t)=R(t;\lambda_N,t_{\mathrm{on},N}),\quad A_C(t)=1-e^{-\lambda_Ct}\)</td><td>-579.27</td><td>26.785</td></tr></tbody></table></div><figure><img src="../images/monoculture_treated/figures/monoculture_treated_timing_hypothesis_grid.png" alt="Treated monoculture timing hypotheses"><figcaption>The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is Resistant onset only.</figcaption></figure></section>
 <section><div class="stage-heading"><span>Stage 3</span><h2>Untreated coculture</h2></div><p>Top five coupled competition models across both densities and all three mix ratios. Lineage growth is inherited from untreated monoculture.</p><div class="notation-key"><h3>Stage 3 notation key</h3><dl>
 <dt>\(N(t),C(t)\)</dt><dd>A2780Naive and total A2780cis populations, respectively.</dd>
 <dt>\(\dot N,\dot C\)</dt><dd>Lineage-specific rates of change. These are coupled because each lineage contributes to the other's crowding.</dd>
@@ -127,12 +129,12 @@ code { font-family: Consolas, "Courier New", monospace; }
 <dt>\(G_N,G_C\)</dt><dd>Stage-1 lineage growth laws evaluated under the coculture competitive loads.</dd>
 <dt>\(d_N,d_C\)</dt><dd>Optional first-order lineage loss rates in the competition-plus-death candidate.</dd>
 </dl></div>
-<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Asymmetric competition with death</td><td>partial_5pct</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C)-d_NN,\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)-d_CC\)</td><td>-684.736</td><td>0.0</td></tr>
-<tr><td>2</td><td>Asymmetric competition with death</td><td>shared</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C)-d_NN,\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)-d_CC\)</td><td>-663.936</td><td>20.8</td></tr>
-<tr><td>3</td><td>Asymmetric competition</td><td>partial_5pct</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C),\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)\)</td><td>-501.968</td><td>182.768</td></tr>
-<tr><td>4</td><td>Symmetric competition</td><td>partial_5pct</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha C),\quad \frac{dC}{dt}=G_C(C,C+\alpha N)\)</td><td>-501.15</td><td>183.587</td></tr>
-<tr><td>5</td><td>Symmetric competition</td><td>shared</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha C),\quad \frac{dC}{dt}=G_C(C,C+\alpha N)\)</td><td>-492.637</td><td>192.1</td></tr></tbody></table></div><figure><img src="../images/coculture_untreated/figures/coculture_untreated_best_mechanistic_fit_grid.png" alt="Untreated coculture"><figcaption>Best coupled competition model across 20k/30k and 25:75, 50:50, and 75:25 starting mixtures.</figcaption></figure></section>
-<section><div class="stage-heading"><span>Stage 4</span><h2>Treated coculture</h2></div><p>Top five linked treatment hypotheses across all treated monoculture and coculture environments. Coculture treatment is IC50 at 1.0 uM (Hill effect signal z = 0.50). Stage-2 drug parameters are inherited within a +/-5% validation margin; every additional context effect is named explicitly.</p><div class="notation-key"><h3>Stage 4 notation key</h3><dl>
+<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Asymmetric competition with death</td><td>partial_5pct</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C)-d_NN,\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)-d_CC\)</td><td>-628.608</td><td>0.0</td></tr>
+<tr><td>2</td><td>Asymmetric competition with death</td><td>shared</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C)-d_NN,\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)-d_CC\)</td><td>-592.276</td><td>36.332</td></tr>
+<tr><td>3</td><td>Asymmetric competition</td><td>partial_5pct</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C),\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)\)</td><td>-487.051</td><td>141.557</td></tr>
+<tr><td>4</td><td>Asymmetric competition</td><td>shared</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C),\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)\)</td><td>-470.833</td><td>157.775</td></tr>
+<tr><td>5</td><td>Symmetric competition</td><td>partial_5pct</td><td>\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha C),\quad \frac{dC}{dt}=G_C(C,C+\alpha N)\)</td><td>-438.455</td><td>190.153</td></tr></tbody></table></div><figure><img src="../images/coculture_untreated/figures/coculture_untreated_best_mechanistic_fit_grid.png" alt="Untreated coculture"><figcaption>Best coupled competition model across 20k/30k and 25:75, 50:50, and 75:25 starting mixtures.</figcaption></figure></section>
+<section><div class="stage-heading"><span>Stage 4</span><h2>Treated coculture</h2></div><p>Top five linked treatment hypotheses across all treated monoculture and coculture environments. Coculture treatment is IC50 at 1.0 uM (Hill effect signal z = 0.50). Stage-2 drug parameters are inherited within a +/-5% validation margin; every additional context effect is named explicitly. Stage 2 nominally selected joint_ic_effect_transit_death, but Stage 4 uses the best population-balance-compatible joint_ic_effect_two_population candidate (Delta BIC=1.22); the mechanisms are not separated by Delta BIC &gt;= 2.</p><div class="notation-key"><h3>Stage 4 notation key</h3><dl>
 <dt>\(N(t),C(t)\)</dt><dd>Total A2780Naive and A2780cis populations. For the resistant population-balance model, \(C=S+T\).</dd>
 <dt>\(X_i(t)\)</dt><dd>Compact lineage placeholder used in the BIC table: \(X_i=N\) for \(i=N\), and \(X_i=C\) for \(i=C\).</dd>
 <dt>\(M_N,M_C\)</dt><dd>Dimensionless coculture modifiers multiplying the inherited Stage-2 drug effects.</dd>
@@ -144,8 +146,7 @@ code { font-family: Consolas, "Courier New", monospace; }
 <div class="notation-key equation-detail"><h3>Stage 4 expanded treated-coculture equations</h3>
 <p>The BIC table below names the candidate-specific change. The full linked system inherits Stage 1 growth, Stage 2 treatment timing/Hill response, and Stage 3 coculture competition/death.</p>
 <div class="math">\[C=S+T,\qquad L_N=N+\alpha_{NC,d}C,\qquad L_C=C+\alpha_{CN,d}N\]</div>
-<div class="math">\[G_N^{\mathrm{co}}=r_{N,d}N\left(1-\frac{L_N}{K_{N,d}}\right)-d_NN\]</div>
-<div class="math">\[G_C^{\mathrm{co}}=r_CC\left[1-\left(\frac{L_C}{K_C}\right)^{\theta_C}\right]-d_CC\]</div>
+<div class="math">\[G_N^{\mathrm{co}}=G_N(N,L_N,t)-d_NN,\qquad G_C^{\mathrm{co}}=G_C(C,L_C,t)-d_CC\]</div>
 <div class="math">\[M_N=e^{\beta_NL_N/K_{N,d}},\qquad M_C=e^{\beta_CL_C/K_C}\]</div>
 <div class="math">\[f_{T0}^{\mathrm{co}}=\operatorname{logit}^{-1}\!\left(\operatorname{logit}(f_{T0})+\delta_f\right),\qquad H_{CT}^{\mathrm{co}}(z)=e^{\gamma_T}H_{CT}(z),\qquad \rho_T=e^{\gamma_{r,T}}\]</div>
 <div class="math">\[\frac{dN}{dt}=G_N^{\mathrm{co}}-M_NA_N(t)H_N(z)N\]</div>
@@ -153,11 +154,11 @@ code { font-family: Consolas, "Courier New", monospace; }
 <div class="math">\[\frac{dT}{dt}=\rho_TG_C^{\mathrm{co}}\frac{T}{C}-M_CA_C(t)H_{CT}^{\mathrm{co}}(z)T\]</div>
 <p><strong>How to read the candidate rows:</strong> strict inheritance sets the extra coculture modifiers to their neutral values; load-scaled candidates estimate one or more \(\beta\) terms; tolerant-state candidates also estimate \(\delta_f\), \(\gamma_T\), and/or \(\gamma_{r,T}\).</p>
 </div>
-<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Load plus tolerant-state and growth plasticity</td><td>linked_global</td><td>\(\displaystyle M_C=e^{\beta_C\,L_C/K_C},\quad \frac{dT}{dt}=\rho_TG_C^{\mathrm{co}}\frac{T}{C}-M_CA_C(t)H_{CT}^{\mathrm{co}}(z)T,\quad \rho_T=e^{\gamma_{r,T}}\)</td><td>-1257.27</td><td>0.0</td></tr>
-<tr><td>2</td><td>Load scaling plus tolerant-state shift</td><td>linked_global</td><td>\(M_i=e^{\beta_iL_i/K_i},\quad f_{T0}^{\mathrm{co}}=\operatorname{logit}^{-1}[\operatorname{logit}(f_{T0})+\delta_f],\quad H_{CT}^{\mathrm{co}}=e^{\gamma_T}H_{CT}\)</td><td>-1163.325</td><td>93.945</td></tr>
-<tr><td>3</td><td>Fully free context diagnostic</td><td>linked_global</td><td>\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-E_i^{\mathrm{co}}(t,z)X_i,\quad \mathbf q_{\mathrm{drug}}^{\mathrm{co}}\ne\mathbf q_{\mathrm{drug}}^{\mathrm{mono}}\)</td><td>-1114.3</td><td>142.969</td></tr>
-<tr><td>4</td><td>Total-load-scaled drug effect</td><td>linked_global</td><td>\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-e^{\beta_iL_i/K_i}E_i^{\mathrm{mono}}(t,z)X_i\)</td><td>-1082.181</td><td>175.089</td></tr>
-<tr><td>5</td><td>Subpopulation-specific load scaling</td><td>linked_global</td><td>\(M_N=e^{\beta_NL_N/K_N},\quad M_{CS}=e^{\beta_{CS}L_C/K_C},\quad M_{CT}=e^{\beta_{CT}L_C/K_C}\)</td><td>-1051.838</td><td>205.432</td></tr></tbody></table></div><figure><img src="../images/coculture_treated/figures/linked_treatment_coculture_grid.png" alt="Treated coculture"><figcaption>Best linked treatment model across both seeding densities and all mixture environments.</figcaption></figure></section>
+<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Model</th><th>Pooling</th><th>Equation</th><th>BIC</th><th>delta_BIC</th></tr></thead><tbody><tr><td>1</td><td>Load scaling plus tolerant-state shift</td><td>linked_global</td><td>\(M_i=e^{\beta_iL_i/K_i},\quad f_{T0}^{\mathrm{co}}=\operatorname{logit}^{-1}[\operatorname{logit}(f_{T0})+\delta_f],\quad H_{CT}^{\mathrm{co}}=e^{\gamma_T}H_{CT}\)</td><td>-1145.758</td><td>0.0</td></tr>
+<tr><td>2</td><td>Total-load-scaled drug effect</td><td>linked_global</td><td>\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-e^{\beta_iL_i/K_i}E_i^{\mathrm{mono}}(t,z)X_i\)</td><td>-1102.223</td><td>43.535</td></tr>
+<tr><td>3</td><td>Load plus tolerant-state and growth plasticity</td><td>linked_global</td><td>\(\displaystyle M_C=e^{\beta_C\,L_C/K_C},\quad \frac{dT}{dt}=\rho_TG_C^{\mathrm{co}}\frac{T}{C}-M_CA_C(t)H_{CT}^{\mathrm{co}}(z)T,\quad \rho_T=e^{\gamma_{r,T}}\)</td><td>-1074.294</td><td>71.464</td></tr>
+<tr><td>4</td><td>Subpopulation-specific load scaling</td><td>linked_global</td><td>\(M_N=e^{\beta_NL_N/K_N},\quad M_{CS}=e^{\beta_{CS}L_C/K_C},\quad M_{CT}=e^{\beta_{CT}L_C/K_C}\)</td><td>-1071.377</td><td>74.381</td></tr>
+<tr><td>5</td><td>Fully free context diagnostic</td><td>linked_global</td><td>\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-E_i^{\mathrm{co}}(t,z)X_i,\quad \mathbf q_{\mathrm{drug}}^{\mathrm{co}}\ne\mathbf q_{\mathrm{drug}}^{\mathrm{mono}}\)</td><td>-1066.963</td><td>78.794</td></tr></tbody></table></div><figure><img src="../images/coculture_treated/figures/linked_treatment_coculture_grid.png" alt="Treated coculture"><figcaption>Best linked treatment model across both seeding densities and all mixture environments.</figcaption></figure></section>
 <section class="equation-summary">
 <div class="stage-heading"><span>Summary</span><h2>Equation progression</h2></div>
 <p>The selected models build sequentially. Every growth, density, dose, delay, population-balance, competition, death, context-scaling, initial-condition, observation, and model-selection term used by the winning pipeline is defined below.</p>
@@ -176,9 +177,11 @@ code { font-family: Consolas, "Courier New", monospace; }
   </article>
   <article>
     <h3>1. Intrinsic untreated monoculture growth</h3>
-    <div class="math">\[\frac{dN}{dt}=r_{N,d}N\left[1-\frac{N}{K_{N,d}}\right]_+\qquad\text{(A2780Naive)}\]</div>
-    <div class="math">\[\frac{dC}{dt}=r_CC\left[1-\left(\frac{C}{K_C}\right)^{\theta_C}\right]_+\qquad\text{(A2780cis)}\]</div>
-    <p>The selected winners are density-partially-pooled logistic growth for A2780Naive and shared theta-logistic growth for A2780cis. These exact families and effective parameters are inherited by all later stages.</p>
+    <p><strong>A2780Naive: Baranyi-adjusted theta-logistic growth.</strong></p>
+    <div class="math">\(\displaystyle \frac{dX}{dt}=\alpha_B(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad \alpha_B(t)=\frac{q_0}{q_0+e^{-rt}}\)</div>
+    <p><strong>A2780cis: Smooth adaptation theta-logistic growth.</strong></p>
+    <div class="math">\(\displaystyle \frac{dX}{dt}=A(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad A(t)=1-e^{-\lambda_A t}\)</div>
+    <p>The displayed equations are read from the selected Stage 1 baseline artifact when this report is built. The exact winning family, including any fitted lag or adaptation term, and its density-specific effective parameters are inherited by all later stages. The Baranyi candidate is used only as a phenomenological lag description here; its original biological interpretation was developed for microbial growth and is not evidence of an ovarian-cancer mechanism.</p>
   </article>
   <article>
     <h3>2. Add treated-monoculture effects</h3>
@@ -189,10 +192,10 @@ code { font-family: Consolas, "Courier New", monospace; }
     <div class="math">\[H_{N,d}(z)=\frac{E_{\max,N,d}z^{h_N}}{EC_{50,N}^{h_N}+z^{h_N}+\varepsilon}\]</div>
     <div class="math">\[H_{CS,d}(z)=\frac{E_{\max,CS,d}z^4}{0.5^4+z^4+\varepsilon},\qquad H_{CT,d}(z)=\frac{E_{\max,CT,d}z^4}{0.5^4+z^4+\varepsilon}\]</div>
     <div class="math">\[E_{\max,i,d}=E_{\max,i,\mathrm{center}}e^{s_d\delta_{E,i}},\qquad |\delta_{E,i}|\le\ln(1.05)\]</div>
-    <div class="math">\[\frac{dN}{dt}=r_{N,d}N\left[1-\frac{N}{K_{N,d}}\right]_+-A_N(t)H_{N,d}(z)N\]</div>
+    <div class="math">\[\frac{dN}{dt}=G_N(N,t)-A_N(t)H_{N,d}(z)N\]</div>
     <div class="math">\[C=S+T\]</div>
-    <div class="math">\[\frac{dS}{dt}=r_CC\left[1-\left(\frac{C}{K_C}\right)^{\theta_C}\right]_+\frac{S}{C}-A_C(t)H_{CS,d}(z)S\]</div>
-    <div class="math">\[\frac{dT}{dt}=r_CC\left[1-\left(\frac{C}{K_C}\right)^{\theta_C}\right]_+\frac{T}{C}-A_C(t)H_{CT,d}(z)T\]</div>
+    <div class="math">\[\frac{dS}{dt}=G_C(C,t)\frac{S}{C}-A_C(t)H_{CS,d}(z)S\]</div>
+    <div class="math">\[\frac{dT}{dt}=G_C(C,t)\frac{T}{C}-A_C(t)H_{CT,d}(z)T\]</div>
     <p>The A2780Naive winner is delayed Hill-ramp kill. The A2780cis winner has separate sensitive and tolerant kill amplitudes and an estimated initial tolerant fraction. A five-model timing audit selected <code>cis_onset_only</code> by BIC; onset, gradual activation, shared-onset, and bounded-onset alternatives remain in the ranking rather than being silently discarded.</p>
   </article>
   <article>
@@ -200,10 +203,10 @@ code { font-family: Consolas, "Courier New", monospace; }
     <div class="math">\[C=S+T\]</div>
     <div class="math">\[\alpha_{NC,d}=\alpha_{NC,\mathrm{center}}e^{s_d\delta_\alpha},\qquad \alpha_{CN,d}=\alpha_{CN,\mathrm{center}}e^{s_d\delta_\alpha}\]</div>
     <div class="math">\[L_N=N+\alpha_{NC,d}C,\qquad L_C=C+\alpha_{CN,d}N\]</div>
-    <div class="math">\[G_N^{\mathrm{co}}=r_{N,d}N\left(1-\frac{L_N}{K_{N,d}}\right)-d_NN\]</div>
-    <div class="math">\[G_C^{\mathrm{co}}=r_CC\left[1-\left(\frac{L_C}{K_C}\right)^{\theta_C}\right]-d_CC\]</div>
+    <div class="math">\[G_N^{\mathrm{co}}=G_N(N,L_N,t)-d_NN\]</div>
+    <div class="math">\[G_C^{\mathrm{co}}=G_C(C,L_C,t)-d_CC\]</div>
     <div class="math">\[\frac{dN}{dt}=G_N^{\mathrm{co}},\qquad \frac{dC}{dt}=G_C^{\mathrm{co}}\qquad\text{(untreated coculture)}\]</div>
-    <p>The winner is asymmetric competition with lineage-specific death. The two competition coefficients may differ by direction; their common density contrast is bounded at plus-or-minus five percent. Death rates are shared across density. Monoculture <code>r</code>, <code>K</code>, and <code>theta</code> remain fixed.</p>
+    <p>The winner is asymmetric competition with lineage-specific death. The two competition coefficients may differ by direction; their common density contrast is bounded at plus-or-minus five percent. Death rates are shared across density. Every selected monoculture growth parameter, including a lag/adaptation parameter when present, remains fixed.</p>
   </article>
   <article>
     <h3>4. Fully expanded treated-coculture winner</h3>
@@ -211,18 +214,25 @@ code { font-family: Consolas, "Courier New", monospace; }
     <div class="math">\[M_N=\exp\!\left(\operatorname{clamp}\!\left[\beta_N\frac{L_N}{K_{N,d}},-4,4\right]\right),\qquad M_C=\exp\!\left(\operatorname{clamp}\!\left[\beta_C\frac{L_C}{K_C},-4,4\right]\right)\]</div>
     <div class="math">\[f_{T0}^{\mathrm{co}}=\operatorname{logit}^{-1}\!\left[\operatorname{logit}(f_{T0})+\delta_f\right]\]</div>
     <div class="math">\[H_{CT,d}^{\mathrm{co}}(0.50)=e^{\gamma_T}H_{CT,d}(0.50),\qquad \rho_T=e^{\gamma_{r,T}}\]</div>
-    <div class="math">\[\frac{dN}{dt}=r_{N,d}N\left(1-\frac{L_N}{K_{N,d}}\right)-d_NN-M_NA_N(t)H_{N,d}(0.50)N\]</div>
-    <div class="math">\[\frac{dS}{dt}=\left\{r_CC\left[1-\left(\frac{L_C}{K_C}\right)^{\theta_C}\right]-d_CC\right\}\frac{S}{C}-M_CA_C(t)H_{CS,d}(0.50)S\]</div>
-    <div class="math">\[\frac{dT}{dt}=\rho_T\left\{r_CC\left[1-\left(\frac{L_C}{K_C}\right)^{\theta_C}\right]-d_CC\right\}\frac{T}{C}-M_CA_C(t)H_{CT,d}^{\mathrm{co}}(0.50)T\]</div>
+    <div class="math">\[\frac{dN}{dt}=G_N^{\mathrm{co}}-M_NA_N(t)H_{N,d}(0.50)N\]</div>
+    <div class="math">\[\frac{dS}{dt}=G_C^{\mathrm{co}}\frac{S}{C}-M_CA_C(t)H_{CS,d}(0.50)S\]</div>
+    <div class="math">\[\frac{dT}{dt}=\rho_TG_C^{\mathrm{co}}\frac{T}{C}-M_CA_C(t)H_{CT,d}^{\mathrm{co}}(0.50)T\]</div>
     <div class="math">\[C=S+T,\qquad L_N=N+\alpha_{NC,d}C,\qquad L_C=C+\alpha_{CN,d}N\]</div>
-    <p>This is the selected <code>load_plus_tolerant_growth_context</code> model. Intrinsic growth and untreated competition/death parameters are fixed from Stages 1 and 3. Stage 2 drug parameters and the BIC-selected timing architecture are inherited within a plus-or-minus five-percent validation window. The fitted context terms are total-load drug scaling <code>beta_N,beta_C</code>, a resistant tolerant-fraction shift <code>delta_f</code>, tolerant-kill attenuation <code>gamma_T</code>, and a tolerant-growth plasticity multiplier <code>rho_T</code>.</p>
+    <p>This is the selected <code>load_plus_tolerant_context</code> model. Intrinsic growth and untreated competition/death parameters are fixed from Stages 1 and 3. Stage 2 drug parameters and the BIC-selected timing architecture are inherited within a plus-or-minus five-percent validation window. Its fitted context structure is total-load scaling, an initial tolerant-fraction shift, and tolerant-kill attenuation; modifiers not named by this winner are fixed at their neutral values.</p>
   </article>
   <article>
-    <h3>Fitting and BIC selection</h3>
+    <h3>Fitting, scale normalization, and BIC selection</h3>
     <div class="math">\[s_j=\max_t y_j(t)\]</div>
     <div class="math">\[\mathrm{SSE}_{\mathrm{scaled}}=\sum_j\sum_t\left[\frac{y_j(t)-\widehat y_j(t)}{s_j}\right]^2\]</div>
+    <div class="math">\[\mathrm{SSE}_{\mathrm{raw}}=\sum_j\sum_t\left[y_j(t)-\widehat y_j(t)\right]^2\]</div>
     <div class="math">\[\mathrm{BIC}=n\ln\!\left(\frac{\mathrm{SSE}_{\mathrm{scaled}}}{n}\right)+k\ln n\]</div>
-    <p>Every candidate is fitted jointly across the environments stated in its stage. Here <code>n</code> is the total number of observations and <code>k</code> counts all fitted center, shape, modifier, and pooling-contrast parameters. Fixed inherited parameters and fixed day-zero populations are not counted again.</p>
+    <p><strong>Small-to-large trajectory normalization.</strong> Each trajectory \(j\) is divided by its own observed peak \(s_j\). A 500-cell trajectory and a 4,000-cell trajectory therefore contribute comparable relative errors instead of the larger curve dominating merely because its residuals have larger units. The scaled SSE is dimensionless and drives optimization and BIC; raw SSE in squared cell-count units is also exported for scale-aware interpretation.</p>
+    <p><strong>What is jointly fitted.</strong> Every candidate is fitted across all trajectories stated in its stage with one objective. In the canonical report, image tiles are averaged within wells and then biological samples are averaged at each time point. The sample-aware report preserves sample-level trajectories after within-well averaging and displays their between-sample uncertainty bands.</p>
+    <p><strong>BIC counting.</strong> Here \(n\) is the total number of fitted time-point observations across all joint trajectories, not the number of wells, tiles, or environments. The count \(k\) includes every freely optimized center, shape, treatment, context, and pooling-contrast parameter. Fixed inherited parameters and fixed day-zero populations are not counted again. Lower BIC is better only relative to candidates fitted to the same observations and objective; it is not proof that the winning biological mechanism is true.</p>
+    <p><strong>Initial conditions and time origin.</strong> Day zero is fixed at 67 measured cells for 20k seeding and 100 for 30k seeding. The first observed point is day 1. These anchors are passed through the package's fixed-initial-time and initial-state builder interface and are not estimated kinetic parameters.</p>
+    <p><strong>Pooling.</strong> Shared models use one parameter value across 20k and 30k. Partial pooling permits only \(r\) and \(K\), or the stage-specific named effects, to differ through symmetric log contrasts bounded at plus-or-minus five percent: \(p_{20k}=p_c e^{-\delta_p}\), \(p_{30k}=p_c e^{\delta_p}\), \(|\delta_p|\le\ln(1.05)\). Fully independent density fits are retained as diagnostics but cannot silently become inherited defaults.</p>
+    <p><strong>Fit validity.</strong> A fit is rejected if any parameter, prediction, SSE, or BIC is non-finite, or if its objective retains the failure sentinel. Boundary profiles expand requested bounds and accept an expansion only when the improvement is scientifically material under the configured BIC and margin rules. Multistart results and parameter-stability summaries are retained where that stage uses multistart optimization.</p>
+    <p><strong>Uncertainty and weighting.</strong> Error ribbons show empirical variation; they are not inverse-variance weights in the canonical scaled-SSE objective. Later-stage fits inherit only eligible finite winners and record the exact source family and parameters in inheritance audit CSVs. This prevents a downstream stage from quietly replacing a selected lag, growth, dose-response, or competition law.</p>
   </article>
 </div>
 <div class="model-guide">
@@ -250,6 +260,9 @@ code { font-family: Consolas, "Courier New", monospace; }
         <dt><code>r_i</code></dt><dd>Intrinsic per-capita growth rate, with units day^-1.</dd>
         <dt><code>K_i</code></dt><dd>Carrying capacity on the measured cell-count scale.</dd>
         <dt><code>theta_i</code></dt><dd>Dimensionless theta-logistic shape. \(\theta=1\) recovers ordinary logistic growth; other values shift how sharply crowding suppresses growth.</dd>
+        <dt><code>tau_i</code></dt><dd>Hard-lag duration in days. The hard-lag candidate sets intrinsic growth to zero until \(t>\tau_i\), then switches the fitted theta-logistic law on.</dd>
+        <dt><code>q0_i</code></dt><dd>Positive Baranyi initial-state parameter. It defines \(\alpha_B(t)=q_0/(q_0+e^{-r_it})\), which smoothly raises the fraction of the intrinsic growth rate expressed over time.</dd>
+        <dt><code>lambda_A,i</code></dt><dd>Smooth adaptation rate in day\(^{-1}\). It defines \(A_i(t)=1-e^{-\lambda_{A,i}t}\), equivalent to \(dA_i/dt=\lambda_{A,i}(1-A_i)\) with \(A_i(0)=0\).</dd>
         <dt><code>[x]_+</code></dt><dd>Positive part \([x]_+=\max(x,0)\), used in monoculture fits to prevent the inherited growth term from becoming artificial negative crowding death above <code>K</code>.</dd>
       </dl>
     </article>

@@ -28,10 +28,13 @@ function _linked_treatment_seed(start)
     base = joinpath(root, "outputs", "csv", "monoculture_treated")
     status_path = joinpath(base, "monoculture_treated_pooling_status.csv")
     parameter_path = joinpath(base, "monoculture_treated_joint_parameter_estimates.csv")
+    ranking_path = joinpath(base, "monoculture_treated_pooling_model_ranking.csv")
     isfile(status_path) || error("Treated-monoculture pooling status is required for linked treatment fitting")
     isfile(parameter_path) || error("Treated-monoculture parameter estimates are required for linked treatment fitting")
+    isfile(ranking_path) || error("Treated-monoculture model ranking is required for linked treatment fitting")
     status = CSV.read(status_path, DataFrame)
     parameters = CSV.read(parameter_path, DataFrame)
+    ranking = CSV.read(ranking_path, DataFrame)
 
     expected = Dict(
         "A2780Naive" => "joint_ic_effect_hill_ramp_onset",
@@ -43,12 +46,26 @@ function _linked_treatment_seed(start)
         selected = status[String.(status.cell_line) .== cell_line, :]
         nrow(selected) == 1 || error("Expected one treated-monoculture winner for $(cell_line)")
         winner = first(selected)
-        String(winner.winning_model) == expected_model ||
-            error("Linked treatment adapter requires $(expected_model) for $(cell_line), found $(winner.winning_model)")
+        nominal_model = String(winner.winning_model)
+        compatible = ranking[
+            (String.(ranking.cell_line) .== cell_line) .&
+            (String.(ranking.model) .== expected_model) .&
+            Bool.(ranking.eligible_for_inheritance),
+            :,
+        ]
+        isempty(compatible) && error("No eligible $(expected_model) fit is available for linked $(cell_line) treatment")
+        sort!(compatible, :bic)
+        compatible_winner = first(compatible)
+        selected_pooling = String(compatible_winner.pooling_mode)
+        nominal_bic = Float64(winner.winning_bic)
+        compatible_bic = Float64(compatible_winner.bic)
+        selection_reason = nominal_model == expected_model ?
+            "nominal_stage2_winner" :
+            "best_stage2_candidate_compatible_with_population_balance_stage4"
         winner_parameters = parameters[
             (String.(parameters.cell_line) .== cell_line) .&
             (String.(parameters.model) .== expected_model) .&
-            (String.(parameters.pooling_mode) .== String(winner.winning_pooling_mode)),
+            (String.(parameters.pooling_mode) .== selected_pooling),
             :,
         ]
         for parameter in unique(String.(winner_parameters.parameter))
@@ -58,16 +75,21 @@ function _linked_treatment_seed(start)
             push!(rows, (
                 cell_line = cell_line,
                 treatment_family = expected_model,
-                pooling_mode = String(winner.winning_pooling_mode),
+                pooling_mode = selected_pooling,
                 parameter = parameter,
                 sequential_stage2_center = center,
+                nominal_stage2_winner = nominal_model,
+                nominal_stage2_bic = nominal_bic,
+                compatible_stage2_bic = compatible_bic,
+                compatible_delta_bic = compatible_bic - nominal_bic,
+                selection_reason = selection_reason,
                 source_path = parameter_path,
             ))
         end
         contrast_rows = parameters[
             (String.(parameters.cell_line) .== cell_line) .&
             (String.(parameters.model) .== expected_model) .&
-            (String.(parameters.pooling_mode) .== String(winner.winning_pooling_mode)) .&
+            (String.(parameters.pooling_mode) .== selected_pooling) .&
             (String.(parameters.parameter) .== (cell_line == "A2780Naive" ? "emax" : "emax_sensitive")),
             :,
         ]
@@ -103,6 +125,11 @@ function _linked_treatment_seed(start)
                 pooling_mode = "joint across both cell lines, densities, and doses",
                 parameter = String(name),
                 sequential_stage2_center = estimate,
+                nominal_stage2_winner = timing_winner,
+                nominal_stage2_bic = Float64(first(timing_ranking.bic)),
+                compatible_stage2_bic = Float64(first(timing_ranking.bic)),
+                compatible_delta_bic = 0.0,
+                selection_reason = "timing_audit_winner",
                 source_path = timing_parameter_path,
             ))
         end
@@ -330,16 +357,8 @@ function _linked_context_scales(p, hypothesis, sensitive_burden, resistant_burde
     )
 end
 
-function _linked_intrinsic_growth(population, baseline)
-    N = max(population, zero(population))
-    K = max(baseline.K, 1e-8)
-    if String(baseline.model) == "gompertz_growth"
-        return baseline.r * max(N, 1e-8) * log(K / max(N, 1e-8))
-    elseif String(baseline.model) == "theta_logistic_growth"
-        theta = max(baseline.shape_value, 1e-8)
-        return baseline.r * N * max(zero(N), 1 - (N / K)^theta)
-    end
-    return baseline.r * N * max(zero(N), 1 - N / K)
+function _linked_intrinsic_growth(population, baseline, t)
+    return _baseline_growth(population, population, baseline, t)
 end
 
 function _linked_problem(monoculture_environments, coculture_environments, start, seed, hypothesis)
@@ -364,7 +383,7 @@ function _linked_problem(monoculture_environments, coculture_environments, start
             treatment = _linked_treatment_values(p, hypothesis, :monoculture, environment.density, base)
             activation = _ramp_activation(t, 0.0, treatment.naive_lambda, treatment.naive_onset)
             kill = activation * _hill_effect(environment.effect_level, treatment.naive_emax, treatment.naive_ec50, treatment.naive_hill)
-            du[index] = _linked_intrinsic_growth(N, environment.baseline) - kill * N
+            du[index] = _linked_intrinsic_growth(N, environment.baseline, t) - kill * N
         end
         for (index, environment) in enumerate(cis_mono)
             sensitive_index = mono_cis_offset + 2index - 1
@@ -376,7 +395,7 @@ function _linked_problem(monoculture_environments, coculture_environments, start
             activation = _timing_activation(t, treatment.cis_lambda, treatment.cis_onset, treatment.cis_activation_mode)
             kill_sensitive = activation * _hill_effect(environment.effect_level, treatment.cis_emax_sensitive, 0.5, 4.0)
             kill_tolerant = activation * _hill_effect(environment.effect_level, treatment.cis_emax_tolerant, 0.5, 4.0)
-            growth = _linked_intrinsic_growth(total, environment.baseline)
+            growth = _linked_intrinsic_growth(total, environment.baseline, t)
             sensitive_share = total > 0 ? sensitive / total : one(total)
             tolerant_share = total > 0 ? tolerant / total : zero(total)
             du[sensitive_index] = growth * sensitive_share - kill_sensitive * sensitive
@@ -401,8 +420,8 @@ function _linked_problem(monoculture_environments, coculture_environments, start
             naive_baseline, cis_baseline = coculture_baselines[index]
             naive_load = naive + alpha_sr * cis_total
             cis_load = cis_total + alpha_rs * naive
-            naive_growth = _anchored_component_growth(naive, naive_load, naive_baseline) - death_naive * naive
-            cis_growth = _anchored_component_growth(cis_total, cis_load, cis_baseline) - death_cis * cis_total
+            naive_growth = _anchored_component_growth(naive, naive_load, naive_baseline, t) - death_naive * naive
+            cis_growth = _anchored_component_growth(cis_total, cis_load, cis_baseline, t) - death_cis * cis_total
             treatment = _linked_treatment_values(p, hypothesis, :coculture, environment.density, base)
             if hypothesis == "competitor_scaled"
                 naive_burden = alpha_sr * cis_total / max(naive_baseline.K, 1e-8)

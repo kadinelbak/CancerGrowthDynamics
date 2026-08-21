@@ -1,17 +1,16 @@
 parameter,estimate,sequential_stage2_seed,deviation_percent,lower_bound,upper_bound,source
-naive_emax,4.728100570548113,4.976947746531369,-4.99999575355573,4.7281003592048005,5.0,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-naive_ec50_effect,1.625856539504498,1.6743678013763035,-2.897288267961795,1.5906494113074883,1.7580861914451187,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-naive_hill_n,1.7426644196675973,1.7603852630742758,-1.0066457484273261,1.672365999920562,1.8484045262279896,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-naive_lambda,0.842774282785131,0.8670557241316468,-2.800447614925039,0.8237029379250644,0.9104085103382291,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-naive_log_contrast_density,-0.048777971888491096,-0.04878978516549798,-0.024212603041418035,-0.04879016416943205,-0.04635029590722308,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-cis_emax_sensitive,4.999999999999977,4.999994295137574,0.00011409737823431243,4.7499945803806956,5.0,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-cis_emax_tolerant,0.30372697362778217,0.29689033512638674,2.3027487568718197,0.2820458183700674,0.31173485188270605,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-cis_f_tolerant0,0.6756249137099752,0.6765256779400239,-0.13314560842561107,0.6426993940430228,0.7103519618370251,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-cis_log_contrast_density,0.0480147139608418,0.0487692587839795,-1.547173038819205,0.046330795844780524,0.04879016416943205,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-naive_t_onset,2.8726408785264996,2.7958694662995973,2.745886857461599,2.6560759929846176,2.935662939614577,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-cis_t_onset,6.919734099916775,6.901753823721871,0.26051749532276514,6.556666132535778,7.0,shared intrinsic parameter jointly estimated from treated monoculture and coculture
-beta_naive,-2.922103713243805,NaN,NaN,-3.0,3.0,coculture-specific modifier
-beta_cis,-0.28833207316744547,NaN,NaN,-3.0,3.0,coculture-specific modifier
-log_cis_tolerant_context,-3.972508696570258,NaN,NaN,-4.0,4.0,coculture-specific modifier
-cis_tolerant_logit_shift,2.981332725076694,NaN,NaN,-3.0,3.0,coculture-specific modifier
-log_cis_tolerant_growth_context,0.22678933788669742,NaN,NaN,-0.6931471805599453,0.6931471805599453,coculture-specific modifier
+naive_emax,4.999989257539974,4.999998085342592,-0.0001765561199795762,4.749998181075463,5.0,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+naive_ec50_effect,1.2523136898886182,1.2223026295256232,2.4552888652986438,1.161187498049342,1.2834177610019044,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+naive_hill_n,2.232057612521176,2.3480482652557044,-4.9398751486863794,2.2306458519929193,2.4654506785184895,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+naive_lambda,0.5417180299402324,0.5159219395878215,4.999998715507203,0.49012584260843045,0.5417180365672126,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+naive_log_contrast_density,-0.0487901624540802,-0.04879016384417571,-2.8491306425237894e-6,-0.04879016416943205,-0.04635065565196693,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+cis_emax_sensitive,4.749824790198794,4.999815568630285,-4.999999999999538,4.749824790198771,5.0,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+cis_emax_tolerant,0.3188421377643444,0.319310740624452,-0.14675449350410874,0.3033452035932294,0.33527627765567464,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+cis_f_tolerant0,0.5743665873794508,0.5788600219760291,-0.7762558176395262,0.5499170208772277,0.6078030230748306,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+cis_log_contrast_density,0.023554025831355328,0.023465443087366575,0.37750296748688683,0.022292170932998245,0.024638715241734905,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+naive_t_onset,2.418362177230118,2.4382683603313136,-0.8164065705421719,2.316354942314748,2.560181778347879,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+cis_t_onset,6.906900257133545,6.908388471679879,-0.021542137539520834,6.562969048095884,7.0,shared intrinsic parameter jointly estimated from treated monoculture and coculture
+beta_naive,-2.2244142157462017,NaN,NaN,-3.0,3.0,coculture-specific modifier
+beta_cis,-2.95312964480568,NaN,NaN,-3.0,3.0,coculture-specific modifier
+log_cis_tolerant_context,-6.748160167538817,NaN,NaN,-8.0,4.0,coculture-specific modifier
+cis_tolerant_logit_shift,2.9999911672176856,NaN,NaN,-3.0,3.0,coculture-specific modifier

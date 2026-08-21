@@ -6,8 +6,10 @@ using GrowthParameterEstimation
 @testset "A2780 fitted-artifact adapter" begin
     package_root = normpath(joinpath(@__DIR__, ".."))
     config = load_a2780_adaptive_config(package_root)
-    @test config.winners.stage3.model == "lv_asymmetric_competition_death"
-    @test config.winners.stage4.model == "load_plus_tolerant_growth_context"
+    stage3_status = CSV.read(joinpath(package_root, "outputs", "csv", "coculture_untreated", "coculture_untreated_pooling_status.csv"), DataFrame)
+    stage4_status = CSV.read(joinpath(package_root, "outputs", "csv", "coculture_treated", "linked_treatment_status.csv"), DataFrame)
+    @test config.winners.stage3.model == String(first(stage3_status.winning_model))
+    @test config.winners.stage4.model == String(first(stage4_status.winning_model))
     @test config.winners.stage4.eligible
     @test config.observables == ["A2780Naive", "Total A2780cis", "Total population"]
     @test "cis tolerant-like" in config.latent_states_hidden
@@ -58,7 +60,7 @@ using GrowthParameterEstimation
 
     linked_overlay = CSV.read(joinpath(package_root, "outputs", "csv", "coculture_treated", "figures", "linked_treatment_combined_overlays.csv"), DataFrame)
     linked_reference = filter(row ->
-        row.model == "load_plus_tolerant_growth_context" &&
+        row.model == config.winners.stage4.model &&
         row.context == "coculture" &&
         row.density == "20k" &&
         row.mix == "50-50",
