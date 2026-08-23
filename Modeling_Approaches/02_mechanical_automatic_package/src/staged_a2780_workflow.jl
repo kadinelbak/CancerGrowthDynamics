@@ -844,21 +844,25 @@ function _report_display_rows(df::DataFrame; limit::Int = 5)
 end
 
 function _report_ranking_table(df::DataFrame; display_subset::Bool = true)
+    all_ranked = _report_ranked_rows(df)
     ranked = display_subset ? _report_display_rows(df) : _report_ranked_rows(df)
     model_names = String.(ranked.model)
     ranks = Int.(ranked.report_rank)
     pooling = :pooling_mode in propertynames(ranked) ? String.(ranked.pooling_mode) : fill("", nrow(ranked))
     counts = [_report_parameter_count(row) for row in eachrow(ranked)]
-    all_counts = [_report_parameter_count(row) for row in eachrow(_report_ranked_rows(df))]
+    all_counts = [_report_parameter_count(row) for row in eachrow(all_ranked)]
     simplest_count = minimum(all_counts)
+    eligible_mask = :eligible_for_inheritance in propertynames(all_ranked) ?
+        [value !== missing && Bool(value) for value in all_ranked.eligible_for_inheritance] : trues(nrow(all_ranked))
+    selected_rank = any(eligible_mask) ? minimum(Int.(all_ranked.report_rank[eligible_mask])) : 1
     diagnostics = [
         (:diagnostic_model in propertynames(row) && row.diagnostic_model !== missing && Bool(row.diagnostic_model)) ||
         (:eligible_for_inheritance in propertynames(row) && row.eligible_for_inheritance !== missing && !Bool(row.eligible_for_inheritance))
         for row in eachrow(ranked)
     ]
     roles = [diagnostic ? (count == simplest_count ? "Literature/diagnostic benchmark; simplest" : "Literature/diagnostic benchmark") :
-        (rank == 1 && count == simplest_count ? "Winner; simplest" :
-        (rank == 1 ? "Winner" : (count == simplest_count ? "Simplest candidate" : "Leading candidate")))
+        (rank == selected_rank && count == simplest_count ? "Selected for inheritance; simplest" :
+        (rank == selected_rank ? "Selected for inheritance" : (count == simplest_count ? "Simplest candidate" : "Leading candidate")))
         for (rank, count, diagnostic) in zip(ranks, counts, diagnostics)]
     return DataFrame(
         ID = ["M$(rank)" for rank in ranks],

@@ -25,6 +25,7 @@ using DataFrames
     @test !occursin("<details class=\"appendix-disclosure\" open", html)
     @test occursin("Strobl density-dependent-birth family", html)
     @test occursin("Strobl linked-treatment benchmarks", html)
+    @test occursin("Selected for inheritance", html)
     appendix_html = last(split(html, "id=\"model-appendix\""))
     @test occursin("<th>BIC</th>", appendix_html)
     @test occursin("<th>Parameters</th>", appendix_html)
