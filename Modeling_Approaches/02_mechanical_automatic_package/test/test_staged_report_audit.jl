@@ -17,7 +17,7 @@ using DataFrames
 
     @test MechanicalAutomaticModeling.FitWorkflows._shared_y_limits(
         DataFrame(observed = [0.0, 10.0], predicted = [2.0, 20.0]),
-    ) ≈ (0.0, 21.0)
+    ) == (0.0, 21.0)
 
     @test occursin("Complete model, BIC, and parameter audit", html)
     @test occursin("<details class=\"appendix-disclosure\">", html)

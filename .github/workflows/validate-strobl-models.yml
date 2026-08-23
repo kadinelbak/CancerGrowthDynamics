@@ -29,7 +29,7 @@ jobs:
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
 
   refit:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[strobl-refit]'))
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 300
@@ -54,6 +54,6 @@ jobs:
           path: |
             Modeling_Approaches/02_mechanical_automatic_package/outputs/csv/coculture_untreated
             Modeling_Approaches/02_mechanical_automatic_package/outputs/csv/coculture_treated
-            Modeling_Approaches/02_mechanical_automatic_package/outputs/figures/coculture_untreated
-            Modeling_Approaches/02_mechanical_automatic_package/outputs/figures/coculture_treated
+            Modeling_Approaches/02_mechanical_automatic_package/outputs/images/coculture_untreated
+            Modeling_Approaches/02_mechanical_automatic_package/outputs/images/coculture_treated
             Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_staged_model_comparison.html
