@@ -703,8 +703,14 @@ function _fit_linked_treatment_joint(
             params = string((names = problem.names, values = fit.params, package_api = "GrowthParameterEstimation.run_joint_fit")),
         ))
     end
+    strobl = _fit_strobl_linked_benchmarks(
+        monoculture_environments, coculture_environments, start;
+        max_time_per_fit = max_time_per_fit,
+    )
+    append!(rows, strobl.rows)
     ranking = sort!(DataFrame(rows), :bic)
-    nrow(ranking) == length(LINKED_TREATMENT_HYPOTHESES) || error("Not all linked treatment hypotheses produced finite fits")
+    expected_model_count = length(LINKED_TREATMENT_HYPOTHESES) + length(STROBL_MODEL_VARIANTS)
+    nrow(ranking) == expected_model_count || error("Not all linked treatment and Strobl benchmark hypotheses produced finite fits")
     eligible = ranking[Bool.(ranking.eligible_for_inheritance), :]
     winner = eligible[argmin(eligible.bic), :]
     cached = fit_cache[String(winner.model)]
@@ -771,6 +777,7 @@ function _fit_linked_treatment_joint(
         cached_hypothesis = fit_cache[hypothesis]
         push!(overlay_parts, _linked_overlay(cached_hypothesis.fit, cached_hypothesis.problem, hypothesis))
     end
+    append!(overlay_parts, strobl.overlays)
     overlay = vcat(overlay_parts...; cols = :union)
     free_row = first(ranking[String.(ranking.model) .== "fully_free_context_diagnostic", :])
     free_improvement = Float64(winner.bic) - Float64(free_row.bic)

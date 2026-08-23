@@ -373,6 +373,13 @@ function _fit_untreated_coculture_joint(environments, out; start, max_time_per_f
             end
         end
     end
+    strobl = _fit_strobl_untreated_benchmarks(
+        environments, baselines, datasets, u0, metadata;
+        max_time_per_fit = max_time_per_fit,
+    )
+    append!(rows, strobl.rows)
+    append!(overlays, strobl.overlays)
+    append!(parameter_rows, strobl.parameter_rows)
     ranking = sort!(DataFrame(rows), :bic)
     isempty(ranking) && error("No finite untreated coculture joint fits were produced")
     eligible = ranking[Bool.(ranking.eligible_for_inheritance), :]
