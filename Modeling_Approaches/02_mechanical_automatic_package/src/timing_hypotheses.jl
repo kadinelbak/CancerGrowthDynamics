@@ -268,6 +268,8 @@ function _render_timing_hypothesis_grid(overlay, ranking, out)
     top_models = String.(first(ranking.model, min(3, nrow(ranking))))
     colors = [:royalblue3, :darkorange2, :seagreen4]
     panels = Any[]
+    selected_overlay = overlay[in.(String.(overlay.timing_hypothesis), Ref(top_models)), :]
+    y_limits = _shared_y_limits(selected_overlay)
     for cell_line in ("A2780Naive", "A2780cis"), density in ("20k", "30k"), dose in (0.67, 1.0, 1.47)
         panel_rows = overlay[
             (String.(overlay.cell_line) .== cell_line) .&
@@ -280,6 +282,7 @@ function _render_timing_hypothesis_grid(overlay, ranking, out)
             title = "$(cell_line) $(density), $(label)",
             xlabel = "Time (day)",
             ylabel = "Cell count",
+            ylims = y_limits,
             legend = false,
         )
         observed = panel_rows[String.(panel_rows.timing_hypothesis) .== first(top_models), :]

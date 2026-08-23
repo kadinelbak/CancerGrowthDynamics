@@ -1119,6 +1119,17 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     cis_growth_label = get(REPORT_MODEL_LABELS, cis_growth_model, cis_growth_model)
     naive_growth_equation = get(REPORT_MODEL_EQUATIONS, naive_growth_model, "")
     cis_growth_equation = get(REPORT_MODEL_EQUATIONS, cis_growth_model, "")
+    treated_status_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_pooling_status.csv")
+    treated_status = isfile(treated_status_path) ? CSV.read(treated_status_path, DataFrame) : DataFrame()
+    function selected_treatment_model(cell_line, fallback)
+        isempty(treated_status) && return fallback
+        rows = treated_status[String.(treated_status.cell_line) .== cell_line, :]
+        isempty(rows) ? fallback : String(first(rows.winning_model))
+    end
+    naive_treatment_model = selected_treatment_model("A2780Naive", "joint_ic_effect_hill_ramp_onset")
+    cis_treatment_model = selected_treatment_model("A2780cis", "joint_ic_effect_transit_death")
+    naive_treatment_label = get(REPORT_MODEL_LABELS, naive_treatment_model, naive_treatment_model)
+    cis_treatment_label = get(REPORT_MODEL_LABELS, cis_treatment_model, cis_treatment_model)
 
     stages = [
         (
@@ -1137,7 +1148,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
             ranking = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_model_ranking.csv"),
             by_cell_line = true,
             figure = joinpath(image_root, "monoculture_untreated", "figures", "monoculture_untreated_pooling_model_grid.png"),
-            caption = "Models shown: A2780Naive $(naive_growth_label) and A2780cis $(cis_growth_label), each using its selected density-pooling mode. These are joint 20k/30k untreated fits.",
+            caption = "Models shown: A2780Naive $(naive_growth_label) and A2780cis $(cis_growth_label), each using its selected density-pooling mode. These are joint 20k/30k untreated fits; every panel uses the same y-axis range.",
         ),
         (
             number = 2,
@@ -1159,7 +1170,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
             ranking = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_dose_model_ranking.csv"),
             by_cell_line = true,
             figure = joinpath(image_root, "monoculture_treated", "figures", "monoculture_treated_best_joint_model_by_environment.png"),
-            caption = "Models shown: A2780Naive delayed Hill-ramp treatment and A2780cis sensitive/tolerant treatment, with the selected pooling mode for each lineage. One joint winner is used across both densities and all three doses for each cell line.",
+            caption = "Models shown: A2780Naive $(naive_treatment_label) and A2780cis $(cis_treatment_label), with the selected pooling mode for each lineage. One joint winner is used across both densities and all three doses for each cell line; every panel uses the same y-axis range.",
         ),
         (
             number = 3,
@@ -1178,7 +1189,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
             ranking = joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_model_ranking.csv"),
             by_cell_line = false,
             figure = joinpath(image_root, "coculture_untreated", "figures", "coculture_untreated_best_mechanistic_fit_grid.png"),
-            caption = "Model shown: asymmetric competition with lineage-specific loss using partial_5pct pooling, fitted jointly across 20k/30k and all three starting mixtures.",
+            caption = "Model shown: asymmetric competition with lineage-specific loss using partial_5pct pooling, fitted jointly across 20k/30k and all three starting mixtures. Every panel uses the same y-axis range.",
         ),
         (
             number = 4,
@@ -1198,7 +1209,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
             ranking = joinpath(csv_root, "coculture_treated", "linked_treatment_model_ranking.csv"),
             by_cell_line = false,
             figure = joinpath(image_root, "coculture_treated", "figures", "linked_treatment_coculture_grid.png"),
-            caption = "Model shown: $(get(REPORT_MODEL_LABELS, linked_winner, linked_winner)) with linked_global pooling, fitted across both seeding densities and all mixture environments.",
+            caption = "Model shown: $(get(REPORT_MODEL_LABELS, linked_winner, linked_winner)) with linked_global pooling, fitted across both seeding densities and all mixture environments. Every panel uses the same y-axis range.",
         ),
     ]
 
@@ -1222,7 +1233,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
                 timing_figure_path,
                 report_dir,
                 "Treated monoculture timing hypotheses",
-                "The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is $(get(REPORT_MODEL_LABELS, timing_winner, timing_winner)).",
+                "The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is $(get(REPORT_MODEL_LABELS, timing_winner, timing_winner)); every panel uses the same y-axis range.",
             )
             timing_notation = raw"""
 <div class="notation-key"><h3>Timing-audit notation key</h3><dl>

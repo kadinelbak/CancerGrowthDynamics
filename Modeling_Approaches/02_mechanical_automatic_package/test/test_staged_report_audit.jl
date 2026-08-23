@@ -13,6 +13,11 @@ using DataFrames
     @test count("Simplest candidate", teaching_html) >= 4
     @test occursin("Model shown: asymmetric competition with lineage-specific loss", html)
     @test occursin("Model shown: Load scaling plus tolerant-state shift", html)
+    @test count("same y-axis range", html) == 5
+
+    @test MechanicalAutomaticModeling.FitWorkflows._shared_y_limits(
+        DataFrame(observed = [0.0, 10.0], predicted = [2.0, 20.0]),
+    ) ≈ (0.0, 21.0)
 
     @test occursin("Complete model, BIC, and parameter audit", html)
     appendix_html = last(split(html, "id=\"model-appendix\""))
