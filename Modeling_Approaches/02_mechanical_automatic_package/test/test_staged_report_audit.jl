@@ -20,6 +20,9 @@ using DataFrames
     ) ≈ (0.0, 21.0)
 
     @test occursin("Complete model, BIC, and parameter audit", html)
+    @test occursin("<details class=\"appendix-disclosure\">", html)
+    @test occursin("Show appendix", html)
+    @test !occursin("<details class=\"appendix-disclosure\" open", html)
     appendix_html = last(split(html, "id=\"model-appendix\""))
     @test occursin("<th>BIC</th>", appendix_html)
     @test occursin("<th>Parameters</th>", appendix_html)

@@ -1517,9 +1517,13 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     ]
     push!(sections, """
 <section class="report-appendix" id="model-appendix">
-<div class="stage-heading"><span>Appendix</span><h2>Complete model, BIC, and parameter audit</h2></div>
+<details class="appendix-disclosure">
+<summary><span class="appendix-kicker">Appendix</span><span class="appendix-title">Complete model, BIC, and parameter audit</span><span class="appendix-action" aria-hidden="true"></span></summary>
+<div class="appendix-content">
 <p>This appendix is the archival view. Unlike the teaching tables above, it lists every finite tested candidate, its absolute BIC, Delta BIC, free-parameter count, boundary flag, and complete exported fitted parameter vector. Model IDs restart within each table and match the corresponding Delta-BIC chart.</p>
 $(join(appendix_blocks))
+</div>
+</details>
 </section>
 """)
 
@@ -1566,6 +1570,15 @@ figcaption { color: var(--muted); font-size: 12px; margin-top: 8px; }
 .uncertainty-audit h3 { margin-top: 0; }
 .audit-warning { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--soft); }
 .report-appendix { width: min(1720px, calc(100% - 48px)); }
+.appendix-disclosure { border-top: 3px solid var(--ink); border-bottom: 1px solid var(--line); }
+.appendix-disclosure summary { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 22px 0; cursor: pointer; list-style-position: outside; }
+.appendix-disclosure summary:hover .appendix-title { color: var(--accent); }
+.appendix-disclosure summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; }
+.appendix-kicker { color: var(--accent); font-size: 12px; font-weight: 750; text-transform: uppercase; }
+.appendix-title { font-size: 24px; font-weight: 700; }
+.appendix-action::before { content: "Show appendix"; color: var(--accent); font-size: 13px; font-weight: 700; }
+.appendix-disclosure[open] .appendix-action::before { content: "Hide appendix"; }
+.appendix-content { padding: 0 0 36px; }
 .appendix-table table { min-width: 1260px; }
 .appendix-table td:last-child { min-width: 620px; font-family: Consolas, "Courier New", monospace; font-size: 11px; overflow-wrap: anywhere; }
 .compact-parameters table { min-width: 760px; }
@@ -1609,7 +1622,14 @@ code { font-family: Consolas, "Courier New", monospace; }
   .bic-label { grid-column: 1 / -1; }
   dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .notation-key dl { grid-template-columns: minmax(0, 1fr); }
+  .appendix-disclosure summary { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+  .appendix-kicker { grid-column: 1 / -1; }
+  .appendix-title { font-size: 20px; }
   dd { max-width: 100%; margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; }
+}
+@media print {
+  .appendix-disclosure summary { display: none; }
+  .appendix-content { display: block !important; }
 }
     .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
     .back-home:hover { text-decoration: underline; }

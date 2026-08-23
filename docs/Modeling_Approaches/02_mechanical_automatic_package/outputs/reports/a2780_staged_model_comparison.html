@@ -40,6 +40,15 @@ figcaption { color: var(--muted); font-size: 12px; margin-top: 8px; }
 .uncertainty-audit h3 { margin-top: 0; }
 .audit-warning { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--soft); }
 .report-appendix { width: min(1720px, calc(100% - 48px)); }
+.appendix-disclosure { border-top: 3px solid var(--ink); border-bottom: 1px solid var(--line); }
+.appendix-disclosure summary { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 22px 0; cursor: pointer; list-style-position: outside; }
+.appendix-disclosure summary:hover .appendix-title { color: var(--accent); }
+.appendix-disclosure summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; }
+.appendix-kicker { color: var(--accent); font-size: 12px; font-weight: 750; text-transform: uppercase; }
+.appendix-title { font-size: 24px; font-weight: 700; }
+.appendix-action::before { content: "Show appendix"; color: var(--accent); font-size: 13px; font-weight: 700; }
+.appendix-disclosure[open] .appendix-action::before { content: "Hide appendix"; }
+.appendix-content { padding: 0 0 36px; }
 .appendix-table table { min-width: 1260px; }
 .appendix-table td:last-child { min-width: 620px; font-family: Consolas, "Courier New", monospace; font-size: 11px; overflow-wrap: anywhere; }
 .compact-parameters table { min-width: 760px; }
@@ -83,7 +92,14 @@ code { font-family: Consolas, "Courier New", monospace; }
   .bic-label { grid-column: 1 / -1; }
   dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .notation-key dl { grid-template-columns: minmax(0, 1fr); }
+  .appendix-disclosure summary { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+  .appendix-kicker { grid-column: 1 / -1; }
+  .appendix-title { font-size: 20px; }
   dd { max-width: 100%; margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; }
+}
+@media print {
+  .appendix-disclosure summary { display: none; }
+  .appendix-content { display: block !important; }
 }
     .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
     .back-home:hover { text-decoration: underline; }
@@ -477,7 +493,9 @@ code { font-family: Consolas, "Courier New", monospace; }
 </section>
 
 <section class="report-appendix" id="model-appendix">
-<div class="stage-heading"><span>Appendix</span><h2>Complete model, BIC, and parameter audit</h2></div>
+<details class="appendix-disclosure">
+<summary><span class="appendix-kicker">Appendix</span><span class="appendix-title">Complete model, BIC, and parameter audit</span><span class="appendix-action" aria-hidden="true"></span></summary>
+<div class="appendix-content">
 <p>This appendix is the archival view. Unlike the teaching tables above, it lists every finite tested candidate, its absolute BIC, Delta BIC, free-parameter count, boundary flag, and complete exported fitted parameter vector. Model IDs restart within each table and match the corresponding Delta-BIC chart.</p>
 <h3>Stage 1 untreated monoculture: A2780Naive</h3><div class="table-wrap appendix-table"><table><thead><tr><th>ID</th><th>Model</th><th>Code</th><th>Pooling</th><th>BIC</th><th>delta_BIC</th><th>Free_parameters</th><th>Boundary_issue</th><th>Parameters</th></tr></thead><tbody><tr><td>M1</td><td>Baranyi-adjusted theta-logistic growth</td><td>baranyi_theta_logistic_growth</td><td>partial_5pct</td><td>-177.559</td><td>0.0</td><td>6</td><td>true</td><td>20k: r=2.058304; 30k: r=1.889844; 20k: K=4102.681; 30k: K=4033.277; 20k: theta=0.3078701; 30k: theta=0.3078701; 20k: q0=0.391724; 30k: q0=0.391724</td></tr>
 <tr><td>M2</td><td>Theta-logistic growth</td><td>theta_logistic_growth</td><td>partial_5pct</td><td>-177.493</td><td>0.066</td><td>5</td><td>true</td><td>20k: r=1.153576; 30k: r=1.046668; 20k: K=4096.795; 30k: K=4015.951; 20k: theta=0.5969006; 30k: theta=0.5969006</td></tr>
@@ -598,6 +616,8 @@ code { font-family: Consolas, "Courier New", monospace; }
 <tr><td>M7</td><td>Competitor-scaled drug effect</td><td>competitor_scaled</td><td>linked_global</td><td>-1030.554</td><td>115.204</td><td>13</td><td>false</td><td>(names = [:naive_emax, :naive_ec50_effect, :naive_hill_n, :naive_lambda, :naive_log_contrast_density, :cis_emax_sensitive, :cis_emax_tolerant, :cis_f_tolerant0, :cis_log_contrast_density, :naive_t_onset, :cis_t_onset, :beta_naive, :beta_cis], values = [4.749998181075486, 1.2371153274372835, 2.4063155941268928, 0.5213041532846023, -0.04879016416943182, 4.999999999997769, 0.3168917154709768, 0.5860743149306995, 0.02336763848869534, 2.4563286522549754, 6.9998313659627485, -2.4253753636006623, -0.6579926353577092], package_api = &quot;GrowthParameterEstimation.run_joint_fit&quot;)</td></tr>
 <tr><td>M8</td><td>Strict drug-effect inheritance</td><td>strict_inheritance</td><td>linked_global</td><td>-971.071</td><td>174.687</td><td>11</td><td>false</td><td>(names = [:naive_emax, :naive_ec50_effect, :naive_hill_n, :naive_lambda, :naive_log_contrast_density, :cis_emax_sensitive, :cis_emax_tolerant, :cis_f_tolerant0, :cis_log_contrast_density, :naive_t_onset, :cis_t_onset], values = [4.749998181075486, 1.2805114683675034, 2.457037970454268, 0.5066770650361648, -0.04879016416943182, 4.749824790198794, 0.3256845768406515, 0.5830537081402035, 0.02300286266621822, 2.334033448869393, 6.986015141806381], package_api = &quot;GrowthParameterEstimation.run_joint_fit&quot;)</td></tr>
 <tr><td>M9</td><td>Coculture tolerant-state shift</td><td>tolerant_context_shift</td><td>linked_global</td><td>-943.377</td><td>202.38</td><td>13</td><td>false</td><td>(names = [:naive_emax, :naive_ec50_effect, :naive_hill_n, :naive_lambda, :naive_log_contrast_density, :cis_emax_sensitive, :cis_emax_tolerant, :cis_f_tolerant0, :cis_log_contrast_density, :naive_t_onset, :cis_t_onset, :log_cis_tolerant_context, :cis_tolerant_logit_shift], values = [4.749998181075486, 1.2467853796688604, 2.3850939052464373, 0.5079273341424622, -0.0487881642850185, 4.749824790198794, 0.3184354235971886, 0.5736463212006004, 0.02344034588352751, 2.4304225994586015, 6.885738621195099, 0.43040862152516723, 2.9707511305743513], package_api = &quot;GrowthParameterEstimation.run_joint_fit&quot;)</td></tr></tbody></table></div>
+</div>
+</details>
 </section>
 
 </body>
