@@ -757,6 +757,13 @@ const REPORT_MODEL_LABELS = Dict(
     "lv_symmetric_competition" => "Symmetric competition",
     "lv_asymmetric_competition" => "Asymmetric competition",
     "lv_asymmetric_competition_death" => "Asymmetric competition with death",
+    "strobl_birth_no_cost_no_turnover" => "Strobl birth model: no cost or turnover",
+    "strobl_birth_growth_cost_only" => "Strobl birth model: growth cost only",
+    "strobl_birth_turnover_only" => "Strobl birth model: turnover only",
+    "strobl_birth_growth_cost_turnover" => "Strobl birth model: growth cost and turnover",
+    "strobl_birth_capacity_cost_turnover" => "Strobl birth model: carrying-capacity cost",
+    "strobl_birth_death_cost_turnover" => "Strobl birth model: death cost",
+    "strobl_density_dependent_death" => "Strobl density-dependent-death model",
     "strict_inheritance" => "Strict drug-effect inheritance",
     "competitor_scaled" => "Competitor-scaled drug effect",
     "load_scaled" => "Total-load-scaled drug effect",
@@ -787,6 +794,13 @@ const REPORT_MODEL_EQUATIONS = Dict(
     "lv_symmetric_competition" => raw"\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha C),\quad \frac{dC}{dt}=G_C(C,C+\alpha N)\)",
     "lv_asymmetric_competition" => raw"\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C),\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)\)",
     "lv_asymmetric_competition_death" => raw"\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C)-d_NN,\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)-d_CC\)",
+    "strobl_birth_no_cost_no_turnover" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S,\quad \dot R=r_S\!\left(1-\frac{S+R}{K}\right)R\)",
+    "strobl_birth_growth_cost_only" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S,\quad \dot R=(1-c)r_S\!\left(1-\frac{S+R}{K}\right)R\)",
+    "strobl_birth_turnover_only" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S-d_TS,\quad \dot R=r_S\!\left(1-\frac{S+R}{K}\right)R-d_TR\)",
+    "strobl_birth_growth_cost_turnover" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S-d_TS,\quad \dot R=(1-c)r_S\!\left(1-\frac{S+R}{K}\right)R-d_TR\)",
+    "strobl_birth_capacity_cost_turnover" => raw"\(\displaystyle K_S=K,\ K_R=(1-c)K,\quad \dot X_i=r_i\!\left(1-\frac{S+R}{K_i}\right)X_i-d_iX_i\)",
+    "strobl_birth_death_cost_turnover" => raw"\(\displaystyle d_S=d_T,\ d_R=(1+c)d_T,\quad \dot X_i=r_i\!\left(1-\frac{S+R}{K}\right)X_i-d_iX_i\)",
+    "strobl_density_dependent_death" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S-d_T^{\dagger}\frac{S+R}{K}S,\quad \dot R=(1-c)r_SR-d_T^{\dagger}\frac{S+R}{K}R\)",
     "strict_inheritance" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-E_i^{\mathrm{mono}}(t,z)X_i\)",
     "competitor_scaled" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-e^{\beta_i\alpha_{ij}X_j/K_i}E_i^{\mathrm{mono}}(t,z)X_i\)",
     "load_scaled" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-e^{\beta_iL_i/K_i}E_i^{\mathrm{mono}}(t,z)X_i\)",
@@ -830,16 +844,26 @@ function _report_display_rows(df::DataFrame; limit::Int = 5)
 end
 
 function _report_ranking_table(df::DataFrame; display_subset::Bool = true)
+    all_ranked = _report_ranked_rows(df)
     ranked = display_subset ? _report_display_rows(df) : _report_ranked_rows(df)
     model_names = String.(ranked.model)
     ranks = Int.(ranked.report_rank)
     pooling = :pooling_mode in propertynames(ranked) ? String.(ranked.pooling_mode) : fill("", nrow(ranked))
     counts = [_report_parameter_count(row) for row in eachrow(ranked)]
-    all_counts = [_report_parameter_count(row) for row in eachrow(_report_ranked_rows(df))]
+    all_counts = [_report_parameter_count(row) for row in eachrow(all_ranked)]
     simplest_count = minimum(all_counts)
-    roles = [rank == 1 && count == simplest_count ? "Winner; simplest" :
-        (rank == 1 ? "Winner" : (count == simplest_count ? "Simplest candidate" : "Leading candidate"))
-        for (rank, count) in zip(ranks, counts)]
+    eligible_mask = :eligible_for_inheritance in propertynames(all_ranked) ?
+        [value !== missing && Bool(value) for value in all_ranked.eligible_for_inheritance] : trues(nrow(all_ranked))
+    selected_rank = any(eligible_mask) ? minimum(Int.(all_ranked.report_rank[eligible_mask])) : 1
+    diagnostics = [
+        (:diagnostic_model in propertynames(row) && row.diagnostic_model !== missing && Bool(row.diagnostic_model)) ||
+        (:eligible_for_inheritance in propertynames(row) && row.eligible_for_inheritance !== missing && !Bool(row.eligible_for_inheritance))
+        for row in eachrow(ranked)
+    ]
+    roles = [diagnostic ? (count == simplest_count ? "Literature/diagnostic benchmark; simplest" : "Literature/diagnostic benchmark") :
+        (rank == selected_rank && count == simplest_count ? "Selected for inheritance; simplest" :
+        (rank == selected_rank ? "Selected for inheritance" : (count == simplest_count ? "Simplest candidate" : "Leading candidate")))
+        for (rank, count, diagnostic) in zip(ranks, counts, diagnostics)]
     return DataFrame(
         ID = ["M$(rank)" for rank in ranks],
         Model = [get(REPORT_MODEL_LABELS, model, model) for model in model_names],
@@ -1469,6 +1493,11 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <p>Each lineage can affect the other differently.</p>
     <p class="equation-label"><strong>Asymmetric competition plus death</strong></p><div class="math">\\[\\frac{dN}{dt}=G_N(L_N)-d_NN,\\qquad \\frac{dC}{dt}=G_C(L_C)-d_CC\\]</div>
     <p>Adds lineage-specific loss beyond competitive growth suppression. This is the selected Stage 3 model. All six density/mix environments are fitted together.</p>
+    <p class="equation-label"><strong>Strobl density-dependent-birth family</strong></p><div class="math">\\[\\frac{dS}{dt}=r_S\\left(1-\\frac{S+R}{K_S}\\right)\\left(1-\\frac{2d_DD(t)}{D_{\\max}}\\right)S-d_SS,\\qquad \\frac{dR}{dt}=r_R\\left(1-\\frac{S+R}{K_R}\\right)R-d_RR\\]</div>
+    <p>The four main-paper reductions test neither cost nor turnover, growth cost only, turnover only, and growth cost plus turnover. The supplementary variants place the same relative cost in resistant carrying capacity, \\(K_R=(1-c)K\\), or resistant death, \\(d_R=(1+c)d_T\\). For untreated Stage 3, \\(D(t)=0\\).</p>
+    <p class="equation-label"><strong>Strobl density-dependent-death alternative</strong></p><div class="math">\\[\\frac{dS}{dt}=r_S\\left(1-\\frac{2d_DD(t)}{D_{\\max}}\\right)S-d_T^{\\dagger}\\frac{S+R}{K}S,\\qquad \\frac{dR}{dt}=r_RR-d_T^{\\dagger}\\frac{S+R}{K}R\\]</div>
+    <p>This supplementary model moves density regulation from proliferation to death. It is fitted as a diagnostic because the paper's \\(S/R\\) phenotypes are mapped here to two separately measured A2780 cell lines. The mapping is useful as a structural benchmark but is not proof that the lines are interchangeable with within-tumor sensitive and resistant phenotypes.</p>
+    <p><strong>Primary sources:</strong> <a href="$(FitWorkflows.STROBL_REFERENCE_URL)">Strobl et al. main paper</a>, <a href="$(FitWorkflows.STROBL_SUPPLEMENT_URL)">mathematical supplement</a>, and <a href="https://github.com/MathOnco/AT_costOfResistance_LVModel">authors' fitting code</a>. The report preserves the published equation structures; A2780-specific parameter estimates are refitted against this experiment.</p>
   </article>
   <article class="model-family">
     <h3>Stage 4: linked treated-coculture hypotheses</h3>
@@ -1490,6 +1519,8 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <p>Adds one bounded phenotype-specific growth-plasticity multiplier to the preceding model. This is the selected Stage 4 mechanism; BIC pays for the additional fitted parameter.</p>
     <p class="equation-label"><strong>Fully free context diagnostic</strong></p><div class="math">\\[\\mathbf q_{\\mathrm{drug}}^{\\mathrm{co}}\\ne\\mathbf q_{\\mathrm{drug}}^{\\mathrm{mono}}\\]</div>
     <p>Fits separate complete drug vectors by context. It tests whether inheritance fails, but is deliberately diagnostic because it gives up mechanistic sharing.</p>
+    <p class="equation-label"><strong>Strobl linked-treatment benchmarks</strong></p><div class="math">\\[\\bar D(t)=\\frac{D(t)}{D_{\\max}},\\qquad \\text{drug modifies sensitive-cell proliferation by }1-2d_D\\bar D(t)\\]</div>
+    <p>Each Strobl variant is also fitted to the identical 24-trajectory Stage 4 objective. Physical cisplatin concentrations are normalized by the largest measured dose, 1.47 uM; \\(d_D\\) is refitted for A2780 rather than copied from the prostate-cancer parameterization. A2780cis receives no direct drug term because the paper defines \\(R\\) as fully resistant. This is a stringent, low-parameter benchmark and may fit poorly if A2780cis retains measurable cisplatin response.</p>
     <p><strong>Important:</strong> Stage 4 does not attach an arbitrary coefficient to every term. Growth and untreated interaction parameters are fixed from earlier stages, and the Stage 2 drug vector is restricted to a plus-or-minus five-percent inheritance window. Candidate-specific context terms are counted in BIC, and the fully free context vector remains diagnostic only.</p>
   </article>
 

@@ -2654,6 +2654,7 @@ function run_condition_fit!(
 end
 
 include("coculture_joint.jl")
+include("strobl_models.jl")
 include("linked_treatment_joint.jl")
 include("timing_hypotheses.jl")
 
