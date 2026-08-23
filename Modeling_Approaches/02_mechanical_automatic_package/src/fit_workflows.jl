@@ -22,6 +22,17 @@ const THETA_UNTREATED_MODELS = Set([
 ])
 const PRIMARY_UNTREATED_MODELS = union(Set(["logistic_growth", "gompertz_growth"]), THETA_UNTREATED_MODELS)
 
+function _shared_y_limits(df::DataFrame; columns = (:observed, :predicted), headroom::Float64 = 0.05)
+    values = Float64[]
+    for column in columns
+        column in propertynames(df) || continue
+        append!(values, Float64(value) for value in df[!, column]
+            if value !== missing && isfinite(Float64(value)) && abs(Float64(value)) < 1e11)
+    end
+    upper = isempty(values) ? 1.0 : max(maximum(values), 1.0)
+    return (0.0, upper * (1 + headroom))
+end
+
 # ---------------------------------------------------------------------------
 # Untreated baseline loading
 # ---------------------------------------------------------------------------
@@ -1231,6 +1242,7 @@ function _render_treated_pooling_graph_grid(overlay::DataFrame, status::DataFram
     isempty(overlay) && return nothing
     panels = Any[]
     best_parts = DataFrame[]
+    y_limits = _shared_y_limits(overlay)
     cell_lines = sort(unique(String.(overlay.cell_line)); by = cell -> occursin("naive", lowercase(cell)) ? 1 : 2)
     for cell_line in cell_lines
         status_row = status[String.(status.cell_line) .== cell_line, :]
@@ -1265,6 +1277,7 @@ function _render_treated_pooling_graph_grid(overlay::DataFrame, status::DataFram
                     titlefontsize = 8,
                     xlabel = "Time (day)",
                     ylabel = dose_index == 1 ? "Cell count" : "",
+                    ylims = y_limits,
                     legend = false,
                 )
                 scatter!(panel, observed.time, observed.observed; color = :black, ms = 3.5, markerstrokewidth = 0, label = "")
@@ -2035,6 +2048,7 @@ function _render_untreated_pooling_graph_grid(overlay::DataFrame, top5::DataFram
     isempty(overlay) && return nothing
     palette_values = Plots.palette(:tab10)
     panels = Any[]
+    y_limits = _shared_y_limits(overlay)
     for cell_line in sort(unique(String.(overlay.cell_line)); by = cell -> occursin("naive", lowercase(cell)) ? 1 : 2)
         selected = top5[String.(top5.cell_line) .== cell_line, :]
         combinations = [(String(row.model), String(row.pooling_mode)) for row in eachrow(selected)]
@@ -2052,6 +2066,7 @@ function _render_untreated_pooling_graph_grid(overlay::DataFrame, top5::DataFram
                 titlefontsize = 10,
                 xlabel = "Time (day)",
                 ylabel = "Cell count",
+                ylims = y_limits,
                 legend = :bottomright,
                 legendfontsize = 7,
             )

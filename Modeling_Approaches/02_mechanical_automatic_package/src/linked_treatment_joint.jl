@@ -549,9 +549,10 @@ end
 function _render_linked_coculture_grid(overlay, winner, out)
     selected = overlay[(String.(overlay.model) .== String(winner.model)) .& (String.(overlay.context) .== "coculture"), :]
     panels = Any[]
+    y_limits = _shared_y_limits(selected)
     for density in ("20k", "30k"), mix in ("25-75", "50-50", "75-25")
         environment = selected[(String.(selected.density) .== density) .& (String.(selected.mix) .== mix), :]
-        panel = plot(title = "$(density), mix $(mix)", titlefontsize = 9, xlabel = "Time (day)", ylabel = mix == "25-75" ? "Measured population" : "", legend = density == "20k" && mix == "75-25" ? :outertopright : false, legendfontsize = 8)
+        panel = plot(title = "$(density), mix $(mix)", titlefontsize = 9, xlabel = "Time (day)", ylabel = mix == "25-75" ? "Measured population" : "", ylims = y_limits, legend = density == "20k" && mix == "75-25" ? :outertopright : false, legendfontsize = 8)
         for (component, color) in (("sensitive", :crimson), ("resistant", :steelblue))
             rows = environment[String.(environment.component) .== component, :]
             sort!(rows, :time)

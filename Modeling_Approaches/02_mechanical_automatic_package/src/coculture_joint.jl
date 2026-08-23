@@ -795,6 +795,7 @@ function _render_coculture_graph_grid(overlay::DataFrame, winner, out, condition
         :,
     ]
     panels = Any[]
+    y_limits = _shared_y_limits(selected)
     for density in ("20k", "30k"), mix in ("25-75", "50-50", "75-25")
         environment = selected[(String.(selected.density) .== density) .& (String.(selected.mix) .== mix), :]
         isempty(environment) && continue
@@ -803,6 +804,7 @@ function _render_coculture_graph_grid(overlay::DataFrame, winner, out, condition
             titlefontsize = 10,
             xlabel = "Time (day)",
             ylabel = mix == "25-75" ? "Measured population" : "",
+            ylims = y_limits,
             legend = density == "20k" && mix == "75-25" ? :outertopright : false,
             legendfontsize = 8,
         )

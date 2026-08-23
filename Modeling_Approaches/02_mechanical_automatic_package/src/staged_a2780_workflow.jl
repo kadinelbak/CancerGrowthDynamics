@@ -7,6 +7,7 @@ using Dates
 using JSON3
 using OrdinaryDiffEq
 using Plots
+using Random
 using Statistics
 
 using ..IOUtils
@@ -797,46 +798,247 @@ const REPORT_MODEL_EQUATIONS = Dict(
     "fully_free_context_diagnostic" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-E_i^{\mathrm{co}}(t,z)X_i,\quad \mathbf q_{\mathrm{drug}}^{\mathrm{co}}\ne\mathbf q_{\mathrm{drug}}^{\mathrm{mono}}\)",
 )
 
-function _report_ranking_table(df::DataFrame)
+function _report_parameter_count(row)
+    for column in (:n_parameters, :parameter_count)
+        column in propertynames(row) || continue
+        value = row[column]
+        value === missing && continue
+        parsed = tryparse(Int, string(value))
+        parsed === nothing || return parsed
+    end
+    return typemax(Int)
+end
+
+function _report_ranked_rows(df::DataFrame)
     valid = [_is_valid_metric(value) && abs(Float64(value)) < 1e11 for value in df.bic]
     ranked = copy(df[valid, :])
-    rank_column = :rank_within_cell_line in propertynames(ranked) ? :rank_within_cell_line :
-        (:rank in propertynames(ranked) ? :rank : nothing)
-    rank_column === nothing ? sort!(ranked, :bic) : sort!(ranked, rank_column)
+    sort!(ranked, :bic)
+    ranked[!, :report_rank] = collect(1:nrow(ranked))
+    ranked[!, :report_delta_bic] = Float64.(ranked.bic) .- minimum(Float64.(ranked.bic))
+    return ranked
+end
+
+function _report_display_rows(df::DataFrame; limit::Int = 5)
+    ranked = _report_ranked_rows(df)
+    isempty(ranked) && return ranked
+    shown_indices = collect(1:min(limit, nrow(ranked)))
+    counts = [_report_parameter_count(row) for row in eachrow(ranked)]
+    simplest_count = minimum(counts)
+    simplest_index = findfirst(==(simplest_count), counts)
+    simplest_index in shown_indices || push!(shown_indices, simplest_index)
+    return ranked[shown_indices, :]
+end
+
+function _report_ranking_table(df::DataFrame; display_subset::Bool = true)
+    ranked = display_subset ? _report_display_rows(df) : _report_ranked_rows(df)
     model_names = String.(ranked.model)
-    ranks = rank_column === nothing ? collect(1:nrow(ranked)) : Int.(ranked[!, rank_column])
+    ranks = Int.(ranked.report_rank)
     pooling = :pooling_mode in propertynames(ranked) ? String.(ranked.pooling_mode) : fill("", nrow(ranked))
-    delta_bic = :delta_bic in propertynames(ranked) ? round.(Float64.(ranked.delta_bic); digits = 3) :
-        round.(Float64.(ranked.bic) .- minimum(Float64.(ranked.bic)); digits = 3)
+    counts = [_report_parameter_count(row) for row in eachrow(ranked)]
+    all_counts = [_report_parameter_count(row) for row in eachrow(_report_ranked_rows(df))]
+    simplest_count = minimum(all_counts)
+    roles = [rank == 1 && count == simplest_count ? "Winner; simplest" :
+        (rank == 1 ? "Winner" : (count == simplest_count ? "Simplest candidate" : "Leading candidate"))
+        for (rank, count) in zip(ranks, counts)]
     return DataFrame(
-        Rank = ranks,
+        ID = ["M$(rank)" for rank in ranks],
         Model = [get(REPORT_MODEL_LABELS, model, model) for model in model_names],
         Pooling = pooling,
         Equation = [get(REPORT_MODEL_EQUATIONS, model, "See the model source and CSV parameter artifact") for model in model_names],
-        BIC = round.(Float64.(ranked.bic); digits = 3),
-        delta_BIC = delta_bic,
+        delta_BIC = round.(Float64.(ranked.report_delta_bic); digits = 3),
+        Role = roles,
     )
 end
 
-function _report_top_five_html(path::AbstractString; by_cell_line::Bool = false)
+function _report_bic_plot_html(df::DataFrame; title::AbstractString = "Model comparison")
+    shown = _report_display_rows(df)
+    isempty(shown) && return ""
+    max_delta = maximum(Float64.(shown.report_delta_bic))
+    rows = String[]
+    for row in eachrow(shown)
+        delta = Float64(row.report_delta_bic)
+        width = max_delta > 0 ? max(1.5, 100 * delta / max_delta) : 1.5
+        label = get(REPORT_MODEL_LABELS, String(row.model), String(row.model))
+        push!(rows, """<div class="bic-row"><div class="bic-label"><strong>M$(row.report_rank)</strong><span>$(_html_escape(label))</span></div><div class="bic-track"><span class="bic-bar" style="width:$(round(width; digits=2))%"></span></div><output>$(round(delta; digits=2))</output></div>""")
+    end
+    return """<figure class="bic-figure"><h4>$(_html_escape(title)): Delta BIC</h4><div class="bic-axis" aria-label="$(_html_escape(title)) Delta BIC bar plot">$(join(rows))</div><figcaption>Horizontal bars show Delta BIC relative to M1 within this table. Shorter is better; M1 is zero by definition.</figcaption></figure>"""
+end
+
+function _report_top_five_html(path::AbstractString; by_cell_line::Bool = false, label::AbstractString = "Model comparison")
     isfile(path) || return "<p class=\"missing\">Ranking CSV not found: $(_html_escape(path))</p>"
     ranking = CSV.read(path, DataFrame)
     if by_cell_line && :cell_line in propertynames(ranking)
         blocks = String[]
         for group in groupby(ranking, :cell_line; sort = true)
             cell_line = String(first(group.cell_line))
+            group_df = DataFrame(group)
             push!(blocks, "<h3>$(_html_escape(cell_line))</h3><div class=\"table-wrap\">" *
-                _table_html(first(_report_ranking_table(DataFrame(group)), 5); limit = 5) * "</div>")
+                _table_html(_report_ranking_table(group_df); limit = 6) * "</div>" *
+                _report_bic_plot_html(group_df; title = "$(label), $(cell_line)"))
         end
         return join(blocks, "\n")
     end
-    return "<div class=\"table-wrap\">" * _table_html(first(_report_ranking_table(ranking), 5); limit = 5) * "</div>"
+    return "<div class=\"table-wrap\">" * _table_html(_report_ranking_table(ranking); limit = 6) * "</div>" *
+        _report_bic_plot_html(ranking; title = label)
 end
 
 function _report_stage_figure(path::AbstractString, report_dir::AbstractString, alt::AbstractString, caption::AbstractString)
     isfile(path) || return "<p class=\"missing\">Graph not found: $(_html_escape(path))</p>"
     relative_path = replace(relpath(path, report_dir), "\\" => "/")
     return "<figure><img src=\"$relative_path\" alt=\"$(_html_escape(alt))\"><figcaption>$(_html_escape(caption))</figcaption></figure>"
+end
+
+function _percentile(values::Vector{Float64}, probability::Float64)
+    isempty(values) && return NaN
+    sorted = sort(values)
+    index = clamp(ceil(Int, probability * length(sorted)), 1, length(sorted))
+    return sorted[index]
+end
+
+function _treated_coculture_endpoint_bootstrap(csv_root::AbstractString, winner::AbstractString; n_bootstrap::Int = 5000, seed::Int = 4040)
+    decoded_path = joinpath(csv_root, "coculture_treated", "coculture_treated_a2780_decoded.csv")
+    overlay_path = joinpath(csv_root, "coculture_treated", "figures", "linked_treatment_combined_overlays.csv")
+    isfile(decoded_path) && isfile(overlay_path) || return DataFrame()
+    decoded = CSV.read(decoded_path, DataFrame)
+    wells = filter(row -> occursin("_well_day_averages", String(row.source_file)), decoded)
+    isempty(wells) && return DataFrame()
+    endpoint_day = maximum(Float64.(wells.time))
+    endpoint = wells[Float64.(wells.time) .== endpoint_day, :]
+    overlay = CSV.read(overlay_path, DataFrame)
+    selected = overlay[(String.(overlay.model) .== winner) .&
+        (String.(overlay.context) .== "coculture") .&
+        (Float64.(overlay.time) .== endpoint_day), :]
+    rng = MersenneTwister(seed)
+    rows = NamedTuple[]
+    for group in groupby(endpoint, [:density, :mix, :cell_line]; sort = true)
+        values = Float64.(group.count)
+        samples = [mean(rand(rng, values, length(values))) for _ in 1:n_bootstrap]
+        lineage = String(first(group.cell_line))
+        component = lineage == "A2780Naive" ? "sensitive" : "resistant"
+        prediction_rows = selected[(String.(selected.density) .== String(first(group.density))) .&
+            (String.(selected.mix) .== String(first(group.mix))) .&
+            (String.(selected.component) .== component), :]
+        prediction = isempty(prediction_rows) ? NaN : Float64(first(prediction_rows.predicted))
+        lower = _percentile(samples, 0.025)
+        upper = _percentile(samples, 0.975)
+        push!(rows, (
+            density = String(first(group.density)),
+            mix = String(first(group.mix)),
+            lineage = lineage,
+            endpoint_day = endpoint_day,
+            n_wells = length(values),
+            observed_mean = mean(values),
+            ci95_lower = lower,
+            ci95_upper = upper,
+            model_prediction = prediction,
+            model_within_observed_ci95 = isfinite(prediction) && lower <= prediction <= upper,
+            bootstrap_method = "nonparametric well-resampling within condition",
+            n_bootstrap = n_bootstrap,
+            seed = seed,
+        ))
+    end
+    result = DataFrame(rows)
+    CSV.write(joinpath(csv_root, "coculture_treated", "linked_treatment_endpoint_bootstrap.csv"), result)
+    return result
+end
+
+function _endpoint_bootstrap_html(endpoint::DataFrame, winner::AbstractString)
+    isempty(endpoint) && return "<p class=\"missing\">Endpoint bootstrap could not be generated.</p>"
+    shown = select(endpoint,
+        :density => :Density,
+        :mix => :Mix,
+        :lineage => :Lineage,
+        :n_wells => :Wells,
+        :observed_mean => ByRow(x -> round(x; digits = 1)) => :Observed_mean,
+        :ci95_lower => ByRow(x -> round(x; digits = 1)) => :CI95_lower,
+        :ci95_upper => ByRow(x -> round(x; digits = 1)) => :CI95_upper,
+        :model_prediction => ByRow(x -> round(x; digits = 1)) => :Model_prediction,
+        :model_within_observed_ci95 => :Prediction_inside_CI)
+    return """
+<div class="uncertainty-audit">
+<h3>Day-$(Int(first(endpoint.endpoint_day))) endpoint bootstrap: 95% confidence intervals</h3>
+<p>For each density, mixture, and lineage, the six well-level endpoint measurements were resampled with replacement 5,000 times. The interval is the 2.5th to 97.5th percentile of the bootstrapped well mean. The separately exported aggregate row was excluded, preventing double-counting. The selected <code>$(_html_escape(winner))</code> prediction is shown for comparison.</p>
+<div class="table-wrap">$(_table_html(shown; limit = nrow(shown)))</div>
+<p class="audit-warning"><strong>Interpretation limit:</strong> these are confidence intervals for the observed endpoint mean, not confidence intervals for every fitted parameter and not proof that the latent sensitive/tolerant mechanism is identifiable.</p>
+</div>
+"""
+end
+
+function _linked_sensitivity_html(csv_root::AbstractString)
+    path = joinpath(csv_root, "coculture_treated", "linked_treatment_identifiability.csv")
+    isfile(path) || return ""
+    sensitivity = CSV.read(path, DataFrame)
+    shown = select(sensitivity,
+        :parameter => :Parameter,
+        :estimate => ByRow(x -> round(Float64(x); sigdigits = 5)) => :Estimate,
+        :lower_bound => ByRow(x -> round(Float64(x); sigdigits = 5)) => :Lower_bound,
+        :upper_bound => ByRow(x -> round(Float64(x); sigdigits = 5)) => :Upper_bound,
+        :bound_position => ByRow(x -> round(Float64(x); digits = 3)) => :Bound_position,
+        :identifiability => :Profile_status)
+    return """
+<div class="uncertainty-audit">
+<h3>GrowthParameterEstimation two-sided sensitivity and bound profile</h3>
+<p>The winning linked fit was passed through <code>profile_joint_fit_bounds_two_sided</code>. Each fitted dimension is challenged toward both bounds and classified by its position in the accepted interval. A value near 0 or 1 indicates that the optimum remains close to a bound and is practically weakly identified on that side.</p>
+<div class="table-wrap compact-parameters">$(_table_html(shown; limit = nrow(shown)))</div>
+</div>
+"""
+end
+
+function _structured_parameter_summary(parameter_df::DataFrame, row)
+    isempty(parameter_df) && return nothing
+    mask = trues(nrow(parameter_df))
+    if :model in propertynames(parameter_df) && :model in propertynames(row)
+        mask .&= String.(parameter_df.model) .== String(row.model)
+    elseif :timing_hypothesis in propertynames(parameter_df) && :model in propertynames(row)
+        mask .&= String.(parameter_df.timing_hypothesis) .== String(row.model)
+    end
+    for column in (:cell_line, :pooling_mode)
+        column in propertynames(parameter_df) && column in propertynames(row) || continue
+        mask .&= String.(parameter_df[!, column]) .== String(row[column])
+    end
+    selected = parameter_df[mask, :]
+    isempty(selected) && return nothing
+    value_column = :effective_value in propertynames(selected) ? :effective_value :
+        (:estimate in propertynames(selected) ? :estimate : nothing)
+    value_column === nothing && return nothing
+    entries = String[]
+    for parameter_row in eachrow(selected)
+        density = :density in propertynames(parameter_row) ? "$(parameter_row.density): " : ""
+        value = round(Float64(parameter_row[value_column]); sigdigits = 7)
+        push!(entries, "$(density)$(parameter_row.parameter)=$(value)")
+    end
+    return join(entries, "; ")
+end
+
+function _appendix_ranking_html(path::AbstractString; title::AbstractString, by_cell_line::Bool = false, parameter_path::Union{Nothing,AbstractString} = nothing)
+    isfile(path) || return ""
+    ranking = CSV.read(path, DataFrame)
+    parameter_df = parameter_path !== nothing && isfile(parameter_path) ? CSV.read(parameter_path, DataFrame) : DataFrame()
+    groups = by_cell_line && :cell_line in propertynames(ranking) ? groupby(ranking, :cell_line; sort = true) : [ranking]
+    blocks = String[]
+    for group in groups
+        group_df = DataFrame(group)
+        ranked = _report_ranked_rows(group_df)
+        pooling = :pooling_mode in propertynames(ranked) ? String.(ranked.pooling_mode) : fill("", nrow(ranked))
+        boundary = :boundary_issue in propertynames(ranked) ? string.(ranked.boundary_issue) : fill("", nrow(ranked))
+        fallback_params = :params in propertynames(ranked) ? String.(ranked.params) : fill("Not exported", nrow(ranked))
+        params = [something(_structured_parameter_summary(parameter_df, row), fallback)
+            for (row, fallback) in zip(eachrow(ranked), fallback_params)]
+        appendix = DataFrame(
+            ID = ["M$(rank)" for rank in ranked.report_rank],
+            Model = [get(REPORT_MODEL_LABELS, String(model), String(model)) for model in ranked.model],
+            Code = String.(ranked.model),
+            Pooling = pooling,
+            BIC = round.(Float64.(ranked.bic); digits = 3),
+            delta_BIC = round.(Float64.(ranked.report_delta_bic); digits = 3),
+            Free_parameters = [_report_parameter_count(row) for row in eachrow(ranked)],
+            Boundary_issue = boundary,
+            Parameters = params,
+        )
+        suffix = by_cell_line ? ": $(String(first(group_df.cell_line)))" : ""
+        push!(blocks, "<h3>$(_html_escape(title * suffix))</h3><div class=\"table-wrap appendix-table\">$(_table_html(appendix; limit = nrow(appendix)))</div>")
+    end
+    return join(blocks)
 end
 
 function _report_stage4_expanded_equations_html()
@@ -917,6 +1119,17 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     cis_growth_label = get(REPORT_MODEL_LABELS, cis_growth_model, cis_growth_model)
     naive_growth_equation = get(REPORT_MODEL_EQUATIONS, naive_growth_model, "")
     cis_growth_equation = get(REPORT_MODEL_EQUATIONS, cis_growth_model, "")
+    treated_status_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_pooling_status.csv")
+    treated_status = isfile(treated_status_path) ? CSV.read(treated_status_path, DataFrame) : DataFrame()
+    function selected_treatment_model(cell_line, fallback)
+        isempty(treated_status) && return fallback
+        rows = treated_status[String.(treated_status.cell_line) .== cell_line, :]
+        isempty(rows) ? fallback : String(first(rows.winning_model))
+    end
+    naive_treatment_model = selected_treatment_model("A2780Naive", "joint_ic_effect_hill_ramp_onset")
+    cis_treatment_model = selected_treatment_model("A2780cis", "joint_ic_effect_transit_death")
+    naive_treatment_label = get(REPORT_MODEL_LABELS, naive_treatment_model, naive_treatment_model)
+    cis_treatment_label = get(REPORT_MODEL_LABELS, cis_treatment_model, cis_treatment_model)
 
     stages = [
         (
@@ -932,10 +1145,10 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(\tau_i,q_{0,i},\lambda_{A,i}\)</dt><dd>Optional hard-lag duration, Baranyi initial physiological-state parameter, or smooth adaptation rate. Only the parameter belonging to the candidate being fitted is used.</dd>
 </dl></div>
 """,
-            ranking = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_top5.csv"),
+            ranking = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_model_ranking.csv"),
             by_cell_line = true,
             figure = joinpath(image_root, "monoculture_untreated", "figures", "monoculture_untreated_pooling_model_grid.png"),
-            caption = "Joint 20k/30k untreated fits. Curves use the selected cell-line growth family and density-aware pooling mode.",
+            caption = "Models shown: A2780Naive $(naive_growth_label) and A2780cis $(cis_growth_label), each using its selected density-pooling mode. These are joint 20k/30k untreated fits; every panel uses the same y-axis range.",
         ),
         (
             number = 2,
@@ -954,10 +1167,10 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(A_i(t)H_i(z)\)</dt><dd>The active per-capita treatment effect applied to a live/proliferating state. Transit models route this effect into a damaged-visible compartment before clearance.</dd>
 </dl><p><strong>Why the derivatives differ:</strong> \(dX/dt\), \(dP/dt\), and \(dS/dt\) are rates for different biological state variables, not interchangeable names for the same quantity.</p></div>
 """,
-            ranking = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_cell_line_top5.csv"),
+            ranking = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_dose_model_ranking.csv"),
             by_cell_line = true,
             figure = joinpath(image_root, "monoculture_treated", "figures", "monoculture_treated_best_joint_model_by_environment.png"),
-            caption = "Best treated model in every cell-line, density, and dose environment; one joint BIC winner is used across each cell line.",
+            caption = "Models shown: A2780Naive $(naive_treatment_label) and A2780cis $(cis_treatment_label), with the selected pooling mode for each lineage. One joint winner is used across both densities and all three doses for each cell line; every panel uses the same y-axis range.",
         ),
         (
             number = 3,
@@ -973,10 +1186,10 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(d_N,d_C\)</dt><dd>Optional first-order lineage loss rates in the competition-plus-death candidate.</dd>
 </dl></div>
 """,
-            ranking = joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_top5.csv"),
+            ranking = joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_model_ranking.csv"),
             by_cell_line = false,
             figure = joinpath(image_root, "coculture_untreated", "figures", "coculture_untreated_best_mechanistic_fit_grid.png"),
-            caption = "Best coupled competition model across 20k/30k and 25:75, 50:50, and 75:25 starting mixtures.",
+            caption = "Model shown: asymmetric competition with lineage-specific loss using partial_5pct pooling, fitted jointly across 20k/30k and all three starting mixtures. Every panel uses the same y-axis range.",
         ),
         (
             number = 4,
@@ -993,28 +1206,34 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(\rho_T\)</dt><dd>Multiplier on tolerant-state growth in treated coculture; \(\rho_T=1\) means no growth-context change.</dd>
 </dl></div>
 """,
-            ranking = joinpath(csv_root, "coculture_treated", "linked_treatment_top5.csv"),
+            ranking = joinpath(csv_root, "coculture_treated", "linked_treatment_model_ranking.csv"),
             by_cell_line = false,
             figure = joinpath(image_root, "coculture_treated", "figures", "linked_treatment_coculture_grid.png"),
-            caption = "Best linked treatment model across both seeding densities and all mixture environments.",
+            caption = "Model shown: $(get(REPORT_MODEL_LABELS, linked_winner, linked_winner)) with linked_global pooling, fitted across both seeding densities and all mixture environments. Every panel uses the same y-axis range.",
         ),
     ]
 
     sections = String[
-        "<header><a class=\"back-home\" href=\"../../../../index.html\">Back to reports home</a><h1>A2780 staged model comparison</h1><p>Top-five mechanistic equations, BIC rankings, and fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Detailed parameters, diagnostics, provenance, and inheritance audits are retained in <code>outputs/csv</code>.</p></header>",
+        "<header><a class=\"back-home\" href=\"../../../../index.html\">Back to reports home</a><h1>A2780 staged model comparison</h1><p>Mechanistic equations, Delta-BIC rankings, and explicitly labeled fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Each teaching table shows the five leading candidates plus the simplest tested candidate when it is not already present. Absolute BIC values and complete parameter vectors are retained in the appendix and <code>outputs/csv</code>.</p></header>",
     ]
     for stage in stages
-        table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line)
+        table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line, label = "Stage $(stage.number) $(stage.title)")
         graph = _report_stage_figure(stage.figure, report_dir, stage.title, stage.caption)
         stage_details = stage.number == 4 ? _report_stage4_expanded_equations_html() : ""
-        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(stage_details)$(table)$(graph)</section>")
+        uncertainty = if stage.number == 4
+            endpoint = _treated_coculture_endpoint_bootstrap(csv_root, linked_winner)
+            _linked_sensitivity_html(csv_root) * _endpoint_bootstrap_html(endpoint, linked_winner)
+        else
+            ""
+        end
+        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(stage_details)$(table)$(graph)$(uncertainty)</section>")
         if stage.number == 2 && isfile(timing_ranking_path)
-            timing_table = _report_top_five_html(timing_ranking_path)
+            timing_table = _report_top_five_html(timing_ranking_path; label = "Stage 2 timing audit")
             timing_graph = _report_stage_figure(
                 timing_figure_path,
                 report_dir,
                 "Treated monoculture timing hypotheses",
-                "The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is $(get(REPORT_MODEL_LABELS, timing_winner, timing_winner)).",
+                "The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is $(get(REPORT_MODEL_LABELS, timing_winner, timing_winner)); every panel uses the same y-axis range.",
             )
             timing_notation = raw"""
 <div class="notation-key"><h3>Timing-audit notation key</h3><dl>
@@ -1097,6 +1316,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <p><strong>Small-to-large trajectory normalization.</strong> Each trajectory \\(j\\) is divided by its own observed peak \\(s_j\\). A 500-cell trajectory and a 4,000-cell trajectory therefore contribute comparable relative errors instead of the larger curve dominating merely because its residuals have larger units. The scaled SSE is dimensionless and drives optimization and BIC; raw SSE in squared cell-count units is also exported for scale-aware interpretation.</p>
     <p><strong>What is jointly fitted.</strong> Every candidate is fitted across all trajectories stated in its stage with one objective. In the canonical report, image tiles are averaged within wells and then biological samples are averaged at each time point. The sample-aware report preserves sample-level trajectories after within-well averaging and displays their between-sample uncertainty bands.</p>
     <p><strong>BIC counting.</strong> Here \\(n\\) is the total number of fitted time-point observations across all joint trajectories, not the number of wells, tiles, or environments. The count \\(k\\) includes every freely optimized center, shape, treatment, context, and pooling-contrast parameter. Fixed inherited parameters and fixed day-zero populations are not counted again. Lower BIC is better only relative to candidates fitted to the same observations and objective; it is not proof that the winning biological mechanism is true.</p>
+    <p><strong>How to read Delta BIC.</strong> For candidate <code>m</code>, <code>Delta BIC(m) = BIC(m) - minimum BIC</code>, so the table winner is always zero. As descriptive evidence bands, 0-2 means little separation from the winner, 2-6 indicates positive separation, 6-10 strong separation, and values above 10 very strong separation. These are relative model-selection heuristics, not probabilities, confidence intervals, or proof of mechanism. Comparisons are valid only within a table whose candidates use the same observations and residual objective.</p>
     <p><strong>Initial conditions and time origin.</strong> Day zero is fixed at 67 measured cells for 20k seeding and 100 for 30k seeding. The first observed point is day 1. These anchors are passed through the package's fixed-initial-time and initial-state builder interface and are not estimated kinetic parameters.</p>
     <p><strong>Pooling.</strong> Shared models use one parameter value across 20k and 30k. Partial pooling permits only \\(r\\) and \\(K\\), or the stage-specific named effects, to differ through symmetric log contrasts bounded at plus-or-minus five percent: \\(p_{20k}=p_c e^{-\\delta_p}\\), \\(p_{30k}=p_c e^{\\delta_p}\\), \\(|\\delta_p|\\le\\ln(1.05)\\). Fully independent density fits are retained as diagnostics but cannot silently become inherited defaults.</p>
     <p><strong>Fit validity.</strong> A fit is rejected if any parameter, prediction, SSE, or BIC is non-finite, or if its objective retains the failure sentinel. Boundary profiles expand requested bounds and accept an expansion only when the improvement is scientifically material under the configured BIC and margin rules. Multistart results and parameter-stability summaries are retained where that stage uses multistart optimization.</p>
@@ -1284,6 +1504,25 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 </section>
 """)
 
+    appendix_blocks = [
+        _appendix_ranking_html(stages[1].ranking; title = "Stage 1 untreated monoculture", by_cell_line = true,
+            parameter_path = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_parameter_estimates.csv")),
+        _appendix_ranking_html(stages[2].ranking; title = "Stage 2 treated monoculture", by_cell_line = true,
+            parameter_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_parameter_estimates.csv")),
+        _appendix_ranking_html(timing_ranking_path; title = "Stage 2 timing audit",
+            parameter_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_timing_hypothesis_parameters.csv")),
+        _appendix_ranking_html(stages[3].ranking; title = "Stage 3 untreated coculture",
+            parameter_path = joinpath(csv_root, "coculture_untreated", "coculture_untreated_joint_parameter_estimates.csv")),
+        _appendix_ranking_html(stages[4].ranking; title = "Stage 4 treated coculture"),
+    ]
+    push!(sections, """
+<section class="report-appendix" id="model-appendix">
+<div class="stage-heading"><span>Appendix</span><h2>Complete model, BIC, and parameter audit</h2></div>
+<p>This appendix is the archival view. Unlike the teaching tables above, it lists every finite tested candidate, its absolute BIC, Delta BIC, free-parameter count, boundary flag, and complete exported fitted parameter vector. Model IDs restart within each table and match the corresponding Delta-BIC chart.</p>
+$(join(appendix_blocks))
+</section>
+""")
+
     html = """
 <!doctype html>
 <html lang="en">
@@ -1314,6 +1553,22 @@ td:nth-child(4) { min-width: 360px; font-family: Consolas, "Courier New", monosp
 figure { margin: 28px 0 0; }
 img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
 figcaption { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.bic-figure { margin: 8px 0 34px; padding: 16px 18px; border: 1px solid var(--line); }
+.bic-figure h4 { margin: 0 0 14px; font-size: 14px; }
+.bic-axis { display: grid; gap: 9px; }
+.bic-row { display: grid; grid-template-columns: minmax(220px, 0.36fr) minmax(180px, 1fr) 64px; gap: 10px; align-items: center; }
+.bic-label { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 5px; font-size: 12px; }
+.bic-label span { overflow-wrap: anywhere; }
+.bic-track { height: 14px; background: var(--soft); border-left: 2px solid var(--ink); }
+.bic-bar { display: block; height: 100%; min-width: 3px; background: var(--accent); }
+.bic-row output { font-variant-numeric: tabular-nums; font-size: 12px; }
+.uncertainty-audit { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
+.uncertainty-audit h3 { margin-top: 0; }
+.audit-warning { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--soft); }
+.report-appendix { width: min(1720px, calc(100% - 48px)); }
+.appendix-table table { min-width: 1260px; }
+.appendix-table td:last-child { min-width: 620px; font-family: Consolas, "Courier New", monospace; font-size: 11px; overflow-wrap: anywhere; }
+.compact-parameters table { min-width: 760px; }
 .notation-key { margin: 20px 0 24px; padding: 12px 0 14px; border-top: 2px solid var(--line); border-bottom: 1px solid var(--line); }
 .notation-key h3 { margin: 0 0 10px; font-size: 15px; }
 .notation-key dl { grid-template-columns: minmax(160px, 0.25fr) minmax(0, 1fr); }
@@ -1350,6 +1605,8 @@ code { font-family: Consolas, "Courier New", monospace; }
   h2 { font-size: 21px; }
   .stage-heading { display: block; }
   .guide-grid { grid-template-columns: minmax(0, 1fr); }
+  .bic-row { grid-template-columns: minmax(0, 1fr) 50px; }
+  .bic-label { grid-column: 1 / -1; }
   dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .notation-key dl { grid-template-columns: minmax(0, 1fr); }
   dd { max-width: 100%; margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; }
