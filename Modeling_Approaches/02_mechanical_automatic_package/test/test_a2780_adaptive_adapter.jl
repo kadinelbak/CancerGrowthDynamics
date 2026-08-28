@@ -14,6 +14,11 @@ using GrowthParameterEstimation
     @test config.observables == ["A2780Naive", "Total A2780cis", "Total population"]
     @test "cis tolerant-like" in config.latent_states_hidden
     @test all(isfinite, values(config.winners.stage4.parameters))
+    @test any(candidate -> candidate.stage == 1 && candidate.cell_line == "A2780Naive" && candidate.eligible, config.advanced_models)
+    @test any(candidate -> candidate.stage == 1 && candidate.cell_line == "A2780cis" && candidate.eligible, config.advanced_models)
+    @test any(candidate -> candidate.stage == 2 && candidate.eligible, config.advanced_models)
+    @test any(candidate -> candidate.stage == 3 && candidate.eligible, config.advanced_models)
+    @test any(candidate -> candidate.stage == 4 && candidate.eligible, config.advanced_models)
     @test length(config.experimental_library.original) == 6
     @test length(config.experimental_library.fitted) == 6
     @test haskey(config.experimental_library.original, "coculture_untreated__20k__50-50__0")

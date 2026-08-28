@@ -92,6 +92,83 @@ function _parse_parameters(text)
     return Dict(name => value::Float64 for (name, value) in zip(names, values))
 end
 
+function _parse_parameter_vector(text)
+    source = strip(String(text))
+    startswith(source, "[") && endswith(source, "]") || return Float64[]
+    values = tryparse.(Float64, strip.(split(source[2:(end - 1)], ',')))
+    any(isnothing, values) && return Float64[]
+    return Float64[value::Float64 for value in values]
+end
+
+function _stage1_baselines(model, pooling, values)
+    nbase = model in ("logistic_growth", "gompertz_growth") ? 2 : 3
+    model in ("lagged_theta_logistic_growth", "baranyi_theta_logistic_growth", "adaptation_theta_logistic_growth") && (nbase = 4)
+    length(values) >= nbase || return NamedTuple[]
+    base = values[1:nbase]
+    function effective(density)
+        current = copy(base)
+        if pooling == "partial_5pct"
+            length(values) >= nbase + 2 || return Float64[]
+            sign = density == "20k" ? -1.0 : 1.0
+            current[1] *= exp(sign * values[nbase + 1])
+            current[2] *= exp(sign * values[nbase + 2])
+        elseif pooling != "shared"
+            return Float64[]
+        end
+        return current
+    end
+    rows = NamedTuple[]
+    for density in ("20k", "30k")
+        current = effective(density)
+        isempty(current) && return NamedTuple[]
+        theta = model in ("logistic_growth", "gompertz_growth") ? 1.0 : current[3]
+        push!(rows, (
+            density = density,
+            model = model,
+            pooling = pooling,
+            r = current[1],
+            K = current[2],
+            theta = theta,
+            lag_time = model == "lagged_theta_logistic_growth" ? current[4] : 0.0,
+            baranyi_q0 = model == "baranyi_theta_logistic_growth" ? current[4] : 1.0,
+            adaptation_rate = model == "adaptation_theta_logistic_growth" ? current[4] : 1.0,
+        ))
+    end
+    return rows
+end
+
+function _stage1_candidates(csv_root)
+    path = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_automatic_model_ranking.csv")
+    isfile(path) || error("required Stage 1 ranking export is missing: $path")
+    table = CSV.read(path, DataFrame)
+    candidates = NamedTuple[]
+    for cell_line in unique(String.(table.cell_line))
+        rows = sort(filter(row -> String(row.cell_line) == cell_line, table), :bic)
+        for (rank, row) in enumerate(eachrow(rows))
+            values = _parse_parameter_vector(row.params)
+            model, pooling = String(row.model), String(row.pooling_mode)
+            baselines = _stage1_baselines(model, pooling, values)
+            eligible = _bool(row.eligible_for_inheritance) && !_bool(row.diagnostic_model) &&
+                !isempty(baselines) && isfinite(Float64(row.bic))
+            push!(candidates, (
+                stage = 1,
+                rank = rank,
+                cell_line = cell_line,
+                model = model,
+                pooling = pooling,
+                bic = Float64(row.bic),
+                baselines = baselines,
+                boundary_issue = _bool(row.boundary_issue),
+                identifiability = "see Stage 1 profile exports",
+                evidence_level = "A2780 fitted growth",
+                eligible = eligible,
+                exclusion_reason = eligible ? "" : "not eligible for inherited simulation",
+            ))
+        end
+    end
+    return candidates
+end
+
 function _identifiability_summary(path, parameters)
     isfile(path) || return "not exported"
     table = CSV.read(path, DataFrame)
@@ -195,6 +272,7 @@ end
 function load_a2780_adaptive_config(package_root)
     csv_root = joinpath(package_root, "outputs", "csv")
     baselines = _baseline_rows(csv_root)
+    stage1 = _stage1_candidates(csv_root)
 
     stage2 = _stage2_candidates(csv_root)
     stage2_winner, stage2_skipped = _winner(stage2, 2)
@@ -230,10 +308,12 @@ function load_a2780_adaptive_config(package_root)
         adaptation_rate = :adaptation_rate in propertynames(baselines) && !ismissing(row.adaptation_rate) && isfinite(Float64(row.adaptation_rate)) ? Float64(row.adaptation_rate) : nothing,
     ) for row in eachrow(baselines)]
 
-    advanced = [_candidate_json(candidate) for candidate in vcat(stage2, stage4) if candidate.rank <= 8]
+    stage1_json = [candidate for candidate in stage1 if candidate.rank <= 12]
+    advanced = Any[stage1_json...]
+    append!(advanced, [_candidate_json(candidate) for candidate in vcat(stage2, stage3, stage4) if candidate.rank <= 12])
     skipped = [_candidate_json(candidate) for candidate in vcat(stage2_skipped, stage3_skipped, stage4_skipped)]
     return (
-        schema_version = 1,
+        schema_version = 2,
         generated_from = "Julia staged ranking/status artifacts",
         calibration_end_day = 14.0,
         observables = ["A2780Naive", "Total A2780cis", "Total population"],

@@ -1,5 +1,5 @@
 {
-    "schema_version": 1,
+    "schema_version": 2,
     "generated_from": "Julia staged ranking/status artifacts",
     "calibration_end_day": 14,
     "observables": [
@@ -1624,7 +1624,7 @@
         "unit": "uM",
         "presets": [
             0.67,
-            1.0,
+            1,
             1.47
         ],
         "effect_levels": [
@@ -1726,7 +1726,7 @@
             "bic": -628.6081386168919,
             "parameters": {
                 "alpha_rs": 1.3522313840194164,
-                "death_resistant": 1.923047556845251e-6,
+                "death_resistant": 0.000001923047556845251,
                 "alpha_sr": 0.5096417838847659,
                 "death_sensitive": 0.22137721014457323,
                 "log_contrast_density": 0.06947977059406192
@@ -1767,9 +1767,554 @@
             "exclusion_reason": ""
         }
     },
-    "skipped_nominal_winners": [
-    ],
+    "skipped_nominal_winners": [],
     "advanced_models": [
+        {
+            "stage": 1,
+            "rank": 1,
+            "cell_line": "A2780Naive",
+            "model": "baranyi_theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -177.5588224995718,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "baranyi_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 2.0583042351862697,
+                    "K": 4102.6812640387225,
+                    "theta": 0.3078701226100252,
+                    "lag_time": 0,
+                    "baranyi_q0": 0.3917239510595033,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "baranyi_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.8898439722620546,
+                    "K": 4033.277431411544,
+                    "theta": 0.3078701226100252,
+                    "lag_time": 0,
+                    "baranyi_q0": 0.3917239510595033,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": true,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 2,
+            "cell_line": "A2780Naive",
+            "model": "theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -177.49328221263238,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.1535755406439168,
+                    "K": 4096.795259852484,
+                    "theta": 0.5969005838591523,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.0466677904011785,
+                    "K": 4015.9509079611653,
+                    "theta": 0.5969005838591523,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": true,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 3,
+            "cell_line": "A2780Naive",
+            "model": "adaptation_theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -177.1821757128049,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "adaptation_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 2.090403476454323,
+                    "K": 4105.939171214122,
+                    "theta": 0.30775028462009957,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1.4617139829722596
+                },
+                {
+                    "density": "30k",
+                    "model": "adaptation_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.9125696396831657,
+                    "K": 4020.7102059979147,
+                    "theta": 0.30775028462009957,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1.4617139829722596
+                }
+            ],
+            "boundary_issue": true,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 4,
+            "cell_line": "A2780Naive",
+            "model": "logistic_growth",
+            "pooling": "independent_diagnostic",
+            "bic": -175.2345848644254,
+            "baselines": [],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inherited simulation"
+        },
+        {
+            "stage": 1,
+            "rank": 5,
+            "cell_line": "A2780Naive",
+            "model": "theta_logistic_growth",
+            "pooling": "independent_diagnostic",
+            "bic": -174.63568953690677,
+            "baselines": [],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inherited simulation"
+        },
+        {
+            "stage": 1,
+            "rank": 6,
+            "cell_line": "A2780Naive",
+            "model": "logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -174.35978772559204,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.9177394582623256,
+                    "K": 4030.161871389699,
+                    "theta": 1,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.8324168796206267,
+                    "K": 3932.16111444378,
+                    "theta": 1,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": true,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 7,
+            "cell_line": "A2780Naive",
+            "model": "lagged_theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -172.97693058275607,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "lagged_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.1825019288656111,
+                    "K": 4091.0989283619133,
+                    "theta": 0.5960676337507468,
+                    "lag_time": 0.15449956838660675,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "lagged_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.1028278554095183,
+                    "K": 3985.8641291812132,
+                    "theta": 0.5960676337507468,
+                    "lag_time": 0.15449956838660675,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 8,
+            "cell_line": "A2780Naive",
+            "model": "logistic_simple_death",
+            "pooling": "partial_5pct",
+            "bic": -171.11461208452607,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "logistic_simple_death",
+                    "pooling": "partial_5pct",
+                    "r": 0.9334857913722087,
+                    "K": 4096.800503665084,
+                    "theta": 0.014929366788743794,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "logistic_simple_death",
+                    "pooling": "partial_5pct",
+                    "r": 0.8466991304963497,
+                    "K": 4003.2801065646536,
+                    "theta": 0.014929366788743794,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": true,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inherited simulation"
+        },
+        {
+            "stage": 1,
+            "rank": 1,
+            "cell_line": "A2780cis",
+            "model": "adaptation_theta_logistic_growth",
+            "pooling": "shared",
+            "bic": -186.40564973620323,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "adaptation_theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 1.3033401811989338,
+                    "K": 3819.019651355322,
+                    "theta": 0.9738231812965199,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 0.21127164965197726
+                },
+                {
+                    "density": "30k",
+                    "model": "adaptation_theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 1.3033401811989338,
+                    "K": 3819.019651355322,
+                    "theta": 0.9738231812965199,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 0.21127164965197726
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 2,
+            "cell_line": "A2780cis",
+            "model": "baranyi_theta_logistic_growth",
+            "pooling": "shared",
+            "bic": -186.03680107220023,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "baranyi_theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 0.8409304462110382,
+                    "K": 3821.135954881842,
+                    "theta": 1.2620476371285276,
+                    "lag_time": 0,
+                    "baranyi_q0": 0.1742509249371738,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "baranyi_theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 0.8409304462110382,
+                    "K": 3821.135954881842,
+                    "theta": 1.2620476371285276,
+                    "lag_time": 0,
+                    "baranyi_q0": 0.1742509249371738,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": true,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 3,
+            "cell_line": "A2780cis",
+            "model": "lagged_theta_logistic_growth",
+            "pooling": "shared",
+            "bic": -185.70416306289172,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "lagged_theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 0.7413830717660111,
+                    "K": 3820.3074446792393,
+                    "theta": 1.4586336200366865,
+                    "lag_time": 1.8205028950402544,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "lagged_theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 0.7413830717660111,
+                    "K": 3820.3074446792393,
+                    "theta": 1.4586336200366865,
+                    "lag_time": 1.8205028950402544,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 4,
+            "cell_line": "A2780cis",
+            "model": "theta_logistic_growth",
+            "pooling": "shared",
+            "bic": -181.56937165339986,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 0.48688247139575735,
+                    "K": 3802.772131307019,
+                    "theta": 3.082890807249316,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "theta_logistic_growth",
+                    "pooling": "shared",
+                    "r": 0.48688247139575735,
+                    "K": 3802.772131307019,
+                    "theta": 3.082890807249316,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 5,
+            "cell_line": "A2780cis",
+            "model": "theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -180.0963252951401,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.49683063923724985,
+                    "K": 3799.050672666412,
+                    "theta": 3.5540722532991245,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.4649317787285867,
+                    "K": 3794.242889149462,
+                    "theta": 3.5540722532991245,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 6,
+            "cell_line": "A2780cis",
+            "model": "lagged_theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -179.89696676044966,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "lagged_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.6652799832414777,
+                    "K": 3821.6946340238046,
+                    "theta": 1.8624221105104828,
+                    "lag_time": 1.4378225186922449,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "lagged_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.6408816934021153,
+                    "K": 3803.3236162541475,
+                    "theta": 1.8624221105104828,
+                    "lag_time": 1.4378225186922449,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 7,
+            "cell_line": "A2780cis",
+            "model": "baranyi_theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -179.69012495893773,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "baranyi_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.7401987357832789,
+                    "K": 3821.9404098367486,
+                    "theta": 1.6009004379595477,
+                    "lag_time": 0,
+                    "baranyi_q0": 0.3291894386401773,
+                    "adaptation_rate": 1
+                },
+                {
+                    "density": "30k",
+                    "model": "baranyi_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 0.7221459214567474,
+                    "K": 3809.1791040574703,
+                    "theta": 1.6009004379595477,
+                    "lag_time": 0,
+                    "baranyi_q0": 0.3291894386401773,
+                    "adaptation_rate": 1
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 1,
+            "rank": 8,
+            "cell_line": "A2780cis",
+            "model": "adaptation_theta_logistic_growth",
+            "pooling": "partial_5pct",
+            "bic": -179.58006541941015,
+            "baselines": [
+                {
+                    "density": "20k",
+                    "model": "adaptation_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.022420197228088,
+                    "K": 3825.8480485568866,
+                    "theta": 1.1655567238937645,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 0.29173176979715765
+                },
+                {
+                    "density": "30k",
+                    "model": "adaptation_theta_logistic_growth",
+                    "pooling": "partial_5pct",
+                    "r": 1.0134217542882986,
+                    "K": 3810.9265768915707,
+                    "theta": 1.1655567238937645,
+                    "lag_time": 0,
+                    "baranyi_q0": 1,
+                    "adaptation_rate": 0.29173176979715765
+                }
+            ],
+            "boundary_issue": false,
+            "identifiability": "see Stage 1 profile exports",
+            "evidence_level": "A2780 fitted growth",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
         {
             "stage": 2,
             "rank": 1,
@@ -1922,6 +2467,154 @@
             "boundary_issue": true,
             "identifiability": "boundary-limited",
             "evidence_level": "A2780 fitted; measured-dose range",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 3,
+            "rank": 1,
+            "model": "strobl_birth_growth_cost_turnover",
+            "pooling": "strobl_joint",
+            "bic": -645.8523471037355,
+            "parameters": {
+                "K_20k": 11072.940455765525,
+                "K_30k": 11765.71502305271,
+                "resistance_cost": 0.06525050729368831,
+                "turnover_fraction": 0.6776380761468194
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inheritance"
+        },
+        {
+            "stage": 3,
+            "rank": 2,
+            "model": "strobl_birth_death_cost_turnover",
+            "pooling": "strobl_joint",
+            "bic": -640.7437721809151,
+            "parameters": {
+                "K_20k": 11517.172271819676,
+                "K_30k": 12270.077742011865,
+                "resistance_cost": 0.08191970493582419,
+                "turnover_fraction": 0.6852034166621993
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inheritance"
+        },
+        {
+            "stage": 3,
+            "rank": 3,
+            "model": "lv_asymmetric_competition_death",
+            "pooling": "partial_5pct",
+            "bic": -628.6081386168919,
+            "parameters": {
+                "alpha_sr": 0.5096417838847659,
+                "alpha_rs": 1.3522313840194164,
+                "death_sensitive": 0.22137721014457323,
+                "death_resistant": 0.000001923047556845251,
+                "log_contrast_density": 0.06947977059406192
+            },
+            "boundary_issue": true,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 3,
+            "rank": 4,
+            "model": "lv_asymmetric_competition_death",
+            "pooling": "independent_diagnostic",
+            "bic": -623.2518061517798,
+            "parameters": {
+                "alpha_sr_20k": 0.4987247116061063,
+                "alpha_rs_20k": 1.3547390460983593,
+                "death_sensitive_20k": 0.2529830950098182,
+                "death_resistant_20k": 0.000515739786139759,
+                "alpha_sr_30k": 0.6794889648262195,
+                "alpha_rs_30k": 1.3027925444337773,
+                "death_sensitive_30k": 0.17149923976890366,
+                "death_resistant_30k": 0.004644241782151178
+            },
+            "boundary_issue": true,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inheritance"
+        },
+        {
+            "stage": 3,
+            "rank": 5,
+            "model": "lv_asymmetric_competition_death",
+            "pooling": "shared",
+            "bic": -592.2756647382031,
+            "parameters": {
+                "alpha_sr": 0.39211766933432135,
+                "alpha_rs": 1.369679830617308,
+                "death_sensitive": 0.23269932283039527,
+                "death_resistant": 0.000006987696568970475
+            },
+            "boundary_issue": true,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 3,
+            "rank": 6,
+            "model": "strobl_birth_capacity_cost_turnover",
+            "pooling": "strobl_joint",
+            "bic": -573.6025883475429,
+            "parameters": {
+                "K_20k": 14095.92189530074,
+                "K_30k": 15343.23275546247,
+                "resistance_cost": 0.35260854886280296,
+                "turnover_fraction": 0.7243676074458064
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inheritance"
+        },
+        {
+            "stage": 3,
+            "rank": 7,
+            "model": "lv_asymmetric_competition",
+            "pooling": "independent_diagnostic",
+            "bic": -487.6072634862396,
+            "parameters": {
+                "alpha_sr_20k": 1.6963534553060153,
+                "alpha_rs_20k": 0.9148115559042411,
+                "alpha_sr_30k": 1.496288643649774,
+                "alpha_rs_30k": 1.0222117126955232
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inheritance"
+        },
+        {
+            "stage": 3,
+            "rank": 8,
+            "model": "lv_asymmetric_competition",
+            "pooling": "partial_5pct",
+            "bic": -487.0510627230585,
+            "parameters": {
+                "alpha_sr": 1.5701578885480798,
+                "alpha_rs": 0.9768574594449181,
+                "log_contrast_density": 0.0888186074647655
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
             "eligible": true,
             "exclusion_reason": ""
         },
@@ -2153,6 +2846,69 @@
             "boundary_issue": false,
             "identifiability": "boundary-limited",
             "evidence_level": "A2780 linked fit",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 3,
+            "rank": 9,
+            "model": "lv_asymmetric_competition",
+            "pooling": "shared",
+            "bic": -470.83322297623516,
+            "parameters": {
+                "alpha_sr": 1.4705477836319034,
+                "alpha_rs": 0.9524518366194239
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 3,
+            "rank": 10,
+            "model": "lv_symmetric_competition",
+            "pooling": "partial_5pct",
+            "bic": -438.4551459023744,
+            "parameters": {
+                "alpha": 0.882505346669063,
+                "log_contrast_density": 0.04874216776204078
+            },
+            "boundary_issue": true,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": true,
+            "exclusion_reason": ""
+        },
+        {
+            "stage": 3,
+            "rank": 11,
+            "model": "lv_symmetric_competition",
+            "pooling": "independent_diagnostic",
+            "bic": -438.4551154442178,
+            "parameters": {
+                "alpha_20k": 0.8405225020326054,
+                "alpha_30k": 0.9267599105216734
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
+            "eligible": false,
+            "exclusion_reason": "not eligible for inheritance"
+        },
+        {
+            "stage": 3,
+            "rank": 12,
+            "model": "lv_symmetric_competition",
+            "pooling": "shared",
+            "bic": -433.9015054804498,
+            "parameters": {
+                "alpha": 0.8835627410947443
+            },
+            "boundary_issue": false,
+            "identifiability": "see Stage 3 profile exports",
+            "evidence_level": "A2780 fitted competition",
             "eligible": true,
             "exclusion_reason": ""
         }
