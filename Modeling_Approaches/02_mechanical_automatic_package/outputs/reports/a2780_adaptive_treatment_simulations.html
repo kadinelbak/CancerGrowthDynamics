@@ -155,6 +155,9 @@
     .status-item { border-top: 1px solid #e5e9ee; padding: 9px 0; background: transparent; min-width: 0; }
     .status-item strong { display: block; font-size: 12px; color: var(--muted); }
     .status-item span { display: block; margin-top: 3px; font-weight: 700; overflow-wrap: anywhere; }
+    .model-choice { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; align-items: end; }
+    .model-choice label { gap: 5px; }
+    .model-choice-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .mode-switch { display: inline-flex; gap: 0; border: 1px solid var(--line); padding: 3px; background: white; flex-shrink: 0; }
     .mode-switch button { border: 0; background: white; color: var(--ink); border-radius: 3px; }
     .mode-switch button.active { background: var(--ink); color: white; }
@@ -185,6 +188,7 @@
       .status-strip { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 680px) {
+      .model-choice { grid-template-columns: 1fr; }
       header, main { padding-left: 14px; padding-right: 14px; }
       .dataset-heading { align-items: flex-start; }
       .mode-switch { width: 100%; }
@@ -465,7 +469,16 @@
       {start: 30, end: 34, dose: 1.47, refresh: 2, label: "Cycle 3"}
     ];
     let researchMode = "experimental";
-    let selectedAdvancedModel = adaptiveConfig.winners.stage4.model;
+    const stage4Candidates = adaptiveConfig.advanced_models
+      .filter(candidate => candidate.stage === 4 && candidate.eligible && candidate.parameters && Number.isFinite(candidate.bic))
+      .sort((left, right) => left.rank - right.rank || left.bic - right.bic)
+      .slice(0, 5);
+    function candidateKey(candidate) { return `${candidate.rank}|${candidate.model}|${candidate.pooling}`; }
+    const defaultStage4Candidate = stage4Candidates.find(candidate =>
+      candidate.model === adaptiveConfig.winners.stage4.model && candidate.pooling === adaptiveConfig.winners.stage4.pooling
+    ) || stage4Candidates[0];
+    let selectedStage4Candidate = defaultStage4Candidate;
+    let selectedAdvancedModel = selectedStage4Candidate.model;
     const colors = {
       naive: "#dc143c", sensitive: "#f59e0b", tolerant: "#2563eb", total: "#111827", dose: "#7c3aed",
       none: "#52606d", fittedTreatment: "#1d4ed8", custom: "#7c3aed", originalRefresh: "#7c3aed", continuous: "#111827", pulse: "#f59e0b", at50: "#2563eb", hysteresis: "#059669", doseModulation: "#b45309", timeVarying: "#be123c"
@@ -498,7 +511,7 @@
       const nBase = baselines.find(row => row.cell_line === "A2780Naive" && row.density === density) || baselines.find(row => row.cell_line === "A2780Naive");
       const cBase = baselines.find(row => row.cell_line === "A2780cis" && row.density === density) || baselines.find(row => row.cell_line === "A2780cis");
       const interaction = adaptiveConfig.winners.stage3.parameters;
-      const treatment = adaptiveConfig.winners.stage4.parameters;
+      const treatment = selectedStage4Candidate.parameters;
       const densitySign = density === "20k" ? -1 : 1;
       const contrast = interaction.log_contrast_density || 0;
       const contextShift = isCoculture ? (treatment.cis_tolerant_logit_shift || 0) : 0;
@@ -531,7 +544,11 @@
         cisEmaxSensitive: treatment.cis_emax_sensitive * Math.exp(densitySign * (treatment.cis_log_contrast_density || 0)),
         cisEmaxTolerant: treatment.cis_emax_tolerant * Math.exp(densitySign * (treatment.cis_log_contrast_density || 0)) * (isCoculture ? Math.exp(Math.max(-4, Math.min(4, treatment.log_cis_tolerant_context || 0))) : 1),
         cisGrowthScale: isCoculture ? Math.exp(treatment.log_cis_tolerant_growth_context || 0) : 1,
-        betaN: isCoculture ? (treatment.beta_naive || 0) : 0, betaC: isCoculture ? (treatment.beta_cis || 0) : 0,
+        betaN: isCoculture ? (treatment.beta_naive || 0) : 0,
+        betaCS: isCoculture ? (treatment.beta_cis_sensitive ?? treatment.beta_cis ?? 0) : 0,
+        betaCT: isCoculture ? (treatment.beta_cis_tolerant ?? treatment.beta_cis ?? 0) : 0,
+        contextAmplitudeN: isCoculture ? (treatment.log_context_amplitude_naive || 0) : 0,
+        contextAmplitudeC: isCoculture ? (treatment.log_context_amplitude_cis || 0) : 0,
         qST: document.getElementById("enableSwitching").checked ? 0.012 : 0,
         kUptake: 1.0, kEfflux: 0.6417, kBind: 1.0, kRepair: 0.573, boundEc50: 0.5, boundHill: 3.0,
         advancedModel: selectedAdvancedModel
@@ -671,9 +688,10 @@
         ? [{start: 0, end: experimentDefaults.days, dose: experimentDefaults.maxDose, refresh: 2, label: "Selected experiment"}]
         : [];
       if (resetAdvanced) {
-        selectedAdvancedModel = adaptiveConfig.winners.stage4.model;
+        selectedStage4Candidate = defaultStage4Candidate;
+        selectedAdvancedModel = selectedStage4Candidate.model;
         const modelSelect = document.getElementById("advancedModelSelect");
-        if (modelSelect) modelSelect.value = selectedAdvancedModel;
+        if (modelSelect) modelSelect.value = candidateKey(selectedStage4Candidate);
         document.getElementById("showLatent").checked = false;
         document.getElementById("enableScenarioControls").checked = false;
         document.getElementById("enableSwitching").checked = false;
@@ -908,16 +926,17 @@
       const tShare = state.T / C;
       const activeThreshold = 0.01 * Math.max(p.maxDose, 1e-9);
       const pharmacodynamicActive = doseCommand > 0 || state.E > activeThreshold;
-      const naiveScale = pharmacodynamicActive ? Math.exp(Math.max(-4, Math.min(4, p.betaN * LN / Math.max(scaledKN, 1e-9)))) : 1;
-      const cisScale = pharmacodynamicActive ? Math.exp(Math.max(-4, Math.min(4, p.betaC * LC / Math.max(scaledKC, 1e-9)))) : 1;
+      const naiveScale = pharmacodynamicActive ? Math.exp(Math.max(-4, Math.min(4, p.betaN * LN / Math.max(scaledKN, 1e-9) + p.contextAmplitudeN))) : 1;
+      const sensitiveScale = pharmacodynamicActive ? Math.exp(Math.max(-4, Math.min(4, p.betaCS * LC / Math.max(scaledKC, 1e-9) + p.contextAmplitudeC))) : 1;
+      const tolerantScale = pharmacodynamicActive ? Math.exp(Math.max(-4, Math.min(4, p.betaCT * LC / Math.max(scaledKC, 1e-9) + p.contextAmplitudeC))) : 1;
       const usePkpd = selectedAdvancedModel.includes("intracellular_platinum");
       const activeConcentration = doseCommand > 0 ? doseCommand : state.E;
       const effect = usePkpd ? state.Ck : doseToEffect(activeConcentration);
       const naiveActivation = pharmacodynamicActive && state.A > p.naiveOnset ? 1 - Math.exp(-p.naiveLambda * (state.A - p.naiveOnset)) : 0;
       const cisActivation = pharmacodynamicActive && state.A >= p.cisOnset ? 1 : 0;
       const naiveKill = naiveScale * naiveActivation * hill(effect, p.naiveEmax, p.naiveEc50, p.naiveHill);
-      const sensitiveKill = cisScale * cisActivation * hill(effect, p.cisEmaxSensitive, 0.5, 4);
-      const tolerantKill = cisScale * cisActivation * hill(effect, p.cisEmaxTolerant, 0.5, 4);
+      const sensitiveKill = sensitiveScale * cisActivation * hill(effect, p.cisEmaxSensitive, 0.5, 4);
+      const tolerantKill = tolerantScale * cisActivation * hill(effect, p.cisEmaxTolerant, 0.5, 4);
       const shift = p.qST * cisActivation * effect * state.S;
       const drugDecay = Math.log(2) / Math.max(p.drugHalfLife, 1e-6);
       const deathN = isCoculture ? p.deathN : 0;
@@ -1240,8 +1259,10 @@
       const ensemble = [-4,-3,-2,-1,0,1,2,3,4].map(member => simulate(selectedSchedule, member));
       const canvas = document.getElementById("comparePlot");
       const ctx = prepareCanvas(canvas);
-      const experimentMatched = matchesSelectedExperiment(selectedSchedule);
-      const observedValues = experimentMatched ? [...activeLibrary().naive.map(point => point.y), ...activeLibrary().cis.map(point => point.y)] : [];
+      const protocolMatched = matchesSelectedExperiment(selectedSchedule);
+      const defaultModelActive = candidateKey(selectedStage4Candidate) === candidateKey(defaultStage4Candidate);
+      const exportedFitMatched = protocolMatched && defaultModelActive;
+      const observedValues = protocolMatched ? [...activeLibrary().naive.map(point => point.y), ...activeLibrary().cis.map(point => point.y)] : [];
       const maxY = Math.max(...results.flatMap(r => r.series.map(d => Math.max(d.total, d.N, d.S + d.T))), ...ensemble.flatMap(r => r.series.map(d => d.total)), ...observedValues, 1000) * 1.08;
       const maxT = Math.max(...results[0].series.map(d => d.t));
       const detailedView = comparisonMode === "selected";
@@ -1256,7 +1277,7 @@
         drawLine(ctx, selectedResult.series, d => scale.x(d.t), d => scale.y(d.total), colors.total, 3.1);
         drawLine(ctx, selectedResult.series, d => scale.x(d.t), d => scale.y(d.N), colors.naive, 2.7);
         drawLine(ctx, selectedResult.series, d => scale.x(d.t), d => scale.y(d.S + d.T), colors.tolerant, 2.7);
-        if (experimentMatched) drawObservedPoints(ctx, scale, activeLibrary());
+        if (protocolMatched) drawObservedPoints(ctx, scale, activeLibrary());
         if (document.getElementById("showLatent").checked) {
           drawLine(ctx, selectedResult.series, d => scale.x(d.t), d => scale.y(d.S), colors.sensitive, 1.8, [6, 4]);
           drawLine(ctx, selectedResult.series, d => scale.x(d.t), d => scale.y(d.T), "#0f766e", 1.8, [3, 4]);
@@ -1269,8 +1290,8 @@
           `<span class="legend-item" style="color:${colors.total}"><span class="line"></span>Selected schedule total</span>` +
           `<span class="legend-item" style="color:${colors.naive}"><span class="line"></span>A2780Naive</span>` +
           `<span class="legend-item" style="color:${colors.tolerant}"><span class="line"></span>Total A2780cis</span>` +
-          (experimentMatched && activeLibrary().naive.length ? `<span class="legend-item" style="color:${colors.naive}"><span class="dot"></span>Observed Naive</span>` : "") +
-          (experimentMatched && activeLibrary().cis.length ? `<span class="legend-item" style="color:${colors.tolerant}"><span class="dot"></span>Observed cis</span>` : "") +
+          (protocolMatched && activeLibrary().naive.length ? `<span class="legend-item" style="color:${colors.naive}"><span class="dot"></span>Observed Naive</span>` : "") +
+          (protocolMatched && activeLibrary().cis.length ? `<span class="legend-item" style="color:${colors.tolerant}"><span class="dot"></span>Observed cis</span>` : "") +
           (document.getElementById("showLatent").checked ? `<span class="legend-item" style="color:${colors.sensitive}"><span class="line dash"></span>Latent cis sensitive-like (diagnostic)</span><span class="legend-item" style="color:#0f766e"><span class="line dash"></span>Latent cis tolerant-like (diagnostic)</span>` : "") +
           `<span class="legend-item" style="color:#6b7280"><span style="width:28px;height:13px;background:rgba(17,24,39,.12)"></span>80% scenario ensemble after day 14</span>` +
           `<span class="legend-item" style="color:${colors.dose}"><span class="line dash"></span>Effective drug exposure</span>` +
@@ -1288,18 +1309,20 @@
       const referenceNote = showUntreated && selectedSchedule !== "none"
         ? " The gray untreated counterfactual uses the same day-0 state with u(t) = 0."
         : "";
-      const matchDiagnostics = experimentMatched ? fittedMatchDiagnostics(selectedResult) : {maxRelativeError: NaN, worst: null};
+      const matchDiagnostics = exportedFitMatched ? fittedMatchDiagnostics(selectedResult) : {maxRelativeError: NaN, worst: null};
       const matchError = matchDiagnostics.maxRelativeError;
       const comparisonSummary = document.getElementById("comparisonSummary");
       comparisonSummary.dataset.maxFitError = Number.isFinite(matchError) ? matchError.toString() : "";
       comparisonSummary.dataset.worstFitPoint = matchDiagnostics.worst ? JSON.stringify(matchDiagnostics.worst) : "";
       comparisonSummary.textContent = comparisonMode === "all"
         ? `${visibleSchedules.length} schedules are drawn, including the untreated reference only when its overlay is enabled.`
-        : experimentMatched
+        : exportedFitMatched
           ? activeLibrary().treated
             ? `The simulator uses the selected experiment's fitted day-0 state, density, mixture, measured dose, and constant-effect treatment assumption. Maximum difference from the exported fitted trajectory: ${Number.isFinite(matchError) ? (100 * matchError).toFixed(2) + "%" : "not available"}. Dots are observations; day 14 is the calibration boundary.${referenceNote}`
             : `The simulator uses the selected untreated experiment's fitted day-0 state, mixture, and Stage 3 competition model with u(t) = 0. Maximum difference from the exported fitted trajectory: ${Number.isFinite(matchError) ? (100 * matchError).toFixed(2) + "%" : "not available"}. Dots are observations; day 14 is the calibration boundary.`
-          : `${labels[selectedSchedule]} is shown over the fitted untreated coculture baseline. Blue bands mark commanded treatment days; the purple exposure trace continues after treatment stops according to the ${params().drugHalfLife.toFixed(2)}-day effective half-life.${referenceNote}`;
+          : protocolMatched
+            ? `Alternative fitted Stage 4 candidate #${selectedStage4Candidate.rank}, ${selectedStage4Candidate.model} (${selectedStage4Candidate.pooling}), is simulated with its exported inherited parameter block. Dots are observations; the stored winning-fit reproduction is unchanged. Day 14 is the calibration boundary.${referenceNote}`
+            : `${labels[selectedSchedule]} is shown over the fitted untreated coculture baseline using Stage 4 candidate #${selectedStage4Candidate.rank}, ${selectedStage4Candidate.model}. Blue bands mark commanded treatment days; the purple exposure trace continues after treatment stops according to the ${params().drugHalfLife.toFixed(2)}-day effective half-life.${referenceNote}`;
       document.getElementById("showSelectedSchedule").classList.toggle("active", comparisonMode === "selected");
       document.getElementById("showAllSchedules").classList.toggle("active", comparisonMode === "all");
       updateMetrics(selectedResult.metrics);
@@ -1327,34 +1350,51 @@
       const prettyModel = model => ({
         logistic_growth: "Logistic growth",
         theta_logistic_growth: "Theta-logistic growth",
+        baranyi_theta_logistic_growth: "Baranyi theta-logistic growth",
+        adaptation_theta_logistic_growth: "Adaptation theta-logistic growth",
         joint_ic_effect_hill_ramp_onset: "Delayed Hill-ramp treatment",
         lv_asymmetric_competition_death: "Asymmetric competition with loss",
+        load_scaled: "Total-load-scaled drug effect",
+        load_plus_context_amplitude: "Load scaling plus context amplitude",
+        subpopulation_load_scaled: "Subpopulation-specific load scaling",
+        load_plus_tolerant_context: "Load scaling plus tolerant-state shift",
         load_plus_tolerant_growth_context: "Load, cis-state, and growth context"
       })[model] || model.replaceAll("_", " ");
+      const bestBic = stage4Candidates[0].bic;
+      const selectedKey = candidateKey(selectedStage4Candidate);
+      const inheritedSummary = `Used for schedule simulations. It inherits ${winner.stage1.length} Stage 1 growth fits, Stage 2 ${prettyModel(winner.stage2.model)} (${winner.stage2.pooling}), and Stage 3 ${prettyModel(winner.stage3.model)} (${winner.stage3.pooling}). Only the selected Stage 4 parameter block changes; the fitted-reproduction tab remains the saved winning-fit audit.`;
       document.getElementById("modelStatus").innerHTML = [
         ["Stage 1 growth", winner.stage1.map(row => `${row.cell_line}: ${prettyModel(row.model)}`).filter((value, index, all) => all.indexOf(value) === index).join("; ")],
         ["Stage 2 treatment", `${prettyModel(winner.stage2.model)} (${winner.stage2.pooling})`],
         ["Stage 3 competition", `${prettyModel(winner.stage3.model)} (${winner.stage3.pooling})`],
-        ["Stage 4 treated coculture", `${prettyModel(winner.stage4.model)}; BIC ${winner.stage4.bic.toFixed(1)}; ${winner.stage4.identifiability}`]
-      ].map(([label, value]) => `<div class="status-item"><strong>${label}</strong><span>${value}</span></div>`).join("");
+        ["Active Stage 4 treated coculture", `${prettyModel(selectedStage4Candidate.model)} (${selectedStage4Candidate.pooling}); BIC ${selectedStage4Candidate.bic.toFixed(1)}; ${selectedStage4Candidate.identifiability}`]
+      ].map(([label, value]) => `<div class="status-item"><strong>${label}</strong><span>${value}</span></div>`).join("") + `
+        <div class="status-item model-choice">
+          <label>Stage 4 model
+            <select id="advancedModelSelect">
+              ${stage4Candidates.map(candidate => {
+                const delta = candidate.bic - bestBic;
+                return `<option value="${candidateKey(candidate)}"${candidateKey(candidate) === selectedKey ? " selected" : ""}>#${candidate.rank} ${prettyModel(candidate.model)} · ${candidate.pooling} · ΔBIC ${delta.toFixed(1)}</option>`;
+              }).join("")}
+            </select>
+          </label>
+          <p class="model-choice-note">${inheritedSummary}</p>
+        </div>`;
 
-      const candidates = adaptiveConfig.advanced_models.filter((candidate, index, all) => all.findIndex(item => item.model === candidate.model) === index);
       document.getElementById("advancedModelTable").innerHTML = `
-        <label style="margin-top:10px">Active mechanism
-          <select id="advancedModelSelect">
-            <option value="${winner.stage4.model}">Data-selected default: ${winner.stage4.model}</option>
-            ${candidates.filter(candidate => candidate.model !== winner.stage4.model).map(candidate => `<option value="${candidate.model}">${candidate.model}</option>`).join("")}
-          </select>
-        </label>
-        <div class="table-scroll"><table class="advanced-table"><thead><tr><th>Model</th><th>BIC</th><th>Boundary</th><th>Identifiability</th><th>Evidence</th></tr></thead><tbody>
-          ${candidates.map(candidate => `<tr><td>${candidate.model}${candidate.model === winner.stage4.model ? " (default)" : ""}</td><td>${candidate.bic.toFixed(1)}</td><td>${candidate.boundary_issue ? "flagged" : "clear"}</td><td>${candidate.identifiability}</td><td>${candidate.evidence_level}</td></tr>`).join("")}
+        <div class="table-scroll"><table class="advanced-table"><thead><tr><th>Rank</th><th>Model</th><th>BIC</th><th>Boundary</th><th>Identifiability</th><th>Evidence</th></tr></thead><tbody>
+          ${stage4Candidates.map(candidate => `<tr><td>${candidate.rank}</td><td>${prettyModel(candidate.model)}${candidateKey(candidate) === candidateKey(defaultStage4Candidate) ? " (default)" : ""}</td><td>${candidate.bic.toFixed(1)}</td><td>${candidate.boundary_issue ? "flagged" : "clear"}</td><td>${candidate.identifiability}</td><td>${candidate.evidence_level}</td></tr>`).join("")}
         </tbody></table></div>`;
       document.getElementById("advancedModelSelect").addEventListener("change", event => {
-        selectedAdvancedModel = event.target.value;
-        document.getElementById("comparisonSummary").textContent = selectedAdvancedModel === winner.stage4.model
+        const candidate = stage4Candidates.find(item => candidateKey(item) === event.target.value);
+        if (!candidate) return;
+        selectedStage4Candidate = candidate;
+        selectedAdvancedModel = candidate.model;
+        document.getElementById("comparisonSummary").textContent = candidateKey(candidate) === candidateKey(defaultStage4Candidate)
           ? "Data-selected default restored."
-          : `Advanced research scenario: ${selectedAdvancedModel}. This does not change the stored default.`;
-        if (!document.getElementById("compareView").classList.contains("hidden")) renderCompare();
+          : `Alternative fitted candidate #${candidate.rank}: ${prettyModel(candidate.model)} (${candidate.pooling}). Its exported inherited parameter block is active; the stored default is unchanged.`;
+        renderModelStatus();
+        document.getElementById("compareView").classList.contains("hidden") ? renderSingle() : renderCompare();
       });
     }
     function setResearchMode(mode) {
