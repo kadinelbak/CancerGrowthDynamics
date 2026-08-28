@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A2780 Model Registry</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root { --ink:#1f2933; --muted:#52606d; --line:#cbd2d9; --bg:#f6f8fa; --panel:#fff; --accent:#2563eb; --accent-soft:#e8f0ff; --stage1:#237a57; --stage2:#b45309; --stage3:#7c3aed; --stage4:#be123c; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Arial,Helvetica,sans-serif; line-height:1.45; }
+    header, main { width:min(1240px,100%); margin:0 auto; padding:24px; }
+    header { padding-top:34px; }
+    h1 { margin:12px 0 6px; font-size:34px; letter-spacing:0; }
+    h2 { margin:0; font-size:21px; }
+    p { margin:7px 0; }
+    a { color:var(--accent); }
+    .back { font-weight:700; text-decoration:none; }
+    .lede { max-width:920px; color:var(--muted); font-size:17px; }
+    .notice { margin-top:18px; padding:13px 15px; border-left:4px solid var(--accent); background:var(--accent-soft); }
+    .toolbar { position:sticky; top:0; z-index:10; background:rgba(246,248,250,.97); border-bottom:1px solid var(--line); padding:14px 0; }
+    .toolbar-inner { width:min(1192px,calc(100% - 48px)); margin:auto; display:grid; grid-template-columns:minmax(240px,1fr) auto auto; gap:10px; align-items:end; }
+    label { font-size:13px; font-weight:700; }
+    input[type="search"], select { width:100%; min-height:42px; border:1px solid #aeb8c2; border-radius:6px; background:#fff; padding:8px 10px; color:var(--ink); font:inherit; }
+    button { min-height:42px; border:1px solid var(--accent); border-radius:6px; padding:8px 13px; background:#fff; color:var(--accent); font-weight:700; cursor:pointer; }
+    button.primary { background:var(--accent); color:#fff; }
+    .summary { display:flex; gap:12px; flex-wrap:wrap; margin:18px 0; }
+    .summary span { padding:7px 10px; border:1px solid var(--line); background:#fff; border-radius:6px; font-weight:700; }
+    .selection { border:1px solid var(--line); background:#fff; border-radius:8px; padding:16px; margin-bottom:20px; }
+    .selection-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    #selectionTray { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:34px; }
+    .selection-pill { display:inline-flex; align-items:center; gap:7px; padding:6px 8px; background:var(--accent-soft); border:1px solid #a8c3ff; border-radius:5px; font-size:13px; }
+    .selection-pill button { min-height:0; border:0; padding:0 2px; background:transparent; color:var(--ink); }
+    .empty { color:var(--muted); font-style:italic; }
+    .group { margin:24px 0 32px; }
+    .group-heading { display:flex; justify-content:space-between; gap:10px; align-items:baseline; border-bottom:2px solid var(--ink); padding-bottom:8px; margin-bottom:12px; }
+    .group-heading p { color:var(--muted); font-size:14px; }
+    .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .model { display:grid; grid-template-columns:32px minmax(0,1fr); gap:10px; min-width:0; padding:15px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+    .model.selected { border-color:var(--accent); box-shadow:inset 4px 0 0 var(--accent); }
+    .model input { width:18px; height:18px; margin:3px 0 0; accent-color:var(--accent); }
+    .model-title { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+    .model-title h3 { margin:0; font-size:17px; }
+    code { background:#eef2f6; border-radius:4px; padding:2px 5px; overflow-wrap:anywhere; }
+    .badges { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0; }
+    .badge { border:1px solid var(--line); border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; text-transform:uppercase; }
+    .stage-1 { color:var(--stage1); border-color:var(--stage1); } .stage-2 { color:var(--stage2); border-color:var(--stage2); }
+    .stage-3 { color:var(--stage3); border-color:var(--stage3); } .stage-4 { color:var(--stage4); border-color:var(--stage4); }
+    .equation { overflow-x:auto; margin:10px 0; padding:9px 10px; background:#f8fafc; border:1px solid #e3e8ee; min-height:54px; }
+    .meta { color:var(--muted); font-size:13px; }
+    .meta strong { color:var(--ink); }
+    .note { margin-top:8px; font-size:13px; }
+    .hidden { display:none !important; }
+    @media (max-width:820px) { .toolbar-inner { grid-template-columns:1fr 1fr; } .search-wrap { grid-column:1/-1; } .cards { grid-template-columns:1fr; } h1 { font-size:28px; } }
+    @media (max-width:520px) { header,main { padding-left:14px; padding-right:14px; } .toolbar-inner { width:calc(100% - 28px); grid-template-columns:1fr; } .search-wrap { grid-column:auto; } .selection-head { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../../../../index.html">Back to reports home</a>
+    <h1>A2780 Model Registry</h1>
+    <p class="lede">A visual inventory of the reusable GrowthParameterEstimation models and the A2780-specific candidates used across the staged workflow. Select any models to build a focused visual set; filtering never changes fitted winners or scientific results.</p>
+    <div class="notice"><strong>Registry scope:</strong> package primitives, staged fit candidates, timing and inheritance hypotheses, literature benchmarks, and legacy diagnostics are shown separately. Repeated mathematical structures are cross-referenced instead of being presented as independent evidence.</div>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-inner">
+      <div class="search-wrap"><label for="search">Find a model, parameter, state, or mechanism</label><input id="search" type="search" placeholder="Try: turnover, Hill, transit, competition..."></div>
+      <div><label for="groupFilter">Registry group</label><select id="groupFilter"><option value="all">All groups</option></select></div>
+      <div><label for="statusFilter">Use status</label><select id="statusFilter"><option value="all">All statuses</option><option value="validated">Validated fit candidate</option><option value="benchmark">Literature benchmark</option><option value="package">Package primitive</option><option value="diagnostic">Diagnostic / advanced</option><option value="legacy">Legacy local candidate</option></select></div>
+    </div>
+  </div>
+
+  <main>
+    <div class="summary"><span id="visibleCount">0 models visible</span><span id="selectedCount">0 selected</span><button class="primary" id="selectVisible">Select visible</button><button id="clearSelection">Clear selection</button></div>
+    <section class="selection" aria-labelledby="selectionTitle">
+      <div class="selection-head"><div><h2 id="selectionTitle">Models in visual</h2><p class="meta">This tray is the starting point for the future registry diagram.</p></div></div>
+      <div id="selectionTray"><span class="empty">Choose model checkboxes below.</span></div>
+    </section>
+    <div id="registry"></div>
+  </main>
+
+  <script>
+  const groups = {
+    "Package primitives": "Reusable models registered by GrowthParameterEstimation.",
+    "Stage 1 - untreated monoculture": "Base growth laws fitted before treatment or coculture modifiers are introduced.",
+    "Stage 2 - treated monoculture": "Drug-response candidates fitted jointly across doses and seeding densities.",
+    "Stage 2 - timing architectures": "Constraints on how A2780Naive and A2780cis treatment activation is shared.",
+    "Stage 3 - untreated coculture": "Competition and lineage-loss structures fitted after inheriting Stage 1 growth.",
+    "Strobl literature benchmarks": "Low-parameter sensitive/resistant competition, cost, and turnover equations.",
+    "Stage 4 - treated coculture": "Linked-treatment hypotheses that inherit prior-stage growth, competition, and drug effects.",
+    "Treated-coculture diagnostics": "Earlier direct candidates retained for audit but not part of the canonical linked hierarchy.",
+    "Legacy local registry": "Application-local candidates predating the reconciled package registry."
+  };
+  const M = (group,id,name,status,stages,states,params,equation,note) => ({group,id,name,status,stages,states,params,equation,note});
+  const models = [
+    M("Package primitives","logistic_growth","Logistic growth","package",[1],["N"],["r","K"],String.raw`\dot N=rN(1-N/K)`,"Also tested directly in Stage 1."),
+    M("Package primitives","gompertz_growth","Gompertz growth","package",[1],["N"],["a","b","K"],String.raw`\dot N=rN\log(K/N)`,"Also tested directly in Stage 1."),
+    M("Package primitives","theta_logistic_hill_inhibition","Theta-logistic Hill inhibition","package",[2],["N"],["r","K","theta","IC50","h"],String.raw`\dot N=rN[1-(N/K)^\theta][1-H(D)]`,"Drug inhibits proliferation rather than adding death."),
+    M("Package primitives","theta_logistic_hill_kill","Theta-logistic Hill kill","package",[2],["N"],["r","K","theta","Emax","IC50","h"],String.raw`\dot N=rN[1-(N/K)^\theta]-E_{max}H(D)N`,"Immediate saturable per-capita killing."),
+    M("Package primitives","null_coculture","Independent coculture null","package",[3],["S","R"],["rS","KS","rR","KR"],String.raw`\dot S=r_SS(1-S/K_S),\quad \dot R=r_RR(1-R/K_R)`,"No cross-lineage interaction."),
+    M("Package primitives","lotka_volterra_competition","Lotka-Volterra competition","package",[3],["S","R"],["rS","KS","alphaSR","rR","KR","alphaRS"],String.raw`\dot S=r_SS[1-(S+\alpha_{SR}R)/K_S],\quad \dot R=r_RR[1-(R+\alpha_{RS}S)/K_R]`,"Reusable two-population competition model."),
+    M("Package primitives","lotka_volterra_hill_competition","Lotka-Volterra plus Hill kill","package",[4],["S","R"],["growth","competition","EmaxS","IC50S","EmaxR","IC50R","h"],String.raw`\dot X_i=G_i^{LV}(S,R)-E_{max,i}H_i(D)X_i`,"Direct treated-competition primitive."),
+    M("Package primitives","sensitive_resistant","Sensitive-to-resistant transition","package",[2,4],["S","R"],["rS","rR","K","kSR","Emax","IC50","h"],String.raw`\dot S=G_S-k_{SR}S-H(D)S,\quad \dot R=G_R+k_{SR}S`,"Latent states require additional evidence for biological interpretation."),
+    M("Package primitives","damage_repair_arrest","Damage, repair, and arrest","package",[2],["live","damaged"],["r","K","kDamage","kRepair","kDeath","IC50","h"],String.raw`\dot L=G(L)-k_dH(D)L+k_rA,\quad \dot A=k_dH(D)L-(k_r+k_{death})A`,"Separates reversible damage from damaged-cell loss."),
+    M("Package primitives","adaptive_ic50","Adaptive IC50 state","package",[2],["N","A"],["r","K","Emax","IC50_0","h","kAdapt"],String.raw`IC50(t)=IC50_0[1+A(t)],\quad \dot A=k_{adapt}H(D)-0.05A`,"Advanced reversible-tolerance mechanism."),
+    M("Package primitives","pkpd_inhibition","PK/PD growth inhibition","package",[2],["N","C"],["r","K","Emax","IC50","h","kElim","kIn"],String.raw`\dot C=k_{in}D-k_{elim}C,\quad \dot N=G(N)[1-E_{max}H(C)]`,"One effective internal-exposure state."),
+    M("Package primitives","transit_chain_erlang","Erlang transit chain","package",[2],["N","X1","X2","X3"],["r","K","ktr","Emax","IC50","h"],String.raw`\dot X_1=H(D)N-k_{tr}X_1,\ \dot X_2=k_{tr}(X_1-X_2),\ \dot X_3=k_{tr}(X_2-X_3)`,"Delay surrogate using three transit stages."),
+    M("Package primitives","bi_exponential_response","Bi-exponential response","package",[2],["N1","N2"],["a","b"],String.raw`\dot N_1=-aN_1,\quad \dot N_2=-bN_2,\quad \hat y=N_1+N_2`,"Phenomenological two-rate response."),
+
+    M("Stage 1 - untreated monoculture","theta_logistic_growth","Theta-logistic growth","validated",[1],["X"],["r","K","theta"],String.raw`\dot X=rX[1-(X/K)^\theta]`,"Generalizes the shape of crowding slowdown."),
+    M("Stage 1 - untreated monoculture","lagged_theta_logistic_growth","Hard-lag theta-logistic","validated",[1],["X"],["r","K","theta","tau"],String.raw`\dot X=\mathbf 1_{t>\tau}rX[1-(X/K)^\theta]`,"No growth before a fitted lag time."),
+    M("Stage 1 - untreated monoculture","baranyi_theta_logistic_growth","Baranyi-adjusted theta-logistic","validated",[1],["X"],["r","K","theta","q0"],String.raw`\dot X=\alpha_B(t)rX[1-(X/K)^\theta],\quad \alpha_B(t)=q_0/(q_0+e^{-rt})`,"Smooth physiological adjustment."),
+    M("Stage 1 - untreated monoculture","adaptation_theta_logistic_growth","Smooth-adaptation theta-logistic","validated",[1],["X"],["r","K","theta","lambdaA"],String.raw`\dot X=(1-e^{-\lambda_A t})rX[1-(X/K)^\theta]`,"Smoothly activates growth from time zero."),
+
+    M("Stage 2 - treated monoculture","joint_anchored_linear_kill","Anchored linear kill","validated",[2],["X"],["kill"],String.raw`\dot X=G_i(X)-k_iDX`,"Simplest immediate concentration-proportional treatment model."),
+    M("Stage 2 - treated monoculture","joint_anchored_hill_kill","Anchored Hill kill","validated",[2],["X"],["Emax","EC50","h"],String.raw`\dot X=G_i(X)-E_{max,i}\frac{D^h}{EC50_i^h+D^h}X`,"Immediate saturating kill."),
+    M("Stage 2 - treated monoculture","joint_time_decay_dose_scaled","Time-decay kill","validated",[2],["X"],["kill","lambda"],String.raw`\dot X=G_i(X)-k_iD e^{-\lambda_i t}X`,"Treatment effect wanes from its initial value."),
+    M("Stage 2 - treated monoculture","joint_ic_effect_logistic_hill","IC-effect logistic Hill","validated",[2],["X"],["Emax","EC50","h"],String.raw`\dot X=G_i(X)-H_i(z)X`,"Uses experiment-defined IC effect level z."),
+    M("Stage 2 - treated monoculture","joint_ic_effect_hill_ramp","Hill-ramp kill","validated",[2],["X"],["Emax","lambda"],String.raw`\dot X=G_i(X)-(1-e^{-\lambda_i t})H_i(z)X`,"Drug effect accumulates gradually from time zero."),
+    M("Stage 2 - treated monoculture","joint_ic_effect_hill_ramp_onset","Delayed Hill-ramp kill","validated",[2],["X"],["Emax","lambda","tOn"],String.raw`\dot X=G_i(X)-\mathbf1_{t>t_{on}}[1-e^{-\lambda_i(t-t_{on})}]H_i(z)X`,"Adds an explicit onset time."),
+    M("Stage 2 - treated monoculture","joint_ic_effect_transit_death","Transit damage/death","validated",[2],["P","D"],["Emax","lambda","tOn","kClear"],String.raw`\dot P=G_i(P)-A_iH_iP,\quad \dot D=A_iH_iP-k_{clear}D,\quad \hat y=P+D/2`,"Damaged cells remain partly visible before clearing."),
+    M("Stage 2 - treated monoculture","joint_ic_effect_two_population","Sensitive/tolerant populations","validated",[2],["S","T"],["fT0","killS","killT","timing"],String.raw`\dot S=G(S+T)S/(S+T)-A H_S S,\quad \dot T=G(S+T)T/(S+T)-A H_T T`,"Latent cis states are aggregated in default outputs."),
+    M("Stage 2 - treated monoculture","joint_intracellular_platinum_pkpd","Intracellular platinum PK/PD","validated",[2],["X","Ci","Cb"],["Emax","EC50b","h","kEfflux","kRepair"],String.raw`\dot C_i=D-k_{efflux}C_i,\quad \dot C_b=C_i-k_{repair}C_b,\quad \dot X=G_i(X)-H(C_b)X`,"Mechanism-inspired effective uptake and binding states."),
+
+    M("Stage 2 - timing architectures","cis_onset_only","A2780cis onset only","validated",[2],["activation"],["tOnC"],String.raw`A_N=R(t;\lambda_N,t_{on,N}),\quad A_C=\mathbf1_{t>t_{on,C}}`,"Tests abrupt A2780cis activation."),
+    M("Stage 2 - timing architectures","independent_onset_gradual","Independent onset plus gradual activation","validated",[2],["activation"],["lambdaN","tOnN","lambdaC","tOnC"],String.raw`A_N=R(t;\lambda_N,t_{on,N}),\quad A_C=R(t;\lambda_C,t_{on,C})`,"Cell lines have independent timing."),
+    M("Stage 2 - timing architectures","shared_onset_gradual","Shared onset plus gradual activation","validated",[2],["activation"],["tOn","lambdaN","lambdaC"],String.raw`A_N=R(t;\lambda_N,t_{on}),\quad A_C=R(t;\lambda_C,t_{on})`,"One onset is shared across cell lines."),
+    M("Stage 2 - timing architectures","cis_gradual_only","A2780cis gradual activation only","validated",[2],["activation"],["lambdaC"],String.raw`A_N=R(t;\lambda_N,t_{on,N}),\quad A_C=1-e^{-\lambda_Ct}`,"No separate A2780cis onset."),
+    M("Stage 2 - timing architectures","partial_onset_0_5day","Onsets within 0.5 day","validated",[2],["activation"],["meanOnset","deltaT"],String.raw`t_{on,N}=\bar t_{on}-\delta_t,\quad t_{on,C}=\bar t_{on}+\delta_t,\quad |\delta_t|\le0.5`,"Partially pooled onset constraint."),
+
+    M("Stage 3 - untreated coculture","lv_symmetric_competition","Symmetric competition","validated",[3],["N","C"],["alpha"],String.raw`\dot N=G_N(N,N+\alpha C),\quad \dot C=G_C(C,C+\alpha N)`,"Simplest tested interaction model."),
+    M("Stage 3 - untreated coculture","lv_asymmetric_competition","Asymmetric competition","validated",[3],["N","C"],["alphaNC","alphaCN"],String.raw`\dot N=G_N(N,N+\alpha_{NC}C),\quad \dot C=G_C(C,C+\alpha_{CN}N)`,"Direction-specific competition."),
+    M("Stage 3 - untreated coculture","lv_asymmetric_competition_death","Asymmetric competition with loss","validated",[3],["N","C"],["alphaNC","alphaCN","dN","dC"],String.raw`\dot N=G_N(N,L_N)-d_NN,\quad \dot C=G_C(C,L_C)-d_CC`,"Adds lineage-specific net loss."),
+
+    M("Strobl literature benchmarks","strobl_birth_no_cost_no_turnover","Strobl: no cost, no turnover","benchmark",[3,4],["S","R"],["K"],String.raw`\dot S=r_S(1-(S+R)/K)S,\quad \dot R=r_S(1-(S+R)/K)R`,"Lowest-parameter Strobl reduction."),
+    M("Strobl literature benchmarks","strobl_birth_growth_cost_only","Strobl: growth cost only","benchmark",[3,4],["S","R"],["K","c"],String.raw`\dot R=(1-c)r_S(1-(S+R)/K)R`,"Resistance cost acts on growth."),
+    M("Strobl literature benchmarks","strobl_birth_turnover_only","Strobl: turnover only","benchmark",[3,4],["S","R"],["K","dT"],String.raw`\dot X_i=r_i(1-(S+R)/K)X_i-d_TX_i`,"Shared background turnover."),
+    M("Strobl literature benchmarks","strobl_birth_growth_cost_turnover","Strobl: growth cost plus turnover","benchmark",[3,4],["S","R"],["K","c","dT"],String.raw`\dot R=(1-c)r_S(1-(S+R)/K)R-d_TR`,"Main low-parameter cost-and-turnover model."),
+    M("Strobl literature benchmarks","strobl_birth_capacity_cost_turnover","Strobl: carrying-capacity cost","benchmark",[3,4],["S","R"],["K","c","dT"],String.raw`K_R=(1-c)K,\quad \dot X_i=r_i(1-(S+R)/K_i)X_i-d_TX_i`,"Resistance cost acts on carrying capacity."),
+    M("Strobl literature benchmarks","strobl_birth_death_cost_turnover","Strobl: death cost","benchmark",[3,4],["S","R"],["K","c","dT"],String.raw`d_R=(1+c)d_T,\quad \dot X_i=r_i(1-(S+R)/K)X_i-d_iX_i`,"Resistance cost acts on death."),
+    M("Strobl literature benchmarks","strobl_density_dependent_death","Strobl: density-dependent death","benchmark",[3,4],["S","R"],["K","c","dTdagger"],String.raw`\dot X_i=r_iX_i-d_T^\dagger(S+R)X_i/K`,"Crowding acts through death rather than birth suppression."),
+
+    M("Stage 4 - treated coculture","strict_inheritance","Strict drug-effect inheritance","validated",[4],["N","C"],["none new"],String.raw`\dot X_i=G_i^{co}-E_i^{mono}(t,z)X_i`,"Simplest Stage 4 candidate."),
+    M("Stage 4 - treated coculture","competitor_scaled","Competitor-scaled drug effect","validated",[4],["N","C"],["betaN","betaC"],String.raw`\dot X_i=G_i^{co}-e^{\beta_i\alpha_{ij}X_j/K_i}E_i^{mono}X_i`,"Drug effect changes with opposing-lineage burden."),
+    M("Stage 4 - treated coculture","load_scaled","Total-load-scaled drug effect","validated",[4],["N","C"],["betaN","betaC"],String.raw`\dot X_i=G_i^{co}-e^{\beta_iL_i/K_i}E_i^{mono}X_i`,"Drug effect changes with effective competitive load."),
+    M("Stage 4 - treated coculture","load_plus_context_amplitude","Load plus context amplitude","validated",[4],["N","C"],["betaN","betaC","gammaN","gammaC"],String.raw`\dot X_i=G_i^{co}-e^{\beta_iL_i/K_i+\gamma_i}E_i^{mono}X_i`,"Adds a coculture-wide amplitude shift."),
+    M("Stage 4 - treated coculture","tolerant_context_shift","Tolerant-state context shift","validated",[4],["N","S","T"],["deltaF","gammaT"],String.raw`f_{T0}^{co}=logit^{-1}[logit(f_{T0})+\delta_f],\quad H_{CT}^{co}=e^{\gamma_T}H_{CT}`,"Changes latent cis composition and tolerant kill."),
+    M("Stage 4 - treated coculture","subpopulation_load_scaled","Subpopulation-specific load scaling","validated",[4],["N","S","T"],["betaN","betaCS","betaCT"],String.raw`M_N=e^{\beta_NL_N/K_N},\quad M_{CS}=e^{\beta_{CS}L_C/K_C},\quad M_{CT}=e^{\beta_{CT}L_C/K_C}`,"Separate load effects for each latent state."),
+    M("Stage 4 - treated coculture","load_plus_tolerant_context","Load plus tolerant context","validated",[4],["N","S","T"],["beta","deltaF","gammaT"],String.raw`M_i=e^{\beta_iL_i/K_i},\quad f_{T0}^{co}=logit^{-1}[logit(f_{T0})+\delta_f]`,"Combines load scaling with tolerant-state changes."),
+    M("Stage 4 - treated coculture","load_plus_tolerant_growth_context","Load, cis state, and growth context","validated",[4],["N","S","T"],["beta","deltaF","gammaT","gammaRT"],String.raw`\dot T=\rho_TG_C^{co}T/C-M_CA_CH_{CT}^{co}T,\quad \rho_T=e^{\gamma_{r,T}}`,"Current linked winner; latent states remain unobserved."),
+    M("Stage 4 - treated coculture","fully_free_context_diagnostic","Fully free context diagnostic","diagnostic",[4],["N","C or S,T"],["free drug vector"],String.raw`\dot X_i=G_i^{co}-E_i^{co}(t,z)X_i,\quad q_{drug}^{co}\ne q_{drug}^{mono}`,"Upper-flexibility diagnostic; breaks strict inheritance."),
+
+    M("Treated-coculture diagnostics","dual_constant_kill","Dual constant kill","diagnostic",[4],["N","C"],["killN","killC"],String.raw`\dot X_i=G_i^{co}-k_iX_i`,"Immediate additive kill."),
+    M("Treated-coculture diagnostics","dual_time_decay_kill","Dual time-decay kill","diagnostic",[4],["N","C"],["killN","killC","lambda"],String.raw`\dot X_i=G_i^{co}-k_i e^{-\lambda t}X_i`,"Shared decay rate."),
+    M("Treated-coculture diagnostics","dual_delayed_ramp_kill","Dual delayed-ramp kill","diagnostic",[4],["N","C"],["killN","killC","lambda","onset"],String.raw`\dot X_i=G_i^{co}-k_i\mathbf1_{t>t_{on}}(1-e^{-\lambda(t-t_{on})})X_i`,"Shared treatment timing."),
+    M("Treated-coculture diagnostics","dual_transit_damage","Dual transit damage","diagnostic",[4],["liveN","damageN","liveC","damageC"],["killN","killC","lambda","onset","clearance"],String.raw`\dot P_i=G_i^{co}-A(t)k_iP_i,\quad \dot D_i=A(t)k_iP_i-k_{clear}D_i`,"Two lineage-specific damage compartments."),
+    M("Treated-coculture diagnostics","dual_transit_competitor_scaled","Competitor-scaled transit damage","diagnostic",[4],["live/damage by lineage"],["transit","betaN","betaC"],String.raw`damage_i=e^{\beta_i\alpha_{ij}X_j/K_i}A(t)k_iP_i`,"Transit damage scaled by competitor burden."),
+    M("Treated-coculture diagnostics","dual_transit_load_scaled","Load-scaled transit damage","diagnostic",[4],["live/damage by lineage"],["transit","betaN","betaC"],String.raw`damage_i=e^{\beta_iL_i/K_i}A(t)k_iP_i`,"Transit damage scaled by total load."),
+    M("Treated-coculture diagnostics","sensitive_tolerant_transition","Sensitive/tolerant transition diagnostic","diagnostic",[4],["sensitive","tolerant","resistant"],["kills","lambda","onset","transition"],String.raw`\dot S=G_S-Ak_SS-qS,\quad \dot T=G_T-Ak_TT+qS`,"Advanced latent transition model."),
+
+    M("Legacy local registry","hill_death_instantaneous","Instantaneous Hill death","legacy",[2],["N"],["r","K","Emax","EC50","h"],String.raw`\dot N=rN(1-N/K)-E_{max}H(D)N`,"Superseded by joint treated-monoculture candidates."),
+    M("Legacy local registry","one_stage_transit_linear_kill","One-stage linear transit kill","legacy",[2],["live","damaged"],["r","K","kill","tau"],String.raw`\dot L=G(L)-kDL,\quad \dot A=kDL-A/\tau`,"Application-local transit model."),
+    M("Legacy local registry","transit_hill_combined","One-stage Hill transit","legacy",[2],["live","damaged"],["r","K","Emax","EC50","h","tau"],String.raw`\dot L=G(L)-H(D)L,\quad \dot A=H(D)L-A/\tau`,"Hill dose response plus one transit state."),
+    M("Legacy local registry","adaptive_ic50_hill","Adaptive IC50 with relaxation","legacy",[2],["N","A"],["r","K","Emax","IC50","h","adapt","relax"],String.raw`IC50_{eff}=IC50_0(1+A),\quad \dot A=k_aD-k_rA`,"Legacy reversible-tolerance candidate."),
+    M("Legacy local registry","population_balance_sr","Population-balance S/R","legacy",[2],["S","R"],["r","K","kills","EC50","h","kSR","kRS"],String.raw`\dot S=G_S-H_SK-k_{SR}DS+k_{RS}R,\quad \dot R=G_R-H_RR+k_{SR}DS-k_{RS}R`,"Bidirectional population balance."),
+    M("Legacy local registry","theta_hill_kill","Local theta-Hill kill","legacy",[2],["N"],["r","K","theta","Emax","EC50","h"],String.raw`\dot N=rN[1-(N/K)^\theta]-E_{max}H(D)N`,"Equivalent family now available from the package."),
+    M("Legacy local registry","simeoni_transit_compartment","Simeoni-style transit compartment","legacy",[2],["live","damage1","damage2"],["r","K","kill","kTransit"],String.raw`\dot L=G(L)-kDL,\quad \dot Z_1=kDL-k_{tr}Z_1,\quad \dot Z_2=k_{tr}(Z_1-Z_2)`,"Literature-inspired delay surrogate."),
+    M("Legacy local registry","time_decay_kill_fixed","Fixed time-decay kill","legacy",[2],["N"],["r","K","kill","lambda"],String.raw`\dot N=G(N)-ke^{-\lambda t}N`,"Does not scale by measured dose."),
+    M("Legacy local registry","time_decay_kill_dose_scaled","Dose-scaled time-decay kill","legacy",[2],["N"],["r","K","kill","lambda"],String.raw`\dot N=G(N)-kDe^{-\lambda t}N`,"Dose-scaled legacy alternative.")
+  ];
+
+  const registry = document.getElementById('registry');
+  const search = document.getElementById('search');
+  const groupFilter = document.getElementById('groupFilter');
+  const statusFilter = document.getElementById('statusFilter');
+  const selected = new Set();
+  Object.keys(groups).forEach(group => groupFilter.add(new Option(group, group)));
+
+  function stageBadges(stages) { return stages.map(s => `<span class="badge stage-${s}">Stage ${s}</span>`).join(''); }
+  function card(model) {
+    const haystack = [model.group,model.id,model.name,model.status,model.states.join(' '),model.params.join(' '),model.note].join(' ').toLowerCase();
+    return `<article class="model" data-id="${model.id}" data-group="${model.group}" data-status="${model.status}" data-search="${haystack}">
+      <input type="checkbox" aria-label="Show ${model.name} in visual" data-select="${model.id}">
+      <div><div class="model-title"><h3>${model.name}</h3><code>${model.id}</code></div>
+      <div class="badges">${stageBadges(model.stages)}<span class="badge">${model.status}</span></div>
+      <div class="equation">\\(${model.equation}\\)</div>
+      <div class="meta"><strong>States:</strong> ${model.states.join(', ')} &nbsp; <strong>Parameters:</strong> ${model.params.join(', ')}</div>
+      <p class="note">${model.note}</p></div></article>`;
+  }
+  function render() {
+    registry.innerHTML = Object.entries(groups).map(([group,description]) => {
+      const entries = models.filter(m => m.group === group);
+      return `<section class="group" data-group-section="${group}"><div class="group-heading"><div><h2>${group}</h2><p>${description}</p></div><strong>${entries.length}</strong></div><div class="cards">${entries.map(card).join('')}</div></section>`;
+    }).join('');
+    document.querySelectorAll('[data-select]').forEach(box => box.addEventListener('change', event => {
+      const id = event.target.dataset.select;
+      event.target.checked ? selected.add(id) : selected.delete(id);
+      updateSelection();
+    }));
+    applyFilters();
+    if (window.MathJax?.typesetPromise) MathJax.typesetPromise();
+  }
+  function applyFilters() {
+    const term = search.value.trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('.model').forEach(el => {
+      const show = (!term || el.dataset.search.includes(term)) && (groupFilter.value === 'all' || el.dataset.group === groupFilter.value) && (statusFilter.value === 'all' || el.dataset.status === statusFilter.value);
+      el.classList.toggle('hidden', !show); if (show) visible++;
+    });
+    document.querySelectorAll('[data-group-section]').forEach(section => section.classList.toggle('hidden', !section.querySelector('.model:not(.hidden)')));
+    document.getElementById('visibleCount').textContent = `${visible} model${visible === 1 ? '' : 's'} visible`;
+  }
+  function updateSelection() {
+    document.querySelectorAll('.model').forEach(el => el.classList.toggle('selected', selected.has(el.dataset.id)));
+    document.getElementById('selectedCount').textContent = `${selected.size} selected`;
+    const tray = document.getElementById('selectionTray');
+    tray.innerHTML = selected.size ? [...selected].map(id => { const m=models.find(x=>x.id===id); return `<span class="selection-pill">${m.name}<button data-remove="${id}" aria-label="Remove ${m.name}">x</button></span>`; }).join('') : '<span class="empty">Choose model checkboxes below.</span>';
+    tray.querySelectorAll('[data-remove]').forEach(button => button.addEventListener('click', () => { selected.delete(button.dataset.remove); const box=document.querySelector(`[data-select="${button.dataset.remove}"]`); if(box) box.checked=false; updateSelection(); }));
+  }
+  [search,groupFilter,statusFilter].forEach(control => control.addEventListener('input', applyFilters));
+  document.getElementById('selectVisible').addEventListener('click', () => { document.querySelectorAll('.model:not(.hidden)').forEach(el => { selected.add(el.dataset.id); el.querySelector('input').checked=true; }); updateSelection(); });
+  document.getElementById('clearSelection').addEventListener('click', () => { selected.clear(); document.querySelectorAll('[data-select]').forEach(box=>box.checked=false); updateSelection(); });
+  render();
+  </script>
+</body>
+</html>
