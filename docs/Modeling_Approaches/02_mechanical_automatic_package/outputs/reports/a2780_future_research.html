@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simplifying A2780 Coculture Adaptive Therapy</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    :root {
+      --ink: #182230;
+      --muted: #52606d;
+      --line: #c9d2dc;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --blue: #2457d6;
+      --green: #16704a;
+      --amber: #8a5700;
+      --red: #a3273f;
+      --soft-blue: #edf3ff;
+      --soft-green: #edf8f2;
+      --soft-amber: #fff7e8;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+    }
+    header, main, footer { max-width: 1240px; margin: 0 auto; padding: 28px 26px; }
+    header { padding-top: 34px; padding-bottom: 18px; }
+    h1 { margin: 14px 0 8px; font-size: 36px; line-height: 1.15; }
+    h2 { margin: 0 0 12px; font-size: 27px; }
+    h3 { margin: 20px 0 8px; font-size: 20px; }
+    h4 { margin: 0 0 5px; font-size: 16px; }
+    p { margin: 8px 0; }
+    a { color: var(--blue); }
+    .back { color: var(--ink); font-weight: 700; text-decoration: none; }
+    .lede { max-width: 980px; color: var(--muted); font-size: 18px; }
+    .boundary {
+      margin-top: 18px;
+      border-left: 5px solid var(--red);
+      background: #fff;
+      padding: 14px 17px;
+    }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    nav a {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font-weight: 700;
+      padding: 8px 11px;
+      text-decoration: none;
+    }
+    section { padding: 28px 0; border-top: 1px solid var(--line); }
+    .summary-grid, .roadmap-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .summary-item, .roadmap-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--blue);
+      padding: 15px;
+    }
+    .summary-item:nth-child(2), .roadmap-item:nth-child(2) { border-top-color: var(--green); }
+    .summary-item:nth-child(3), .roadmap-item:nth-child(3) { border-top-color: var(--amber); }
+    .metric { display: block; margin-bottom: 4px; font-size: 27px; font-weight: 700; }
+    .small { color: var(--muted); font-size: 14px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: #fff; }
+    table { width: 100%; min-width: 1080px; border-collapse: collapse; }
+    th, td { padding: 11px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { background: #eaf0f4; font-size: 14px; }
+    tr:last-child td { border-bottom: 0; }
+    td.rank { width: 48px; font-size: 20px; font-weight: 700; color: var(--blue); }
+    td.paper { min-width: 250px; }
+    td.use { min-width: 250px; }
+    .tag {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .direct { color: var(--green); }
+    .transfer { color: var(--amber); }
+    .preprint { color: var(--red); }
+    .clinical { color: var(--blue); }
+    .paper-list { display: grid; gap: 12px; margin-top: 16px; }
+    details.paper {
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    details.paper > summary {
+      cursor: pointer;
+      padding: 14px 16px;
+      font-weight: 700;
+    }
+    details.paper[open] > summary { border-bottom: 1px solid var(--line); background: #f0f4f7; }
+    .paper-body { padding: 14px 16px 17px; }
+    .paper-body dl { display: grid; grid-template-columns: 150px 1fr; gap: 7px 15px; margin: 0; }
+    dt { font-weight: 700; }
+    dd { margin: 0; color: var(--muted); }
+    .equation { overflow-x: auto; background: #f8fafc; border-left: 4px solid var(--blue); padding: 8px 12px; margin: 12px 0; }
+    .decision {
+      background: var(--soft-green);
+      border: 1px solid #a8d5bd;
+      padding: 14px 16px;
+      margin-top: 14px;
+    }
+    .model-flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0;
+      margin: 18px 0;
+    }
+    .flow-step {
+      position: relative;
+      min-height: 126px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 14px 17px;
+    }
+    .flow-step + .flow-step { border-left: 0; }
+    .flow-step strong { display: block; margin-bottom: 5px; }
+    .flow-step .number { color: var(--blue); font-size: 24px; font-weight: 700; }
+    .parameter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .parameter-item { border-left: 4px solid var(--line); background: #fff; padding: 10px 13px; }
+    .parameter-item strong { display: block; }
+    .warning { background: var(--soft-amber); border: 1px solid #e4c478; padding: 14px 16px; }
+    .roadmap-item ol { margin: 10px 0 0; padding-left: 20px; }
+    .roadmap-item li { margin-bottom: 7px; }
+    .priority {
+      display: inline-block;
+      background: var(--ink);
+      color: #fff;
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .checklist { columns: 2; column-gap: 32px; padding-left: 21px; }
+    .checklist li { break-inside: avoid; margin-bottom: 8px; }
+    .references li { margin-bottom: 11px; }
+    footer { color: var(--muted); padding-top: 8px; padding-bottom: 42px; }
+    @media (max-width: 900px) {
+      header, main, footer { padding-left: 16px; padding-right: 16px; }
+      h1 { font-size: 29px; }
+      .summary-grid, .roadmap-grid { grid-template-columns: 1fr; }
+      .model-flow, .parameter-grid { grid-template-columns: 1fr; }
+      .flow-step + .flow-step { border-left: 1px solid var(--line); border-top: 0; }
+      .paper-body dl { grid-template-columns: 1fr; gap: 2px; }
+      .paper-body dd { margin-bottom: 8px; }
+      .checklist { columns: 1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../../../../index.html">&#8592; Back to reports home</a>
+    <h1>Simplifying A2780 Coculture Adaptive Therapy</h1>
+    <p class="lede">A two-population mathematical core, a focused ovarian-cancer reading set, and an experimental roadmap for explaining how untreated competition, cisplatin exposure, and adaptive treatment decisions fit together.</p>
+    <div class="boundary"><strong>Interpretive boundary:</strong> this is a project-relevance ranking, not a claim that these are the 15 most influential ovarian-cancer papers in general. A paper can justify testing a model class, but only this project's data and prospective validation can support selecting it for A2780.</div>
+    <nav aria-label="Report sections">
+      <a href="#simple-model">Start with the simple model</a>
+      <a href="#method">Selection method</a>
+      <a href="#shortlist">Top 15</a>
+      <a href="#models">Mathematical lessons</a>
+      <a href="#roadmap">Research roadmap</a>
+      <a href="#experiments">Experiments needed</a>
+      <a href="#bibliography">Bibliography</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="simple-model">
+      <h2>Start Here: The Smallest Defensible Model</h2>
+      <p>The current experiment directly observes two established cell lines: A2780Naive, written \(N(t)\), and A2780cis, written \(C(t)\). The clearest adaptive-therapy model should begin with exactly those two populations. A2780cis may be less responsive to cisplatin, but it is not automatically a hidden mixture of sensitive and tolerant cells, and treatment does not convert A2780Naive into the A2780cis cell line.</p>
+
+      <div class="model-flow" aria-label="Four-step adaptive coculture model">
+        <div class="flow-step"><span class="number">1</span><strong>Grow separately</strong><span class="small">Learn the untreated growth law for each lineage from monoculture.</span></div>
+        <div class="flow-step"><span class="number">2</span><strong>Compete together</strong><span class="small">Add only the cross-lineage effects needed to explain untreated coculture.</span></div>
+        <div class="flow-step"><span class="number">3</span><strong>Apply exposure</strong><span class="small">Let the same fitted coculture state continue while cisplatin exposure rises and clears.</span></div>
+        <div class="flow-step"><span class="number">4</span><strong>Decide at checks</strong><span class="small">At monitoring times, choose the next allowed dose from the measured response.</span></div>
+      </div>
+
+      <h3>Step 1: Untreated coculture</h3>
+      <div class="equation">\[L_N=N+\alpha_{NC}C,\qquad L_C=C+\alpha_{CN}N\]
+      \[\frac{dN}{dt}=G_N(N,L_N)-d_NN,\qquad \frac{dC}{dt}=G_C(C,L_C)-d_CC\]</div>
+      <p>\(G_N\) and \(G_C\) are the already fitted logistic or theta-logistic growth laws. \(L_N\) and \(L_C\) are effective crowding loads. If \(\alpha_{NC}=1\), one cis cell contributes the same modeled load to Naive as one Naive cell. If \(\alpha_{NC}&gt;1\), cis has a stronger suppressive effect on Naive. The reverse effect is controlled independently by \(\alpha_{CN}\). The loss terms \(d_N\) and \(d_C\) are included only when the data support lineage-specific decline beyond inherited growth.</p>
+
+      <h3>Step 2: Cisplatin exposure and kill</h3>
+      <div class="equation">\[\frac{dE}{dt}=k_{in}D_{cmd}(t)-k_{clear}E\]
+      \[\frac{dN}{dt}=G_N(N,L_N)-d_NN-q_N(E)N,\qquad \frac{dC}{dt}=G_C(C,L_C)-d_CC-q_C(E)C\]
+      \[q_i(E)=E_{max,i}\frac{E^h}{EC_{50,i}^{h}+E^h}\]</div>
+      <p>\(D_{cmd}(t)\) is what the experimenter adds; \(E(t)\) is effective exposure; and \(q_i(E)\) is the lineage-specific loss pressure. These are not the same quantity. The one-state exposure equation lets drug action decay after washout without creating an unexplained permanent effect. A second damage compartment should be added only if this model fails held-out pulse and washout experiments.</p>
+
+      <h3>Step 3: Adaptive decision rule</h3>
+      <div class="equation">\[
+      D_{k+1}=\begin{cases}
+      D_{high}, & B(t_k)\ge U,\\
+      0, & B(t_k)\le L,\\
+      D_k, & L&lt;B(t_k)&lt;U,
+      \end{cases}
+      \qquad B(t)=N(t)+C(t)
+      \]</div>
+      <p>The model is integrated continuously, but treatment changes only at prespecified monitoring times \(t_k\). \(U\) and \(L\) are upper and lower burden thresholds. The middle rule is hysteresis: between the thresholds, the previous treatment state is retained so noise does not cause rapid on/off switching. Dose modulation can replace \(0\) and \(D_{high}\) with a small set of allowed doses.</p>
+
+      <div class="parameter-grid">
+        <div class="parameter-item"><strong>Measured states</strong>\(N\), \(C\), and total \(B=N+C\). These are appropriate default graph outputs.</div>
+        <div class="parameter-item"><strong>Fitted biology</strong>Growth parameters, \(\alpha_{NC}\), \(\alpha_{CN}\), supported loss terms, and dose-response parameters.</div>
+        <div class="parameter-item"><strong>Experimental exposure</strong>Commanded concentration, refresh and washout times, and fitted effective clearance.</div>
+        <div class="parameter-item"><strong>Policy choices</strong>Monitoring times, thresholds, and allowable doses. These are schedule settings, not biological fit parameters.</div>
+      </div>
+
+      <h3>When adaptive therapy can work</h3>
+      <p>All four conditions should be checked rather than assumed:</p>
+      <ol>
+        <li><strong>Differential drug response:</strong> cisplatin suppresses A2780Naive more strongly than A2780cis over the tested range.</li>
+        <li><strong>Off-drug recovery advantage:</strong> without drug, Naive regrows at least fast enough to recover ecological pressure on cis.</li>
+        <li><strong>Meaningful competition:</strong> the two populations limit one another at the densities used; at very low density, preserving sensitive cells may provide little suppression.</li>
+        <li><strong>Observable feedback:</strong> the quantity controlling treatment can be measured often enough and with known error.</li>
+      </ol>
+      <div class="decision"><strong>Recommended default:</strong> use \(N\), \(C\), one effective-exposure state, and discrete dose decisions. Keep phenotype switching, hidden cis compartments, molecular PK, and spatial structure under Advanced Models until new measurements identify them.</div>
+    </section>
+
+    <section id="method">
+      <h2>How The Papers Were Selected</h2>
+      <p>The search emphasized primary research that clarifies the simple model above: ovarian sensitive/resistant competition, platinum timing, adaptive dose decisions, and longitudinal calibration. Broader virtual-trial and spatial papers remain in the list as future extensions, but they do not define the current default equations.</p>
+      <div class="summary-grid">
+        <div class="summary-item"><span class="metric">15</span><strong>ranked papers</strong><p class="small">Fourteen ovarian-focused modeling or experimental-model papers and one cross-cancer mathematical benchmark; one item is clearly labeled as a preprint.</p></div>
+        <div class="summary-item"><span class="metric">6</span><strong>modeling scales</strong><p class="small">Cellular PK/PD, population ODEs, ecological competition, branching processes, spatial delivery, and clinical biomarker models.</p></div>
+        <div class="summary-item"><span class="metric">3</span><strong>implementation horizons</strong><p class="small">Immediate model audit, new lineage-resolved experiments, then translational and spatial extensions.</p></div>
+      </div>
+      <h3>Ranking rubric</h3>
+      <p>Ordering reflects direct overlap with the A2780 coculture experiment first, then usefulness for simplifying competition and adaptive scheduling, quality of longitudinal validation, and availability of enough model detail to reproduce the work. Newness and citation count were not used as substitutes for relevance.</p>
+    </section>
+
+    <section id="shortlist">
+      <h2>The 15 Most Pertinent Papers</h2>
+      <p>For the simplified coculture model, read ranks 1, 4, 6, 7, 2, and 3 first: ovarian fitness and coculture biology, low-parameter competition, the original OVCAR-3 adaptive-therapy model, cisplatin exposure, and schedule validation. Ranks 5 and 8-13 define later translation. Ranks 14-15 constrain heterogeneity and plasticity without requiring those mechanisms in the default.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Rank</th><th>Paper</th><th>Evidence type</th><th>Why it matters here</th><th>Recommended use</th></tr></thead>
+        <tbody>
+          <tr><td class="rank">1</td><td class="paper"><strong>Hockings et al. (2025)</strong><br><a href="https://doi.org/10.1158/0008-5472.CAN-25-0351">Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer</a></td><td><span class="tag direct">Ovarian coculture</span><span class="tag direct">Carboplatin AT</span></td><td class="use">Directly tests sensitive/resistant fitness reversal, low-resource competition, apoptosis, and response-guided carboplatin in ovarian models.</td><td>Primary biological basis for testing a resistant fitness cost, lineage-specific loss, and treatment holidays. Do not copy carboplatin parameters into cisplatin fits.</td></tr>
+          <tr><td class="rank">2</td><td class="paper"><strong>El-Kareh &amp; Secomb (2003)</strong><br><a href="https://doi.org/10.1016/S1476-5586(03)80008-8">A mathematical model for cisplatin cellular pharmacodynamics</a></td><td><span class="tag direct">A2780</span><span class="tag direct">Cisplatin PK/PD</span></td><td class="use">Uses ovarian-cell uptake and A2780 survival data to connect extracellular exposure, intracellular platinum, DNA binding, and delayed cell kill.</td><td>Replace an arbitrary long-lived drug effect with a fitted exposure/damage candidate once washout and survival data are available.</td></tr>
+          <tr><td class="rank">3</td><td class="paper"><strong>Strobl et al. (2024)</strong><br><a href="https://doi.org/10.1016/j.cels.2024.04.003">To modulate or to skip: De-escalating PARP inhibitor maintenance therapy in ovarian cancer</a></td><td><span class="tag direct">Ovarian dynamics</span><span class="tag direct">Validated schedules</span></td><td class="use">Builds treatment response in stages, compares mechanisms, validates unseen schedules, and propagates uncertainty by parametric bootstrap.</td><td>Methodological template for the A2780 pipeline: staged selection, held-out schedules, density effects, and uncertainty on simulated policies.</td></tr>
+          <tr><td class="rank">4</td><td class="paper"><strong>Valdivia et al. (2024)</strong><br><a href="https://doi.org/10.3389/fonc.2024.1304691">E2F1 mediates competition, proliferation and response to cisplatin</a></td><td><span class="tag direct">Ovarian coculture</span><span class="tag direct">Cisplatin</span></td><td class="use">Shows that direct cohabitation can increase sensitive-cell proliferation and platinum responsiveness while resistant abundance falls.</td><td>Constrains the sign and interpretation of coculture effects. Motivates direct-contact versus conditioned-media experiments before assigning a generic crowding mechanism.</td></tr>
+          <tr><td class="rank">5</td><td class="paper"><strong>Jitmana et al. (2024)</strong><br><a href="https://doi.org/10.1371/journal.pcbi.1012073">Modeling resistance and aggressiveness from patient CA-125 time series</a></td><td><span class="tag clinical">791 patients</span><span class="tag clinical">Sensitive/resistant ODE</span></td><td class="use">Separates off-treatment growth from on-treatment death and fits individual longitudinal HGSOC trajectories.</td><td>Best bridge from the current two-lineage cell model to a future CA-125 observation model. It also demonstrates why resistance and aggressiveness are different parameters.</td></tr>
+          <tr><td class="rank">6</td><td class="paper"><strong>Strobl et al. (2021)</strong><br><a href="https://doi.org/10.1158/0008-5472.CAN-20-0806">Turnover modulates the need for a cost of resistance</a></td><td><span class="tag transfer">Cross-cancer theory</span><span class="tag transfer">Competition</span></td><td class="use">Shows mathematically that turnover, initial burden, resistant fraction, carrying-capacity proximity, and resistance cost jointly determine adaptive-therapy benefit.</td><td>Keep its low-parameter equations as benchmarks and sensitivity analyses. Estimate turnover independently before using its adaptive predictions.</td></tr>
+          <tr><td class="rank">7</td><td class="paper"><strong>Gatenby et al. (2009)</strong><br><a href="https://doi.org/10.1158/0008-5472.CAN-08-3658">Adaptive therapy</a></td><td><span class="tag direct">OVCAR-3 xenograft</span><span class="tag direct">Carboplatin AT</span></td><td class="use">Introduces treatment for stability: preserve enough sensitive cells to suppress less-fit resistant cells, and tests feasibility in OVCAR-3 xenografts.</td><td>Conceptual foundation for the threshold rule. Its benefit still depends on competition, differential drug response, and a resistance cost or turnover structure supported by the experiment.</td></tr>
+          <tr><td class="rank">8</td><td class="paper"><strong>Gu et al. (2021)</strong><br><a href="https://doi.org/10.1073/pnas.2026663118">Computational modeling of ovarian cancer dynamics suggests optimal strategies</a></td><td><span class="tag clinical">Clinical cohorts</span><span class="tag clinical">Branching process</span></td><td class="use">Models sensitive growth, stochastic acquisition of resistance, surgery, chemotherapy, relapse, and screening at the disease scale.</td><td>Future translational architecture for surgery and recurrence. It is not a replacement for the present plate-scale density model.</td></tr>
+          <tr><td class="rank">9</td><td class="paper"><strong>Kozlowska et al. (2018)</strong><br><a href="https://doi.org/10.1158/0008-5472.CAN-17-3746">Mathematical modeling predicts response to chemotherapy and drug combinations</a></td><td><span class="tag clinical">HGSOC virtual patients</span><span class="tag clinical">Platinum resistance</span></td><td class="use">Uses a stochastic multitype branching process and patient imaging/outcome data to represent multiple platinum-resistance mechanisms.</td><td>Use later when the question changes from two observed lineages to heterogeneous resistance mechanisms and combination therapies.</td></tr>
+          <tr><td class="rank">10</td><td class="paper"><strong>Kozlowska et al. (2024)</strong><br><a href="https://doi.org/10.1038/s41598-024-80768-6">Mathematical modeling framework enhances clinical trial design</a></td><td><span class="tag clinical">SOLO-1</span><span class="tag clinical">Toxicity</span></td><td class="use">Combines stochastic tumor dynamics, surgery, platinum chemotherapy, olaparib maintenance, toxicity, and Kaplan-Meier simulation.</td><td>Template for eventually coupling efficacy to hematologic toxicity. Keep outside the current simulator until human-scale calibration exists.</td></tr>
+          <tr><td class="rank">11</td><td class="paper"><strong>Jain et al. (2014)</strong><br><a href="https://doi.org/10.1371/journal.pone.0081582">Exploiting carboplatin and ABT-737 synergy</a></td><td><span class="tag direct">Ovarian xenograft</span><span class="tag direct">Multi-scale PK/PD</span></td><td class="use">Couples proliferating and arrested cells with drug compartments, DNA-damage response, apoptosis signaling, and scheduling.</td><td>Supports damage/arrest compartments and combination scheduling, but its full molecular model is too parameter-rich for current cell-count-only data.</td></tr>
+          <tr><td class="rank">12</td><td class="paper"><strong>Winner et al. (2016)</strong><br><a href="https://doi.org/10.1158/0008-5472.CAN-15-1620">Spatial modeling of drug delivery routes</a></td><td><span class="tag direct">Ovarian spheroids</span><span class="tag direct">Spatial model</span></td><td class="use">Uses a cellular Potts model to compare intraperitoneal and intravenous penetration into microscopic ovarian tumors.</td><td>Defines the spatial extension after 3D spheroid data exist. A larger carrying capacity alone cannot represent patient tumors or drug penetration.</td></tr>
+          <tr><td class="rank">13</td><td class="paper"><strong>Zecchin et al. (2016)</strong><br><a href="https://doi.org/10.1111/bcp.12994">Tumor size, new lesions, and survival in advanced ovarian cancer</a></td><td><span class="tag clinical">Phase III data</span><span class="tag clinical">Population PK/PD</span></td><td class="use">Links longitudinal tumor size under carboplatin-based treatment to new-lesion risk and survival, with external prediction.</td><td>Guides a future observation and outcome layer. Plate cell counts should never be presented as direct survival predictions.</td></tr>
+          <tr><td class="rank">14</td><td class="paper"><strong>Bicaku et al. (2012)</strong><br><a href="https://doi.org/10.1038/bjc.2012.207">Ovarian response to cisplatin, carboplatin, and paclitaxel</a></td><td><span class="tag direct">36 ovarian lines</span><span class="tag direct">Dose response</span></td><td class="use">Demonstrates broad line-to-line heterogeneity in platinum and taxane response and links response-associated pathways with survival.</td><td>Biological constraint against treating one A2780 dose-response curve as universal ovarian pharmacology.</td></tr>
+          <tr><td class="rank">15</td><td class="paper"><strong>Del Pino Herrera et al. (2025)</strong><br><a href="https://doi.org/10.1101/2025.10.08.681266">Metabolic plasticity drives PARP inhibitor persistence</a></td><td><span class="tag preprint">Preprint</span><span class="tag direct">OVCAR3</span></td><td class="use">Combines single-cell data, naive/persister population dynamics, resource dependence, and adaptive-schedule simulations.</td><td>High-value future hypothesis for measured plasticity. Keep advanced-only until peer review and independent experimental validation.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="models">
+      <h2>What The Literature Changes Mathematically</h2>
+      <p>The papers support a sequence of increasingly rich models. Richness should be earned by new measurements, not by a lower training error alone.</p>
+      <div class="paper-list">
+        <details class="paper" open>
+          <summary>1. Observable two-lineage competition should remain the default</summary>
+          <div class="paper-body">
+            <p>For the present experiment, A2780Naive and total A2780cis are measured. The most defensible default therefore keeps those two observables explicit:</p>
+            <div class="equation">\[\frac{dN}{dt}=G_N(N,L_N)-d_NN-E_N(t,D,L_N)N,\qquad \frac{dC}{dt}=G_C(C,L_C)-d_CC-E_C(t,D,L_C)C\]</div>
+            <p>with effective loads \(L_N=N+\alpha_{NC}C\) and \(L_C=C+\alpha_{CN}N\). Hockings and Valdivia support testing asymmetric fitness and lineage-specific loss, but neither paper proves that the A2780cis observations contain separately identifiable sensitive-like and tolerant-like states.</p>
+            <div class="decision"><strong>Decision:</strong> keep latent cis states out of the default graph and default scientific interpretation. Add them only when a marker, sorting assay, or perturbation distinguishes the states.</div>
+          </div>
+        </details>
+        <details class="paper">
+          <summary>2. Drug command, extracellular exposure, damage, and cell loss are different quantities</summary>
+          <div class="paper-body">
+            <p>El-Kareh and Secomb support an exposure-to-damage chain rather than a single drug-on flag:</p>
+            <div class="equation">\[\frac{dc_i}{dt}=k_{in}D_{ext}(t)-k_{out}c_i-k_bc_i,\qquad \frac{dc_b}{dt}=k_bc_i-k_{repair}c_b,\qquad E(t)=E_{max}\frac{c_b^h}{EC_{50}^h+c_b^h}\]</div>
+            <p>This abstraction separates media concentration \(D_{ext}\), intracellular free platinum \(c_i\), bound or damage-associated platinum \(c_b\), and the downstream loss rate \(E\). The full published model contains parameter combinations that cannot be separated from survival data alone, so the project should not fit every rate to total cell counts.</p>
+            <div class="decision"><strong>Decision:</strong> fit a minimal external-exposure plus one damage-state model first. Add a second intracellular state only if uptake or DNA-bound platinum is measured.</div>
+          </div>
+        </details>
+        <details class="paper">
+          <summary>3. Resistance cost, competition, and turnover must be disentangled experimentally</summary>
+          <div class="paper-body">
+            <p>A low-parameter benchmark consistent with Strobl's analysis is:</p>
+            <div class="equation">\[\dot S=r_S S\left(1-\frac{S+R}{K}\right)-d_TS-u(t)k_SS,\qquad \dot R=r_R R\left(1-\frac{S+R}{K}\right)-d_TR-u(t)k_RR\]</div>
+            <p>A smaller \(r_R\) is a growth cost; a larger resistant death term is a survival cost; and competition becomes strongest near carrying capacity. Similar trajectories can arise from different combinations of these terms. Hockings directly measured proliferation and apoptosis, showing the kind of additional data needed to separate them.</p>
+            <div class="decision"><strong>Decision:</strong> do not infer a resistance cost from declining resistant abundance alone. Measure EdU/Ki-67 and apoptosis/death alongside lineage counts under high- and low-resource conditions.</div>
+          </div>
+        </details>
+        <details class="paper">
+          <summary>4. Patient translation requires a new observation model</summary>
+          <div class="paper-body">
+            <p>Jitmana et al. treat CA-125 as a longitudinal proxy for burden while separating on-treatment and off-treatment rates. A future clinical model needs an explicit link between hidden tumor populations and the measured biomarker:</p>
+            <div class="equation">\[S'(t)=\gamma_SS-\delta_Su(t)S-\mu S,\qquad R'(t)=\gamma_RR-\delta_Ru(t)R+\mu S,\qquad y_{CA125}(t)=h(S+R)+\varepsilon(t)\]</div>
+            <p>The observation function \(h\), biomarker delay, surgery, lesion detection, and patient-level variability are new model components. They cannot be created by rescaling plate carrying capacity.</p>
+            <div class="decision"><strong>Decision:</strong> maintain a strict separation between the laboratory simulator and any future clinical simulator.</div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <h2>Future Research Roadmap</h2>
+      <div class="roadmap-grid">
+        <article class="roadmap-item">
+          <span class="priority">NOW: 0-6 months</span>
+          <h3>Make the current mechanism testable</h3>
+          <ol>
+            <li>Keep the observable \(N,C\) model as the default and move latent cis splits to advanced diagnostics.</li>
+            <li>Add a minimal exposure/damage candidate with explicit media refresh and washout.</li>
+            <li>Refit simple competition, growth-cost, death-cost, and turnover candidates to the identical objective.</li>
+            <li>Use sample-aware hierarchical fits and propagate Stage 1-3 uncertainty into Stage 4.</li>
+            <li>Pre-register held-out schedules and directional predictions before collecting more data.</li>
+          </ol>
+        </article>
+        <article class="roadmap-item">
+          <span class="priority">NEXT: 6-18 months</span>
+          <h3>Collect identifying measurements</h3>
+          <ol>
+            <li>Repeat coculture across starting ratios and densities with lineage-resolved counts.</li>
+            <li>Measure proliferation and apoptosis simultaneously.</li>
+            <li>Compare direct contact, transwell, and conditioned media.</li>
+            <li>Run pulse-washout experiments with multiple exposure durations and refresh intervals.</li>
+            <li>Prospectively test at least two model-discriminating adaptive schedules.</li>
+          </ol>
+        </article>
+        <article class="roadmap-item">
+          <span class="priority">LATER: 18+ months</span>
+          <h3>Build the translational bridge</h3>
+          <ol>
+            <li>Move to spheroids or organoids before adding spatial drug penetration.</li>
+            <li>Calibrate a separate human-scale growth and observation model to CA-125, imaging, or cfDNA.</li>
+            <li>Add surgery, lesion emergence, toxicity, and interpatient variability.</li>
+            <li>Run virtual trials only after external validation.</li>
+            <li>Keep clinical dose recommendations outside the scope of the research simulator.</li>
+          </ol>
+        </article>
+      </div>
+      <div class="warning"><strong>Models not ready for default use:</strong> reversible phenotype switching, multi-mechanism resistance branching, intracellular molecular networks, spatial penetration, and patient survival models are scientifically worthwhile. They are not identifiable from the current two-color cell-count trajectories alone.</div>
+    </section>
+
+    <section id="experiments">
+      <h2>The Minimum Experimental Program</h2>
+      <p>These additions would make the largest difference to mechanism identification while preserving the current staged design.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Unresolved question</th><th>Minimum new measurement</th><th>Models separated</th><th>Decisive pattern</th></tr></thead>
+        <tbody>
+          <tr><td>Does resistant decline reflect slower division or greater death?</td><td>Lineage-resolved counts plus EdU/Ki-67 and apoptosis/death over time</td><td>Growth cost versus death cost versus turnover</td><td>The same abundance decline paired with distinct proliferation or death trajectories.</td></tr>
+          <tr><td>Is coculture interaction contact-dependent?</td><td>Direct coculture, transwell, conditioned media, and monoculture controls</td><td>Density competition versus secreted-factor or contact models</td><td>Effect present only in direct contact, only with shared media, or in both.</td></tr>
+          <tr><td>How long does cisplatin action persist after refresh?</td><td>Multiple pulse lengths, washout times, and if feasible intracellular or DNA-bound platinum</td><td>Immediate kill versus delayed ramp versus damage compartment</td><td>Post-washout response aligned with exposure, bound drug, or delayed damage.</td></tr>
+          <tr><td>Are hidden cis states real?</td><td>State marker, sorted populations, or single-cell lineage tracing before and after treatment</td><td>One-state cis versus sensitive-like/tolerant-like compartments</td><td>Distinct, reproducible states with different growth or kill rates and measurable transitions.</td></tr>
+          <tr><td>Does adaptive scheduling outperform equal-dose controls?</td><td>Prospective schedules matched for cumulative dose and observation timing</td><td>Continuous, pulse, dose-modulation, and treatment-holiday policies</td><td>Improved control at equal or lower cumulative exposure across biological replicates.</td></tr>
+          <tr><td>Do 2D conclusions survive spatial structure?</td><td>Mixed-lineage spheroids with radial imaging and drug penetration</td><td>Well-mixed ODE versus spatial or agent-based model</td><td>Systematic radial gradients or delivery-route effects missed by the ODE.</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Analysis requirements</h3>
+      <ul class="checklist">
+        <li>Define training and held-out conditions before fitting.</li>
+        <li>Average technical wells within a biological sample; retain sample identity.</li>
+        <li>Fit all candidate models to the same observations and scaling rule.</li>
+        <li>Report raw and trajectory-scaled residuals.</li>
+        <li>Count every fitted parameter correctly in BIC.</li>
+        <li>Reject nonfinite fits, solver failures, and failure sentinels.</li>
+        <li>Use multistart stability and two-sided profile bounds.</li>
+        <li>Bootstrap predictions and schedules, not just parameter tables.</li>
+        <li>Test predictive coverage on unseen schedules.</li>
+        <li>Record which conclusions survive model uncertainty.</li>
+      </ul>
+    </section>
+
+    <section id="bibliography">
+      <h2>Bibliography And Evidence Status</h2>
+      <p class="small">The ranked set favors primary articles. Paper 15 is a preprint and is retained because it directly connects ovarian persistence measurements to population modeling; it should not carry the same evidentiary weight as peer-reviewed work. The existing Research Foundations report contains additional fitting, identifiability, BIC, and general tumor-growth references.</p>
+      <ol class="references">
+        <li>Hockings H, et al. <em>Adaptive Therapy Exploits Fitness Deficits in Chemotherapy-Resistant Ovarian Cancer to Achieve Long-Term Tumor Control.</em> Cancer Research. 2025;85:3503-3517. <a href="https://doi.org/10.1158/0008-5472.CAN-25-0351">DOI</a> | <a href="https://pubmed.ncbi.nlm.nih.gov/40299825/">PubMed</a></li>
+        <li>El-Kareh AW, Secomb TW. <em>A Mathematical Model for Cisplatin Cellular Pharmacodynamics.</em> Neoplasia. 2003;5:161-169. <a href="https://doi.org/10.1016/S1476-5586(03)80008-8">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1502402/">Full text</a></li>
+        <li>Strobl MAR, et al. <em>To Modulate or to Skip: De-escalating PARP Inhibitor Maintenance Therapy in Ovarian Cancer Using Adaptive Therapy.</em> Cell Systems. 2024;15:510-525.e6. <a href="https://doi.org/10.1016/j.cels.2024.04.003">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11190943/">Full text</a></li>
+        <li>Valdivia A, et al. <em>E2F1 Mediates Competition, Proliferation and Response to Cisplatin in Cohabitating Resistant and Sensitive Ovarian Cancer Cells.</em> Frontiers in Oncology. 2024;14:1304691. <a href="https://doi.org/10.3389/fonc.2024.1304691">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10853425/">Full text</a></li>
+        <li>Jitmana K, et al. <em>Mathematical Modeling of the Evolution of Resistance and Aggressiveness of High-Grade Serous Ovarian Cancer from Patient CA-125 Time Series.</em> PLOS Computational Biology. 2024;20:e1012073. <a href="https://doi.org/10.1371/journal.pcbi.1012073">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11164342/">Full text</a></li>
+        <li>Strobl MAR, et al. <em>Turnover Modulates the Need for a Cost of Resistance in Adaptive Therapy.</em> Cancer Research. 2021;81:1135-1147. <a href="https://doi.org/10.1158/0008-5472.CAN-20-0806">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8455086/">Full text</a></li>
+        <li>Gatenby RA, Silva AS, Gillies RJ, Frieden BR. <em>Adaptive Therapy.</em> Cancer Research. 2009;69:4894-4903. <a href="https://doi.org/10.1158/0008-5472.CAN-08-3658">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3728826/">Full text</a></li>
+        <li>Gu S, et al. <em>Computational Modeling of Ovarian Cancer Dynamics Suggests Optimal Strategies for Therapy and Screening.</em> PNAS. 2021;118:e2026663118. <a href="https://doi.org/10.1073/pnas.2026663118">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8237655/">Full text</a></li>
+        <li>Kozlowska E, et al. <em>Mathematical Modeling Predicts Response to Chemotherapy and Drug Combinations in Ovarian Cancer.</em> Cancer Research. 2018;78:4036-4044. <a href="https://doi.org/10.1158/0008-5472.CAN-17-3746">DOI</a> | <a href="https://pubmed.ncbi.nlm.nih.gov/29769198/">PubMed</a></li>
+        <li>Kozlowska E, et al. <em>Mathematical Modeling Framework Enhances Clinical Trial Design for Maintenance Treatment in Oncology.</em> Scientific Reports. 2024;14:29721. <a href="https://doi.org/10.1038/s41598-024-80768-6">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11607330/">Full text</a></li>
+        <li>Jain HV, Richardson A, Meyer-Hermann M, Byrne HM. <em>Exploiting the Synergy Between Carboplatin and ABT-737 in the Treatment of Ovarian Carcinomas.</em> PLOS ONE. 2014;9:e81582. <a href="https://doi.org/10.1371/journal.pone.0081582">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3882219/">Full text</a></li>
+        <li>Winner KK, et al. <em>Spatial Modeling of Drug Delivery Routes for Treatment of Disseminated Ovarian Cancer.</em> Cancer Research. 2016;76:1320-1334. <a href="https://doi.org/10.1158/0008-5472.CAN-15-1620">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4794352/">Full text</a></li>
+        <li>Zecchin C, et al. <em>Models for Change in Tumour Size, Appearance of New Lesions and Survival Probability in Patients with Advanced Epithelial Ovarian Cancer.</em> British Journal of Clinical Pharmacology. 2016;82:717-727. <a href="https://doi.org/10.1111/bcp.12994">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5338128/">Full text</a></li>
+        <li>Bicaku E, et al. <em>In Vitro Analysis of Ovarian Cancer Response to Cisplatin, Carboplatin, and Paclitaxel Identifies Common Pathways Associated with Survival.</em> British Journal of Cancer. 2012;106:1967-1975. <a href="https://doi.org/10.1038/bjc.2012.207">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3388569/">Full text</a></li>
+        <li>Del Pino Herrera A, et al. <em>Metabolic Plasticity Drives Mechanisms of PARP Inhibitor Persistence in Ovarian Cancer.</em> bioRxiv preprint. 2025. <strong>Not peer reviewed.</strong> <a href="https://doi.org/10.1101/2025.10.08.681266">DOI</a> | <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12632404/">Preprint</a></li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Literature screened through August 28, 2026. This report supports research planning and model criticism; it is not a clinical treatment recommendation.</p>
+  </footer>
+</body>
+</html>
