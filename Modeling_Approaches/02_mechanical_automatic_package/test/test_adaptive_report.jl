@@ -6,6 +6,10 @@
 
     @test isfile(config_path)
     @test occursin("a2780_adaptive_simulator_config.js", report)
+    @test occursin("&larr; Back to reports", report)
+    @test !occursin("Research and teaching use only", report)
+    @test !occursin("A2780 research simulator", report)
+    @test !occursin("Explore fitted growth and treatment schedules", report)
     @test occursin("id=\"advancedModelSelect\"", report)
     @test occursin("id=\"showLatent\"", report)
     @test occursin("id=\"addInterval\"", report)

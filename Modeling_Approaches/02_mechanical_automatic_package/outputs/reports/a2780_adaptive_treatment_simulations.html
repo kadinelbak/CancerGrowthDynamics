@@ -29,21 +29,13 @@
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.45; }
     header, main { max-width: 1280px; margin: 0 auto; padding: 20px 24px; }
-    header { padding-top: 18px; padding-bottom: 8px; }
-    h1 { margin: 0; font-size: 30px; line-height: 1.15; }
+    header { padding-top: 16px; padding-bottom: 0; }
     h2 { margin: 0 0 12px; font-size: 20px; }
     h3 { margin: 12px 0 8px; font-size: 16px; }
     p { margin: 8px 0; }
     code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
     .math { overflow-x: auto; padding: 6px 0; }
     .note { color: var(--muted); }
-    .app-topbar { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 18px; }
-    .title-row { display: flex; justify-content: space-between; gap: 24px; align-items: end; }
-    .title-copy { max-width: 790px; }
-    .eyebrow { margin: 0 0 5px; color: #1d4ed8; font-size: 12px; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
-    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 16px; }
-    .research-notice { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
-    .research-notice::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #d97706; }
     .layout { display: grid; grid-template-columns: minmax(300px, 350px) minmax(0, 1fr); gap: 16px; align-items: start; }
     .layout.recreation-mode { grid-template-columns: minmax(0, 1fr); }
     .panel { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
@@ -194,13 +186,10 @@
     }
     @media (max-width: 680px) {
       header, main { padding-left: 14px; padding-right: 14px; }
-      .app-topbar, .title-row, .dataset-heading { align-items: flex-start; }
-      .title-row { flex-direction: column; gap: 14px; }
-      h1 { font-size: 26px; }
-      .subtitle { font-size: 14px; }
+      .dataset-heading { align-items: flex-start; }
       .mode-switch { width: 100%; }
       .mode-switch button { flex: 1; padding: 8px 6px; font-size: 12px; }
-      .workflow-bar { align-items: stretch; }
+      .workflow-bar { flex-direction: column; align-items: stretch; gap: 8px; }
       .workflow-tabs { width: 100%; }
       .workflow-tabs button { flex: 1; min-width: 0; padding: 10px 6px 9px; font-size: 12px; }
       .data-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -221,25 +210,7 @@
 </head>
 <body>
   <header>
-    <div class="app-topbar">
-      <a class="back-home" href="../../../../index.html">&larr; All reports</a>
-      <span class="research-notice">Research and teaching use only</span>
-    </div>
-    <div class="title-row">
-      <div class="title-copy">
-        <p class="eyebrow">A2780 research simulator</p>
-        <h1>Explore fitted growth and treatment schedules</h1>
-        <p class="subtitle">Start with an experimental dataset, inspect its fitted trajectory, then test treatment timing against the untreated coculture baseline.</p>
-      </div>
-      <div class="mode-switch" aria-label="Dose display mode">
-        <button id="experimentalMode" class="active" type="button">In vitro dose (uM)</button>
-        <button id="translationalMode" type="button">Relative exposure</button>
-      </div>
-    </div>
-    <details class="model-provenance">
-      <summary><span class="status-badge">Data-selected</span><span>The simulator loaded the highest-ranked eligible model from the staged fit exports.</span></summary>
-      <div class="status-strip" id="modelStatus" aria-live="polite"></div>
-    </details>
+    <a class="back-home" href="../../../../index.html">&larr; Back to reports</a>
   </header>
   <main>
     <nav class="workflow-bar" aria-label="Simulator workflow">
@@ -247,7 +218,15 @@
         <button id="singleTab" class="active" type="button">1. Reproduce fitted data</button>
         <button id="compareTab" type="button">2. Design a treatment schedule</button>
       </div>
+      <div class="mode-switch" aria-label="Dose display mode">
+        <button id="experimentalMode" class="active" type="button">In vitro dose (uM)</button>
+        <button id="translationalMode" type="button">Relative exposure</button>
+      </div>
     </nav>
+    <details class="model-provenance">
+      <summary><span class="status-badge">Data-selected</span><span>The simulator loaded the highest-ranked eligible model from the staged fit exports.</span></summary>
+      <div class="status-strip" id="modelStatus" aria-live="polite"></div>
+    </details>
     <section class="dataset-toolbar" aria-labelledby="datasetHeading">
       <div class="dataset-heading">
         <h2 id="datasetHeading">Choose an experimental dataset</h2>
