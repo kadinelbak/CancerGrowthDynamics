@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simplifying A2780 Coculture Adaptive Therapy</title>
+  <title>A2780 Coculture Adaptive Therapy Research</title>
   <script>
     window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
   </script>
@@ -48,16 +48,40 @@
       background: #fff;
       padding: 14px 17px;
     }
-    nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-    nav a {
+    .header-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .toc { position: relative; }
+    .toc > summary {
+      cursor: pointer;
+      list-style: none;
       border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-      color: var(--ink);
+      border-radius: 4px;
+      background: var(--ink);
+      color: #fff;
       font-weight: 700;
-      padding: 8px 11px;
+      padding: 7px 10px;
+    }
+    .toc > summary::-webkit-details-marker { display: none; }
+    .toc > summary::after { content: " +"; }
+    .toc[open] > summary::after { content: " -"; }
+    .toc nav {
+      position: absolute;
+      top: calc(100% + 7px);
+      right: 0;
+      z-index: 20;
+      display: grid;
+      width: 230px;
+      margin: 0;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 6px;
+      box-shadow: 0 10px 28px rgba(24, 34, 48, 0.16);
+    }
+    .toc nav a {
+      color: var(--ink);
+      padding: 7px 9px;
       text-decoration: none;
     }
+    .toc nav a:hover, .toc nav a:focus { background: #eef2f6; }
     section { padding: 22px 0; border-top: 1px solid var(--line); }
     .summary-grid, .roadmap-grid {
       display: grid;
@@ -143,22 +167,6 @@
       padding: 14px 16px;
       margin-top: 14px;
     }
-    .model-flow {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0;
-      margin: 18px 0;
-    }
-    .flow-step {
-      position: relative;
-      min-height: 126px;
-      border: 1px solid var(--line);
-      background: #fff;
-      padding: 14px 17px;
-    }
-    .flow-step + .flow-step { border-left: 0; }
-    .flow-step strong { display: block; margin-bottom: 5px; }
-    .flow-step .number { color: var(--blue); font-size: 24px; font-weight: 700; }
     .parameter-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -188,8 +196,8 @@
       header, main, footer { padding-left: 16px; padding-right: 16px; }
       h1 { font-size: 29px; }
       .summary-grid, .roadmap-grid { grid-template-columns: 1fr; }
-      .model-flow, .parameter-grid { grid-template-columns: 1fr; }
-      .flow-step + .flow-step { border-left: 1px solid var(--line); border-top: 0; }
+      .parameter-grid { grid-template-columns: 1fr; }
+      .toc nav { width: min(260px, calc(100vw - 32px)); }
       .compact-paper > summary { grid-template-columns: 32px 1fr; }
       .compact-tags { grid-column: 2; text-align: left; }
       .compact-bio { grid-template-columns: 1fr; padding-left: 16px; }
@@ -201,34 +209,31 @@
 </head>
 <body>
   <header>
-    <a class="back" href="../../../../index.html">&#8592; Back to reports home</a>
-    <h1>Simplifying A2780 Coculture Adaptive Therapy</h1>
-    <p class="lede">A two-population mathematical core, a focused ovarian-cancer reading set, and an experimental roadmap for explaining how untreated competition, cisplatin exposure, and adaptive treatment decisions fit together.</p>
+    <div class="header-actions">
+      <a class="back" href="../../../../index.html">&#8592; Back to reports home</a>
+      <details class="toc">
+        <summary>Contents</summary>
+        <nav aria-label="Report sections">
+          <a href="#core-model">Core model</a>
+          <a href="#method">Selection method</a>
+          <a href="#shortlist">Top 15 papers</a>
+          <a href="#models">Mathematical lessons</a>
+          <a href="#roadmap">Research roadmap</a>
+          <a href="#experiments">Experiments needed</a>
+          <a href="#bibliography">Bibliography</a>
+        </nav>
+      </details>
+    </div>
+    <h1>A2780 Coculture Adaptive Therapy</h1>
+    <p class="lede">Models, evidence, and experiments for untreated competition, cisplatin response, and adaptive scheduling.</p>
     <div class="boundary"><strong>Interpretive boundary:</strong> this is a project-relevance ranking, not a claim that these are the 15 most influential ovarian-cancer papers in general. A paper can justify testing a model class, but only this project's data and prospective validation can support selecting it for A2780.</div>
-    <nav aria-label="Report sections">
-      <a href="#simple-model">Start with the simple model</a>
-      <a href="#method">Selection method</a>
-      <a href="#shortlist">Top 15</a>
-      <a href="#models">Mathematical lessons</a>
-      <a href="#roadmap">Research roadmap</a>
-      <a href="#experiments">Experiments needed</a>
-      <a href="#bibliography">Bibliography</a>
-    </nav>
   </header>
 
   <main>
-    <section id="simple-model">
-      <h2>Start Here: The Smallest Defensible Model</h2>
-      <p>The current experiment directly observes two established cell lines: A2780Naive, written \(N(t)\), and A2780cis, written \(C(t)\). The clearest adaptive-therapy model should begin with exactly those two populations. A2780cis may be less responsive to cisplatin, but it is not automatically a hidden mixture of sensitive and tolerant cells, and treatment does not convert A2780Naive into the A2780cis cell line.</p>
+    <section id="core-model">
+      <h2>Core Model</h2>
 
-      <div class="model-flow" aria-label="Four-step adaptive coculture model">
-        <div class="flow-step"><span class="number">1</span><strong>Grow separately</strong><span class="small">Learn the untreated growth law for each lineage from monoculture.</span></div>
-        <div class="flow-step"><span class="number">2</span><strong>Compete under resources</strong><span class="small">Add cross-lineage effects, then test only the low-resource changes supported by data.</span></div>
-        <div class="flow-step"><span class="number">3</span><strong>Switch treatment</strong><span class="small">Start with treatment simply off or on; add lingering exposure only if the data require it.</span></div>
-        <div class="flow-step"><span class="number">4</span><strong>Decide at checks</strong><span class="small">At monitoring times, choose the next allowed dose from the measured response.</span></div>
-      </div>
-
-      <h3>Step 1: Untreated coculture</h3>
+      <h3>Untreated coculture</h3>
       <div class="equation">\[
       \frac{dN}{dt}=r_N\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N
       \]
@@ -237,7 +242,7 @@
       \]</div>
       <p>These are theta-logistic competition equations written in full. Setting \(\theta_N=\theta_C=1\) gives ordinary logistic competition. \(r_N\) and \(r_C\) are maximum per-capita growth rates, \(K_N\) and \(K_C\) are assay-scale carrying capacities, and \(d_N\) and \(d_C\) are supported background loss rates. If \(\alpha_{NC}=1\), one cis cell contributes the same modeled crowding to Naive as one Naive cell; \(\alpha_{CN}\) independently controls how Naive affects cis.</p>
 
-      <h3>Step 2A: Simplest low-resource condition</h3>
+      <h3>Low resources: start with one fitted effect</h3>
       <div class="equation">\[
       \frac{dN}{dt}=r_N[1-z(1-\rho)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N
       \]
@@ -246,7 +251,7 @@
       \]</div>
       <p>This introduces only two new quantities. \(z\) is a known experimental switch: \(z=0\) for standard resource and \(z=1\) for low resource. It is not fitted. \(\rho\) is the one fitted parameter and represents the fraction of normal growth retained under low resource. The same \(\rho\) is used for both lineages in the simplest model.</p>
 
-      <h3>Step 2B: Follow-up if the shared resource effect fails</h3>
+      <h3>Low resources: separate lineage effects only if needed</h3>
       <div class="equation">\[
       \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N
       \]
@@ -255,7 +260,7 @@
       \]</div>
       <p>This follow-up fits separate retained-growth fractions \(\rho_N\) and \(\rho_C\). Use it only if the shared-\(\rho\) model misses a reproducible lineage-specific resource response. Do not add a separate low-resource death term without apoptosis or death measurements that distinguish slower proliferation from increased loss.</p>
 
-      <h3>Step 3A: Simplest cisplatin on/off effect</h3>
+      <h3>Cisplatin: start with direct on/off treatment</h3>
       <div class="equation">\[
       u(t)=\begin{cases}0,&\text{cisplatin off},\\1,&\text{cisplatin on}\end{cases}
       \]
@@ -267,7 +272,7 @@
       \]</div>
       <p>\(u(t)\) is fixed by the treatment schedule, so it is not fitted. Each measured lineage gets one fitted kill coefficient: \(\beta_N\) for A2780Naive and \(\beta_C\) for A2780cis. Separate coefficients are necessary because the experiment is specifically testing different cisplatin responses. This direct-effect model should be tested first.</p>
 
-      <h3>Step 3B: Follow-up if drug action clearly lingers</h3>
+      <h3>Cisplatin: add delayed exposure only if needed</h3>
       <div class="equation">\[
       \frac{dE}{dt}=k_E[u(t)-E]
       \]
@@ -279,7 +284,7 @@
       \]</div>
       <p>Here \(E(t)\) is normalized effective exposure: it moves toward 1 while treatment is on and toward 0 while treatment is off. The one additional fitted parameter \(k_E\) controls how quickly that change occurs; its half-life is \(\ln(2)/k_E\). Keep this model only if pulse-and-washout data show delayed action that the direct on/off model cannot predict.</p>
 
-      <h3>Step 4: Adaptive decision rule</h3>
+      <h3>Adaptive treatment rule</h3>
       <div class="equation">\[
       D_{k+1}=\begin{cases}
       D_{high}, & B(t_k)\ge U,\\
@@ -369,10 +374,10 @@
         <details class="paper">
           <summary>2. Delayed drug exposure is a follow-up, not the starting model</summary>
           <div class="paper-body">
-            <p>Begin with the direct on/off model in Step 3A. If pulse-and-washout data show a reproducible delay, Step 3B adds one normalized exposure state. El-Kareh and Secomb provide the basis for a still richer exposure-to-damage chain:</p>
+            <p>Begin with the direct on/off model. If pulse-and-washout data show a reproducible delay, the delayed-exposure follow-up adds one normalized exposure state. El-Kareh and Secomb provide the basis for a still richer exposure-to-damage chain:</p>
             <div class="equation">\[\frac{dc_i}{dt}=k_{in}\,D_{ext}(t)-k_{out}\,c_i-k_b\,c_i,\qquad \frac{dc_b}{dt}=k_b\,c_i-k_{repair}\,c_b,\qquad E(t)=E_{max}\frac{c_b^h}{EC_{50}^h+c_b^h}\]</div>
             <p>This abstraction separates media concentration \(D_{ext}\), intracellular free platinum \(c_i\), bound or damage-associated platinum \(c_b\), and the downstream loss rate \(E\). The full published model contains parameter combinations that cannot be separated from survival data alone, so the project should not fit every rate to total cell counts.</p>
-            <div class="decision"><strong>Decision:</strong> retain Step 3A unless delayed action is demonstrated. Then test the one-parameter lag in Step 3B. Add intracellular or damage states only if uptake or DNA-bound platinum is measured.</div>
+            <div class="decision"><strong>Decision:</strong> retain the direct on/off model unless delayed action is demonstrated. Then test the one-parameter exposure lag. Add intracellular or damage states only if uptake or DNA-bound platinum is measured.</div>
           </div>
         </details>
         <details class="paper">
@@ -493,6 +498,10 @@
   </footer>
   <script>
     document.documentElement.classList.add('js');
+    const toc = document.querySelector('.toc');
+    toc.querySelectorAll('a').forEach(link => link.addEventListener('click', () => {
+      toc.open = false;
+    }));
 
     function buildCompactRanking() {
       const table = document.getElementById('paperRanking');
