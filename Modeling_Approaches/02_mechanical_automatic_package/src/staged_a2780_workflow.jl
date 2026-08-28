@@ -1238,7 +1238,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     ]
 
     sections = String[
-        "<header><a class=\"back-home\" href=\"../../../../index.html\">Back to reports home</a><h1>A2780 staged model comparison</h1><p>Mechanistic equations, Delta-BIC rankings, and explicitly labeled fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Each teaching table shows the five leading candidates plus the simplest tested candidate when it is not already present. Absolute BIC values and complete parameter vectors are retained in the appendix and <code>outputs/csv</code>.</p></header>",
+        "<header><a class=\"back-home\" href=\"../../../../index.html\">&#8592; Back</a><h1>A2780 staged model comparison</h1><p>Mechanistic equations, Delta-BIC rankings, and explicitly labeled fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Each teaching table shows the five leading candidates plus the simplest tested candidate when it is not already present. Absolute BIC values and complete parameter vectors are retained in the appendix and <code>outputs/csv</code>.</p></header>",
     ]
     for stage in stages
         table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line, label = "Stage $(stage.number) $(stage.title)")

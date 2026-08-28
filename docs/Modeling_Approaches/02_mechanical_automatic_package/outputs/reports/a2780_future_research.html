@@ -42,27 +42,24 @@
     a { color: var(--blue); }
     .back { color: var(--ink); font-weight: 700; text-decoration: none; }
     .lede { max-width: 980px; color: var(--muted); font-size: 18px; }
-    .boundary {
-      margin-top: 18px;
-      border-left: 5px solid var(--red);
-      background: #fff;
-      padding: 14px 17px;
-    }
     .header-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
     .toc { position: relative; }
     .toc > summary {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
       cursor: pointer;
       list-style: none;
       border: 1px solid var(--line);
       border-radius: 4px;
       background: var(--ink);
       color: #fff;
-      font-weight: 700;
-      padding: 7px 10px;
+      padding: 0;
+      font-size: 22px;
+      line-height: 1;
     }
     .toc > summary::-webkit-details-marker { display: none; }
-    .toc > summary::after { content: " +"; }
-    .toc[open] > summary::after { content: " -"; }
     .toc nav {
       position: absolute;
       top: calc(100% + 7px);
@@ -212,9 +209,9 @@
 <body>
   <header>
     <div class="header-actions">
-      <a class="back" href="../../../../index.html">&#8592; Back to reports home</a>
+      <a class="back" href="../../../../index.html">&#8592; Back</a>
       <details class="toc">
-        <summary>Contents</summary>
+        <summary aria-label="Table of contents" title="Table of contents"><span aria-hidden="true">&#9776;</span></summary>
         <nav aria-label="Report sections">
           <a href="#core-model">Core model</a>
           <a href="#method">Selection method</a>
@@ -227,7 +224,6 @@
     </div>
     <h1>A2780 Coculture Adaptive Therapy</h1>
     <p class="lede">Models, evidence, and experiments for untreated competition, cisplatin response, and adaptive scheduling.</p>
-    <div class="boundary"><strong>Interpretive boundary:</strong> this is a project-relevance ranking, not a claim that these are the 15 most influential ovarian-cancer papers in general. A paper can justify testing a model class, but only this project's data and prospective validation can support selecting it for A2780.</div>
   </header>
 
   <main>

@@ -371,7 +371,7 @@ function write_report(image_paths, metrics)
     <body>
       <header>
 
-        <a class="back-home" href="../../../../index.html">Back to reports home</a>
+        <a class="back-home" href="../../../../index.html">&#8592; Back</a>
 <h1>A2780 Treated Coculture: Time Delay vs Transit / Compartment</h1>
         <p class="note">Generated $(html_escape(generated)). This report uses existing fitted prediction overlays; it does not refit the models.</p>
       </header>
