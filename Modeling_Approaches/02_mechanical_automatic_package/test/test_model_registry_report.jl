@@ -21,10 +21,23 @@ using GrowthParameterEstimation
     @test occursin("function modelTags(model)", report)
     @test occursin("matchesAnyTag", report)
     @test occursin("model.stages.includes(stage)", report)
+    @test occursin("Build simple shortlist", report)
+    @test occursin("const simpleCandidates", report)
+    @test occursin("Why these models were selected", report)
+    @test occursin("Catalog scope", report)
+    @test occursin("States, parameters, and interpretation", report)
+    @test occursin("data-group-count", report)
 
     registry_ids = [match.captures[1] for match in eachmatch(r"M\(\"[^\"]+\",\"([^\"]+)\"", report)]
     @test length(registry_ids) == 66
     @test allunique(registry_ids)
+
+    shortlist_match = match(r"const simpleCandidates = \[([\s\S]*?)\];", report)
+    @test shortlist_match !== nothing
+    shortlist_ids = [candidate.captures[1] for candidate in eachmatch(r"'([^']+)'", shortlist_match.captures[1])]
+    @test length(shortlist_ids) == 14
+    @test allunique(shortlist_ids)
+    @test all(id -> id in registry_ids, shortlist_ids)
 
     for model_name in GrowthParameterEstimation.list_models()
         @test model_name in registry_ids
