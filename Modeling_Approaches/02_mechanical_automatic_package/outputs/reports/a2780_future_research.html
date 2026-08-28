@@ -224,7 +224,7 @@
       <div class="model-flow" aria-label="Four-step adaptive coculture model">
         <div class="flow-step"><span class="number">1</span><strong>Grow separately</strong><span class="small">Learn the untreated growth law for each lineage from monoculture.</span></div>
         <div class="flow-step"><span class="number">2</span><strong>Compete under resources</strong><span class="small">Add cross-lineage effects, then test only the low-resource changes supported by data.</span></div>
-        <div class="flow-step"><span class="number">3</span><strong>Apply exposure</strong><span class="small">Let the same fitted coculture state continue while cisplatin exposure rises and clears.</span></div>
+        <div class="flow-step"><span class="number">3</span><strong>Switch treatment</strong><span class="small">Start with treatment simply off or on; add lingering exposure only if the data require it.</span></div>
         <div class="flow-step"><span class="number">4</span><strong>Decide at checks</strong><span class="small">At monitoring times, choose the next allowed dose from the measured response.</span></div>
       </div>
 
@@ -237,24 +237,47 @@
       \]</div>
       <p>These are theta-logistic competition equations written in full. Setting \(\theta_N=\theta_C=1\) gives ordinary logistic competition. \(r_N\) and \(r_C\) are maximum per-capita growth rates, \(K_N\) and \(K_C\) are assay-scale carrying capacities, and \(d_N\) and \(d_C\) are supported background loss rates. If \(\alpha_{NC}=1\), one cis cell contributes the same modeled crowding to Naive as one Naive cell; \(\alpha_{CN}\) independently controls how Naive affects cis.</p>
 
-      <h3>Step 2: Low-resource condition</h3>
+      <h3>Step 2A: Simplest low-resource condition</h3>
       <div class="equation">\[
-      \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-(d_N+z\delta_N)\,N
+      \frac{dN}{dt}=r_N[1-z(1-\rho)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N
       \]
       \[
-      \frac{dC}{dt}=r_C[1-z(1-\rho_C)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-(d_C+z\delta_C)\,C
+      \frac{dC}{dt}=r_C[1-z(1-\rho)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-d_C\,C
       \]</div>
-      <p>\(z=0\) represents standard media and recovers the equations above. \(z=1\) represents low-resource media. \(\rho_N\) and \(\rho_C\) are the fractions of standard growth retained under low resource; \(\delta_N\) and \(\delta_C\) are additional low-resource loss rates. Fit the growth modifiers first with \(\delta_N=\delta_C=0\). Add the extra loss terms only if proliferation and death measurements or model comparison require them.</p>
+      <p>This introduces only two new quantities. \(z\) is a known experimental switch: \(z=0\) for standard resource and \(z=1\) for low resource. It is not fitted. \(\rho\) is the one fitted parameter and represents the fraction of normal growth retained under low resource. The same \(\rho\) is used for both lineages in the simplest model.</p>
 
-      <h3>Step 3: Cisplatin exposure and kill</h3>
-      <div class="equation">\[\frac{dE}{dt}=k_{in}D_{cmd}(t)-k_{clear}E\]
-      \[
-      \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-(d_N+z\delta_N)\,N-\beta_N\,E\,N
+      <h3>Step 2B: Follow-up if the shared resource effect fails</h3>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N
       \]
       \[
-      \frac{dC}{dt}=r_C[1-z(1-\rho_C)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-(d_C+z\delta_C)\,C-\beta_C\,E\,C
+      \frac{dC}{dt}=r_C[1-z(1-\rho_C)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-d_C\,C
       \]</div>
-      <p>\(D_{cmd}(t)\) is the concentration commanded by the experimenter, \(E(t)\) is effective exposure, and \(\beta_N\) and \(\beta_C\) convert exposure into lineage-specific loss. This linear exposure effect is the simplest candidate over the measured dose range. Add a saturating Hill term only if it materially improves held-out dose predictions. The one-state exposure equation allows drug action to decay after washout without creating an unexplained permanent effect.</p>
+      <p>This follow-up fits separate retained-growth fractions \(\rho_N\) and \(\rho_C\). Use it only if the shared-\(\rho\) model misses a reproducible lineage-specific resource response. Do not add a separate low-resource death term without apoptosis or death measurements that distinguish slower proliferation from increased loss.</p>
+
+      <h3>Step 3A: Simplest cisplatin on/off effect</h3>
+      <div class="equation">\[
+      u(t)=\begin{cases}0,&\text{cisplatin off},\\1,&\text{cisplatin on}\end{cases}
+      \]
+      \[
+      \frac{dN}{dt}=r_N[1-z(1-\rho)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N-\beta_N\,u(t)\,N
+      \]
+      \[
+      \frac{dC}{dt}=r_C[1-z(1-\rho)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-d_C\,C-\beta_C\,u(t)\,C
+      \]</div>
+      <p>\(u(t)\) is fixed by the treatment schedule, so it is not fitted. Each measured lineage gets one fitted kill coefficient: \(\beta_N\) for A2780Naive and \(\beta_C\) for A2780cis. Separate coefficients are necessary because the experiment is specifically testing different cisplatin responses. This direct-effect model should be tested first.</p>
+
+      <h3>Step 3B: Follow-up if drug action clearly lingers</h3>
+      <div class="equation">\[
+      \frac{dE}{dt}=k_E[u(t)-E]
+      \]
+      \[
+      \frac{dN}{dt}=r_N[1-z(1-\rho)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N-\beta_N\,E\,N
+      \]
+      \[
+      \frac{dC}{dt}=r_C[1-z(1-\rho)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-d_C\,C-\beta_C\,E\,C
+      \]</div>
+      <p>Here \(E(t)\) is normalized effective exposure: it moves toward 1 while treatment is on and toward 0 while treatment is off. The one additional fitted parameter \(k_E\) controls how quickly that change occurs; its half-life is \(\ln(2)/k_E\). Keep this model only if pulse-and-washout data show delayed action that the direct on/off model cannot predict.</p>
 
       <h3>Step 4: Adaptive decision rule</h3>
       <div class="equation">\[
@@ -269,8 +292,8 @@
 
       <div class="parameter-grid">
         <div class="parameter-item"><strong>Measured states</strong>\(N\), \(C\), and total \(B=N+C\). These are appropriate default graph outputs.</div>
-        <div class="parameter-item"><strong>Fitted biology</strong>Growth parameters, \(\alpha_{NC}\), \(\alpha_{CN}\), supported loss terms, and dose-response parameters.</div>
-        <div class="parameter-item"><strong>Experimental exposure</strong>Commanded concentration, refresh and washout times, and fitted effective clearance.</div>
+        <div class="parameter-item"><strong>Fitted biology</strong>Inherited growth parameters, \(\alpha_{NC}\), \(\alpha_{CN}\), one shared \(\rho\), and the lineage-specific kill coefficients \(\beta_N\) and \(\beta_C\).</div>
+        <div class="parameter-item"><strong>Known experimental inputs</strong>The resource switch \(z\), treatment switch \(u(t)\), concentration, and treatment start and stop times.</div>
         <div class="parameter-item"><strong>Policy choices</strong>Monitoring times, thresholds, and allowable doses. These are schedule settings, not biological fit parameters.</div>
       </div>
 
@@ -334,22 +357,22 @@
           <div class="paper-body">
             <p>For the present experiment, A2780Naive and total A2780cis are measured. The most defensible default therefore keeps those two observables explicit:</p>
             <div class="equation">\[
-            \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-(d_N+z\delta_N)\,N-\beta_N\,E\,N
+            \frac{dN}{dt}=r_N[1-z(1-\rho)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N-\beta_N\,u(t)\,N
             \]
             \[
-            \frac{dC}{dt}=r_C[1-z(1-\rho_C)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-(d_C+z\delta_C)\,C-\beta_C\,E\,C
+            \frac{dC}{dt}=r_C[1-z(1-\rho)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-d_C\,C-\beta_C\,u(t)\,C
             \]</div>
             <p>Hockings and Valdivia support testing asymmetric fitness and lineage-specific loss, but neither paper proves that the A2780cis observations contain separately identifiable sensitive-like and tolerant-like states.</p>
             <div class="decision"><strong>Decision:</strong> keep latent cis states out of the default graph and default scientific interpretation. Add them only when a marker, sorting assay, or perturbation distinguishes the states.</div>
           </div>
         </details>
         <details class="paper">
-          <summary>2. Drug command, extracellular exposure, damage, and cell loss are different quantities</summary>
+          <summary>2. Delayed drug exposure is a follow-up, not the starting model</summary>
           <div class="paper-body">
-            <p>El-Kareh and Secomb support an exposure-to-damage chain rather than a single drug-on flag:</p>
-            <div class="equation">\[\frac{dc_i}{dt}=k_{in}D_{ext}(t)-k_{out}c_i-k_bc_i,\qquad \frac{dc_b}{dt}=k_bc_i-k_{repair}c_b,\qquad E(t)=E_{max}\frac{c_b^h}{EC_{50}^h+c_b^h}\]</div>
+            <p>Begin with the direct on/off model in Step 3A. If pulse-and-washout data show a reproducible delay, Step 3B adds one normalized exposure state. El-Kareh and Secomb provide the basis for a still richer exposure-to-damage chain:</p>
+            <div class="equation">\[\frac{dc_i}{dt}=k_{in}\,D_{ext}(t)-k_{out}\,c_i-k_b\,c_i,\qquad \frac{dc_b}{dt}=k_b\,c_i-k_{repair}\,c_b,\qquad E(t)=E_{max}\frac{c_b^h}{EC_{50}^h+c_b^h}\]</div>
             <p>This abstraction separates media concentration \(D_{ext}\), intracellular free platinum \(c_i\), bound or damage-associated platinum \(c_b\), and the downstream loss rate \(E\). The full published model contains parameter combinations that cannot be separated from survival data alone, so the project should not fit every rate to total cell counts.</p>
-            <div class="decision"><strong>Decision:</strong> fit a minimal external-exposure plus one damage-state model first. Add a second intracellular state only if uptake or DNA-bound platinum is measured.</div>
+            <div class="decision"><strong>Decision:</strong> retain Step 3A unless delayed action is demonstrated. Then test the one-parameter lag in Step 3B. Add intracellular or damage states only if uptake or DNA-bound platinum is measured.</div>
           </div>
         </details>
         <details class="paper">
