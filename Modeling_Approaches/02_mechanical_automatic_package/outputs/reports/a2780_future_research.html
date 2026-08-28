@@ -32,8 +32,8 @@
       font-family: Arial, Helvetica, sans-serif;
       line-height: 1.55;
     }
-    header, main, footer { max-width: 1240px; margin: 0 auto; padding: 28px 26px; }
-    header { padding-top: 34px; padding-bottom: 18px; }
+    header, main, footer { max-width: 1240px; margin: 0 auto; padding: 22px 26px; }
+    header { padding-top: 28px; padding-bottom: 14px; }
     h1 { margin: 14px 0 8px; font-size: 36px; line-height: 1.15; }
     h2 { margin: 0 0 12px; font-size: 27px; }
     h3 { margin: 20px 0 8px; font-size: 20px; }
@@ -58,7 +58,7 @@
       padding: 8px 11px;
       text-decoration: none;
     }
-    section { padding: 28px 0; border-top: 1px solid var(--line); }
+    section { padding: 22px 0; border-top: 1px solid var(--line); }
     .summary-grid, .roadmap-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -76,7 +76,7 @@
     .small { color: var(--muted); font-size: 14px; }
     .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: #fff; }
     table { width: 100%; min-width: 1080px; border-collapse: collapse; }
-    th, td { padding: 11px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th, td { padding: 9px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
     th { background: #eaf0f4; font-size: 14px; }
     tr:last-child td { border-bottom: 0; }
     td.rank { width: 48px; font-size: 20px; font-weight: 700; color: var(--blue); }
@@ -97,6 +97,31 @@
     .preprint { color: var(--red); }
     .clinical { color: var(--blue); }
     .paper-list { display: grid; gap: 12px; margin-top: 16px; }
+    .compact-ranking { display: grid; gap: 7px; margin-top: 14px; }
+    .compact-paper { border: 1px solid var(--line); background: #fff; }
+    .compact-paper > summary {
+      display: grid;
+      grid-template-columns: 38px minmax(240px, 1fr) minmax(170px, auto);
+      gap: 10px;
+      align-items: center;
+      cursor: pointer;
+      padding: 10px 12px;
+      list-style-position: inside;
+    }
+    .compact-paper > summary:hover { background: #f5f8fb; }
+    .compact-paper[open] > summary { background: #edf3f8; border-bottom: 1px solid var(--line); }
+    .compact-rank { color: var(--blue); font-size: 18px; font-weight: 700; }
+    .compact-title { min-width: 0; }
+    .compact-title a { color: inherit; font-weight: 700; pointer-events: none; text-decoration: none; }
+    .compact-tags { text-align: right; }
+    .compact-bio {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      padding: 12px 16px 14px 60px;
+    }
+    .compact-bio p { margin: 3px 0 0; color: var(--muted); }
+    .js .ranking-fallback { display: none; }
     details.paper {
       border: 1px solid var(--line);
       background: #fff;
@@ -165,6 +190,9 @@
       .summary-grid, .roadmap-grid { grid-template-columns: 1fr; }
       .model-flow, .parameter-grid { grid-template-columns: 1fr; }
       .flow-step + .flow-step { border-left: 1px solid var(--line); border-top: 0; }
+      .compact-paper > summary { grid-template-columns: 32px 1fr; }
+      .compact-tags { grid-column: 2; text-align: left; }
+      .compact-bio { grid-template-columns: 1fr; padding-left: 16px; }
       .paper-body dl { grid-template-columns: 1fr; gap: 2px; }
       .paper-body dd { margin-bottom: 8px; }
       .checklist { columns: 1; }
@@ -255,7 +283,9 @@
     <section id="shortlist">
       <h2>The 15 Most Pertinent Papers</h2>
       <p>For the simplified coculture model, read ranks 1, 4, 6, 7, 2, and 3 first: ovarian fitness and coculture biology, low-parameter competition, the original OVCAR-3 adaptive-therapy model, cisplatin exposure, and schedule validation. Ranks 5 and 8-13 define later translation. Ranks 14-15 constrain heterogeneity and plasticity without requiring those mechanisms in the default.</p>
-      <div class="table-wrap"><table>
+      <p class="small">Select a paper to reveal its biological relevance and how it should be used in this project.</p>
+      <div id="compactRanking" class="compact-ranking" aria-label="Ranked paper summaries"></div>
+      <div class="table-wrap ranking-fallback"><table id="paperRanking">
         <thead><tr><th>Rank</th><th>Paper</th><th>Evidence type</th><th>Why it matters here</th><th>Recommended use</th></tr></thead>
         <tbody>
           <tr><td class="rank">1</td><td class="paper"><strong>Hockings et al. (2025)</strong><br><a href="https://doi.org/10.1158/0008-5472.CAN-25-0351">Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer</a></td><td><span class="tag direct">Ovarian coculture</span><span class="tag direct">Carboplatin AT</span></td><td class="use">Directly tests sensitive/resistant fitness reversal, low-resource competition, apoptosis, and response-guided carboplatin in ovarian models.</td><td>Primary biological basis for testing a resistant fitness cost, lineage-specific loss, and treatment holidays. Do not copy carboplatin parameters into cisplatin fits.</td></tr>
@@ -275,6 +305,7 @@
           <tr><td class="rank">15</td><td class="paper"><strong>Del Pino Herrera et al. (2025)</strong><br><a href="https://doi.org/10.1101/2025.10.08.681266">Metabolic plasticity drives PARP inhibitor persistence</a></td><td><span class="tag preprint">Preprint</span><span class="tag direct">OVCAR3</span></td><td class="use">Combines single-cell data, naive/persister population dynamics, resource dependence, and adaptive-schedule simulations.</td><td>High-value future hypothesis for measured plasticity. Keep advanced-only until peer review and independent experimental validation.</td></tr>
         </tbody>
       </table></div>
+      <noscript><p class="small">Open the table rows below to read the biological relevance and recommended use. JavaScript is required only for the compact presentation.</p></noscript>
     </section>
 
     <section id="models">
@@ -415,5 +446,54 @@
   <footer>
     <p>Literature screened through August 28, 2026. This report supports research planning and model criticism; it is not a clinical treatment recommendation.</p>
   </footer>
+  <script>
+    document.documentElement.classList.add('js');
+
+    function buildCompactRanking() {
+      const table = document.getElementById('paperRanking');
+      const target = document.getElementById('compactRanking');
+      if (!table || !target) return;
+
+      table.querySelectorAll('tbody tr').forEach((row) => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length !== 5) return;
+
+        const details = document.createElement('details');
+        details.className = 'compact-paper';
+
+        const summary = document.createElement('summary');
+        const rank = document.createElement('span');
+        rank.className = 'compact-rank';
+        rank.textContent = cells[0].textContent.trim();
+
+        const title = document.createElement('span');
+        title.className = 'compact-title';
+        title.innerHTML = cells[1].innerHTML;
+
+        const tags = document.createElement('span');
+        tags.className = 'compact-tags';
+        tags.innerHTML = cells[2].innerHTML;
+
+        summary.append(rank, title, tags);
+
+        const body = document.createElement('div');
+        body.className = 'compact-bio';
+        body.innerHTML = `<div><strong>Biological relevance</strong><p>${cells[3].innerHTML}</p></div>` +
+          `<div><strong>How to use it here</strong><p>${cells[4].innerHTML}</p></div>`;
+
+        const sourceLink = cells[1].querySelector('a');
+        if (sourceLink) {
+          const openPaper = sourceLink.cloneNode(true);
+          openPaper.textContent = 'Open paper';
+          body.lastElementChild.appendChild(openPaper);
+        }
+
+        details.append(summary, body);
+        target.appendChild(details);
+      });
+    }
+
+    buildCompactRanking();
+  </script>
 </body>
 </html>
