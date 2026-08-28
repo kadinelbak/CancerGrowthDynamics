@@ -83,19 +83,18 @@
     }
     .toc nav a:hover, .toc nav a:focus { background: #eef2f6; }
     section { padding: 22px 0; border-top: 1px solid var(--line); }
-    .summary-grid, .roadmap-grid {
+    .summary-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
-    .summary-item, .roadmap-item {
+    .summary-item {
       background: var(--panel);
       border: 1px solid var(--line);
       border-top: 4px solid var(--blue);
       padding: 15px;
     }
-    .summary-item:nth-child(2), .roadmap-item:nth-child(2) { border-top-color: var(--green); }
-    .summary-item:nth-child(3), .roadmap-item:nth-child(3) { border-top-color: var(--amber); }
+    .summary-item:nth-child(2) { border-top-color: var(--green); }
     .metric { display: block; margin-bottom: 4px; font-size: 27px; font-weight: 700; }
     .small { color: var(--muted); font-size: 14px; }
     .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: #fff; }
@@ -121,6 +120,22 @@
     .preprint { color: var(--red); }
     .clinical { color: var(--blue); }
     .paper-list { display: grid; gap: 12px; margin-top: 16px; }
+    .annotated-bibliography { border: 1px solid var(--line); background: #fff; }
+    .annotated-bibliography > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      cursor: pointer;
+      padding: 14px 16px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .annotated-bibliography > summary::after { content: "Open"; color: var(--blue); font-size: 13px; }
+    .annotated-bibliography[open] > summary { border-bottom: 1px solid var(--line); }
+    .annotated-bibliography[open] > summary::after { content: "Close"; }
+    .annotated-body { padding: 14px 16px 16px; }
+    .annotated-body > :first-child { margin-top: 0; }
     .compact-ranking { display: grid; gap: 7px; margin-top: 14px; }
     .compact-paper { border: 1px solid var(--line); background: #fff; }
     .compact-paper > summary {
@@ -175,19 +190,6 @@
     }
     .parameter-item { border-left: 4px solid var(--line); background: #fff; padding: 10px 13px; }
     .parameter-item strong { display: block; }
-    .warning { background: var(--soft-amber); border: 1px solid #e4c478; padding: 14px 16px; }
-    .roadmap-item ol { margin: 10px 0 0; padding-left: 20px; }
-    .roadmap-item li { margin-bottom: 7px; }
-    .priority {
-      display: inline-block;
-      background: var(--ink);
-      color: #fff;
-      border-radius: 3px;
-      padding: 2px 6px;
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
     .checklist { columns: 2; column-gap: 32px; padding-left: 21px; }
     .checklist li { break-inside: avoid; margin-bottom: 8px; }
     .references li { margin-bottom: 11px; }
@@ -195,7 +197,7 @@
     @media (max-width: 900px) {
       header, main, footer { padding-left: 16px; padding-right: 16px; }
       h1 { font-size: 29px; }
-      .summary-grid, .roadmap-grid { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
       .parameter-grid { grid-template-columns: 1fr; }
       .toc nav { width: min(260px, calc(100vw - 32px)); }
       .compact-paper > summary { grid-template-columns: 32px 1fr; }
@@ -216,9 +218,8 @@
         <nav aria-label="Report sections">
           <a href="#core-model">Core model</a>
           <a href="#method">Selection method</a>
-          <a href="#shortlist">Top 15 papers</a>
+          <a href="#shortlist">Annotated bibliography</a>
           <a href="#models">Mathematical lessons</a>
-          <a href="#roadmap">Research roadmap</a>
           <a href="#experiments">Experiments needed</a>
           <a href="#bibliography">Bibliography</a>
         </nav>
@@ -319,18 +320,19 @@
       <div class="summary-grid">
         <div class="summary-item"><span class="metric">15</span><strong>ranked papers</strong><p class="small">Fourteen ovarian-focused modeling or experimental-model papers and one cross-cancer mathematical benchmark; one item is clearly labeled as a preprint.</p></div>
         <div class="summary-item"><span class="metric">6</span><strong>modeling scales</strong><p class="small">Cellular PK/PD, population ODEs, ecological competition, branching processes, spatial delivery, and clinical biomarker models.</p></div>
-        <div class="summary-item"><span class="metric">3</span><strong>implementation horizons</strong><p class="small">Immediate model audit, new lineage-resolved experiments, then translational and spatial extensions.</p></div>
       </div>
       <h3>Ranking rubric</h3>
       <p>Ordering reflects direct overlap with the A2780 coculture experiment first, then usefulness for simplifying competition and adaptive scheduling, quality of longitudinal validation, and availability of enough model detail to reproduce the work. Newness and citation count were not used as substitutes for relevance.</p>
     </section>
 
     <section id="shortlist">
-      <h2>The 15 Most Pertinent Papers</h2>
-      <p>For the simplified coculture model, read ranks 1, 4, 6, 7, 2, and 3 first: ovarian fitness and coculture biology, low-parameter competition, the original OVCAR-3 adaptive-therapy model, cisplatin exposure, and schedule validation. Ranks 5 and 8-13 define later translation. Ranks 14-15 constrain heterogeneity and plasticity without requiring those mechanisms in the default.</p>
-      <p class="small">Select a paper to reveal its biological relevance and how it should be used in this project.</p>
-      <div id="compactRanking" class="compact-ranking" aria-label="Ranked paper summaries"></div>
-      <div class="table-wrap ranking-fallback"><table id="paperRanking">
+      <details class="annotated-bibliography">
+        <summary>Annotated bibliography <span class="small">15 papers</span></summary>
+        <div class="annotated-body">
+          <p>For the simplified coculture model, read ranks 1, 4, 6, 7, 2, and 3 first: ovarian fitness and coculture biology, low-parameter competition, the original OVCAR-3 adaptive-therapy model, cisplatin exposure, and schedule validation. Ranks 5 and 8-13 define later translation. Ranks 14-15 constrain heterogeneity and plasticity without requiring those mechanisms in the default.</p>
+          <p class="small">Select a paper to reveal its biological relevance and how it should be used in this project.</p>
+          <div id="compactRanking" class="compact-ranking" aria-label="Ranked paper summaries"></div>
+          <div class="table-wrap ranking-fallback"><table id="paperRanking">
         <thead><tr><th>Rank</th><th>Paper</th><th>Evidence type</th><th>Why it matters here</th><th>Recommended use</th></tr></thead>
         <tbody>
           <tr><td class="rank">1</td><td class="paper"><strong>Hockings et al. (2025)</strong><br><a href="https://doi.org/10.1158/0008-5472.CAN-25-0351">Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer</a></td><td><span class="tag direct">Ovarian coculture</span><span class="tag direct">Carboplatin AT</span></td><td class="use">Directly tests sensitive/resistant fitness reversal, low-resource competition, apoptosis, and response-guided carboplatin in ovarian models.</td><td>Primary biological basis for testing a resistant fitness cost, lineage-specific loss, and treatment holidays. Do not copy carboplatin parameters into cisplatin fits.</td></tr>
@@ -349,8 +351,10 @@
           <tr><td class="rank">14</td><td class="paper"><strong>Bicaku et al. (2012)</strong><br><a href="https://doi.org/10.1038/bjc.2012.207">Ovarian response to cisplatin, carboplatin, and paclitaxel</a></td><td><span class="tag direct">36 ovarian lines</span><span class="tag direct">Dose response</span></td><td class="use">Demonstrates broad line-to-line heterogeneity in platinum and taxane response and links response-associated pathways with survival.</td><td>Biological constraint against treating one A2780 dose-response curve as universal ovarian pharmacology.</td></tr>
           <tr><td class="rank">15</td><td class="paper"><strong>Del Pino Herrera et al. (2025)</strong><br><a href="https://doi.org/10.1101/2025.10.08.681266">Metabolic plasticity drives PARP inhibitor persistence</a></td><td><span class="tag preprint">Preprint</span><span class="tag direct">OVCAR3</span></td><td class="use">Combines single-cell data, naive/persister population dynamics, resource dependence, and adaptive-schedule simulations.</td><td>High-value future hypothesis for measured plasticity. Keep advanced-only until peer review and independent experimental validation.</td></tr>
         </tbody>
-      </table></div>
-      <noscript><p class="small">Open the table rows below to read the biological relevance and recommended use. JavaScript is required only for the compact presentation.</p></noscript>
+          </table></div>
+          <noscript><p class="small">Open this section to read the biological relevance and recommended use. JavaScript is required only for the compact presentation.</p></noscript>
+        </div>
+      </details>
     </section>
 
     <section id="models">
@@ -399,46 +403,6 @@
           </div>
         </details>
       </div>
-    </section>
-
-    <section id="roadmap">
-      <h2>Future Research Roadmap</h2>
-      <div class="roadmap-grid">
-        <article class="roadmap-item">
-          <span class="priority">NOW: 0-6 months</span>
-          <h3>Make the current mechanism testable</h3>
-          <ol>
-            <li>Keep the observable \(N,C\) model as the default and move latent cis splits to advanced diagnostics.</li>
-            <li>Add a minimal exposure/damage candidate with explicit media refresh and washout.</li>
-            <li>Refit simple competition, growth-cost, death-cost, and turnover candidates to the identical objective.</li>
-            <li>Use sample-aware hierarchical fits and propagate Stage 1-3 uncertainty into Stage 4.</li>
-            <li>Pre-register held-out schedules and directional predictions before collecting more data.</li>
-          </ol>
-        </article>
-        <article class="roadmap-item">
-          <span class="priority">NEXT: 6-18 months</span>
-          <h3>Collect identifying measurements</h3>
-          <ol>
-            <li>Repeat coculture across starting ratios and densities with lineage-resolved counts.</li>
-            <li>Measure proliferation and apoptosis simultaneously.</li>
-            <li>Compare direct contact, transwell, and conditioned media.</li>
-            <li>Run pulse-washout experiments with multiple exposure durations and refresh intervals.</li>
-            <li>Prospectively test at least two model-discriminating adaptive schedules.</li>
-          </ol>
-        </article>
-        <article class="roadmap-item">
-          <span class="priority">LATER: 18+ months</span>
-          <h3>Build the translational bridge</h3>
-          <ol>
-            <li>Move to spheroids or organoids before adding spatial drug penetration.</li>
-            <li>Calibrate a separate human-scale growth and observation model to CA-125, imaging, or cfDNA.</li>
-            <li>Add surgery, lesion emergence, toxicity, and interpatient variability.</li>
-            <li>Run virtual trials only after external validation.</li>
-            <li>Keep clinical dose recommendations outside the scope of the research simulator.</li>
-          </ol>
-        </article>
-      </div>
-      <div class="warning"><strong>Models not ready for default use:</strong> reversible phenotype switching, multi-mechanism resistance branching, intracellular molecular networks, spatial penetration, and patient survival models are scientifically worthwhile. They are not identifiable from the current two-color cell-count trajectories alone.</div>
     </section>
 
     <section id="experiments">
