@@ -16,6 +16,11 @@ using GrowthParameterEstimation
     @test occursin("transit_chain_erlang", report)
     @test occursin("Legacy local registry", report)
     @test occursin("Select visible", report)
+    @test occursin("Selected equations by modeling stage", report)
+    @test occursin("id=\"tagButtons\"", report)
+    @test occursin("function modelTags(model)", report)
+    @test occursin("matchesAnyTag", report)
+    @test occursin("model.stages.includes(stage)", report)
 
     registry_ids = [match.captures[1] for match in eachmatch(r"M\(\"[^\"]+\",\"([^\"]+)\"", report)]
     @test length(registry_ids) == 66
