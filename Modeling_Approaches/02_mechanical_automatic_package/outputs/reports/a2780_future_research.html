@@ -223,23 +223,40 @@
 
       <div class="model-flow" aria-label="Four-step adaptive coculture model">
         <div class="flow-step"><span class="number">1</span><strong>Grow separately</strong><span class="small">Learn the untreated growth law for each lineage from monoculture.</span></div>
-        <div class="flow-step"><span class="number">2</span><strong>Compete together</strong><span class="small">Add only the cross-lineage effects needed to explain untreated coculture.</span></div>
+        <div class="flow-step"><span class="number">2</span><strong>Compete under resources</strong><span class="small">Add cross-lineage effects, then test only the low-resource changes supported by data.</span></div>
         <div class="flow-step"><span class="number">3</span><strong>Apply exposure</strong><span class="small">Let the same fitted coculture state continue while cisplatin exposure rises and clears.</span></div>
         <div class="flow-step"><span class="number">4</span><strong>Decide at checks</strong><span class="small">At monitoring times, choose the next allowed dose from the measured response.</span></div>
       </div>
 
       <h3>Step 1: Untreated coculture</h3>
-      <div class="equation">\[L_N=N+\alpha_{NC}C,\qquad L_C=C+\alpha_{CN}N\]
-      \[\frac{dN}{dt}=G_N(N,L_N)-d_NN,\qquad \frac{dC}{dt}=G_C(C,L_C)-d_CC\]</div>
-      <p>\(G_N\) and \(G_C\) are the already fitted logistic or theta-logistic growth laws. \(L_N\) and \(L_C\) are effective crowding loads. If \(\alpha_{NC}=1\), one cis cell contributes the same modeled load to Naive as one Naive cell. If \(\alpha_{NC}&gt;1\), cis has a stronger suppressive effect on Naive. The reverse effect is controlled independently by \(\alpha_{CN}\). The loss terms \(d_N\) and \(d_C\) are included only when the data support lineage-specific decline beyond inherited growth.</p>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_N\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-d_N\,N
+      \]
+      \[
+      \frac{dC}{dt}=r_C\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-d_C\,C
+      \]</div>
+      <p>These are theta-logistic competition equations written in full. Setting \(\theta_N=\theta_C=1\) gives ordinary logistic competition. \(r_N\) and \(r_C\) are maximum per-capita growth rates, \(K_N\) and \(K_C\) are assay-scale carrying capacities, and \(d_N\) and \(d_C\) are supported background loss rates. If \(\alpha_{NC}=1\), one cis cell contributes the same modeled crowding to Naive as one Naive cell; \(\alpha_{CN}\) independently controls how Naive affects cis.</p>
 
-      <h3>Step 2: Cisplatin exposure and kill</h3>
+      <h3>Step 2: Low-resource condition</h3>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-(d_N+z\delta_N)\,N
+      \]
+      \[
+      \frac{dC}{dt}=r_C[1-z(1-\rho_C)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-(d_C+z\delta_C)\,C
+      \]</div>
+      <p>\(z=0\) represents standard media and recovers the equations above. \(z=1\) represents low-resource media. \(\rho_N\) and \(\rho_C\) are the fractions of standard growth retained under low resource; \(\delta_N\) and \(\delta_C\) are additional low-resource loss rates. Fit the growth modifiers first with \(\delta_N=\delta_C=0\). Add the extra loss terms only if proliferation and death measurements or model comparison require them.</p>
+
+      <h3>Step 3: Cisplatin exposure and kill</h3>
       <div class="equation">\[\frac{dE}{dt}=k_{in}D_{cmd}(t)-k_{clear}E\]
-      \[\frac{dN}{dt}=G_N(N,L_N)-d_NN-q_N(E)N,\qquad \frac{dC}{dt}=G_C(C,L_C)-d_CC-q_C(E)C\]
-      \[q_i(E)=E_{max,i}\frac{E^h}{EC_{50,i}^{h}+E^h}\]</div>
-      <p>\(D_{cmd}(t)\) is what the experimenter adds; \(E(t)\) is effective exposure; and \(q_i(E)\) is the lineage-specific loss pressure. These are not the same quantity. The one-state exposure equation lets drug action decay after washout without creating an unexplained permanent effect. A second damage compartment should be added only if this model fails held-out pulse and washout experiments.</p>
+      \[
+      \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-(d_N+z\delta_N)\,N-\beta_N\,E\,N
+      \]
+      \[
+      \frac{dC}{dt}=r_C[1-z(1-\rho_C)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-(d_C+z\delta_C)\,C-\beta_C\,E\,C
+      \]</div>
+      <p>\(D_{cmd}(t)\) is the concentration commanded by the experimenter, \(E(t)\) is effective exposure, and \(\beta_N\) and \(\beta_C\) convert exposure into lineage-specific loss. This linear exposure effect is the simplest candidate over the measured dose range. Add a saturating Hill term only if it materially improves held-out dose predictions. The one-state exposure equation allows drug action to decay after washout without creating an unexplained permanent effect.</p>
 
-      <h3>Step 3: Adaptive decision rule</h3>
+      <h3>Step 4: Adaptive decision rule</h3>
       <div class="equation">\[
       D_{k+1}=\begin{cases}
       D_{high}, & B(t_k)\ge U,\\
@@ -316,8 +333,13 @@
           <summary>1. Observable two-lineage competition should remain the default</summary>
           <div class="paper-body">
             <p>For the present experiment, A2780Naive and total A2780cis are measured. The most defensible default therefore keeps those two observables explicit:</p>
-            <div class="equation">\[\frac{dN}{dt}=G_N(N,L_N)-d_NN-E_N(t,D,L_N)N,\qquad \frac{dC}{dt}=G_C(C,L_C)-d_CC-E_C(t,D,L_C)C\]</div>
-            <p>with effective loads \(L_N=N+\alpha_{NC}C\) and \(L_C=C+\alpha_{CN}N\). Hockings and Valdivia support testing asymmetric fitness and lineage-specific loss, but neither paper proves that the A2780cis observations contain separately identifiable sensitive-like and tolerant-like states.</p>
+            <div class="equation">\[
+            \frac{dN}{dt}=r_N[1-z(1-\rho_N)]\,N\left[1-\left(\frac{N+\alpha_{NC}C}{K_N}\right)^{\theta_N}\right]-(d_N+z\delta_N)\,N-\beta_N\,E\,N
+            \]
+            \[
+            \frac{dC}{dt}=r_C[1-z(1-\rho_C)]\,C\left[1-\left(\frac{C+\alpha_{CN}N}{K_C}\right)^{\theta_C}\right]-(d_C+z\delta_C)\,C-\beta_C\,E\,C
+            \]</div>
+            <p>Hockings and Valdivia support testing asymmetric fitness and lineage-specific loss, but neither paper proves that the A2780cis observations contain separately identifiable sensitive-like and tolerant-like states.</p>
             <div class="decision"><strong>Decision:</strong> keep latent cis states out of the default graph and default scientific interpretation. Add them only when a marker, sorting assay, or perturbation distinguishes the states.</div>
           </div>
         </details>
