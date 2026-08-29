@@ -11,7 +11,7 @@ using Plots
 using ..IOUtils
 using ..ModelRegistry
 
-export load_untreated_baseline, run_condition_fit!
+export load_untreated_baseline, run_condition_fit!, run_reduced_stage_comparison!
 
 const DENSITY_LOG_CONTRAST_BOUND = log(1.05)
 const THETA_UNTREATED_MODELS = Set([
@@ -2657,5 +2657,6 @@ include("coculture_joint.jl")
 include("strobl_models.jl")
 include("linked_treatment_joint.jl")
 include("timing_hypotheses.jl")
+include("reduced_stage_comparison.jl")
 
 end

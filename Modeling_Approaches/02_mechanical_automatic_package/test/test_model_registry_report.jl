@@ -34,7 +34,7 @@ using GrowthParameterEstimation
     @test occursin("data-group-count", report)
 
     registry_ids = [match.captures[1] for match in eachmatch(r"M\(\"[^\"]+\",\"([^\"]+)\"", report)]
-    @test length(registry_ids) == 66
+    @test length(registry_ids) == 71
     @test allunique(registry_ids)
 
     shortlist_match = match(r"const simpleCandidates = \[([\s\S]*?)\];", report)

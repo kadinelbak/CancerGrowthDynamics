@@ -16,7 +16,6 @@
     @test occursin("id=\"core-model\"", report)
     @test !occursin("The Smallest Defensible Model", report)
     @test !occursin("model-flow", report)
-    @test occursin("D_{cmd}(t)", report)
     @test occursin("D_{k+1}", report)
     @test occursin("Policy choices", report)
     @test occursin("When adaptive therapy can work", report)

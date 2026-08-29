@@ -1,0 +1,3 @@
+route,omitted_stage,inherited_information,newly_fitted_information,comparison_observations,residual_scaling
+Stage 1 -> Stage 3 -> Stage 4,Stage 2 treated monoculture,Stage 1 growth plus fixed Stage 3 asymmetric competition/loss,Treatment terms from treated coculture,168,component-trajectory peak
+Stage 1 -> Stage 2 -> Stage 4,Stage 3 untreated coculture,"Stage 1 growth plus fixed Stage 2 timing, Hill response, and cis state fraction",Coculture context scale or asymmetric competition from treated coculture,168,component-trajectory peak
