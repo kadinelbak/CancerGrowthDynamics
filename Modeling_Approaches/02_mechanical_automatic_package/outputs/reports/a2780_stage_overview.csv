@@ -1,5 +1,5 @@
 condition,status,decoded_rows,fit_rows,best_model,best_bic,best_ssr,message
 monoculture_untreated,completed,179,48,adaptation_theta_logistic_growth,-186.40564973620323,1.067310195491836e6,Reused validated executed outputs.
 monoculture_treated,completed,504,54,joint_ic_effect_transit_death,-370.75497675445547,1.226994479683555e7,Reused validated executed outputs.
-coculture_untreated,completed,502,9,lv_asymmetric_competition_death,-628.6081386168919,1.847696965769249e7,Reused validated executed outputs.
+coculture_untreated,completed,502,16,strobl_birth_growth_cost_turnover,-645.8523471037355,1.824653137312481e7,Reused validated executed outputs.
 coculture_treated,completed,1176,21,dual_transit_load_scaled,-611.2527283702277,1.5559773031407777e7,Reused validated executed outputs.

@@ -31,6 +31,37 @@ using DataFrames
     @test occursin("<th>Parameters</th>", appendix_html)
     @test occursin("Strict drug-effect inheritance", appendix_html)
 
+    @test count("Compare fitted assumptions", html) == 4
+    @test count("class=\"model-options\"", html) == 6
+    @test count("class=\"pooling-options\"", html) == 6
+    @test occursin("Choose a model, then its fitted pooling method", html)
+    @test occursin("id=\"model-path-data\"", html)
+    @test occursin("\"stage2_A2780cis\":\"joint_ic_effect_two_population|shared\"", html)
+    @test occursin("logistic_growth|shared", html)
+    @test occursin("Selected inheritance path", html)
+    @test occursin("Running Delta BIC penalty", html)
+    @test occursin("Parameters carried from this fit", html)
+    @test occursin("a conditional refit is required", html)
+    @test occursin("What pooling means", html)
+    @test occursin("Shared pooling", html)
+    @test occursin("Partial pooling", html)
+    @test occursin("Independent diagnostic", html)
+    @test occursin("Linked global", html)
+    @test occursin("Well and sample aggregation", html)
+    @test occursin("partial_5pct", html)
+    @test occursin("Refit downstream", html)
+    @test occursin("Conditionally refitted", html)
+    @test occursin("http://127.0.0.1:8766", html)
+    @test occursin("content-addressed by the exact model and pooling path", html)
+    @test occursin("How preview and refitting work", html)
+    @test occursin("Partially refitted", html)
+    @test count("class=\"live-equation\"", html) == 4
+    @test occursin("hot inherited forward preview", html)
+    @test occursin("Stage 3 now propagates the selected Stage 1 growth equations and parameters", html)
+    @test occursin("effective_parameters", html)
+    @test occursin("stage3ForwardRows", html)
+    @test !occursin("Its plot remains a stage-local shape comparison", html)
+
     @test occursin("GrowthParameterEstimation two-sided sensitivity and bound profile", html)
     @test occursin("endpoint bootstrap: 95% confidence intervals", html)
     endpoint_path = joinpath(package_root, "outputs", "csv", "coculture_treated", "linked_treatment_endpoint_bootstrap.csv")

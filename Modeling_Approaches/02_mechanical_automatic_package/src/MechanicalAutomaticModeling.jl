@@ -9,6 +9,7 @@ include("sample_aware_report.jl")
 include("reduced_stage_report.jl")
 include("adaptive_simulation_engine.jl")
 include("a2780_adaptive_adapter.jl")
+include("hybrid_refit_service.jl")
 
 using .IOUtils
 using .ModelRegistry
@@ -19,7 +20,8 @@ using .SampleAwareReport
 using .ReducedStageReport
 using .AdaptiveSimulationEngine
 using .A2780AdaptiveAdapter
+using .HybridRefitService
 
-export IOUtils, ModelRegistry, FitWorkflows, AnalysisWorkflows, StagedA2780Workflow, SampleAwareReport, ReducedStageReport, AdaptiveSimulationEngine, A2780AdaptiveAdapter
+export IOUtils, ModelRegistry, FitWorkflows, AnalysisWorkflows, StagedA2780Workflow, SampleAwareReport, ReducedStageReport, AdaptiveSimulationEngine, A2780AdaptiveAdapter, HybridRefitService
 
 end

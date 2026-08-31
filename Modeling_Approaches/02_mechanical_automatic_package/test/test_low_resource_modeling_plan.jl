@@ -6,6 +6,10 @@
     @test isfile(report_path)
     @test isfile(docs_report_path)
     report = read(report_path, String)
+    section_html(id) = begin
+        matched = match(Regex("<section id=\"" * id * "\">([\\s\\S]*?)</section>"), report)
+        matched === nothing ? "" : matched.captures[1]
+    end
     @test report == read(docs_report_path, String)
     @test occursin("A2780 Low-Resource Modeling Plan", report)
     @test occursin("Untreated Monoculture", report)
@@ -17,6 +21,32 @@
     @test occursin("Low-Resource Treated Coculture", report)
     @test occursin("Growth-Rate And Carrying-Capacity Modifiers", report)
     @test occursin("Separately Fitted Growth Rate", report)
+    @test occursin("Lineage-Specific Subtractive Loss", report)
+    @test occursin("-d_N^{LR}N", report)
+    @test occursin("-d_C^{LR}C", report)
+    @test occursin("A2780Naive monoculture", report)
+    @test occursin("A2780cis-resistant monoculture", report)
+    @test count("^{\\theta_X}", report) == 1
+    @test !occursin("^{\\theta_N}", report)
+    @test !occursin("^{\\theta_C}", report)
+    @test occursin("r_NN\\left(1-\\frac{N+\\alpha_{NC}C}{K_N}\\right)", report)
+    @test occursin("r_CC\\left(1-\\frac{C+\\alpha_{CN}N}{K_C}\\right)", report)
+
+    treated_coculture = section_html("treated-coculture")
+    @test !occursin("-d_NN", treated_coculture)
+    @test !occursin("-d_CC", treated_coculture)
+    @test occursin("ordinary coculture death terms are not carried forward", treated_coculture)
+
+    for section_id in ("low-resource-treated-monoculture", "low-resource-coculture", "low-resource-treated-coculture")
+        downstream = section_html(section_id)
+        @test occursin("d_N^{LR}", downstream)
+        @test occursin("d_C^{LR}", downstream)
+        @test !occursin("\\rho_r", downstream)
+        @test !occursin("\\rho_K", downstream)
+        @test !occursin("r_X^{LR}", downstream)
+        @test !occursin("-d_NN", downstream)
+        @test !occursin("-d_CC", downstream)
+    end
     @test occursin("\\rho_r r_X", report)
     @test occursin("\\rho_KK_X", report)
     @test occursin("r_X^{LR}", report)

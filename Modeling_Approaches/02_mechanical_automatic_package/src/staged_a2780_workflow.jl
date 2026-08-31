@@ -912,6 +912,171 @@ function _report_stage_figure(path::AbstractString, report_dir::AbstractString, 
     return "<figure><img src=\"$relative_path\" alt=\"$(_html_escape(alt))\"><figcaption>$(_html_escape(caption))</figcaption></figure>"
 end
 
+function _path_candidate(row)
+    model = String(row.model)
+    pooling = :pooling_mode in propertynames(row) ? String(row.pooling_mode) : ""
+    return Dict(
+        "id" => "$(model)|$(pooling)",
+        "model" => model,
+        "label" => get(REPORT_MODEL_LABELS, model, model),
+        "pooling" => pooling,
+        "bic" => Float64(row.bic),
+        "delta_bic" => Float64(row.report_delta_bic),
+        "parameters" => (:params in propertynames(row) ? String(row.params) : "Not exported"),
+        "growth_family" => (:growth_family in propertynames(row) ? String(row.growth_family) : ""),
+        "eligible" => (:eligible_for_inheritance in propertynames(row) ? Bool(row.eligible_for_inheritance) : true),
+    )
+end
+
+function _path_candidates(ranking::DataFrame; cell_line::Union{Nothing,String} = nothing, include_model::Union{Nothing,String} = nothing)
+    selected = if cell_line === nothing || !(:cell_line in propertynames(ranking))
+        ranking
+    else
+        ranking[String.(ranking.cell_line) .== cell_line, :]
+    end
+    ranked = _report_ranked_rows(selected)
+    model_order = String[]
+    for row in eachrow(ranked)
+        model = String(row.model)
+        model in model_order || push!(model_order, model)
+        length(model_order) >= 5 && break
+    end
+    if include_model !== nothing && !(include_model in model_order)
+        isempty(model_order) ? push!(model_order, include_model) : (model_order[end] = include_model)
+    end
+    candidates = ranked[in.(String.(ranked.model), Ref(model_order)), :]
+    sort!(candidates, :report_rank)
+    return [_path_candidate(row) for row in eachrow(candidates)]
+end
+
+function _plot_rows(path::AbstractString; filters = Pair{Symbol,String}[], fields::Vector{Symbol})
+    isfile(path) || return Dict{String,Any}[]
+    rows = CSV.read(path, DataFrame)
+    for (column, value) in filters
+        column in propertynames(rows) || continue
+        rows = rows[String.(rows[!, column]) .== value, :]
+    end
+    result = Dict{String,Any}[]
+    for row in eachrow(rows)
+        item = Dict{String,Any}()
+        for field in fields
+            field in propertynames(row) || continue
+            value = row[field]
+            item[String(field)] = value isa Real ? Float64(value) : String(value)
+        end
+        push!(result, item)
+    end
+    return result
+end
+
+function _effective_parameter_payload(path::AbstractString; lineage::Bool = false)
+    isfile(path) || return Dict{String,Any}()
+    parameters = CSV.read(path, DataFrame)
+    result = Dict{String,Any}()
+    for row in eachrow(parameters)
+        model = String(row.model)
+        pooling = String(row.pooling_mode)
+        key = lineage ? "$(row.cell_line)|$(model)|$(pooling)" : "$(model)|$(pooling)"
+        density = :density in propertynames(row) ? String(row.density) : "all"
+        candidate = get!(result, key, Dict{String,Any}())
+        density_values = get!(candidate, density, Dict{String,Float64}())
+        value_column = :effective_value in propertynames(row) ? :effective_value : :estimate
+        value = row[value_column]
+        value === missing || (density_values[String(row.parameter)] = Float64(value))
+    end
+    return result
+end
+
+function _model_path_payload(csv_root::AbstractString)
+    stage1_ranking = CSV.read(joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_model_ranking.csv"), DataFrame)
+    stage2_ranking = CSV.read(joinpath(csv_root, "monoculture_treated", "monoculture_treated_pooling_model_ranking.csv"), DataFrame)
+    stage3_ranking = CSV.read(joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_model_ranking.csv"), DataFrame)
+    stage4_ranking = CSV.read(joinpath(csv_root, "coculture_treated", "linked_treatment_model_ranking.csv"), DataFrame)
+
+    stage1_overlay = joinpath(csv_root, "monoculture_untreated", "figures", "monoculture_untreated_pooling_overlays.csv")
+    stage2_overlay = joinpath(csv_root, "monoculture_treated", "figures", "monoculture_treated_joint_dose_overlays.csv")
+    stage3_overlay = joinpath(csv_root, "coculture_untreated", "figures", "coculture_untreated_joint_overlays.csv")
+    stage4_overlay = joinpath(csv_root, "coculture_treated", "figures", "linked_treatment_combined_overlays.csv")
+    stage1_parameters = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_parameter_estimates.csv")
+    stage3_parameters = joinpath(csv_root, "coculture_untreated", "coculture_untreated_joint_parameter_estimates.csv")
+
+    candidate_groups = Dict{String,Any}()
+    plot_rows = Dict{String,Any}()
+    for lineage in ("A2780Naive", "A2780cis")
+        key1 = "stage1_$(lineage)"
+        candidate_groups[key1] = _path_candidates(stage1_ranking; cell_line = lineage, include_model = "logistic_growth")
+        plot_rows[key1] = _plot_rows(stage1_overlay;
+            filters = [:cell_line => lineage],
+            fields = [:time, :observed, :predicted, :model, :pooling_mode, :cell_line, :density])
+
+        key2 = "stage2_$(lineage)"
+        candidate_groups[key2] = _path_candidates(stage2_ranking; cell_line = lineage)
+        plot_rows[key2] = _plot_rows(stage2_overlay;
+            filters = [:cell_line => lineage],
+            fields = [:time, :observed, :predicted, :model, :pooling_mode, :cell_line, :density, :dose, :ic_label, :growth_family])
+    end
+    candidate_groups["stage3"] = _path_candidates(stage3_ranking)
+    plot_rows["stage3"] = _plot_rows(stage3_overlay;
+        fields = [:time, :observed, :predicted, :model, :pooling_mode, :density, :mix, :component])
+    candidate_groups["stage4"] = _path_candidates(stage4_ranking)
+    plot_rows["stage4"] = _plot_rows(stage4_overlay;
+        filters = [:context => "coculture"],
+        fields = [:time, :observed, :predicted, :model, :pooling_mode, :density, :mix, :component])
+
+    default_ids = Dict{String,String}()
+    for (key, values) in candidate_groups
+        selected = findfirst(item -> Bool(item["eligible"]), values)
+        default_ids[key] = isempty(values) ? "" : values[something(selected, 1)]["id"]
+    end
+    seed_audit_path = joinpath(csv_root, "coculture_treated", "linked_treatment_stage2_seed_audit.csv")
+    if isfile(seed_audit_path)
+        seed_audit = unique(CSV.read(seed_audit_path, DataFrame), [:cell_line, :treatment_family, :pooling_mode])
+        for row in eachrow(seed_audit)
+            key = "stage2_$(row.cell_line)"
+            inherited_id = "$(row.treatment_family)|$(row.pooling_mode)"
+            any(item -> item["id"] == inherited_id, get(candidate_groups, key, [])) && (default_ids[key] = inherited_id)
+        end
+    end
+    payload = Dict(
+        "candidate_groups" => candidate_groups,
+        "plot_rows" => plot_rows,
+        "default_ids" => default_ids,
+        "effective_parameters" => Dict(
+            "stage1" => _effective_parameter_payload(stage1_parameters; lineage = true),
+            "stage3" => _effective_parameter_payload(stage3_parameters),
+        ),
+    )
+    return replace(JSON3.write(payload), "</" => "<\\/")
+end
+
+function _model_path_selector_html(stage::Int)
+    groups = stage in (1, 2) ? ["A2780Naive", "A2780cis"] : [""]
+    selectors = String[]
+    for lineage in groups
+        key = isempty(lineage) ? "stage$(stage)" : "stage$(stage)_$(lineage)"
+        title = isempty(lineage) ? "Stage $(stage) candidates" : lineage
+        push!(selectors, """
+        <fieldset class="path-choice" data-choice-group="$key">
+          <legend>$(_html_escape(title))</legend>
+          <span class="choice-label">Model</span>
+          <div class="model-options" role="radiogroup" aria-label="$(_html_escape(title)) model family"></div>
+          <span class="choice-label">Pooling</span>
+          <div class="pooling-options" role="radiogroup" aria-label="$(_html_escape(title)) pooling method"></div>
+          <p class="inheritance-line" data-inheritance-for="$key"></p>
+        </fieldset>
+        """)
+    end
+    return """
+<div class="path-explorer" data-stage="$stage">
+  <div class="path-explorer-heading"><h3>Compare fitted assumptions</h3><span>Choose a model, then its fitted pooling method</span></div>
+  <div class="path-choice-grid">$(join(selectors))</div>
+  <div class="path-warning" data-stage-warning="$stage" hidden></div>
+  <div class="live-equation" data-equation-stage="$stage" aria-live="polite"></div>
+  <div class="reactive-plot" data-plot-stage="$stage" aria-live="polite"></div>
+</div>
+"""
+end
+
 function _percentile(values::Vector{Float64}, probability::Float64)
     isempty(values) && return NaN
     sorted = sort(values)
@@ -1087,6 +1252,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     mkpath(report_dir)
     csv_root = joinpath(root, "outputs", "csv")
     image_root = joinpath(root, "outputs", "images")
+    model_path_payload = _model_path_payload(csv_root)
     timing_ranking_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_timing_hypothesis_ranking.csv")
     timing_figure_path = joinpath(image_root, "monoculture_treated", "figures", "monoculture_treated_timing_hypothesis_grid.png")
     timing_winner = if isfile(timing_ranking_path)
@@ -1243,6 +1409,8 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     for stage in stages
         table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line, label = "Stage $(stage.number) $(stage.title)")
         graph = _report_stage_figure(stage.figure, report_dir, stage.title, stage.caption)
+        explorer = _model_path_selector_html(stage.number)
+        fixed_graph = "<details class=\"fixed-fit-plot\"><summary>Open the fixed, data-selected export</summary>$(graph)</details>"
         stage_details = stage.number == 4 ? _report_stage4_expanded_equations_html() : ""
         uncertainty = if stage.number == 4
             endpoint = _treated_coculture_endpoint_bootstrap(csv_root, linked_winner)
@@ -1250,7 +1418,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
         else
             ""
         end
-        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(stage_details)$(table)$(graph)$(uncertainty)</section>")
+        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(stage_details)$(explorer)$(table)$(fixed_graph)$(uncertainty)</section>")
         if stage.number == 2 && isfile(timing_ranking_path)
             timing_table = _report_top_five_html(timing_ranking_path; label = "Stage 2 timing audit")
             timing_graph = _report_stage_figure(
@@ -1535,6 +1703,52 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 </section>
 """)
 
+    push!(sections, raw"""
+<section class="path-summary" id="model-path-summary">
+  <div class="stage-heading"><span>Selection</span><h2>Selected inheritance path</h2></div>
+  <p>The ledger records the exact fitted rows selected above. The running value is the sum of the displayed stage-local Delta BIC penalties. It is a comparison aid, not a new global BIC, because Stage 4 reuses treated-monoculture observations and only the data-selected path has been refitted end to end.</p>
+  <div class="path-ledger" data-path-ledger></div>
+  <div class="path-total"><span>Running Delta BIC penalty</span><strong data-path-total>0.00</strong></div>
+  <p class="path-validity" data-path-validity></p>
+  <div class="hybrid-refit" data-refit-panel>
+    <div>
+      <strong data-refit-mode>Preview</strong>
+      <p data-refit-status>Stored fits update immediately. Connect the local Julia service to conditionally refit downstream stages under this exact inheritance path.</p>
+    </div>
+    <button type="button" class="refit-button" data-refit-button>Refit downstream</button>
+  </div>
+  <details class="refit-details" data-refit-details hidden>
+    <summary>Conditional-refit provenance</summary>
+    <pre data-refit-result></pre>
+  </details>
+  <details class="refit-details hybrid-method">
+    <summary>How preview and refitting work</summary>
+    <p><strong>Preview</strong> switches among stored top-candidate trajectories immediately. <strong>Refit downstream</strong> sends the exact model and pooling path to a local Julia service, which calls the package fitting functions, carries fitted parameters into later stages, and caches the result by path.</p>
+    <p>If a selected treatment model lacks the latent states required by the linked Stage 4 equation, or a selected competition family cannot be inherited by that equation, Stages 1-3 are still recomputed and the result is labeled <strong>Partially refitted</strong>. The static GitHub Pages copy remains fully usable for preview but cannot start Julia by itself.</p>
+  </details>
+</section>
+
+<section class="pooling-glossary" id="pooling-notation">
+  <div class="stage-heading"><span>Notation</span><h2>What pooling means</h2></div>
+  <p>Pooling describes which experimental groups share a fitted parameter. It does not mean averaging cell lines together, and it is separate from averaging technical wells within a biological sample.</p>
+  <dl>
+    <dt>Shared pooling</dt>
+    <dd>One parameter value is fitted jointly to every included density or environment. For example, (r_{20k}=r_{30k}=r). All trajectories inform the same estimate, reducing free parameters but assuming no density-specific difference.</dd>
+    <dt>Partial pooling, <code>partial_5pct</code></dt>
+    <dd>A shared center is fitted with a small, symmetric density contrast: (p_{20k}=p_{mathrm{center}}e^{-delta_p}), (p_{30k}=p_{mathrm{center}}e^{+delta_p}), and (|delta_p|leqln(1.05)). The densities may differ by roughly five percent in either direction while remaining anchored to one biological estimate. Which parameters receive this contrast is stated in each stage.</dd>
+    <dt>Independent diagnostic</dt>
+    <dd>Each density or group receives its own unconstrained parameter vector. This can reveal heterogeneity or model misspecification, but it uses more free parameters and is not automatically eligible for inheritance because the later stages require a coherent shared baseline.</dd>
+    <dt>Linked global</dt>
+    <dd>One combined objective is fitted across all linked monoculture and coculture trajectories. Intrinsic drug parameters are shared across contexts, while only the candidate's explicitly named coculture modifiers are added.</dd>
+    <dt>Strobl joint</dt>
+    <dd>The complete two-population Strobl equation is fitted jointly across the relevant density and mixture environments. Its parameter sharing follows that published model structure rather than the project's ordinary density-contrast rule.</dd>
+    <dt>Well and sample aggregation</dt>
+    <dd>Technical wells are first summarized within their experimental sample. A sample-aware analysis then retains between-sample variation and uncertainty. This observation-level aggregation changes the data entering the objective; it is distinct from parameter pooling.</dd>
+  </dl>
+  <p><strong>BIC accounting:</strong> (k) counts parameters estimated in that candidate's objective. Parameters fixed from an earlier stage are inherited parameters, not free parameters again in the downstream BIC. A partial-pooling contrast is free and is counted once.</p>
+</section>
+""")
+
     appendix_blocks = [
         _appendix_ranking_html(stages[1].ranking; title = "Stage 1 untreated monoculture", by_cell_line = true,
             parameter_path = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_parameter_estimates.csv")),
@@ -1597,6 +1811,78 @@ figcaption { color: var(--muted); font-size: 12px; margin-top: 8px; }
 .bic-track { height: 14px; background: var(--soft); border-left: 2px solid var(--ink); }
 .bic-bar { display: block; height: 100%; min-width: 3px; background: var(--accent); }
 .bic-row output { font-variant-numeric: tabular-nums; font-size: 12px; }
+.path-explorer { margin: 24px 0 30px; padding: 18px 0 22px; border-top: 3px solid var(--ink); border-bottom: 1px solid var(--line); }
+.path-explorer-heading { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; margin-bottom: 14px; }
+.path-explorer-heading h3 { margin: 0; font-size: 18px; }
+.path-explorer-heading span { color: var(--muted); font-size: 12px; }
+.path-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.path-choice-grid > :only-child { grid-column: 1 / -1; }
+.path-choice { min-width: 0; margin: 0; padding: 0; border: 0; }
+.path-choice legend { margin-bottom: 8px; font-size: 13px; font-weight: 750; }
+.choice-label { display: block; margin: 9px 0 5px; color: var(--muted); font-size: 10px; font-weight: 750; text-transform: uppercase; }
+.model-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pooling-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.model-option { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 1px 6px; min-height: 76px; padding: 8px; border: 1px solid var(--line); cursor: pointer; background: #fff; }
+.model-option:hover { border-color: var(--ink); }
+.model-option.selected { border: 2px solid var(--accent); padding: 7px; background: #fff8fa; }
+.model-option input { position: absolute; opacity: 0; pointer-events: none; }
+.model-rank { grid-row: 1 / 3; display: grid; place-items: center; width: 24px; height: 24px; color: #fff; background: var(--ink); font-size: 11px; font-weight: 750; }
+.model-option.selected .model-rank { background: var(--accent); }
+.model-name { min-width: 0; font-size: 12px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.model-meta { grid-column: 2; color: var(--muted); font-size: 10px; line-height: 1.3; }
+.pooling-option { position: relative; display: inline-flex; align-items: center; min-height: 34px; padding: 7px 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
+.pooling-option:hover { border-color: var(--ink); }
+.pooling-option.selected { border: 2px solid var(--accent); padding: 6px 9px; color: var(--accent); background: #fff8fa; }
+.pooling-option input { position: absolute; opacity: 0; pointer-events: none; }
+.pooling-option small { margin-left: 6px; color: var(--muted); font-size: 9px; font-weight: 500; }
+.inheritance-line { min-height: 34px; margin: 8px 0 0; font-size: 11px; }
+.live-equation { margin: 14px 0 4px; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--soft); }
+.live-equation h4 { margin: 0 0 8px; font-size: 12px; }
+.equation-chain { display: grid; gap: 6px; }
+.equation-chain code { display: block; width: 100%; padding: 6px 8px; color: var(--ink); background: #fff; border: 1px solid var(--line); white-space: normal; overflow-wrap: anywhere; font-size: 11px; line-height: 1.45; }
+.equation-chain small { color: var(--muted); }
+.compatible { color: #176538 !important; }
+.incompatible { color: #8b1d2c !important; }
+.path-warning { margin: 12px 0; padding: 10px 12px; color: #8b1d2c; background: #fff4f4; border-left: 3px solid #8b1d2c; font-size: 12px; }
+.reactive-plot { margin-top: 18px; }
+.plot-key { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 11px; }
+.plot-key i { display: inline-block; margin-right: 5px; vertical-align: middle; }
+.plot-key .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); opacity: .65; }
+.plot-key .line { width: 18px; border-top: 2px solid var(--ink); }
+.sensitive-key::before, .resistant-key::before { content: ""; display: inline-block; width: 14px; margin-right: 5px; border-top: 2px solid; vertical-align: middle; }
+.sensitive-key::before { border-color: #a21f3d; }
+.resistant-key::before { border-color: #2d65b0; }
+.mini-plot-grid { display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: 10px; margin-top: 8px; }
+.mini-plot { min-width: 0; margin: 0; border: 1px solid var(--line); }
+.mini-plot svg { display: block; width: 100%; height: auto; background: #fff; }
+.mini-plot .axis { stroke: #7a878c; stroke-width: 1; }
+.mini-plot .plot-title { font-size: 11px; font-weight: 650; fill: var(--ink); }
+.mini-plot .tick { font-size: 9px; fill: var(--muted); }
+.fixed-fit-plot { margin-top: 22px; border-top: 1px solid var(--line); }
+.fixed-fit-plot summary { padding: 12px 0; color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
+.path-ledger { border-top: 2px solid var(--ink); }
+.ledger-row { display: grid; grid-template-columns: 155px minmax(260px, 1fr) 150px 70px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.ledger-row span { color: var(--muted); text-transform: capitalize; }
+.ledger-row code { overflow-wrap: anywhere; }
+.ledger-row output { text-align: right; font-variant-numeric: tabular-nums; }
+.ledger-row details { grid-column: 1 / -1; }
+.ledger-row summary { width: fit-content; color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 650; }
+.ledger-row pre { max-width: 100%; margin: 7px 0 2px; padding: 9px; background: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; }
+.path-total { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 0 4px; }
+.path-total span { font-weight: 700; }
+.path-total strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.path-validity { margin-top: 6px; font-weight: 650; }
+.hybrid-refit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; margin-top: 16px; padding: 14px 0; border-top: 1px solid var(--line); }
+.hybrid-refit strong { display: inline-block; margin-bottom: 3px; color: var(--accent); }
+.hybrid-refit p { margin: 0; font-size: 12px; }
+.refit-button { min-height: 40px; padding: 9px 14px; border: 1px solid var(--ink); color: #fff; background: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.refit-button:hover { background: var(--accent); border-color: var(--accent); }
+.refit-button:disabled { cursor: wait; opacity: .55; }
+.refit-details { margin-top: 4px; }
+.refit-details summary { color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 700; }
+.refit-details pre { max-height: 280px; overflow: auto; padding: 10px; background: var(--soft); white-space: pre-wrap; font-size: 10px; }
+.hybrid-method p { max-width: 1050px; font-size: 12px; }
+.pooling-glossary dl { grid-template-columns: minmax(190px, .25fr) minmax(0, 1fr); }
 .uncertainty-audit { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
 .uncertainty-audit h3 { margin-top: 0; }
 .audit-warning { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--soft); }
@@ -1656,6 +1942,15 @@ code { font-family: Consolas, "Courier New", monospace; }
   .appendix-disclosure summary { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
   .appendix-kicker { grid-column: 1 / -1; }
   .appendix-title { font-size: 20px; }
+  .path-choice-grid { grid-template-columns: minmax(0, 1fr); }
+  .model-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mini-plot-grid { grid-template-columns: minmax(0, 1fr); }
+  .ledger-row { grid-template-columns: minmax(0, 1fr) 58px; gap: 3px 10px; }
+  .ledger-row strong, .ledger-row code { grid-column: 1; }
+  .ledger-row output { grid-column: 2; grid-row: 1 / 4; }
+  .pooling-glossary dl { grid-template-columns: minmax(0, 1fr); }
+  .hybrid-refit { grid-template-columns: minmax(0, 1fr); }
+  .refit-button { width: 100%; }
   dd { max-width: 100%; margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; }
 }
 @media print {
@@ -1668,6 +1963,379 @@ code { font-family: Consolas, "Courier New", monospace; }
 </head>
 <body>
 $(join(sections, "\n"))
+<script id="model-path-data" type="application/json">$(model_path_payload)</script>
+""" * raw"""
+<script>
+(() => {
+  const payload = JSON.parse(document.getElementById('model-path-data').textContent);
+  const selected = {...payload.default_ids};
+  const colors = {sensitive:'#a21f3d', resistant:'#2d65b0', total:'#1d2529'};
+  const groupOrder = ['stage1_A2780Naive','stage1_A2780cis','stage2_A2780Naive','stage2_A2780cis','stage3','stage4'];
+  const escapeHtml = value => String(value).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const candidate = key => (payload.candidate_groups[key] || []).find(item => item.id === selected[key]);
+  const isDefault = key => selected[key] === payload.default_ids[key];
+  const poolingLabel = value => ({shared:'Shared',partial_5pct:'Partial 5%',independent_diagnostic:'Independent',linked_global:'Linked global',strobl_joint:'Strobl joint'})[value] || value || 'Unpooled';
+  const refitService = 'http://127.0.0.1:8766';
+  let serviceAvailable = false;
+  let refittedSignature = null;
+  let activeJob = null;
+
+  const selectionRequest = () => ({
+    selections: Object.fromEntries(groupOrder.map(key => [key, {model:candidate(key).model, pooling:candidate(key).pooling}])),
+    max_time_per_fit: 12.0
+  });
+  const selectionSignature = () => JSON.stringify(selectionRequest().selections);
+  const setRefitState = (mode, message, busy=false) => {
+    document.querySelector('[data-refit-mode]').textContent = mode;
+    document.querySelector('[data-refit-status]').textContent = message;
+    const button = document.querySelector('[data-refit-button]');
+    button.disabled = busy;
+    button.textContent = busy ? 'Refitting...' : 'Refit downstream';
+  };
+
+  async function checkRefitService() {
+    try {
+      const response = await fetch(`${refitService}/health`, {signal: AbortSignal.timeout(1200)});
+      serviceAvailable = response.ok;
+    } catch (_) {
+      serviceAvailable = false;
+    }
+    if (refittedSignature === selectionSignature()) return;
+    setRefitState('Preview', serviceAvailable
+      ? 'Stored trajectories are shown. Julia is connected and can refit downstream stages under this exact path.'
+      : 'Stored trajectories are shown. Start the local Julia refit service to recompute this inheritance path.');
+  }
+
+  async function pollRefit(jobId, signature) {
+    for (;;) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const response = await fetch(`${refitService}/api/refits/${jobId}`);
+      const job = await response.json();
+      if (job.status === 'queued' || job.status === 'running') {
+        setRefitState('Refitting', 'Julia is fitting the selected downstream path. You may continue inspecting the stored preview.', true);
+        continue;
+      }
+      if (job.status === 'failed') throw new Error(job.error || 'Conditional refit failed');
+      const result = job.result || job;
+      activeJob = null;
+      if (signature === selectionSignature()) refittedSignature = signature;
+      const partial = job.status === 'partial' || result.status === 'partial';
+      setRefitState(partial ? 'Partially refitted' : 'Conditionally refitted',
+        partial ? (result.note || 'Upstream stages were refitted, but this path is not structurally compatible with Stage 4.') :
+          'The selected upstream equations and parameters were recomputed and inherited by the downstream fit.');
+      const details = document.querySelector('[data-refit-details]');
+      details.hidden = false;
+      document.querySelector('[data-refit-result]').textContent = JSON.stringify({
+        job_id: result.job_id || jobId,
+        status: result.status || job.status,
+        completed_at: result.completed_at,
+        provenance: result.provenance,
+        note: result.note || '',
+        cache: 'content-addressed by the exact model and pooling path'
+      }, null, 2);
+      renderLedger();
+      return;
+    }
+  }
+
+  async function requestRefit() {
+    const signature = selectionSignature();
+    if (!groupOrder.every(key => candidate(key).eligible)) {
+      setRefitState('Preview only', 'Diagnostic pooling cannot be inherited. Choose an eligible pooling option before refitting.');
+      return;
+    }
+    if (!serviceAvailable) {
+      await checkRefitService();
+      if (!serviceAvailable) {
+        setRefitState('Preview', 'The Julia service is not connected at http://127.0.0.1:8766. The public report remains preview-only.');
+        return;
+      }
+    }
+    setRefitState('Submitting', 'Validating the selected equations, pooling choices, and inherited parameter artifacts.', true);
+    try {
+      const response = await fetch(`${refitService}/api/refits`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(selectionRequest())
+      });
+      const job = await response.json();
+      if (!response.ok) throw new Error(job.error || 'The refit request was rejected');
+      activeJob = job.job_id;
+      if (job.cached && job.result) {
+        activeJob = null;
+        refittedSignature = signature;
+        setRefitState(job.result.status === 'partial' ? 'Partially refitted' : 'Conditionally refitted', job.result.note || 'Loaded the cached conditional fit for this exact path.');
+        document.querySelector('[data-refit-details]').hidden = false;
+        document.querySelector('[data-refit-result]').textContent = JSON.stringify(job.result, null, 2);
+        renderLedger();
+      } else {
+        await pollRefit(job.job_id, signature);
+      }
+    } catch (error) {
+      activeJob = null;
+      setRefitState('Refit unavailable', error.message || String(error));
+    }
+  }
+
+  function renderOptions(key) {
+    const fieldset = document.querySelector(`[data-choice-group="${key}"]`);
+    if (!fieldset) return;
+    const choices = payload.candidate_groups[key] || [];
+    const current = candidate(key);
+    const models = [...new Map(choices.map(item => [item.model, item])).values()];
+    const modelHost = fieldset.querySelector('.model-options');
+    modelHost.innerHTML = models.map((representative, index) => {
+      const variants = choices.filter(item => item.model === representative.model);
+      const best = variants.reduce((winner, item) => item.delta_bic < winner.delta_bic ? item : winner, variants[0]);
+      return `
+      <label class="model-option ${current.model === representative.model ? 'selected' : ''}">
+        <input type="radio" name="${key}_model" value="${escapeHtml(representative.model)}" ${current.model === representative.model ? 'checked' : ''}>
+        <span class="model-rank">${index + 1}</span>
+        <span class="model-name">${escapeHtml(representative.label)}</span>
+        <span class="model-meta">Best Delta BIC ${best.delta_bic.toFixed(2)} · ${variants.length} pooling ${variants.length === 1 ? 'fit' : 'fits'}</span>
+      </label>`;
+    }).join('');
+    modelHost.querySelectorAll('input').forEach(input => input.addEventListener('change', event => {
+      const variants = choices.filter(item => item.model === event.target.value);
+      const samePooling = variants.find(item => item.pooling === current.pooling);
+      const inherited = variants.find(item => item.eligible);
+      selected[key] = (samePooling || inherited || variants[0]).id;
+      renderAll();
+    }));
+
+    const poolingHost = fieldset.querySelector('.pooling-options');
+    const poolings = choices.filter(item => item.model === current.model);
+    poolingHost.innerHTML = poolings.map(item => `
+      <label class="pooling-option ${selected[key] === item.id ? 'selected' : ''}">
+        <input type="radio" name="${key}_pooling" value="${escapeHtml(item.id)}" ${selected[key] === item.id ? 'checked' : ''}>
+        <span>${escapeHtml(poolingLabel(item.pooling))}</span><small>Delta BIC ${item.delta_bic.toFixed(2)}${item.eligible ? '' : ' · diagnostic'}</small>
+      </label>`).join('');
+    poolingHost.querySelectorAll('input').forEach(input => input.addEventListener('change', event => {
+      selected[key] = event.target.value;
+      renderAll();
+    }));
+  }
+
+  function panelGroups(stage, rows) {
+    const fields = stage <= 2 ? ['cell_line','density', ...(stage === 2 ? ['dose'] : [])] : ['density','mix'];
+    const groups = new Map();
+    rows.forEach(row => {
+      const id = fields.map(field => row[field] || '').join('|');
+      if (!groups.has(id)) groups.set(id, {title: fields.map(field => row[field] || '').filter(Boolean).join(', '), rows: []});
+      groups.get(id).rows.push(row);
+    });
+    return [...groups.values()];
+  }
+
+  function svgPanel(panel, sharedYmax) {
+    const width = 360, height = 230, margin = {l:48,r:12,t:28,b:34};
+    const xs = panel.rows.map(row => +row.time), ys = panel.rows.flatMap(row => [+row.observed,+row.predicted]).filter(Number.isFinite);
+    const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = 0, ymax = sharedYmax;
+    const sx = x => margin.l + (x - xmin) / Math.max(xmax - xmin, 1) * (width-margin.l-margin.r);
+    const sy = y => height-margin.b - (y-ymin) / Math.max(ymax-ymin,1) * (height-margin.t-margin.b);
+    const components = [...new Set(panel.rows.map(row => row.component || 'total'))];
+    let marks = '';
+    components.forEach(component => {
+      const rows = panel.rows.filter(row => (row.component || 'total') === component).sort((a,b) => a.time-b.time);
+      const color = colors[component] || colors.total;
+      const points = rows.map(row => `${sx(+row.time).toFixed(1)},${sy(+row.predicted).toFixed(1)}`).join(' ');
+      marks += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.4"/>`;
+      marks += rows.map(row => `<circle cx="${sx(+row.time).toFixed(1)}" cy="${sy(+row.observed).toFixed(1)}" r="2.5" fill="${color}" opacity=".65"/>`).join('');
+    });
+    return `<figure class="mini-plot"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(panel.title)} fitted trajectory">
+      <text x="${margin.l}" y="18" class="plot-title">${escapeHtml(panel.title)}</text>
+      <line x1="${margin.l}" y1="${height-margin.b}" x2="${width-margin.r}" y2="${height-margin.b}" class="axis"/>
+      <line x1="${margin.l}" y1="${margin.t}" x2="${margin.l}" y2="${height-margin.b}" class="axis"/>
+      <text x="${margin.l}" y="${height-10}" class="tick">${xmin}</text><text x="${width-margin.r}" y="${height-10}" text-anchor="end" class="tick">${xmax} d</text>
+      <text x="${margin.l-6}" y="${height-margin.b}" text-anchor="end" class="tick">0</text><text x="${margin.l-6}" y="${margin.t+4}" text-anchor="end" class="tick">${Math.round(ymax)}</text>
+      ${marks}</svg></figure>`;
+  }
+
+  function selectedRows(key) {
+    const item = candidate(key);
+    return (payload.plot_rows[key] || []).filter(row => `${row.model}|${row.pooling_mode || ''}` === item.id);
+  }
+
+  function effectiveParameters(stage, item, density, lineage='') {
+    const catalog = payload.effective_parameters?.[stage] || {};
+    const key = stage === 'stage1' ? `${lineage}|${item.model}|${item.pooling}` : `${item.model}|${item.pooling}`;
+    return catalog[key]?.[density] || catalog[key]?.all || null;
+  }
+
+  const number = (values, key, fallback=0) => Number.isFinite(+values?.[key]) ? +values[key] : fallback;
+
+  function growthRate(base, population, load, time) {
+    if (!base) return 0;
+    const r = number(base, 'r'), K = Math.max(number(base, 'K', 1), 1e-8);
+    const N = Math.max(population, 0), L = Math.max(load, 1e-8);
+    const model = base.__model || 'logistic_growth';
+    let adjustment = 1;
+    if (model === 'lagged_theta_logistic_growth') adjustment = time <= number(base, 'lag_time') ? 0 : 1;
+    if (model === 'baranyi_theta_logistic_growth') {
+      const q0 = Math.max(number(base, 'q0', 1), 1e-8);
+      adjustment = q0 / (q0 + Math.exp(-Math.max(r, 0) * Math.max(time, 0)));
+    }
+    if (model === 'adaptation_theta_logistic_growth') {
+      adjustment = 1 - Math.exp(-Math.max(number(base, 'adaptation_rate', 1), 1e-8) * Math.max(time, 0));
+    }
+    if (model === 'gompertz_growth') return adjustment * r * N * Math.log(K / L);
+    if (model.includes('theta_logistic_growth')) {
+      const theta = Math.max(number(base, 'theta', 1), .05);
+      return adjustment * r * N * Math.max(0, 1 - Math.pow(L / K, theta));
+    }
+    if (model === 'logistic_simple_death') return r*N*Math.max(0,1-L/K) - Math.max(number(base,'death_rate'),0)*N;
+    if (model === 'allee_growth') {
+      const threshold = Math.max(number(base,'allee_threshold',1),1e-8);
+      return r*N*Math.max(0,1-L/K)*(N/threshold-1);
+    }
+    return r * N * Math.max(0, 1 - L / K);
+  }
+
+  function stage3ForwardRows() {
+    const interaction = candidate('stage3');
+    if (!interaction.model.startsWith('lv_')) return selectedRows('stage3');
+    const source = selectedRows('stage3');
+    const panels = panelGroups(3, source);
+    const output = [];
+    panels.forEach(panel => {
+      const density = panel.rows[0]?.density || '20k';
+      const naiveItem = candidate('stage1_A2780Naive'), cisItem = candidate('stage1_A2780cis');
+      const naive = effectiveParameters('stage1', naiveItem, density, 'A2780Naive');
+      const cis = effectiveParameters('stage1', cisItem, density, 'A2780cis');
+      const interactions = effectiveParameters('stage3', interaction, density);
+      if (!naive || !cis || !interactions) { output.push(...panel.rows); return; }
+      naive.__model = naiveItem.model; cis.__model = cisItem.model;
+      const times = [...new Set(panel.rows.map(row => +row.time))].sort((a,b) => a-b);
+      const firstTime = times[0];
+      const n0row = panel.rows.find(row => row.component === 'sensitive' && +row.time === firstTime);
+      const c0row = panel.rows.find(row => row.component === 'resistant' && +row.time === firstTime);
+      let state = [Math.max(+n0row?.observed || 0,0), Math.max(+c0row?.observed || 0,0)], current = firstTime;
+      const alphaNC = number(interactions, interaction.model === 'lv_symmetric_competition' ? 'alpha' : 'alpha_sr', 1);
+      const alphaCN = number(interactions, interaction.model === 'lv_symmetric_competition' ? 'alpha' : 'alpha_rs', 1);
+      const deathN = number(interactions, 'death_sensitive'), deathC = number(interactions, 'death_resistant');
+      const derivative = (values,t) => {
+        const [N,C] = values;
+        return [growthRate(naive,N,N+alphaNC*C,t)-deathN*N, growthRate(cis,C,C+alphaCN*N,t)-deathC*C];
+      };
+      const advance = target => {
+        while (current < target - 1e-10) {
+          const h = Math.min(.025, target-current), k1=derivative(state,current);
+          const s2=state.map((v,i)=>v+h*k1[i]/2), k2=derivative(s2,current+h/2);
+          const s3=state.map((v,i)=>v+h*k2[i]/2), k3=derivative(s3,current+h/2);
+          const s4=state.map((v,i)=>v+h*k3[i]), k4=derivative(s4,current+h);
+          state=state.map((v,i)=>Math.max(0,v+h*(k1[i]+2*k2[i]+2*k3[i]+k4[i])/6)); current+=h;
+        }
+      };
+      times.forEach(time => {
+        advance(time);
+        panel.rows.filter(row => +row.time === time).forEach(row => output.push({...row, predicted: row.component === 'sensitive' ? state[0] : state[1], hot_preview:true}));
+      });
+    });
+    return output;
+  }
+
+  function growthEquation(item, symbol) {
+    const X=symbol, m=item.model;
+    if (m === 'gompertz_growth') return `G_${X}=r_${X}${X} log(K_${X}/L_${X})`;
+    if (m.includes('theta_logistic_growth')) {
+      const prefix=m.startsWith('baranyi_') ? `q_${X}(t)/[1+q_${X}(t)] ` : m.startsWith('adaptation_') ? `[1-exp(-a_${X}t)] ` : m.startsWith('lagged_') ? `I(t>tau_${X}) ` : '';
+      return `G_${X}=${prefix}r_${X}${X}[1-(L_${X}/K_${X})^theta_${X}]`;
+    }
+    if (m === 'logistic_simple_death') return `G_${X}=r_${X}${X}(1-L_${X}/K_${X})-d_${X}${X}`;
+    if (m === 'allee_growth') return `G_${X}=r_${X}${X}(1-L_${X}/K_${X})(${X}/A_${X}-1)`;
+    return `G_${X}=r_${X}${X}(1-L_${X}/K_${X})`;
+  }
+
+  function treatmentTerm(item, symbol) {
+    const m=item.model, X=symbol;
+    if (m.includes('two_population')) return `C=S+T; dS/dt=G_C S/C-A_CS(t)H_CS(D)S; dT/dt=G_C T/C-A_CT(t)H_CT(D)T`;
+    if (m.includes('transit')) return `d${X}/dt=G_${X}-A_${X}(t)H_${X}(D)${X}; dZ_${X}/dt=A_${X}(t)H_${X}(D)${X}-k_clear Z_${X}`;
+    if (m.includes('hill')) return `d${X}/dt=G_${X}-A_${X}(t)[Emax_${X}D^h/(EC50_${X}^h+D^h)]${X}`;
+    return `d${X}/dt=G_${X}-Q_${X}(t,D)${X}`;
+  }
+
+  function renderEquation(stage) {
+    const host=document.querySelector(`[data-equation-stage="${stage}"]`); if(!host) return;
+    const n=candidate('stage1_A2780Naive'), c=candidate('stage1_A2780cis');
+    const lines=[growthEquation(n,'N'), growthEquation(c,'C')];
+    if(stage>=2) lines.push(treatmentTerm(candidate('stage2_A2780Naive'),'N'), treatmentTerm(candidate('stage2_A2780cis'),'C'));
+    if(stage>=3) {
+      const s3=candidate('stage3'), symmetric=s3.model==='lv_symmetric_competition';
+      if(s3.model.startsWith('lv_')) {
+        const loss=s3.model.includes('_death') ? '-d_N N;  -d_C C' : '';
+        lines.push(`L_N=N+${symmetric?'alpha':'alpha_NC'}C; L_C=C+${symmetric?'alpha':'alpha_CN'}N`, `dN/dt=G_N(N,L_N,t) ${loss.split(';')[0]||''}; dC/dt=G_C(C,L_C,t) ${loss.split(';')[1]||''}`);
+      } else {
+        lines.push(`Stage 3 replacement system: ${s3.label}`, 'dN/dt=r_N[1-(N+C)/K_N]N-d_N N; dC/dt=r_C[1-(N+C)/K_C]C-d_C C');
+      }
+    }
+    if(stage>=4) {
+      const s4=candidate('stage4');
+      lines.push(`Stage 4 context: ${s4.label}`, `dN/dt=G_N^co-M_N A_N(t)H_N(D)N; dC/dt=G_C^co-M_C A_C(t)H_C(D)C`);
+    }
+    host.innerHTML=`<h4>Live inherited equation set through Stage ${stage}</h4><div class="equation-chain">${lines.map(line=>`<code>${escapeHtml(line)}</code>`).join('')}</div><small>Updates with the selected model and pooling assumptions. Numeric parameters are listed in the selection ledger.</small>`;
+  }
+
+  function renderPlot(stage) {
+    const host = document.querySelector(`[data-plot-stage="${stage}"]`);
+    if (!host) return;
+    let rows = [];
+    if (stage <= 2) rows = ['A2780Naive','A2780cis'].flatMap(lineage => selectedRows(`stage${stage}_${lineage}`));
+    else rows = stage === 3 ? stage3ForwardRows() : selectedRows(`stage${stage}`);
+    const panels = panelGroups(stage, rows);
+    const sharedYmax = Math.max(1, ...rows.flatMap(row => [+row.observed,+row.predicted]).filter(Number.isFinite)) * 1.06;
+    const hot = stage === 3 && rows.some(row => row.hot_preview);
+    host.innerHTML = `<div class="plot-key"><span><i class="dot"></i> observations</span><span><i class="line"></i> ${hot ? 'hot inherited forward preview' : 'selected fit'}</span><span>shared y-axis: 0-${Math.round(sharedYmax)}</span>${stage >= 3 ? '<span class="sensitive-key">Naive</span><span class="resistant-key">cis</span>' : ''}</div><div class="mini-plot-grid">${panels.map(panel => svgPanel(panel, sharedYmax)).join('')}</div>`;
+  }
+
+  function renderInheritance() {
+    const s1n = candidate('stage1_A2780Naive'), s1c = candidate('stage1_A2780cis');
+    ['A2780Naive','A2780cis'].forEach(lineage => {
+      const base = lineage === 'A2780Naive' ? s1n : s1c;
+      const treatment = candidate(`stage2_${lineage}`);
+      const line = document.querySelector(`[data-inheritance-for="stage2_${lineage}"]`);
+      const match = treatment.growth_family === base.model;
+      line.className = `inheritance-line ${match ? 'compatible' : 'incompatible'}`;
+      line.innerHTML = `<strong>Inherited base:</strong> ${escapeHtml(base.label)}. ${match ? 'This exported treatment fit used that base.' : `The stored treatment fit used ${escapeHtml(treatment.growth_family)}; a conditional refit is required.`}`;
+    });
+    const upstreamChanged = !isDefault('stage1_A2780Naive') || !isDefault('stage1_A2780cis');
+    const stage3Model = candidate('stage3');
+    const stage3 = document.querySelector('[data-stage-warning="3"]');
+    stage3.hidden = !upstreamChanged;
+    stage3.textContent = upstreamChanged ? (stage3Model.model.startsWith('lv_') ? 'Stage 3 now propagates the selected Stage 1 growth equations and parameters as a live forward preview. Its competition/death parameters remain at their stored estimates until Julia conditionally refits them.' : 'This Strobl candidate is a complete replacement growth-and-competition system, so it does not inherit the selected Stage 1 equations. Choose an LV candidate to preview the Stage 1 handoff, or conditionally refit this replacement system.') : '';
+    const stage4Changed = upstreamChanged || !isDefault('stage2_A2780Naive') || !isDefault('stage2_A2780cis') || !isDefault('stage3');
+    const stage4 = document.querySelector('[data-stage-warning="4"]');
+    stage4.hidden = !stage4Changed;
+    stage4.textContent = stage4Changed ? 'Stage 4 was exported under the data-selected upstream chain. The selected Stage 4 curve is a local comparison, not a refit under your altered path.' : '';
+  }
+
+  function renderLedger() {
+    const rows = groupOrder.map(key => {
+      const item = candidate(key);
+      return `<div class="ledger-row"><span>${escapeHtml(key.replace('_',' · ').replaceAll('_',' '))}</span><strong>${escapeHtml(item.label)}</strong><code>${escapeHtml(item.pooling)}</code><output>${item.delta_bic.toFixed(2)}</output><details><summary>Parameters carried from this fit</summary><pre>${escapeHtml(item.parameters)}</pre></details></div>`;
+    });
+    document.querySelector('[data-path-ledger]').innerHTML = rows.join('');
+    const total = groupOrder.reduce((sum,key) => sum + candidate(key).delta_bic, 0);
+    document.querySelector('[data-path-total]').textContent = total.toFixed(2);
+    const conditionallyRefitted = refittedSignature === selectionSignature();
+    const valid = (groupOrder.every(isDefault) || conditionallyRefitted) && groupOrder.every(key => candidate(key).eligible);
+    const validity = document.querySelector('[data-path-validity]');
+    validity.className = `path-validity ${valid ? 'compatible' : 'incompatible'}`;
+    validity.textContent = valid ? (conditionallyRefitted ? 'Conditionally refitted path: downstream fits inherited the selected equations and fitted parameters.' : 'Fully inheritance-consistent: every stage is the exported conditional fit used by the next stage.') : 'Exploratory preview: at least one downstream stage has not been conditionally refitted under the selected upstream model and parameters.';
+  }
+
+  function renderAll() {
+    if (refittedSignature !== selectionSignature() && !activeJob) {
+      setRefitState('Preview', serviceAvailable ? 'Stored trajectories are shown. Refit to carry this exact path downstream.' : 'Stored trajectories are shown. Connect the local Julia service to refit this exact path.');
+    }
+    groupOrder.forEach(renderOptions);
+    [1,2,3,4].forEach(stage => { renderEquation(stage); renderPlot(stage); });
+    renderInheritance();
+    renderLedger();
+  }
+  document.querySelector('[data-refit-button]').addEventListener('click', requestRefit);
+  renderAll();
+  checkRefitService();
+})();
+</script>
+""" * """
 </body>
 </html>
 """
