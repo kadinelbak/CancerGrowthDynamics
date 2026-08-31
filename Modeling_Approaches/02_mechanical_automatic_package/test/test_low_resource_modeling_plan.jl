@@ -22,8 +22,11 @@
     @test occursin("Growth-Rate And Carrying-Capacity Modifiers", report)
     @test occursin("Separately Fitted Growth Rate", report)
     @test occursin("Lineage-Specific Subtractive Loss", report)
-    @test occursin("-d_N^{LR}N", report)
-    @test occursin("-d_C^{LR}C", report)
+    @test occursin("u_R(t)=\\frac{10-F(t)}{10-0.05}", report)
+    @test occursin("0.05\\le F(t)\\le 10", report)
+    @test count("d_N^{LR}u_R(t)N", report) == 4
+    @test count("d_C^{LR}u_R(t)C", report) == 4
+    @test occursin("0 at 10% FBS and 1 at 0.05% FBS", report)
     @test occursin("A2780Naive monoculture", report)
     @test occursin("A2780cis-resistant monoculture", report)
     @test count("^{\\theta_X}", report) == 1
@@ -41,6 +44,7 @@
         downstream = section_html(section_id)
         @test occursin("d_N^{LR}", downstream)
         @test occursin("d_C^{LR}", downstream)
+        @test occursin("u_R(t)", downstream)
         @test !occursin("\\rho_r", downstream)
         @test !occursin("\\rho_K", downstream)
         @test !occursin("r_X^{LR}", downstream)
@@ -65,6 +69,10 @@
     @test !occursin("\\frac{dZ}{dt}", report)
     @test !occursin("drug-disappearance", lowercase(report))
     @test occursin("optional stage", report)
+    @test occursin("Logistic <span aria-label=\"carried forward\">&#9733;</span>", report)
+    @test occursin("Time-Delayed Hill Function <span aria-label=\"carried forward\">&#9733;</span>", report)
+    @test occursin("Asymmetric Crowding <span aria-label=\"carried forward\">&#9733;</span>", report)
+    @test occursin("Lineage-Specific Subtractive Loss <span aria-label=\"carried forward\">&#9733;</span>", report)
     @test occursin("<h3>Notation</h3>", report)
     @test !occursin("Focused Sources", report)
     @test !occursin("Fitting And Decision Plan", report)
