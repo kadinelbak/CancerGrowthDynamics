@@ -19,7 +19,7 @@
     @test occursin("Low-Resource Treated Monoculture", report)
     @test occursin("Low-Resource Coculture", report)
     @test occursin("Low-Resource Treated Coculture", report)
-    @test occursin("Low-Resource Treated Coculture With Drug-Induced Sensitive-To-Resistant Transfer", report)
+    @test occursin("Low-Resource Treated Coculture With Resource-Driven Sensitive-To-Resistant Transfer", report)
     @test occursin("Growth-Rate And Carrying-Capacity Modifiers", report)
     @test occursin("Separately Fitted Growth Rate", report)
     @test occursin("Lineage-Specific Subtractive Loss", report)
@@ -80,9 +80,11 @@
     @test occursin("Asymmetric Crowding <span aria-label=\"carried forward\">&#9733;</span>", report)
     @test occursin("Lineage-Specific Subtractive Loss <span aria-label=\"carried forward\">&#9733;</span>", report)
     transfer = section_html("low-resource-treated-coculture-transfer")
-    @test occursin("-\\gamma D(t)N", transfer)
-    @test occursin("+\\gamma D(t)N", transfer)
-    @test count("\\gamma D(t)N", transfer) == 4
+    @test occursin("-\\gamma u_R(t)N", transfer)
+    @test occursin("+\\gamma u_R(t)N", transfer)
+    @test count("\\gamma u_R(t)N", transfer) == 4
+    @test !occursin("\\gamma D(t)N", transfer)
+    @test occursin("scales linearly from 0 at 10% FBS to 1 at 0.05% FBS", transfer)
     @test occursin("Equal-and-opposite transfer terms", transfer)
     @test occursin("\\frac{N+\\alpha_{NC}C}{K}", transfer)
     @test occursin("d_N^{LR}u_R(t)N", transfer)
