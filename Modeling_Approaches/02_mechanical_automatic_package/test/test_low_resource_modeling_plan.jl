@@ -32,8 +32,13 @@
     @test count("^{\\theta_X}", report) == 1
     @test !occursin("^{\\theta_N}", report)
     @test !occursin("^{\\theta_C}", report)
-    @test occursin("r_NN\\left(1-\\frac{N+\\alpha_{NC}C}{K_N}\\right)", report)
-    @test occursin("r_CC\\left(1-\\frac{C+\\alpha_{CN}N}{K_C}\\right)", report)
+    @test occursin("r_NN\\left(1-\\frac{N+\\alpha_{NC}C}{K}\\right)", report)
+    @test occursin("r_CC\\left(1-\\frac{C+\\alpha_{CN}N}{K}\\right)", report)
+    @test count("\\frac{N+\\alpha_{NC}C}{K}", report) == 5
+    @test count("\\frac{C+\\alpha_{CN}N}{K}", report) == 5
+    @test !occursin("\\frac{N+\\alpha_{NC}C}{K_N}", report)
+    @test !occursin("\\frac{C+\\alpha_{CN}N}{K_C}", report)
+    @test occursin("Given carrying capacity shared by both lineages in coculture", report)
 
     treated_coculture = section_html("treated-coculture")
     @test !occursin("-d_NN", treated_coculture)

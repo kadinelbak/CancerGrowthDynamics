@@ -149,26 +149,27 @@
       <div class="model">
         <h3>Asymmetric Crowding <span aria-label="carried forward">&#9733;</span></h3>
         <div class="equation">\[
-        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K_N}\right)
+        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)
         \]
         \[
-        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K_C}\right)
+        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)
         \]</div>
       </div>
 
       <div class="model">
         <h3>Asymmetric Crowding Plus Death</h3>
         <div class="equation">\[
-        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K_N}\right)-d_NN
+        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_NN
         \]
         \[
-        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K_C}\right)-d_CC
+        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_CC
         \]</div>
       </div>
 
       <h3>Notation</h3>
       <dl class="notation">
         <dt>\(N(t),C(t)\)</dt><dd>Measured A2780Naive and total A2780cis populations.</dd>
+        <dt>\(K\)</dt><dd>Given carrying capacity shared by both lineages in coculture; it is not fitted separately for each lineage.</dd>
         <dt>\(\alpha_{NC}\)</dt><dd>Effect of A2780cis crowding on A2780Naive.</dd>
         <dt>\(\alpha_{CN}\)</dt><dd>Effect of A2780Naive crowding on A2780cis.</dd>
         <dt>\(d_N,d_C\)</dt><dd>Lineage-specific death or loss-rate parameters.</dd>
@@ -181,15 +182,16 @@
       <div class="model">
         <h3>Asymmetric Crowding Plus Time-Delayed Hill Function <span aria-label="carried forward">&#9733;</span></h3>
         <div class="equation">\[
-        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K_N}\right)-\beta_NA_N(t)H_N(D)N
+        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-\beta_NA_N(t)H_N(D)N
         \]
         \[
-        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K_C}\right)-\beta_CA_C(t)H_C(D)C
+        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-\beta_CA_C(t)H_C(D)C
         \]</div>
       </div>
 
       <h3>Notation</h3>
       <dl class="notation">
+        <dt>\(K\)</dt><dd>Inherited given carrying capacity shared by both lineages.</dd>
         <dt>\(\alpha_{NC},\alpha_{CN}\)</dt><dd>Inherited asymmetric crowding parameters; ordinary coculture death terms are not carried forward.</dd>
         <dt>\(A_N(t),A_C(t)\)</dt><dd>Inherited lineage-specific exponential delay multipliers.</dd>
         <dt>\(H_N(D),H_C(D)\)</dt><dd>Lineage-specific Hill dose-response functions.</dd>
@@ -260,14 +262,15 @@
     <section id="low-resource-coculture">
       <h2>Low-Resource Coculture <span aria-label="carried forward">&#9733;</span></h2>
       <div class="equation">\[
-      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K_N}\right)-d_N^{LR}u_R(t)N
+      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_N^{LR}u_R(t)N
       \]
       \[
-      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K_C}\right)-d_C^{LR}u_R(t)C
+      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_C^{LR}u_R(t)C
       \]</div>
 
       <h3>Notation</h3>
       <dl class="notation">
+        <dt>\(K\)</dt><dd>Inherited given carrying capacity shared by both lineages.</dd>
         <dt>\(\alpha_{NC},\alpha_{CN}\)</dt><dd>Inherited asymmetric crowding parameters.</dd>
         <dt>\(d_N^{LR},d_C^{LR},u_R(t)\)</dt><dd>Carried controllable low-resource subtractive losses; no ordinary coculture death term is inherited.</dd>
       </dl>
@@ -276,14 +279,15 @@
     <section id="low-resource-treated-coculture">
       <h2>Low-Resource Treated Coculture</h2>
       <div class="equation">\[
-      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K_N}\right)-d_N^{LR}u_R(t)N-\beta_NA_N(t)H_N(D)N
+      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_N^{LR}u_R(t)N-\beta_NA_N(t)H_N(D)N
       \]
       \[
-      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K_C}\right)-d_C^{LR}u_R(t)C-\beta_CA_C(t)H_C(D)C
+      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_C^{LR}u_R(t)C-\beta_CA_C(t)H_C(D)C
       \]</div>
 
       <h3>Notation</h3>
       <dl class="notation">
+        <dt>\(K\)</dt><dd>Inherited given carrying capacity shared by both lineages.</dd>
         <dt>\(\alpha_{NC},\alpha_{CN}\)</dt><dd>Inherited asymmetric crowding parameters.</dd>
         <dt>\(d_N^{LR},d_C^{LR},u_R(t)\)</dt><dd>Carried controllable low-resource subtractive losses; no ordinary coculture death term is inherited.</dd>
         <dt>\(A_N(t),A_C(t)\)</dt><dd>Inherited lineage-specific exponential delay multipliers.</dd>
