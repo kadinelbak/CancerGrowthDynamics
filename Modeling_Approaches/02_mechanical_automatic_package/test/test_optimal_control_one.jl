@@ -1,3 +1,5 @@
+using DataFrames
+
 @testset "Optimal Control One" begin
     OC = MechanicalAutomaticModeling.OptimalControlOne
     @test OC.A2780_DOSE_MAP["IC25"] == 1.47
@@ -39,4 +41,29 @@
     @test all(isfinite, control.total)
     @test all(control.total .>= 0)
     @test control.latent == zeros(length(control.time))
+
+    ranking = DataFrame(
+        model = ["simple", "complex"], pooling_mode = ["shared", "shared"],
+        n_parameters = [2, 4], bic = [10.0, 12.0], boundary_issue = [false, true],
+        eligible_for_inheritance = [true, true],
+    )
+    status = DataFrame(winning_model = ["simple"], winning_pooling_mode = ["shared"])
+    candidates = OC._top_stage_rows(ranking, status)
+    @test candidates.candidate == ["M1", "M2"]
+    @test candidates.selected == [true, false]
+
+    overlay = DataFrame(
+        model = repeat(["simple", "complex"], inner = 3), pooling_mode = fill("shared", 6),
+        observed = repeat([1.0, 2.0, 3.0], 2), predicted = [1.0, 2.0, 3.0, 1.0, 1.0, 1.0],
+        density = fill("30k", 6),
+    )
+    audited = OC._attach_candidate_errors(candidates, overlay)
+    @test audited.median_nRMSE[1] == 0.0
+    @test audited.median_nRMSE[2] > audited.median_nRMSE[1]
+
+    report = read(normpath(joinpath(@__DIR__, "..", "outputs", "reports", "optimal_control_one.html")), String)
+    @test all(contains(report, "Stage $stage:") for stage in 1:4)
+    @test contains(report, "Optimal control is gated off")
+    @test contains(report, "Stage 4 Candidate Endpoint Audit")
+    @test !contains(report, "endpoint-only prediction")
 end

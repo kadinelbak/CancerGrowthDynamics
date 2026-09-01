@@ -1,0 +1,7 @@
+criterion,passed,evidence
+All four inherited winners eligible,true,staged status exports
+All inherited winners boundary-free,false,Stage 1: baranyi_theta_logistic_growth; Stage 2: joint_ic_effect_hill_ramp_onset; Stage 2: joint_ic_effect_transit_death; Stage 3: lv_asymmetric_competition_death; Stage 4: load_plus_tolerant_context
+Independent held-out environment,false,no predeclared held-out environment was exported
+Stage 4 endpoint coverage >= 10/12,false,3/12 endpoints inside bootstrap intervals
+Stage 4 winner boundary-free,false,winner is boundary-limited
+Overall control-ready,false,optimal control not run

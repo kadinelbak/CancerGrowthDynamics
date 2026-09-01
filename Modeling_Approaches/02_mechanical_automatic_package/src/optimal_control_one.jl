@@ -696,8 +696,210 @@ function _run_model_selected_workflow!(; start, fit_seconds, control_seconds, se
     return (report = report_path, docs_report = docs_report, output = output_root, selected_model = selected.name, ranking = ranking, control_table = control_table)
 end
 
+_asbool(value) = lowercase(string(value)) == "true"
+
+function _top_stage_rows(ranking, status; n = 5)
+    rows = NamedTuple[]
+    group_column = :cell_line in propertynames(ranking) ? :cell_line : nothing
+    groups = group_column === nothing ? [ranking] : [DataFrame(group) for group in groupby(ranking, group_column)]
+    for group in groups
+        ordered = sort(group, :bic)
+        best = minimum(Float64.(ordered.bic))
+        selected_model = group_column === nothing ? String(status.winning_model[1]) : begin
+            key = String(group[1, group_column])
+            status_row = filter(row -> String(row.cell_line) == key, status)
+            isempty(status_row) ? "" : String(status_row.winning_model[1])
+        end
+        selected_pooling = group_column === nothing ? String(status.winning_pooling_mode[1]) : begin
+            key = String(group[1, group_column]); status_row = filter(row -> String(row.cell_line) == key, status)
+            isempty(status_row) ? "" : String(status_row.winning_pooling_mode[1])
+        end
+        for (candidate_index, row) in enumerate(eachrow(first(ordered, min(n, nrow(ordered)))))
+            pooling = :pooling_mode in propertynames(ordered) ? String(row.pooling_mode) : ""
+            push!(rows, (group = group_column === nothing ? "all" : String(row[group_column]), candidate = "M$candidate_index", model = String(row.model), pooling = pooling,
+                free_parameters = :n_parameters in propertynames(ordered) ? Int(row.n_parameters) : (:parameter_count in propertynames(ordered) ? Int(row.parameter_count) : missing),
+                BIC = Float64(row.bic), delta_BIC = Float64(row.bic) - best,
+                boundary = :boundary_issue in propertynames(ordered) ? _asbool(row.boundary_issue) : false,
+                eligible = :eligible_for_inheritance in propertynames(ordered) ? _asbool(row.eligible_for_inheritance) : true,
+                selected = String(row.model) == selected_model && pooling == selected_pooling))
+        end
+    end
+    return DataFrame(rows)
+end
+
+function _selected_overlay(overlay, status)
+    parts = DataFrame[]
+    if :cell_line in propertynames(overlay) && :cell_line in propertynames(status) && nrow(status) > 1
+        for row in eachrow(status)
+            part = filter(item -> String(item.cell_line) == String(row.cell_line) && String(item.model) == String(row.winning_model) && String(item.pooling_mode) == String(row.winning_pooling_mode), overlay)
+            isempty(part) || push!(parts, part)
+        end
+    else
+        model = String(status.winning_model[1]); pooling = String(status.winning_pooling_mode[1])
+        part = filter(item -> String(item.model) == model && String(item.pooling_mode) == pooling, overlay)
+        isempty(part) || push!(parts, part)
+    end
+    return isempty(parts) ? DataFrame() : vcat(parts...; cols = :union)
+end
+
+function _reproduction_summary(stage, selected)
+    isempty(selected) && return DataFrame(stage = [stage], trajectories = [0], points = [0], median_normalized_RMSE = [Inf], worst_normalized_RMSE = [Inf])
+    metadata = filter(name -> name in propertynames(selected), [:cell_line, :density, :dose, :mix, :component, :context])
+    isempty(metadata) && (metadata = [:model])
+    values = Float64[]
+    for group in groupby(selected, metadata)
+        observed = Float64.(group.observed); predicted = Float64.(group.predicted)
+        scale = max(maximum(abs.(observed)), 1.0)
+        push!(values, sqrt(mean((predicted .- observed) .^ 2)) / scale)
+    end
+    return DataFrame(stage = [stage], trajectories = [length(values)], points = [nrow(selected)], median_normalized_RMSE = [median(values)], worst_normalized_RMSE = [maximum(values)])
+end
+
+function _attach_candidate_errors(table, overlay)
+    median_errors = Float64[]
+    worst_errors = Float64[]
+    point_counts = Int[]
+    for candidate in eachrow(table)
+        rows = filter(row -> String(row.model) == candidate.model &&
+            String(row.pooling_mode) == candidate.pooling &&
+            (candidate.group == "all" || !(:cell_line in propertynames(overlay)) || String(row.cell_line) == candidate.group), overlay)
+        if isempty(rows)
+            push!(median_errors, Inf); push!(worst_errors, Inf); push!(point_counts, 0)
+            continue
+        end
+        metadata = filter(name -> name in propertynames(rows), [:cell_line, :density, :dose, :mix, :component, :context])
+        isempty(metadata) && (metadata = [:model])
+        errors = Float64[]
+        for trajectory in groupby(rows, metadata)
+            observed = Float64.(trajectory.observed); predicted = Float64.(trajectory.predicted)
+            push!(errors, sqrt(mean((predicted .- observed) .^ 2)) / max(maximum(abs.(observed)), 1.0))
+        end
+        push!(median_errors, median(errors)); push!(worst_errors, maximum(errors)); push!(point_counts, nrow(rows))
+    end
+    result = copy(table)
+    result[!, :median_nRMSE] = median_errors
+    result[!, :worst_nRMSE] = worst_errors
+    result[!, :points] = point_counts
+    return result
+end
+
+function _stage4_endpoint_audit(ranking, overlays, bootstrap)
+    endpoint = filter(row -> String(row.context) == "coculture" && isapprox(Float64(row.time), 14.0; atol = 1e-8), overlays)
+    rows = NamedTuple[]
+    for model in unique(String.(endpoint.model))
+        model_rows = filter(row -> String(row.model) == model, endpoint)
+        covered = 0; errors = Float64[]; matched = 0
+        for row in eachrow(model_rows)
+            lineage = String(row.component) == "sensitive" ? "A2780Naive" : "A2780cis"
+            target = filter(item -> String(item.density) == String(row.density) && String(item.mix) == String(row.mix) && String(item.lineage) == lineage, bootstrap)
+            isempty(target) && continue
+            matched += 1
+            prediction = Float64(row.predicted); observed = Float64(target.observed_mean[1])
+            Float64(target.ci95_lower[1]) <= prediction <= Float64(target.ci95_upper[1]) && (covered += 1)
+            push!(errors, abs(prediction - observed) / max(abs(observed), 1.0))
+        end
+        rank_row = filter(row -> String(row.model) == model, ranking)
+        isempty(rank_row) && continue
+        delta_bic = Float64(rank_row.delta_bic[1])
+        push!(rows, (model = model, stage_winner = isapprox(delta_bic, 0.0; atol = 1e-8), BIC = Float64(rank_row.bic[1]), delta_BIC = delta_bic,
+            free_parameters = Int(rank_row.n_parameters[1]), eligible = _asbool(rank_row.eligible_for_inheritance[1]),
+            boundary = _asbool(rank_row.boundary_issue[1]), endpoints_inside_95CI = covered, endpoints_tested = matched,
+            coverage = matched == 0 ? 0.0 : covered / matched, mean_relative_endpoint_error = isempty(errors) ? Inf : mean(errors)))
+    end
+    return sort(DataFrame(rows), [:coverage, :mean_relative_endpoint_error], rev = [true, false])
+end
+
+function _save_stage_diagnostic(selected, path, title)
+    p = scatter(Float64.(selected.observed), Float64.(selected.predicted); alpha = 0.55, markersize = 4,
+        xlabel = "Observed cell count", ylabel = "Predicted cell count", title = title, legend = false, size = (760, 620))
+    limit = maximum(vcat(Float64.(selected.observed), Float64.(selected.predicted)))
+    plot!(p, [0.0, limit], [0.0, limit]; color = :black, linestyle = :dash, linewidth = 2)
+    savefig(p, path)
+end
+
+function _save_stage_bic(table, path, title)
+    shown = first(sort(table, [:group, :delta_BIC]), min(10, nrow(table)))
+    labels = [row.group == "all" ? row.candidate : string(row.group, " ", row.candidate) for row in eachrow(shown)]
+    positions = collect(1:nrow(shown))
+    p = plot(; xlabel = "Delta BIC within stage/group", yticks = (positions, labels), ylims = (0.5, nrow(shown) + 0.5), legend = false, title = title, size = (1100, 650))
+    for i in positions
+        color = shown.selected[i] ? :seagreen : :deepskyblue3
+        plot!(p, [0.0, shown.delta_BIC[i]], [i, i]; linewidth = 7, color = color)
+    end
+    scatter!(p, shown.delta_BIC, positions; color = :black, markersize = 4)
+    savefig(p, path)
+end
+
+function _write_four_stage_report(path, stage_tables, summaries, endpoint_audit, readiness, figures)
+    stage_names = ["Untreated Monoculture", "Treated Monoculture", "Untreated Coculture", "Treated Coculture"]
+    sections = String[]
+    for i in 1:4
+        validation_text = i < 4 ? "This is a joint-fit reproduction audit across the available environments, not an independent holdout." : "Endpoint bootstrap coverage tests whether fitted day-14 predictions fall inside well-level 95% intervals; it is still an internal validation diagnostic rather than a new experiment."
+        push!(sections, "<section id=\"stage$i\"><h2>Stage $i: $(stage_names[i])</h2><p>$validation_text</p>$(_table_html(stage_tables[i]))<div class=\"figure-grid\"><figure><img src=\"$(figures["stage$(i)_bic"])\" alt=\"Stage $i BIC ranking\"></figure><figure><img src=\"$(figures["stage$(i)_fit"])\" alt=\"Stage $i observed versus predicted\"></figure></div>$(_table_html(summaries[i]))</section>")
+    end
+    html = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Optimal Control One</title><style>
+:root{--ink:#172033;--muted:#596477;--line:#cbd3dd;--soft:#f4f7fa;--accent:#2457d6;--warn:#a43b56;--good:#176b3a}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:var(--ink);line-height:1.5}header,main,footer{width:min(1240px,calc(100% - 40px));margin:auto}header{padding:28px 0 18px}a{color:var(--accent)}h1{font-size:34px;margin:18px 0 4px}h2{font-size:25px;margin:0 0 12px}section{padding:25px 0;border-top:1px solid var(--line)}p{max-width:1000px}.callout{border-left:4px solid var(--warn);padding:10px 16px;background:#fbf5f7}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}th,td{border:1px solid var(--line);padding:7px 9px;text-align:left}th{background:var(--soft)}.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}.toc a{border:1px solid var(--line);padding:6px 9px;text-decoration:none}.figure-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.figure-grid figure{margin:0}.figure-grid img{display:block;width:100%;height:auto;border:1px solid var(--line)}footer{padding:24px 0 40px;color:var(--muted)}@media(max-width:800px){header,main,footer{width:min(100% - 24px,1240px)}.figure-grid{grid-template-columns:1fr}h1{font-size:28px}}
+</style></head><body><header><a href="../../../../index.html">&#8592; Back</a><h1>Optimal Control One</h1><p>Four-stage A2780 model audit before optimal control.</p><nav class="toc"><a href="#stage1">Stage 1</a><a href="#stage2">Stage 2</a><a href="#stage3">Stage 3</a><a href="#stage4">Stage 4</a><a href="#endpoint">Endpoint audit</a><a href="#decision">Control decision</a></nav></header><main>
+<section><div class="callout"><strong>Why the previous validation failed:</strong> the 1.0 &micro;M trajectory is not intermediate between 0.67 and 1.47 &micro;M, so endpoint-only dose interpolation is unsupported. This report now audits the complete inherited four-stage workflow and does not use that failed interpolation as evidence.</div></section>
+<section><h2>How To Read The Audit</h2><p><strong>BIC</strong> balances fit against the number of free parameters; lower is better. <strong>Delta BIC</strong> is measured from the lowest BIC in the same stage and lineage group. <strong>Median and worst nRMSE</strong> divide trajectory RMSE by that trajectory's largest observed count, making shape errors comparable across seeding densities. These nRMSE values describe reproduction of fitted data and are not held-out prediction errors. <strong>Boundary</strong> marks a parameter at or near an allowed limit. <strong>Eligible</strong> means the staged workflow permits inheritance; an ineligible low-BIC model is shown for comparison but is not carried forward.</p></section>
+$(join(sections, "\n"))
+<section id="endpoint"><h2>Stage 4 Candidate Endpoint Audit</h2><p>Every linked treated-coculture candidate is checked against the same 12 day-14 bootstrap intervals. High endpoint coverage cannot rescue an ineligible inheritance model, but it can reveal whether the BIC winner generalizes poorly.</p>$(_table_html(first(endpoint_audit, min(12, nrow(endpoint_audit)))))</section>
+<section id="decision"><h2>Optimal-Control Readiness</h2><div class="callout"><strong>Optimal control is gated off.</strong> No current four-stage model meets the explicit provisional validation requirements. Running an optimizer would produce a mathematically optimal schedule for an inadequately validated model, not a reliable experimental schedule.</div>$(_table_html(readiness))<h3>What would unlock control</h3><ul><li>Predeclare held-out wells, one density, or one mixture before refitting.</li><li>Add doses around 1.0 &micro;M to resolve the non-monotone response.</li><li>Provisionally require at least 10 of 12 treated-coculture endpoints inside bootstrap 95% intervals; calibrate this threshold before prospective validation.</li><li>Require a boundary-free inherited Stage 4 winner and acceptable lineage-specific residuals.</li></ul></section>
+</main><footer>Generated from the staged Julia ranking, inheritance, overlay, and bootstrap artifacts.</footer></body></html>"""
+    mkpath(dirname(path)); write(path, html); return path
+end
+
+function _run_four_stage_workflow!(; start)
+    package_root = isdir(joinpath(start, "src")) ? start : normpath(joinpath(start, ".."))
+    repository_root = normpath(joinpath(package_root, "..", "..")); csv_root = joinpath(package_root, "outputs", "csv")
+    output_root = joinpath(csv_root, "optimal_control_one"); figure_root = joinpath(output_root, "figures"); mkpath(figure_root)
+    report_path = joinpath(package_root, "outputs", "reports", "optimal_control_one.html")
+    docs_root = joinpath(repository_root, "docs", "Modeling_Approaches", "02_mechanical_automatic_package")
+    docs_output = joinpath(docs_root, "outputs", "csv", "optimal_control_one"); docs_report = joinpath(docs_root, "outputs", "reports", "optimal_control_one.html")
+
+    ranking_paths = [joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_model_ranking.csv"), joinpath(csv_root, "monoculture_treated", "monoculture_treated_pooling_model_ranking.csv"), joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_model_ranking.csv"), joinpath(csv_root, "coculture_treated", "linked_treatment_model_ranking.csv")]
+    status_paths = [joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_status.csv"), joinpath(csv_root, "monoculture_treated", "monoculture_treated_pooling_status.csv"), joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_status.csv"), joinpath(csv_root, "coculture_treated", "linked_treatment_status.csv")]
+    overlay_paths = [joinpath(csv_root, "monoculture_untreated", "figures", "monoculture_untreated_pooling_overlays.csv"), joinpath(csv_root, "monoculture_treated", "figures", "monoculture_treated_joint_dose_overlays.csv"), joinpath(csv_root, "coculture_untreated", "figures", "coculture_untreated_joint_overlays.csv"), joinpath(csv_root, "coculture_treated", "figures", "linked_treatment_combined_overlays.csv")]
+    rankings = CSV.read.(ranking_paths, Ref(DataFrame)); statuses = CSV.read.(status_paths, Ref(DataFrame)); overlays = CSV.read.(overlay_paths, Ref(DataFrame))
+    stage_tables = [_attach_candidate_errors(_top_stage_rows(rankings[i], statuses[i]), overlays[i]) for i in 1:4]
+    for (stage, table) in enumerate(stage_tables)
+        insertcols!(table, 1, :stage => fill(stage, nrow(table)))
+    end
+    selected = [_selected_overlay(overlays[i], statuses[i]) for i in 1:4]
+    summaries = [_reproduction_summary(i, selected[i]) for i in 1:4]
+    bootstrap = CSV.read(joinpath(csv_root, "coculture_treated", "linked_treatment_endpoint_bootstrap.csv"), DataFrame)
+    endpoint_audit = _stage4_endpoint_audit(rankings[4], overlays[4], bootstrap)
+    winner = String(statuses[4].winning_model[1]); winner_audit = only(filter(row -> row.model == winner, endpoint_audit))
+    heldout_available = false; coverage_pass = winner_audit.endpoints_inside_95CI >= 10; boundary_pass = !winner_audit.boundary
+    inheritance_pass = all(all(_asbool.(status.inheritance_allowed)) for status in statuses)
+    inherited_boundary_labels = String[]
+    for (stage, table) in enumerate(stage_tables), row in eachrow(table)
+        row.selected && row.boundary && push!(inherited_boundary_labels, "Stage $stage: $(row.model)")
+    end
+    inherited_boundary_pass = isempty(inherited_boundary_labels)
+    inherited_boundary_evidence = inherited_boundary_pass ? "no selected stage winner has a boundary flag" : join(inherited_boundary_labels, "; ")
+    readiness = DataFrame(criterion = ["All four inherited winners eligible", "All inherited winners boundary-free", "Independent held-out environment", "Stage 4 endpoint coverage >= 10/12", "Stage 4 winner boundary-free", "Overall control-ready"],
+        passed = [inheritance_pass, inherited_boundary_pass, heldout_available, coverage_pass, boundary_pass, false],
+        evidence = ["staged status exports", inherited_boundary_evidence, "no predeclared held-out environment was exported", "$(winner_audit.endpoints_inside_95CI)/$(winner_audit.endpoints_tested) endpoints inside bootstrap intervals", winner_audit.boundary ? "winner is boundary-limited" : "no boundary flag", "optimal control not run"])
+    CSV.write(joinpath(output_root, "four_stage_model_audit.csv"), vcat(stage_tables...; cols = :union)); CSV.write(joinpath(output_root, "four_stage_reproduction_summary.csv"), vcat(summaries...)); CSV.write(joinpath(output_root, "stage4_endpoint_model_audit.csv"), endpoint_audit); CSV.write(joinpath(output_root, "control_readiness.csv"), readiness)
+    figures = Dict{String,String}()
+    for i in 1:4
+        bic_path = joinpath(figure_root, "stage$(i)_bic.svg"); fit_path = joinpath(figure_root, "stage$(i)_fit.png")
+        _save_stage_bic(stage_tables[i], bic_path, "Stage $i model comparison"); _save_stage_diagnostic(selected[i], fit_path, "Stage $i selected-model reproduction")
+        figures["stage$(i)_bic"] = "../csv/optimal_control_one/figures/stage$(i)_bic.svg"; figures["stage$(i)_fit"] = "../csv/optimal_control_one/figures/stage$(i)_fit.png"
+    end
+    _write_four_stage_report(report_path, stage_tables, summaries, endpoint_audit, readiness, figures)
+    stale = ("control_metrics.csv", "control_trajectories.csv", "fitted_trajectories.csv", "heldout_validation.csv", "model_selection.csv", "selected_parameters.csv")
+    stale_figures = ("a2780_data.png", "control_comparison.png", "dose_fits.png", "heldout_validation.png", "model_comparison.png", "optimized_composition.png",
+        "stage1_bic.png", "stage2_bic.png", "stage3_bic.png", "stage4_bic.png")
+    for name in stale; rm(joinpath(output_root, name); force = true); rm(joinpath(docs_output, name); force = true); end
+    for name in stale_figures; rm(joinpath(figure_root, name); force = true); rm(joinpath(docs_output, "figures", name); force = true); end
+    mkpath(dirname(docs_report)); mkpath(docs_output); cp(report_path, docs_report; force = true); cp(output_root, docs_output; force = true)
+    return (report = report_path, docs_report = docs_report, output = output_root, control_ready = false, readiness = readiness)
+end
+
 function run_optimal_control_one!(; start = @__DIR__, fit_seconds = 8.0, control_seconds = 20.0, seed = 5113)
-    return _run_model_selected_workflow!(; start = start, fit_seconds = fit_seconds, control_seconds = control_seconds, seed = seed)
+    return _run_four_stage_workflow!(; start = start)
     package_root = isdir(joinpath(start, "src")) ? start : normpath(joinpath(start, ".."))
     repository_root = normpath(joinpath(package_root, "..", ".."))
     output_root = joinpath(package_root, "outputs", "csv", "optimal_control_one")

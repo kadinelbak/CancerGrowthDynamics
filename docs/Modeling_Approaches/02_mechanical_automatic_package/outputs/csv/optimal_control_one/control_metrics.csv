@@ -1,6 +1,0 @@
-schedule,selected_model,final_total,final_sensitive,final_latent_resistant,dose_AUC,population_AUC
-Optimized,shared-growth delayed loss,0.6135662260753053,0.6135662260753053,0.0,13.0,17.478267714444627
-Constant 1 uM,shared-growth delayed loss,7.189676919826951,7.189676919826951,0.0,13.0,67.04374572450239
-Front-loaded,shared-growth delayed loss,1.52303510800528,1.52303510800528,0.0,13.0,24.763057753012085
-Back-loaded,shared-growth delayed loss,3.69979064375401,3.69979064375401,0.0,13.0,58.79259662212968
-Pulsed,shared-growth delayed loss,1.3257589818091249,1.3257589818091249,0.0,12.999999999999998,30.879032649664182
