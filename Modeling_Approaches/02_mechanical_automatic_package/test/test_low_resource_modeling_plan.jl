@@ -19,13 +19,14 @@
     @test occursin("Low-Resource Treated Monoculture", report)
     @test occursin("Low-Resource Coculture", report)
     @test occursin("Low-Resource Treated Coculture", report)
+    @test occursin("Low-Resource Treated Coculture With Drug-Induced Sensitive-To-Resistant Transfer", report)
     @test occursin("Growth-Rate And Carrying-Capacity Modifiers", report)
     @test occursin("Separately Fitted Growth Rate", report)
     @test occursin("Lineage-Specific Subtractive Loss", report)
     @test occursin("u_R(t)=\\frac{10-F(t)}{10-0.05}", report)
     @test occursin("0.05\\le F(t)\\le 10", report)
-    @test count("d_N^{LR}u_R(t)N", report) == 4
-    @test count("d_C^{LR}u_R(t)C", report) == 4
+    @test count("d_N^{LR}u_R(t)N", report) == 5
+    @test count("d_C^{LR}u_R(t)C", report) == 5
     @test occursin("0 at 10% FBS and 1 at 0.05% FBS", report)
     @test occursin("A2780Naive monoculture", report)
     @test occursin("A2780cis-resistant monoculture", report)
@@ -34,8 +35,8 @@
     @test !occursin("^{\\theta_C}", report)
     @test occursin("r_NN\\left(1-\\frac{N+\\alpha_{NC}C}{K}\\right)", report)
     @test occursin("r_CC\\left(1-\\frac{C+\\alpha_{CN}N}{K}\\right)", report)
-    @test count("\\frac{N+\\alpha_{NC}C}{K}", report) == 5
-    @test count("\\frac{C+\\alpha_{CN}N}{K}", report) == 5
+    @test count("\\frac{N+\\alpha_{NC}C}{K}", report) == 6
+    @test count("\\frac{C+\\alpha_{CN}N}{K}", report) == 6
     @test !occursin("\\frac{N+\\alpha_{NC}C}{K_N}", report)
     @test !occursin("\\frac{C+\\alpha_{CN}N}{K_C}", report)
     @test occursin("Given carrying capacity shared by both lineages in coculture", report)
@@ -78,6 +79,13 @@
     @test occursin("Time-Delayed Hill Function <span aria-label=\"carried forward\">&#9733;</span>", report)
     @test occursin("Asymmetric Crowding <span aria-label=\"carried forward\">&#9733;</span>", report)
     @test occursin("Lineage-Specific Subtractive Loss <span aria-label=\"carried forward\">&#9733;</span>", report)
+    transfer = section_html("low-resource-treated-coculture-transfer")
+    @test occursin("-\\gamma D(t)N", transfer)
+    @test occursin("+\\gamma D(t)N", transfer)
+    @test count("\\gamma D(t)N", transfer) == 4
+    @test occursin("Equal-and-opposite transfer terms", transfer)
+    @test occursin("\\frac{N+\\alpha_{NC}C}{K}", transfer)
+    @test occursin("d_N^{LR}u_R(t)N", transfer)
     @test occursin("<h3>Notation</h3>", report)
     @test !occursin("Focused Sources", report)
     @test !occursin("Fitting And Decision Plan", report)

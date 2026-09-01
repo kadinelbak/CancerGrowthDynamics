@@ -59,6 +59,7 @@
           <a href="#low-resource-treated-monoculture">Low-resource treated monoculture</a>
           <a href="#low-resource-coculture">Low-resource coculture</a>
           <a href="#low-resource-treated-coculture">Low-resource treated coculture</a>
+          <a href="#low-resource-treated-coculture-transfer">Drug-induced transfer variant</a>
         </nav>
       </details>
     </div>
@@ -293,6 +294,24 @@
         <dt>\(A_N(t),A_C(t)\)</dt><dd>Inherited lineage-specific exponential delay multipliers.</dd>
         <dt>\(H_N(D),H_C(D)\)</dt><dd>Inherited lineage-specific Hill functions.</dd>
         <dt>\(\beta_N,\beta_C\)</dt><dd>Inherited lineage-specific drug-effect parameters.</dd>
+      </dl>
+    </section>
+
+    <section id="low-resource-treated-coculture-transfer">
+      <h2>Low-Resource Treated Coculture With Drug-Induced Sensitive-To-Resistant Transfer</h2>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_N^{LR}u_R(t)N-\beta_NA_N(t)H_N(D(t))N-\gamma D(t)N
+      \]
+      \[
+      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_C^{LR}u_R(t)C-\beta_CA_C(t)H_C(D(t))C+\gamma D(t)N
+      \]</div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(N(t),C(t)\)</dt><dd>Modeled sensitive and resistant populations.</dd>
+        <dt>\(D(t)\)</dt><dd>Time-varying cisplatin concentration.</dd>
+        <dt>\(\gamma\)</dt><dd>Drug-induced sensitive-to-resistant transfer-rate parameter.</dd>
+        <dt>\(-\gamma D(t)N,+\gamma D(t)N\)</dt><dd>Equal-and-opposite transfer terms that move cells from the sensitive population into the resistant population.</dd>
       </dl>
     </section>
   </main>
