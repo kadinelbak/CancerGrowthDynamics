@@ -151,6 +151,14 @@ function _write_stage1_baseline!(workspace, source_start, selections)
 end
 
 function _decode_and_fit(condition, workspace, max_time)
+    if lowercase(get(ENV, "A2780_TOURNAMENT_SMOKE", "false")) == "true" && condition != "coculture_treated"
+        output = IOUtils.condition_output_dirs(condition; start = workspace).csv
+        ranking_name = condition == "monoculture_treated" ?
+            "monoculture_treated_pooling_model_ranking.csv" :
+            "coculture_untreated_pooling_model_ranking.csv"
+        ranking_path = joinpath(output, ranking_name)
+        isfile(ranking_path) && return (ranking = CSV.read(ranking_path, DataFrame), resumed = true)
+    end
     decoded = StagedA2780Workflow.decode_a2780_condition(condition; start = workspace)
     out = IOUtils.condition_output_dirs(condition; start = workspace)
     CSV.write(joinpath(out.csv, "$(condition)_a2780_decoded.csv"), decoded)
@@ -204,8 +212,12 @@ function _write_stage3_selection!(workspace, selection, ranking)
     CSV.write(path, baseline)
 end
 
+_json_value(value::AbstractFloat) = isfinite(value) ? value : nothing
+_json_value(::Missing) = nothing
+_json_value(value) = value
+
 function _records(df; limit = nrow(df))
-    return [Dict(String(name) => row[Symbol(name)] for name in names(df)) for row in eachrow(first(df, min(limit, nrow(df))))]
+    return [Dict(String(name) => _json_value(row[Symbol(name)]) for name in names(df)) for row in eachrow(first(df, min(limit, nrow(df))))]
 end
 
 function _result_payload(id, canonical, workspace, stage2, stage3; stage4 = nothing, state = "completed", note = "")

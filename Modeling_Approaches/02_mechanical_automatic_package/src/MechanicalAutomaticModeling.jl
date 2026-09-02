@@ -10,6 +10,7 @@ include("reduced_stage_report.jl")
 include("adaptive_simulation_engine.jl")
 include("a2780_adaptive_adapter.jl")
 include("hybrid_refit_service.jl")
+include("model_path_tournament.jl")
 include("optimal_control_one.jl")
 
 using .IOUtils
@@ -22,8 +23,9 @@ using .ReducedStageReport
 using .AdaptiveSimulationEngine
 using .A2780AdaptiveAdapter
 using .HybridRefitService
+using .ModelPathTournament
 using .OptimalControlOne
 
-export IOUtils, ModelRegistry, FitWorkflows, AnalysisWorkflows, StagedA2780Workflow, SampleAwareReport, ReducedStageReport, AdaptiveSimulationEngine, A2780AdaptiveAdapter, HybridRefitService, OptimalControlOne
+export IOUtils, ModelRegistry, FitWorkflows, AnalysisWorkflows, StagedA2780Workflow, SampleAwareReport, ReducedStageReport, AdaptiveSimulationEngine, A2780AdaptiveAdapter, HybridRefitService, ModelPathTournament, OptimalControlOne
 
 end

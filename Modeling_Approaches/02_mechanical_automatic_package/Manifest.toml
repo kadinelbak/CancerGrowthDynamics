@@ -1006,7 +1006,9 @@ version = "1.0.2"
 
 [[deps.GrowthParameterEstimation]]
 deps = ["BlackBoxOptim", "CSV", "DataFrames", "Dates", "DiffEqParamEstim", "DifferentialEquations", "Distributions", "ForwardDiff", "JSON", "LsqFit", "Optimization", "OptimizationBBO", "OptimizationOptimJL", "OrdinaryDiffEq", "Plots", "Random", "RecursiveArrayTools", "Statistics", "StatsBase", "TOML"]
-git-tree-sha1 = "754141dfa9497549a4d597cd9852be5cf4977c5d"
+git-tree-sha1 = "39fecf001e0dc16d4b8c498c059b4fab66ec50c7"
+repo-rev = "5eaadd4"
+repo-url = "https://github.com/kadinelbak/GrowthParameterEstimation.jl.git"
 uuid = "f2d48b76-d258-4732-aa20-f5a609aab424"
 version = "0.4.1"
 

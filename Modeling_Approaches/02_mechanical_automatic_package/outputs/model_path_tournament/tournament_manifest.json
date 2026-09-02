@@ -1,0 +1,1 @@
+{"generated_at":"2026-09-02T06:52:20.242","config":{"candidates_per_lineage":3,"beam_width":3,"simple_delta_bic":10.0,"multistarts":20,"bootstrap_replicates":200,"blocked_validation":true,"max_time_per_fit":0.5,"force":false},"paths":4,"score_warning":"additive beam heuristic; not a global BIC"}

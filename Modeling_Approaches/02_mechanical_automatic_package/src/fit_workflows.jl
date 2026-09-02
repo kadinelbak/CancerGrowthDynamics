@@ -22,6 +22,16 @@ const THETA_UNTREATED_MODELS = Set([
 ])
 const PRIMARY_UNTREATED_MODELS = union(Set(["logistic_growth", "gompertz_growth"]), THETA_UNTREATED_MODELS)
 
+function _configured_multistarts(default::Int)
+    requested = tryparse(Int, get(ENV, "A2780_MULTISTARTS", string(default)))
+    return max(default, something(requested, default))
+end
+
+_stable_multistart_seed(parts...) = 1000 + sum(sum(Int(byte) for byte in codeunits(String(part))) for part in parts)
+_configured_refine_optimizer() = lowercase(get(ENV, "A2780_REFINE_BFGS", "false")) == "true" ? :bfgs : nothing
+_tournament_smoke_test() = lowercase(get(ENV, "A2780_TOURNAMENT_SMOKE", "false")) == "true"
+_configured_fit_maxtime() = let value = tryparse(Float64, get(ENV, "A2780_FIT_MAXTIME", "")); value === nothing ? nothing : max(value, 0.01) end
+
 function _shared_y_limits(df::DataFrame; columns = (:observed, :predicted), headroom::Float64 = 0.05)
     values = Float64[]
     for column in columns
@@ -1413,7 +1423,8 @@ function _run_density_aware_treated_monoculture_fitting(
         length(datasets) == 6 || error("Expected six treated trajectories for $(cell_line), found $(length(datasets))")
         joint_group = "densities=$(join(density_labels, "/"));doses=$(join(sort(unique(doses)), "/"))"
 
-        for pooling_mode in ("shared", "partial_5pct", "independent_diagnostic")
+        pooling_modes = _tournament_smoke_test() ? ("shared", "partial_5pct") : ("shared", "partial_5pct", "independent_diagnostic")
+        for pooling_mode in pooling_modes
             specs = _joint_treated_model_specs(
                 doses,
                 effect_levels,
@@ -1422,7 +1433,9 @@ function _run_density_aware_treated_monoculture_fitting(
                 0.0,
                 pooling_mode,
             )
-            for model_name in sort(collect(keys(specs)))
+            model_names = sort(collect(keys(specs)))
+            _tournament_smoke_test() && (model_names = filter(name -> name in ("joint_ic_effect_hill_ramp_onset", "joint_ic_effect_two_population"), model_names))
+            for model_name in model_names
                 spec = specs[model_name]
                 println("  Density-aware treated fit $(cell_line), $(model_name), $(pooling_mode)...")
                 model_datasets, model_u0, u0_builder = _joint_model_inputs(spec, datasets, initial_counts, trajectory_density_indices)
@@ -1435,12 +1448,37 @@ function _run_density_aware_treated_monoculture_fitting(
                 model_maxiters = pooling_mode == "independent_diagnostic" ?
                     max(250, Int(round(max_time_per_fit * 12))) :
                     max(350, Int(round(max_time_per_fit * 18)))
+                _tournament_smoke_test() && (model_maxiters = 1)
+                multistart = try
+                    starts = GrowthParameterEstimation.generate_multistarts(
+                        spec.p0, spec.bounds;
+                        n_starts = _configured_multistarts(1),
+                        seed = _stable_multistart_seed(cell_line, model_name, pooling_mode),
+                    )
+                    GrowthParameterEstimation.run_joint_multistart(
+                        spec.model, model_datasets, model_u0, starts;
+                        refine_optimizer = _configured_refine_optimizer(),
+                        bounds = spec.bounds,
+                        solver = Tsit5(),
+                        u0_builder = u0_builder,
+                        maxiters = model_maxiters,
+                        maxtime = _configured_fit_maxtime(),
+                        reltol = 1e-7,
+                        abstol = 1e-7,
+                        optimizer = :nelder_mead,
+                        initial_time = 0.0,
+                    )
+                catch error_value
+                    @warn "Density-aware treated multistart failed" cell_line model_name pooling_mode exception = error_value
+                    nothing
+                end
+                multistart === nothing && continue
                 profiled = try
                     GrowthParameterEstimation.profile_joint_fit_bounds(
                         spec.model,
                         model_datasets,
                         model_u0,
-                        spec.p0;
+                        multistart.fit.params;
                         bounds = spec.bounds,
                         parameter_names = spec.param_names,
                         explicit_upper_profiles = explicit_profiles,
@@ -2176,12 +2214,23 @@ function _run_density_aware_untreated_fitting(
                 biological_parameters = [name for name in pooled.param_names if !startswith(String(name), "log_contrast")]
                 println("  Density-aware untreated fit $(model_name), cell=$(cell_line), pooling=$(pooling_mode)...")
                 starts = _untreated_multistarts(pooled, base, model_name)
+                requested_starts = _configured_multistarts(length(starts))
+                if requested_starts > length(starts)
+                    generated = GrowthParameterEstimation.generate_multistarts(
+                        pooled.p0, pooled.bounds;
+                        n_starts = requested_starts,
+                        seed = _stable_multistart_seed(cell_line, model_name, pooling_mode),
+                    )
+                    starts = vcat(starts, generated[2:end])[1:requested_starts]
+                end
                 multistart = GrowthParameterEstimation.run_joint_multistart(
                     ode!, datasets, initial_counts, starts;
+                    refine_optimizer = _configured_refine_optimizer(),
                     bounds = pooled.bounds,
                     solver = Tsit5(),
                     optimizer = :nelder_mead,
                     maxiters = max(120, Int(round(max_time_per_fit * 45))),
+                    maxtime = _configured_fit_maxtime(),
                     reltol = 1e-7,
                     abstol = 1e-7,
                     initial_time = 0.0,

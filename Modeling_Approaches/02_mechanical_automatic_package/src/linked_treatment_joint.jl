@@ -657,7 +657,8 @@ function _fit_linked_treatment_joint(
     fit_cache = Dict{String,Any}()
     overlay_parts = DataFrame[]
     resume_path = joinpath(out.csv, "linked_treatment_model_ranking.csv")
-    for hypothesis in LINKED_TREATMENT_HYPOTHESES
+    linked_hypotheses = _tournament_smoke_test() ? ["load_plus_tolerant_context", "fully_free_context_diagnostic"] : LINKED_TREATMENT_HYPOTHESES
+    for hypothesis in linked_hypotheses
         problem = _linked_problem(monoculture_environments, coculture_environments, start, seed, hypothesis)
         resumed = resume_from_existing ?
             _linked_resume_parameters(resume_path, hypothesis, length(problem.p0)) :
@@ -666,18 +667,28 @@ function _fit_linked_treatment_joint(
             problem = merge(problem, (p0 = resumed, u0 = Float64.(problem.u0_builder(resumed))))
         end
         maxiters = hypothesis == "fully_free_context_diagnostic" ? max(400, Int(round(max_time_per_fit * 80))) : max(300, Int(round(max_time_per_fit * 60)))
+        _tournament_smoke_test() && (maxiters = 1)
         println("  Linked treatment fit $(hypothesis)...")
-        fit = GrowthParameterEstimation.run_joint_fit(
-            problem.model, problem.datasets, problem.u0, problem.p0;
+        starts = GrowthParameterEstimation.generate_multistarts(
+            problem.p0,
+            problem.bounds;
+            n_starts = _configured_multistarts(1),
+            seed = _stable_multistart_seed("linked_treatment", hypothesis),
+        )
+        multistart = GrowthParameterEstimation.run_joint_multistart(
+            problem.model, problem.datasets, problem.u0, starts;
+            refine_optimizer = _configured_refine_optimizer(),
             bounds = problem.bounds,
             u0_builder = problem.u0_builder,
             solver = Rodas5(),
             optimizer = :nelder_mead,
             maxiters = maxiters,
+            maxtime = _configured_fit_maxtime(),
             reltol = 1e-7,
             abstol = 1e-7,
             initial_time = 0.0,
         )
+        fit = multistart.fit
         isfinite(fit.bic) && isfinite(fit.raw_sse) && fit.raw_sse < 9.99e11 || continue
         fit_cache[hypothesis] = (fit = fit, problem = problem)
         push!(rows, (
@@ -700,16 +711,16 @@ function _fit_linked_treatment_joint(
             initial_condition_strategy = "fixed day-zero density totals; coculture split by nominal mix and inherited cis tolerant fraction",
             residual_scaling = "trajectory peak across combined 24-trajectory objective",
             boundary_issue = false,
-            params = string((names = problem.names, values = fit.params, package_api = "GrowthParameterEstimation.run_joint_fit")),
+            params = string((names = problem.names, values = fit.params, package_api = "GrowthParameterEstimation.run_joint_multistart", successful_starts = count(==("completed"), String.(multistart.summary.status)))),
         ))
     end
-    strobl = _fit_strobl_linked_benchmarks(
+    strobl = _tournament_smoke_test() ? (rows = NamedTuple[], fits = Dict{String,Any}(), overlays = DataFrame[]) : _fit_strobl_linked_benchmarks(
         monoculture_environments, coculture_environments, start;
         max_time_per_fit = max_time_per_fit,
     )
     append!(rows, strobl.rows)
     ranking = sort!(DataFrame(rows), :bic)
-    expected_model_count = length(LINKED_TREATMENT_HYPOTHESES) + length(STROBL_MODEL_VARIANTS)
+    expected_model_count = length(linked_hypotheses) + (_tournament_smoke_test() ? 0 : length(STROBL_MODEL_VARIANTS))
     nrow(ranking) == expected_model_count || error("Not all linked treatment and Strobl benchmark hypotheses produced finite fits")
     eligible = ranking[Bool.(ranking.eligible_for_inheritance), :]
     winner = eligible[argmin(eligible.bic), :]
@@ -753,7 +764,8 @@ function _fit_linked_treatment_joint(
         u0_builder = cached.problem.u0_builder,
         solver = Rodas5(),
         optimizer = :nelder_mead,
-        maxiters = max(400, Int(round(max_time_per_fit * 70))),
+        maxiters = _tournament_smoke_test() ? 1 : max(400, Int(round(max_time_per_fit * 70))),
+        maxtime = _configured_fit_maxtime(),
         reltol = 1e-7,
         abstol = 1e-7,
         initial_time = 0.0,
@@ -773,7 +785,7 @@ function _fit_linked_treatment_joint(
     eligible = ranking[Bool.(ranking.eligible_for_inheritance), :]
     winner = eligible[argmin(eligible.bic), :]
 
-    for hypothesis in LINKED_TREATMENT_HYPOTHESES
+    for hypothesis in linked_hypotheses
         cached_hypothesis = fit_cache[hypothesis]
         push!(overlay_parts, _linked_overlay(cached_hypothesis.fit, cached_hypothesis.problem, hypothesis))
     end
@@ -811,6 +823,69 @@ function _fit_linked_treatment_joint(
         ))
     end
     shared_audit = DataFrame(parameter_rows)
+
+    whole_fit_bootstraps = something(tryparse(Int, get(ENV, "A2780_WHOLE_FIT_BOOTSTRAPS", "0")), 0)
+    if whole_fit_bootstraps > 0
+        println("  Whole-fit residual bootstrap for $(winner.model): $(whole_fit_bootstraps) refits...")
+        bootstrap = GrowthParameterEstimation.bootstrap_joint_fit(
+            winner_cached.problem.model,
+            winner_cached.problem.datasets,
+            winner_cached.problem.u0,
+            winner_cached.fit;
+            bounds = winner_cached.problem.bounds,
+            n_bootstrap = whole_fit_bootstraps,
+            starts_per_bootstrap = 2,
+            seed = 4041,
+            u0_builder = winner_cached.problem.u0_builder,
+            solver = Rodas5(),
+            optimizer = :nelder_mead,
+            maxiters = max(250, Int(round(max_time_per_fit * 35))),
+            maxtime = _configured_fit_maxtime(),
+            reltol = 1e-7,
+            abstol = 1e-7,
+            initial_time = 0.0,
+        )
+        summary = copy(bootstrap.parameter_summary)
+        summary.parameter = [String(winner_cached.problem.names[index]) for index in summary.parameter_index]
+        summary.method = fill(bootstrap.method, nrow(summary))
+        summary.requested_replicates = fill(bootstrap.requested_replicates, nrow(summary))
+        CSV.write(joinpath(out.csv, "linked_treatment_whole_fit_bootstrap_parameters.csv"), summary)
+        CSV.write(joinpath(out.csv, "linked_treatment_whole_fit_bootstrap_predictions.csv"), bootstrap.prediction_summary)
+        CSV.write(joinpath(out.csv, "linked_treatment_whole_fit_bootstrap_failures.csv"), bootstrap.failures)
+    end
+    if lowercase(get(ENV, "A2780_BLOCKED_VALIDATION", "false")) == "true"
+        validation_parts = DataFrame[]
+        metadata = winner_cached.problem.metadata
+        strategies = (
+            density = ["density=" * String(row.density) for row in metadata],
+            dose = ["dose=" * string(row.dose) for row in metadata],
+            mixture = [isempty(String(row.mix)) ? "monoculture=" * String(row.cell_line) : "mixture=" * String(row.mix) for row in metadata],
+            context = ["context=" * String(row.context) for row in metadata],
+        )
+        for (strategy, blocks) in pairs(strategies)
+            validation = GrowthParameterEstimation.blocked_joint_validation(
+                winner_cached.problem.model,
+                winner_cached.problem.datasets,
+                winner_cached.problem.u0,
+                winner_cached.fit.params,
+                blocks;
+                bounds = winner_cached.problem.bounds,
+                starts_per_fold = 2,
+                seed = _stable_multistart_seed("blocked", strategy, winner.model),
+                u0_builder = winner_cached.problem.u0_builder,
+                solver = Rodas5(),
+                optimizer = :nelder_mead,
+                maxiters = max(250, Int(round(max_time_per_fit * 35))),
+                maxtime = _configured_fit_maxtime(),
+                reltol = 1e-7,
+                abstol = 1e-7,
+                initial_time = 0.0,
+            )
+            insertcols!(validation, 1, :holdout_scheme => fill(String(strategy), nrow(validation)))
+            push!(validation_parts, validation)
+        end
+        CSV.write(joinpath(out.csv, "linked_treatment_blocked_validation.csv"), vcat(validation_parts...; cols = :union))
+    end
 
     effective_rows = NamedTuple[]
     for density in ("20k", "30k")

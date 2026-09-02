@@ -284,18 +284,47 @@ function _fit_untreated_coculture_joint(environments, out; start, max_time_per_f
     profile_parts = DataFrame[]
     identifiability_parts = DataFrame[]
     fit_cache = Dict{Tuple{String,String},Any}()
-    for pooling_mode in ("shared", "partial_5pct", "independent_diagnostic")
+    pooling_modes = _tournament_smoke_test() ? ("shared", "partial_5pct") : ("shared", "partial_5pct", "independent_diagnostic")
+    for pooling_mode in pooling_modes
         specs = _untreated_coculture_specs(environments, baselines, pooling_mode)
-        for model_name in sort(collect(keys(specs)))
+        model_names = sort(collect(keys(specs)))
+        _tournament_smoke_test() && (model_names = filter(name -> name in ("lv_symmetric_competition", "lv_asymmetric_competition", "lv_asymmetric_competition_death"), model_names))
+        for model_name in model_names
             spec = specs[model_name]
             println("  Joint untreated coculture fit $(model_name), $(pooling_mode)...")
+            model_maxiters = max(500, Int(round(max_time_per_fit * 18)))
+            _tournament_smoke_test() && (model_maxiters = 1)
+            multistart = try
+                starts = GrowthParameterEstimation.generate_multistarts(
+                    spec.p0, spec.bounds;
+                    n_starts = _configured_multistarts(1),
+                    seed = _stable_multistart_seed("untreated_coculture", model_name, pooling_mode),
+                )
+                GrowthParameterEstimation.run_joint_multistart(
+                    spec.model, datasets, u0, starts;
+                    refine_optimizer = _configured_refine_optimizer(),
+                    bounds = spec.bounds,
+                    solver = Tsit5(),
+                    maxiters = model_maxiters,
+                    maxtime = _configured_fit_maxtime(),
+                    reltol = 1e-7,
+                    abstol = 1e-7,
+                    optimizer = :nelder_mead,
+                    initial_time = 0.0,
+                )
+            catch error_value
+                @warn "Untreated coculture joint multistart failed" model_name pooling_mode exception = error_value
+                nothing
+            end
+            multistart === nothing && continue
             profiled = try
                 GrowthParameterEstimation.profile_joint_fit_bounds(
-                    spec.model, datasets, u0, spec.p0;
+                    spec.model, datasets, u0, multistart.fit.params;
                     bounds = spec.bounds,
                     parameter_names = spec.names,
                     solver = Tsit5(),
-                    maxiters = max(500, Int(round(max_time_per_fit * 18))),
+                    maxiters = model_maxiters,
+                    maxtime = _configured_fit_maxtime(),
                     reltol = 1e-7,
                     abstol = 1e-7,
                     optimizer = :nelder_mead,
@@ -576,21 +605,57 @@ function _fit_treated_coculture_joint(environments, out; start, max_time_per_fit
     parameter_rows = NamedTuple[]
     profile_parts = DataFrame[]
     identifiability_parts = DataFrame[]
-    for pooling_mode in ("shared", "partial_5pct", "independent_diagnostic")
+    pooling_modes = _tournament_smoke_test() ? ("shared",) : ("shared", "partial_5pct", "independent_diagnostic")
+    for pooling_mode in pooling_modes
         specs = _treated_coculture_specs(environments, baselines, untreated_baseline, untreated_specs, pooling_mode, t0)
-        for model_name in sort(collect(keys(specs)))
+        model_names = sort(collect(keys(specs)))
+        _tournament_smoke_test() && (model_names = filter(==("dual_constant_kill"), model_names))
+        if lowercase(get(ENV, "A2780_CONDITIONAL_TOURNAMENT", "false")) == "true"
+            model_names = filter(
+                name -> name ∉ ("dual_transit_competitor_scaled", "dual_transit_load_scaled"),
+                model_names,
+            )
+        end
+        for model_name in model_names
             spec = specs[model_name]
             datasets, u0, metadata = _treated_coculture_inputs(environments, spec.layout)
             println("  Joint treated coculture fit $(model_name), $(pooling_mode)...")
             explicit_profiles = Dict{Symbol,Vector{Float64}}(name => [5.0, 7.5, 10.0] for name in spec.names if occursin("lambda", String(name)))
+            model_maxiters = max(650, Int(round(max_time_per_fit * 22)))
+            multistart = try
+                requested_starts = _configured_multistarts(1)
+                screening_starts = lowercase(get(ENV, "A2780_CONDITIONAL_TOURNAMENT", "false")) == "true" ?
+                    min(requested_starts, 3) : requested_starts
+                starts = GrowthParameterEstimation.generate_multistarts(
+                    spec.p0, spec.bounds;
+                    n_starts = screening_starts,
+                    seed = _stable_multistart_seed("treated_coculture", model_name, pooling_mode),
+                )
+                GrowthParameterEstimation.run_joint_multistart(
+                    spec.model, datasets, u0, starts;
+                    refine_optimizer = _configured_refine_optimizer(),
+                    bounds = spec.bounds,
+                    solver = Rodas5(),
+                    maxiters = model_maxiters,
+                    maxtime = _configured_fit_maxtime(),
+                    reltol = 1e-7,
+                    abstol = 1e-7,
+                    optimizer = :nelder_mead,
+                    initial_time = 0.0,
+                )
+            catch error_value
+                @warn "Treated coculture joint multistart failed" model_name pooling_mode exception = error_value
+                nothing
+            end
+            multistart === nothing && continue
             profiled = try
                 GrowthParameterEstimation.profile_joint_fit_bounds(
-                    spec.model, datasets, u0, spec.p0;
+                    spec.model, datasets, u0, multistart.fit.params;
                     bounds = spec.bounds,
                     parameter_names = spec.names,
                     explicit_upper_profiles = explicit_profiles,
                     solver = Rodas5(),
-                    maxiters = max(650, Int(round(max_time_per_fit * 22))),
+                    maxiters = model_maxiters,
                     reltol = 1e-7,
                     abstol = 1e-7,
                     optimizer = :nelder_mead,
@@ -727,6 +792,12 @@ function _coculture_treated_nonadditive_comparison(ranking::DataFrame)
             scaling_hypothesis = hypotheses[model_name],
         ))
     end
+    isempty(rows) && return DataFrame(
+        model = String[], pooling_mode = String[], bic = Float64[],
+        scaled_ssr = Float64[], ssr = Float64[], n_parameters = Int[],
+        n_points = Int[], scaling_hypothesis = String[], delta_bic = Float64[],
+        bic_support = String[],
+    )
     comparison = sort!(DataFrame(rows), :bic)
     isempty(comparison) && return comparison
     comparison.delta_bic = comparison.bic .- minimum(comparison.bic)
