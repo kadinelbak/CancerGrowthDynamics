@@ -68,6 +68,7 @@ using CSV
     @test all(contains(report, "Stage $stage:") for stage in 1:4)
     @test contains(report, "The optimizer was run despite incomplete validation")
     @test contains(report, "Why The Parameters Are Not Yet Reliable")
+    @test contains(report, "Five rows pairing each cisplatin schedule")
     @test contains(report, "Stage 4 Candidate Endpoint Audit")
     @test !contains(report, "endpoint-only prediction")
 
