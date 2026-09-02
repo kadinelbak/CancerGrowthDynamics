@@ -1,4 +1,5 @@
 using DataFrames
+using CSV
 
 @testset "Optimal Control One" begin
     OC = MechanicalAutomaticModeling.OptimalControlOne
@@ -65,7 +66,13 @@ using DataFrames
     @test contains(report, "Conditional Model Tournament")
     @test findfirst("Conditional Model Tournament", report) < findfirst("Stage 1: Untreated Monoculture", report)
     @test all(contains(report, "Stage $stage:") for stage in 1:4)
-    @test contains(report, "Optimal control is gated off")
+    @test contains(report, "The optimizer was run despite incomplete validation")
+    @test contains(report, "Why The Parameters Are Not Yet Reliable")
     @test contains(report, "Stage 4 Candidate Endpoint Audit")
     @test !contains(report, "endpoint-only prediction")
+
+    control = CSV.read(normpath(joinpath(@__DIR__, "..", "outputs", "csv", "optimal_control_one", "control_metrics.csv")), DataFrame)
+    @test Set(control.schedule) == Set(["Optimized", "Constant 1 uM", "Front-loaded", "Back-loaded", "Pulsed"])
+    @test maximum(control.dose_AUC) - minimum(control.dose_AUC) < 1e-8
+    @test only(filter(:schedule => ==("Optimized"), control).final_total) <= only(filter(:schedule => ==("Constant 1 uM"), control).final_total)
 end

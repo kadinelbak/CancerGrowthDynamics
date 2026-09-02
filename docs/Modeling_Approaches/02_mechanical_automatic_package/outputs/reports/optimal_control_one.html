@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Optimal Control One</title><style>
 :root{--ink:#172033;--muted:#596477;--line:#cbd3dd;--soft:#f4f7fa;--accent:#2457d6;--warn:#a43b56;--good:#176b3a}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:var(--ink);line-height:1.5}header,main,footer{width:min(1240px,calc(100% - 40px));margin:auto}header{padding:28px 0 18px}a{color:var(--accent)}h1{font-size:34px;margin:18px 0 4px}h2{font-size:25px;margin:0 0 12px}h3{font-size:19px;margin:22px 0 8px}section{padding:25px 0;border-top:1px solid var(--line)}p{max-width:1000px}.callout{border-left:4px solid var(--warn);padding:10px 16px;background:#fbf5f7}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}th{background:var(--soft)}.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}.toc a{border:1px solid var(--line);padding:6px 9px;text-decoration:none}.figure-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.figure-grid figure{margin:0}.figure-grid img{display:block;width:100%;height:auto;border:1px solid var(--line)}.tournament-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);margin:18px 0}.tournament-summary div{padding:12px;border-right:1px solid var(--line)}.tournament-summary div:last-child{border:0}.tournament-summary strong{display:block;font-size:18px}.path-table{min-width:1450px}.tournament details{border-top:1px solid var(--line);padding:12px 0}.tournament small{color:var(--muted)}footer{padding:24px 0 40px;color:var(--muted)}@media(max-width:800px){header,main,footer{width:min(100% - 24px,1240px)}.figure-grid{grid-template-columns:1fr}.tournament-summary{grid-template-columns:1fr 1fr}.tournament-summary div:nth-child(2){border-right:0}h1{font-size:28px}}
-</style></head><body><header><a href="../../../../index.html">&#8592; Back</a><h1>Optimal Control One</h1><p>Conditional model selection, four-stage validation, and optimal-control readiness for A2780.</p><nav class="toc"><a href="#tournament">Model tournament</a><a href="#stage1">Stage 1</a><a href="#stage2">Stage 2</a><a href="#stage3">Stage 3</a><a href="#stage4">Stage 4</a><a href="#endpoint">Endpoint audit</a><a href="#decision">Control decision</a></nav></header><main>
+</style></head><body><header><a href="../../../../index.html">&#8592; Back</a><h1>Optimal Control One</h1><p>Conditional model selection, four-stage validation, and exploratory optimal control for A2780.</p><nav class="toc"><a href="#tournament">Model tournament</a><a href="#stage1">Stage 1</a><a href="#stage2">Stage 2</a><a href="#stage3">Stage 3</a><a href="#stage4">Stage 4</a><a href="#endpoint">Endpoint audit</a><a href="#control">Optimal control</a></nav></header><main>
 <section id="tournament" class="tournament"><h2>Conditional Model Tournament</h2>
 <p>Each retained Stage 1 lineage pair was carried into fresh Stage 2 and Stage 3 fits. The compatible winners were then inherited by a fresh linked Stage 4 fit. This is a conditional refit, not a visual substitution of previously exported curves.</p>
 <div class="tournament-summary"><div><small>Complete paths</small><strong>4</strong></div><div><small>Starts per fit</small><strong>20</strong></div><div><small>Winner bootstrap refits</small><strong>200</strong></div><div><small>Generated</small><strong>2026-09-02T06:52:20.242</strong></div></div>
@@ -798,7 +798,68 @@
 </tr>
 </tbody></table></div>
 </section>
-<section id="decision"><h2>Optimal-Control Readiness</h2><div class="callout"><strong>Optimal control is gated off.</strong> No current four-stage model meets the explicit provisional validation requirements. Running an optimizer would produce a mathematically optimal schedule for an inadequately validated model, not a reliable experimental schedule.</div><div class="table-wrap"><table><thead><tr>
+<section id="control"><h2>Exploratory Optimal Control</h2><div class="callout"><strong>The optimizer was run despite incomplete validation.</strong> The result is the mathematical optimum found for the selected fitted model under the stated constraints. It is a hypothesis for comparing schedules, not a validated experimental optimum.</div><p>The search minimizes the day-14 total population for the tournament-selected staged model. Dose is piecewise constant in 14 daily intervals, constrained to 0-1.47 &micro;M, and every schedule has the same 14 &micro;M-day commanded-dose budget as constant 1 &micro;M treatment. The initial condition is the measured 20k, 50:50 day-zero composition: 33.5 A2780Naive and 33.5 total A2780cis cells in the image-analysis scale.</p><div class="table-wrap"><table><thead><tr>
+<th>schedule</th>
+<th>final_total</th>
+<th>final_A2780Naive</th>
+<th>final_total_A2780cis</th>
+<th>total_AUC</th>
+<th>cis_AUC</th>
+<th>dose_AUC</th>
+<th>daily_dose_uM</th>
+</tr></thead><tbody>
+<tr>
+<td>Optimized</td>
+<td>2738.0796</td>
+<td>1233.2233</td>
+<td>1504.8563</td>
+<td>24900.4386</td>
+<td>8145.0922</td>
+<td>14.0</td>
+<td>1.47, 1.47, 1.15, 0.54, 0.82, 0.67, 0.62, 0.7, 0.83, 0.76, 0.75, 1.29, 1.47, 1.47</td>
+</tr>
+<tr>
+<td>Constant 1 uM</td>
+<td>3410.1922</td>
+<td>1306.2509</td>
+<td>2103.9413</td>
+<td>24891.7971</td>
+<td>13317.8289</td>
+<td>14.0</td>
+<td>1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0</td>
+</tr>
+<tr>
+<td>Front-loaded</td>
+<td>4078.2066</td>
+<td>1825.5348</td>
+<td>2252.6718</td>
+<td>26197.3155</td>
+<td>15608.6627</td>
+<td>14.0</td>
+<td>1.47, 1.47, 1.47, 1.44, 1.32, 1.21, 1.1, 0.98, 0.87, 0.76, 0.65, 0.53, 0.42, 0.31</td>
+</tr>
+<tr>
+<td>Back-loaded</td>
+<td>3383.2535</td>
+<td>520.7626</td>
+<td>2862.4909</td>
+<td>24234.9679</td>
+<td>13415.6129</td>
+<td>14.0</td>
+<td>0.31, 0.42, 0.53, 0.65, 0.76, 0.87, 0.98, 1.1, 1.21, 1.32, 1.44, 1.47, 1.47, 1.47</td>
+</tr>
+<tr>
+<td>Pulsed</td>
+<td>3578.666</td>
+<td>1213.4102</td>
+<td>2365.2557</td>
+<td>24860.6886</td>
+<td>14424.6041</td>
+<td>14.0</td>
+<td>1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53</td>
+</tr>
+</tbody></table></div>
+<div class="figure-grid"><figure><img src="../csv/optimal_control_one/figures/exploratory_staged_control.png" alt="Exploratory equal-budget optimal-control schedules and model responses"></figure></div><h3>Why The Parameters Are Not Yet Reliable</h3><ul><li>The selected Stage 4 model covers only 3 of 12 treated-coculture day-14 bootstrap intervals.</li><li>No complete density, mixture, dose, or experiment was prospectively reserved before model selection.</li><li>Several inherited parameters sit at or near fitting limits, including treatment-effect amplitudes, activation rate, onset time, and the Stage 3 loss model.</li><li>The narrow residual-bootstrap ranges show repeated convergence to the same constrained solution; they do not repair the poor endpoint coverage or test structural model error.</li><li>The 1.0 &micro;M response is not intermediate between 0.67 and 1.47 &micro;M, so a smooth dose-response assumption can mis-rank schedules that spend time between measured doses.</li></ul><h3>Validation Status</h3><div class="table-wrap"><table><thead><tr>
 <th>criterion</th>
 <th>passed</th>
 <th>evidence</th>
@@ -829,10 +890,10 @@
 <td>winner is boundary-limited</td>
 </tr>
 <tr>
-<td>Overall control-ready</td>
+<td>Overall validation-ready</td>
 <td>false</td>
-<td>optimal control not run</td>
+<td>exploratory optimizer run; model remains unvalidated</td>
 </tr>
 </tbody></table></div>
-<h3>What would unlock control</h3><ul><li>Predeclare held-out wells, one density, or one mixture before refitting.</li><li>Add doses around 1.0 &micro;M to resolve the non-monotone response.</li><li>Provisionally require at least 10 of 12 treated-coculture endpoints inside bootstrap 95% intervals; calibrate this threshold before prospective validation.</li><li>Require a boundary-free inherited Stage 4 winner and acceptable lineage-specific residuals.</li></ul></section>
+<h3>Alternatives To Test</h3><ul><li>Optimize each well-supported complete model path and report schedule disagreement as model uncertainty.</li><li>Restrict controls to the measured dose set 0, 0.67, 1.0, and 1.47 &micro;M instead of continuous interpolation.</li><li>Use robust optimization against bootstrap and alternate-model ensembles rather than one parameter vector.</li><li>Collect an independent mixture, density, or treatment sequence and compare predictions without refitting.</li></ul></section>
 </main><footer>Generated from the staged Julia ranking, inheritance, overlay, and bootstrap artifacts.</footer></body></html>

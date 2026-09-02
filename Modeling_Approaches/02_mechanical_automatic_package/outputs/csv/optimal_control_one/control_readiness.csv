@@ -4,4 +4,4 @@ All inherited winners boundary-free,false,Stage 1: baranyi_theta_logistic_growth
 Independent held-out environment,false,no predeclared held-out environment was exported
 Stage 4 endpoint coverage >= 10/12,false,3/12 endpoints inside bootstrap intervals
 Stage 4 winner boundary-free,false,winner is boundary-limited
-Overall control-ready,false,optimal control not run
+Overall validation-ready,false,exploratory optimizer run; model remains unvalidated

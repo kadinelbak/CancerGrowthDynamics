@@ -2,6 +2,8 @@ module OptimalControlOne
 
 using ..IOUtils: TREATED_MONOCULTURE_IC_DOSE_MAP
 using ..ModelPathTournament
+using ..AdaptiveSimulationEngine
+using ..A2780AdaptiveAdapter
 using BlackBoxOptim
 using CSV
 using DataFrames
@@ -831,7 +833,112 @@ function _save_stage_bic(table, path, title)
     savefig(p, path)
 end
 
-function _write_four_stage_report(path, tournament_section, stage_tables, summaries, endpoint_audit, readiness, figures)
+function _schedule_protocol(schedule; horizon)
+    windows = [TreatmentWindow(index - 1, index, dose, 1.0; label = "day $index") for (index, dose) in enumerate(schedule)]
+    return TreatmentProtocol(windows; monitoring_interval = 1.0, allowable_doses = Float64[], horizon = horizon)
+end
+
+function _staged_control_simulation(config, schedule; horizon)
+    protocol = _schedule_protocol(schedule; horizon = horizon)
+    seed_scenario = A2780AdaptiveAdapter.build_a2780_scenario(config, protocol; density = "20k")
+    tolerant_fraction = seed_scenario.parameters.initial_tolerant_fraction
+    initial_state = [33.5, 33.5 * (1 - tolerant_fraction), 33.5 * tolerant_fraction, 0.0, 0.0, 0.0]
+    scenario = A2780AdaptiveAdapter.build_a2780_scenario(config, protocol; density = "20k", initial_state = initial_state)
+    return AdaptiveSimulationEngine.simulate_protocol(scenario)
+end
+
+function _optional_finite(row, name)
+    name in propertynames(row) || return nothing
+    value = row[name]
+    return ismissing(value) || !isfinite(Float64(value)) ? nothing : Float64(value)
+end
+
+function _tournament_control_config(package_root, winner_package)
+    config = A2780AdaptiveAdapter.load_a2780_adaptive_config(package_root)
+    isdir(winner_package) || return config
+    csv_root = joinpath(winner_package, "outputs", "csv")
+    baseline_path = joinpath(csv_root, "monoculture_untreated", "untreated_group_baselines.csv")
+    stage3_path = joinpath(csv_root, "coculture_untreated", "coculture_untreated_automatic_model_ranking.csv")
+    stage4_path = joinpath(csv_root, "coculture_treated", "linked_treatment_model_ranking.csv")
+    all(isfile, (baseline_path, stage3_path, stage4_path)) || return config
+    baselines = CSV.read(baseline_path, DataFrame)
+    baseline_json = [(
+        cell_line = String(row.cell_line), density = String(row.density), model = String(row.best_model), pooling = String(row.pooling_mode),
+        r = Float64(row.r), K = Float64(row.K),
+        shape_parameter = ismissing(row.shape_parameter) ? nothing : String(row.shape_parameter),
+        shape_value = _optional_finite(row, :shape_value), theta = _optional_finite(row, :theta),
+        lag_time = _optional_finite(row, :lag_time), baranyi_q0 = _optional_finite(row, :baranyi_q0),
+        adaptation_rate = _optional_finite(row, :adaptation_rate),
+    ) for row in eachrow(baselines)]
+    stage3 = A2780AdaptiveAdapter._ranked_candidates(3, stage3_path;
+        identifiability_path = joinpath(csv_root, "coculture_untreated", "coculture_untreated_identifiability.csv"),
+        evidence_level = "conditional tournament A2780 fit")
+    stage4 = A2780AdaptiveAdapter._ranked_candidates(4, stage4_path;
+        identifiability_path = joinpath(csv_root, "coculture_treated", "linked_treatment_identifiability.csv"),
+        status_allowed = true, evidence_level = "conditional tournament A2780 linked fit")
+    stage3_winner, _ = A2780AdaptiveAdapter._winner(stage3, 3)
+    stage4_winner, _ = A2780AdaptiveAdapter._winner(stage4, 4)
+    winners = merge(config.winners, (
+        stage1 = baseline_json,
+        stage3 = A2780AdaptiveAdapter._candidate_json(stage3_winner),
+        stage4 = A2780AdaptiveAdapter._candidate_json(stage4_winner),
+    ))
+    return merge(config, (generated_from = "conditional model-tournament winner", winners = winners))
+end
+
+function _run_exploratory_staged_control(config, figure_path; max_time, seed)
+    horizon = 14.0
+    intervals = 14
+    target_dose = 1.0
+    lower_dose, upper_dose = 0.0, 1.47
+    objective = raw -> begin
+        schedule = _project_mean(Float64.(raw), target_dose, lower_dose, upper_dose)
+        result = _staged_control_simulation(config, schedule; horizon = horizon)
+        return Float64(result.observables[end][3])
+    end
+    Random.seed!(seed)
+    optimization = bboptimize(objective; SearchRange = (lower_dose, upper_dose), NumDimensions = intervals,
+        Method = :adaptive_de_rand_1_bin_radiuslimited, PopulationSize = 80,
+        MaxTime = max_time, TraceMode = :silent)
+    optimized = _project_mean(Vector{Float64}(optimization.archive_output.best_candidate), target_dose, lower_dose, upper_dose)
+    schedules = Dict(
+        "Optimized" => optimized,
+        "Constant 1 uM" => fill(target_dose, intervals),
+        "Front-loaded" => _two_level_schedule(intervals, lower_dose, upper_dose, target_dose; front = true),
+        "Back-loaded" => _two_level_schedule(intervals, lower_dose, upper_dose, target_dose; front = false),
+        "Pulsed" => _project_mean([isodd(index) ? upper_dose : lower_dose for index in 1:intervals], target_dose, lower_dose, upper_dose),
+    )
+    results = Dict(name => _staged_control_simulation(config, schedule; horizon = horizon) for (name, schedule) in schedules)
+    rows = NamedTuple[]
+    trajectories = NamedTuple[]
+    for name in ("Optimized", "Constant 1 uM", "Front-loaded", "Back-loaded", "Pulsed")
+        result = results[name]
+        naive = Float64[observable[1] for observable in result.observables]
+        cis = Float64[observable[2] for observable in result.observables]
+        total = Float64[observable[3] for observable in result.observables]
+        push!(rows, (schedule = name, final_total = total[end], final_A2780Naive = naive[end], final_total_A2780cis = cis[end],
+            total_AUC = AdaptiveSimulationEngine._trapz(result.times, total), cis_AUC = AdaptiveSimulationEngine._trapz(result.times, cis),
+            dose_AUC = AdaptiveSimulationEngine._step_auc(result.times, result.commanded_dose),
+            daily_dose_uM = join(round.(schedules[name]; digits = 2), ", ")))
+        for index in eachindex(result.times)
+            push!(trajectories, (schedule = name, time_day = result.times[index], dose_uM = result.commanded_dose[index],
+                effective_exposure = result.effective_exposure[index], A2780Naive = naive[index], total_A2780cis = cis[index], total = total[index]))
+        end
+    end
+    palette = Dict("Optimized" => :black, "Constant 1 uM" => :royalblue, "Front-loaded" => :seagreen,
+        "Back-loaded" => :darkorange, "Pulsed" => :crimson)
+    dose_plot = plot(xlabel = "Day", ylabel = "Cisplatin (uM)", title = "Equal-dose-budget schedules", legend = :topright)
+    total_plot = plot(xlabel = "Day", ylabel = "Cell count", title = "Data-selected staged-model response", legend = :topright)
+    for name in keys(results)
+        result = results[name]
+        plot!(dose_plot, result.times, result.commanded_dose; label = name, color = palette[name], seriestype = :steppost)
+        plot!(total_plot, result.times, [observable[3] for observable in result.observables]; label = name, color = palette[name])
+    end
+    savefig(plot(dose_plot, total_plot; layout = (1, 2), size = (1300, 480)), figure_path)
+    return (metrics = DataFrame(rows), trajectories = DataFrame(trajectories))
+end
+
+function _write_four_stage_report(path, tournament_section, stage_tables, summaries, endpoint_audit, readiness, control_table, figures)
     stage_names = ["Untreated Monoculture", "Treated Monoculture", "Untreated Coculture", "Treated Coculture"]
     sections = String[]
     for i in 1:4
@@ -840,18 +947,18 @@ function _write_four_stage_report(path, tournament_section, stage_tables, summar
     end
     html = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Optimal Control One</title><style>
 :root{--ink:#172033;--muted:#596477;--line:#cbd3dd;--soft:#f4f7fa;--accent:#2457d6;--warn:#a43b56;--good:#176b3a}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:var(--ink);line-height:1.5}header,main,footer{width:min(1240px,calc(100% - 40px));margin:auto}header{padding:28px 0 18px}a{color:var(--accent)}h1{font-size:34px;margin:18px 0 4px}h2{font-size:25px;margin:0 0 12px}h3{font-size:19px;margin:22px 0 8px}section{padding:25px 0;border-top:1px solid var(--line)}p{max-width:1000px}.callout{border-left:4px solid var(--warn);padding:10px 16px;background:#fbf5f7}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}th{background:var(--soft)}.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}.toc a{border:1px solid var(--line);padding:6px 9px;text-decoration:none}.figure-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.figure-grid figure{margin:0}.figure-grid img{display:block;width:100%;height:auto;border:1px solid var(--line)}.tournament-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);margin:18px 0}.tournament-summary div{padding:12px;border-right:1px solid var(--line)}.tournament-summary div:last-child{border:0}.tournament-summary strong{display:block;font-size:18px}.path-table{min-width:1450px}.tournament details{border-top:1px solid var(--line);padding:12px 0}.tournament small{color:var(--muted)}footer{padding:24px 0 40px;color:var(--muted)}@media(max-width:800px){header,main,footer{width:min(100% - 24px,1240px)}.figure-grid{grid-template-columns:1fr}.tournament-summary{grid-template-columns:1fr 1fr}.tournament-summary div:nth-child(2){border-right:0}h1{font-size:28px}}
-</style></head><body><header><a href="../../../../index.html">&#8592; Back</a><h1>Optimal Control One</h1><p>Conditional model selection, four-stage validation, and optimal-control readiness for A2780.</p><nav class="toc"><a href="#tournament">Model tournament</a><a href="#stage1">Stage 1</a><a href="#stage2">Stage 2</a><a href="#stage3">Stage 3</a><a href="#stage4">Stage 4</a><a href="#endpoint">Endpoint audit</a><a href="#decision">Control decision</a></nav></header><main>
+</style></head><body><header><a href="../../../../index.html">&#8592; Back</a><h1>Optimal Control One</h1><p>Conditional model selection, four-stage validation, and exploratory optimal control for A2780.</p><nav class="toc"><a href="#tournament">Model tournament</a><a href="#stage1">Stage 1</a><a href="#stage2">Stage 2</a><a href="#stage3">Stage 3</a><a href="#stage4">Stage 4</a><a href="#endpoint">Endpoint audit</a><a href="#control">Optimal control</a></nav></header><main>
 $(tournament_section)
 <section><div class="callout"><strong>Why the previous validation failed:</strong> the 1.0 &micro;M trajectory is not intermediate between 0.67 and 1.47 &micro;M, so endpoint-only dose interpolation is unsupported. This report now audits the complete inherited four-stage workflow and does not use that failed interpolation as evidence.</div></section>
 <section><h2>How To Read The Audit</h2><p><strong>BIC</strong> balances fit against the number of free parameters; lower is better. <strong>Delta BIC</strong> is measured from the lowest BIC in the same stage and lineage group. <strong>Median and worst nRMSE</strong> divide trajectory RMSE by that trajectory's largest observed count, making shape errors comparable across seeding densities. These nRMSE values describe reproduction of fitted data and are not held-out prediction errors. <strong>Boundary</strong> marks a parameter at or near an allowed limit. <strong>Eligible</strong> means the staged workflow permits inheritance; an ineligible low-BIC model is shown for comparison but is not carried forward.</p></section>
 $(join(sections, "\n"))
 <section id="endpoint"><h2>Stage 4 Candidate Endpoint Audit</h2><p>Every linked treated-coculture candidate is checked against the same 12 day-14 bootstrap intervals. High endpoint coverage cannot rescue an ineligible inheritance model, but it can reveal whether the BIC winner generalizes poorly.</p>$(_table_html(first(endpoint_audit, min(12, nrow(endpoint_audit)))))</section>
-<section id="decision"><h2>Optimal-Control Readiness</h2><div class="callout"><strong>Optimal control is gated off.</strong> No current four-stage model meets the explicit provisional validation requirements. Running an optimizer would produce a mathematically optimal schedule for an inadequately validated model, not a reliable experimental schedule.</div>$(_table_html(readiness))<h3>What would unlock control</h3><ul><li>Predeclare held-out wells, one density, or one mixture before refitting.</li><li>Add doses around 1.0 &micro;M to resolve the non-monotone response.</li><li>Provisionally require at least 10 of 12 treated-coculture endpoints inside bootstrap 95% intervals; calibrate this threshold before prospective validation.</li><li>Require a boundary-free inherited Stage 4 winner and acceptable lineage-specific residuals.</li></ul></section>
+<section id="control"><h2>Exploratory Optimal Control</h2><div class="callout"><strong>The optimizer was run despite incomplete validation.</strong> The result is the mathematical optimum found for the selected fitted model under the stated constraints. It is a hypothesis for comparing schedules, not a validated experimental optimum.</div><p>The search minimizes the day-14 total population for the tournament-selected staged model. Dose is piecewise constant in 14 daily intervals, constrained to 0-1.47 &micro;M, and every schedule has the same 14 &micro;M-day commanded-dose budget as constant 1 &micro;M treatment. The initial condition is the measured 20k, 50:50 day-zero composition: 33.5 A2780Naive and 33.5 total A2780cis cells in the image-analysis scale.</p>$(_table_html(control_table))<div class="figure-grid"><figure><img src="$(figures["control"])" alt="Exploratory equal-budget optimal-control schedules and model responses"></figure></div><h3>Why The Parameters Are Not Yet Reliable</h3><ul><li>The selected Stage 4 model covers only 3 of 12 treated-coculture day-14 bootstrap intervals.</li><li>No complete density, mixture, dose, or experiment was prospectively reserved before model selection.</li><li>Several inherited parameters sit at or near fitting limits, including treatment-effect amplitudes, activation rate, onset time, and the Stage 3 loss model.</li><li>The narrow residual-bootstrap ranges show repeated convergence to the same constrained solution; they do not repair the poor endpoint coverage or test structural model error.</li><li>The 1.0 &micro;M response is not intermediate between 0.67 and 1.47 &micro;M, so a smooth dose-response assumption can mis-rank schedules that spend time between measured doses.</li></ul><h3>Validation Status</h3>$(_table_html(readiness))<h3>Alternatives To Test</h3><ul><li>Optimize each well-supported complete model path and report schedule disagreement as model uncertainty.</li><li>Restrict controls to the measured dose set 0, 0.67, 1.0, and 1.47 &micro;M instead of continuous interpolation.</li><li>Use robust optimization against bootstrap and alternate-model ensembles rather than one parameter vector.</li><li>Collect an independent mixture, density, or treatment sequence and compare predictions without refitting.</li></ul></section>
 </main><footer>Generated from the staged Julia ranking, inheritance, overlay, and bootstrap artifacts.</footer></body></html>"""
     mkpath(dirname(path)); write(path, html); return path
 end
 
-function _run_four_stage_workflow!(; start)
+function _run_four_stage_workflow!(; start, control_seconds, seed)
     package_root = isdir(joinpath(start, "src")) ? start : normpath(joinpath(start, ".."))
     repository_root = normpath(joinpath(package_root, "..", "..")); csv_root = joinpath(package_root, "outputs", "csv")
     output_root = joinpath(csv_root, "optimal_control_one"); figure_root = joinpath(output_root, "figures"); mkpath(figure_root)
@@ -880,9 +987,9 @@ function _run_four_stage_workflow!(; start)
     end
     inherited_boundary_pass = isempty(inherited_boundary_labels)
     inherited_boundary_evidence = inherited_boundary_pass ? "no selected stage winner has a boundary flag" : join(inherited_boundary_labels, "; ")
-    readiness = DataFrame(criterion = ["All four inherited winners eligible", "All inherited winners boundary-free", "Independent held-out environment", "Stage 4 endpoint coverage >= 10/12", "Stage 4 winner boundary-free", "Overall control-ready"],
+    readiness = DataFrame(criterion = ["All four inherited winners eligible", "All inherited winners boundary-free", "Independent held-out environment", "Stage 4 endpoint coverage >= 10/12", "Stage 4 winner boundary-free", "Overall validation-ready"],
         passed = [inheritance_pass, inherited_boundary_pass, heldout_available, coverage_pass, boundary_pass, false],
-        evidence = ["staged status exports", inherited_boundary_evidence, "no predeclared held-out environment was exported", "$(winner_audit.endpoints_inside_95CI)/$(winner_audit.endpoints_tested) endpoints inside bootstrap intervals", winner_audit.boundary ? "winner is boundary-limited" : "no boundary flag", "optimal control not run"])
+        evidence = ["staged status exports", inherited_boundary_evidence, "no predeclared held-out environment was exported", "$(winner_audit.endpoints_inside_95CI)/$(winner_audit.endpoints_tested) endpoints inside bootstrap intervals", winner_audit.boundary ? "winner is boundary-limited" : "no boundary flag", "exploratory optimizer run; model remains unvalidated"])
     CSV.write(joinpath(output_root, "four_stage_model_audit.csv"), vcat(stage_tables...; cols = :union)); CSV.write(joinpath(output_root, "four_stage_reproduction_summary.csv"), vcat(summaries...)); CSV.write(joinpath(output_root, "stage4_endpoint_model_audit.csv"), endpoint_audit); CSV.write(joinpath(output_root, "control_readiness.csv"), readiness)
     figures = Dict{String,String}()
     for i in 1:4
@@ -892,18 +999,28 @@ function _run_four_stage_workflow!(; start)
     end
     tournament_output = joinpath(package_root, "outputs", "model_path_tournament")
     tournament_section = ModelPathTournament.tournament_report_section(tournament_output)
-    _write_four_stage_report(report_path, tournament_section, stage_tables, summaries, endpoint_audit, readiness, figures)
-    stale = ("control_metrics.csv", "control_trajectories.csv", "fitted_trajectories.csv", "heldout_validation.csv", "model_selection.csv", "selected_parameters.csv")
+    tournament_ranking = CSV.read(joinpath(tournament_output, "complete_path_ranking.csv"), DataFrame)
+    winner_workspace = String(tournament_ranking.workspace[1])
+    winner_package = joinpath(winner_workspace, "Modeling_Approaches", "02_mechanical_automatic_package")
+    control_config_root = isdir(winner_package) ? winner_package : package_root
+    control_config = _tournament_control_config(package_root, control_config_root)
+    control_path = joinpath(figure_root, "exploratory_staged_control.png")
+    control = _run_exploratory_staged_control(control_config, control_path; max_time = control_seconds, seed = seed)
+    CSV.write(joinpath(output_root, "control_metrics.csv"), control.metrics)
+    CSV.write(joinpath(output_root, "control_trajectories.csv"), control.trajectories)
+    figures["control"] = "../csv/optimal_control_one/figures/exploratory_staged_control.png"
+    _write_four_stage_report(report_path, tournament_section, stage_tables, summaries, endpoint_audit, readiness, control.metrics, figures)
+    stale = ("fitted_trajectories.csv", "heldout_validation.csv", "model_selection.csv", "selected_parameters.csv")
     stale_figures = ("a2780_data.png", "control_comparison.png", "dose_fits.png", "heldout_validation.png", "model_comparison.png", "optimized_composition.png",
         "stage1_bic.png", "stage2_bic.png", "stage3_bic.png", "stage4_bic.png")
     for name in stale; rm(joinpath(output_root, name); force = true); rm(joinpath(docs_output, name); force = true); end
     for name in stale_figures; rm(joinpath(figure_root, name); force = true); rm(joinpath(docs_output, "figures", name); force = true); end
     mkpath(dirname(docs_report)); mkpath(docs_output); cp(report_path, docs_report; force = true); cp(output_root, docs_output; force = true)
-    return (report = report_path, docs_report = docs_report, output = output_root, control_ready = false, readiness = readiness)
+    return (report = report_path, docs_report = docs_report, output = output_root, control_ready = false, control_run = true, readiness = readiness, control_table = control.metrics)
 end
 
 function run_optimal_control_one!(; start = @__DIR__, fit_seconds = 8.0, control_seconds = 20.0, seed = 5113)
-    return _run_four_stage_workflow!(; start = start)
+    return _run_four_stage_workflow!(; start = start, control_seconds = control_seconds, seed = seed)
     package_root = isdir(joinpath(start, "src")) ? start : normpath(joinpath(start, ".."))
     repository_root = normpath(joinpath(package_root, "..", ".."))
     output_root = joinpath(package_root, "outputs", "csv", "optimal_control_one")
