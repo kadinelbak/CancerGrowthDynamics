@@ -1,6 +1,7 @@
 module OptimalControlOne
 
 using ..IOUtils: TREATED_MONOCULTURE_IC_DOSE_MAP
+using ..ModelPathTournament
 using BlackBoxOptim
 using CSV
 using DataFrames
@@ -830,7 +831,7 @@ function _save_stage_bic(table, path, title)
     savefig(p, path)
 end
 
-function _write_four_stage_report(path, stage_tables, summaries, endpoint_audit, readiness, figures)
+function _write_four_stage_report(path, tournament_section, stage_tables, summaries, endpoint_audit, readiness, figures)
     stage_names = ["Untreated Monoculture", "Treated Monoculture", "Untreated Coculture", "Treated Coculture"]
     sections = String[]
     for i in 1:4
@@ -838,8 +839,9 @@ function _write_four_stage_report(path, stage_tables, summaries, endpoint_audit,
         push!(sections, "<section id=\"stage$i\"><h2>Stage $i: $(stage_names[i])</h2><p>$validation_text</p>$(_table_html(stage_tables[i]))<div class=\"figure-grid\"><figure><img src=\"$(figures["stage$(i)_bic"])\" alt=\"Stage $i BIC ranking\"></figure><figure><img src=\"$(figures["stage$(i)_fit"])\" alt=\"Stage $i observed versus predicted\"></figure></div>$(_table_html(summaries[i]))</section>")
     end
     html = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Optimal Control One</title><style>
-:root{--ink:#172033;--muted:#596477;--line:#cbd3dd;--soft:#f4f7fa;--accent:#2457d6;--warn:#a43b56;--good:#176b3a}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:var(--ink);line-height:1.5}header,main,footer{width:min(1240px,calc(100% - 40px));margin:auto}header{padding:28px 0 18px}a{color:var(--accent)}h1{font-size:34px;margin:18px 0 4px}h2{font-size:25px;margin:0 0 12px}section{padding:25px 0;border-top:1px solid var(--line)}p{max-width:1000px}.callout{border-left:4px solid var(--warn);padding:10px 16px;background:#fbf5f7}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}th,td{border:1px solid var(--line);padding:7px 9px;text-align:left}th{background:var(--soft)}.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}.toc a{border:1px solid var(--line);padding:6px 9px;text-decoration:none}.figure-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.figure-grid figure{margin:0}.figure-grid img{display:block;width:100%;height:auto;border:1px solid var(--line)}footer{padding:24px 0 40px;color:var(--muted)}@media(max-width:800px){header,main,footer{width:min(100% - 24px,1240px)}.figure-grid{grid-template-columns:1fr}h1{font-size:28px}}
-</style></head><body><header><a href="../../../../index.html">&#8592; Back</a><h1>Optimal Control One</h1><p>Four-stage A2780 model audit before optimal control.</p><nav class="toc"><a href="#stage1">Stage 1</a><a href="#stage2">Stage 2</a><a href="#stage3">Stage 3</a><a href="#stage4">Stage 4</a><a href="#endpoint">Endpoint audit</a><a href="#decision">Control decision</a></nav></header><main>
+:root{--ink:#172033;--muted:#596477;--line:#cbd3dd;--soft:#f4f7fa;--accent:#2457d6;--warn:#a43b56;--good:#176b3a}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:var(--ink);line-height:1.5}header,main,footer{width:min(1240px,calc(100% - 40px));margin:auto}header{padding:28px 0 18px}a{color:var(--accent)}h1{font-size:34px;margin:18px 0 4px}h2{font-size:25px;margin:0 0 12px}h3{font-size:19px;margin:22px 0 8px}section{padding:25px 0;border-top:1px solid var(--line)}p{max-width:1000px}.callout{border-left:4px solid var(--warn);padding:10px 16px;background:#fbf5f7}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}th{background:var(--soft)}.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}.toc a{border:1px solid var(--line);padding:6px 9px;text-decoration:none}.figure-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.figure-grid figure{margin:0}.figure-grid img{display:block;width:100%;height:auto;border:1px solid var(--line)}.tournament-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);margin:18px 0}.tournament-summary div{padding:12px;border-right:1px solid var(--line)}.tournament-summary div:last-child{border:0}.tournament-summary strong{display:block;font-size:18px}.path-table{min-width:1450px}.tournament details{border-top:1px solid var(--line);padding:12px 0}.tournament small{color:var(--muted)}footer{padding:24px 0 40px;color:var(--muted)}@media(max-width:800px){header,main,footer{width:min(100% - 24px,1240px)}.figure-grid{grid-template-columns:1fr}.tournament-summary{grid-template-columns:1fr 1fr}.tournament-summary div:nth-child(2){border-right:0}h1{font-size:28px}}
+</style></head><body><header><a href="../../../../index.html">&#8592; Back</a><h1>Optimal Control One</h1><p>Conditional model selection, four-stage validation, and optimal-control readiness for A2780.</p><nav class="toc"><a href="#tournament">Model tournament</a><a href="#stage1">Stage 1</a><a href="#stage2">Stage 2</a><a href="#stage3">Stage 3</a><a href="#stage4">Stage 4</a><a href="#endpoint">Endpoint audit</a><a href="#decision">Control decision</a></nav></header><main>
+$(tournament_section)
 <section><div class="callout"><strong>Why the previous validation failed:</strong> the 1.0 &micro;M trajectory is not intermediate between 0.67 and 1.47 &micro;M, so endpoint-only dose interpolation is unsupported. This report now audits the complete inherited four-stage workflow and does not use that failed interpolation as evidence.</div></section>
 <section><h2>How To Read The Audit</h2><p><strong>BIC</strong> balances fit against the number of free parameters; lower is better. <strong>Delta BIC</strong> is measured from the lowest BIC in the same stage and lineage group. <strong>Median and worst nRMSE</strong> divide trajectory RMSE by that trajectory's largest observed count, making shape errors comparable across seeding densities. These nRMSE values describe reproduction of fitted data and are not held-out prediction errors. <strong>Boundary</strong> marks a parameter at or near an allowed limit. <strong>Eligible</strong> means the staged workflow permits inheritance; an ineligible low-BIC model is shown for comparison but is not carried forward.</p></section>
 $(join(sections, "\n"))
@@ -888,7 +890,9 @@ function _run_four_stage_workflow!(; start)
         _save_stage_bic(stage_tables[i], bic_path, "Stage $i model comparison"); _save_stage_diagnostic(selected[i], fit_path, "Stage $i selected-model reproduction")
         figures["stage$(i)_bic"] = "../csv/optimal_control_one/figures/stage$(i)_bic.svg"; figures["stage$(i)_fit"] = "../csv/optimal_control_one/figures/stage$(i)_fit.png"
     end
-    _write_four_stage_report(report_path, stage_tables, summaries, endpoint_audit, readiness, figures)
+    tournament_output = joinpath(package_root, "outputs", "model_path_tournament")
+    tournament_section = ModelPathTournament.tournament_report_section(tournament_output)
+    _write_four_stage_report(report_path, tournament_section, stage_tables, summaries, endpoint_audit, readiness, figures)
     stale = ("control_metrics.csv", "control_trajectories.csv", "fitted_trajectories.csv", "heldout_validation.csv", "model_selection.csv", "selected_parameters.csv")
     stale_figures = ("a2780_data.png", "control_comparison.png", "dose_fits.png", "heldout_validation.png", "model_comparison.png", "optimized_composition.png",
         "stage1_bic.png", "stage2_bic.png", "stage3_bic.png", "stage4_bic.png")

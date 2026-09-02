@@ -14,4 +14,9 @@ using Test
     @test issorted(beam.stage1_bic)
     @test all(isfinite, beam.stage1_bic)
     @test any(beam.simple_path)
+
+    section = tournament.tournament_report_section(joinpath(package_root, "outputs", "model_path_tournament"))
+    @test contains(section, "Conditional Model Tournament")
+    @test contains(section, "Stage 2 A2780Naive")
+    @test contains(section, "Blocked validation")
 end

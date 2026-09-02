@@ -8,7 +8,7 @@ using JSON3
 using ..IOUtils
 using ..HybridRefitService
 
-export TournamentConfig, stage1_beam, run_model_path_tournament!
+export TournamentConfig, stage1_beam, tournament_report_section, run_model_path_tournament!
 
 Base.@kwdef struct TournamentConfig
     candidates_per_lineage::Int = 3
@@ -212,26 +212,48 @@ function _validation_html(output)
     return blocked * bootstrap
 end
 
-function _report_html(results, config, generated, output)
+function _report_section(results, config, generated, output)
     rows = join([
         "<tr><td>$(index)</td><td>$(_escape(row.naive_model))<br><small>$(_escape(row.naive_pooling))</small></td>" *
         "<td>$(_escape(row.cis_model))<br><small>$(_escape(row.cis_pooling))</small></td>" *
+        "<td>$(_escape(row.naive_stage2_model))<br><small>$(_escape(row.naive_stage2_pooling))</small></td>" *
+        "<td>$(_escape(row.cis_stage2_model))<br><small>$(_escape(row.cis_stage2_pooling))</small></td>" *
         "<td>$(_escape(row.stage3_model))</td><td>$(_escape(row.stage4_model))</td>" *
         "<td>$(_fmt(row.cumulative_path_score))</td><td>$(row.boundary_count)</td></tr>"
         for (index, row) in enumerate(eachrow(results))
     ], "\n")
+    return """<section id="tournament" class="tournament"><h2>Conditional Model Tournament</h2>
+<p>Each retained Stage 1 lineage pair was carried into fresh Stage 2 and Stage 3 fits. The compatible winners were then inherited by a fresh linked Stage 4 fit. This is a conditional refit, not a visual substitution of previously exported curves.</p>
+<div class="tournament-summary"><div><small>Complete paths</small><strong>$(nrow(results))</strong></div><div><small>Starts per fit</small><strong>$(config.multistarts)</strong></div><div><small>Winner bootstrap refits</small><strong>$(config.bootstrap_replicates)</strong></div><div><small>Generated</small><strong>$(generated)</strong></div></div>
+<h3>Retained Complete Paths</h3><div class="table-wrap"><table class="path-table"><thead><tr><th>Rank</th><th>Stage 1 A2780Naive</th><th>Stage 1 A2780cis</th><th>Stage 2 A2780Naive</th><th>Stage 2 A2780cis</th><th>Stage 3</th><th>Stage 4</th><th>Cumulative path score</th><th>Boundary flags</th></tr></thead><tbody>$(rows)</tbody></table></div>
+<h3>How To Read The Score</h3><p>Every stage retains its own BIC. The cumulative path score is the sum used to prune the beam and compare complete inheritance paths. It is not a new global BIC because fitted datasets and inherited information overlap across stages. Smaller values are favored only as a tournament heuristic.</p>
+<h3>Fitting Tournament</h3><p>Stages 1-3, linked Stage 4 finalists, and the winning complete chain use $(config.multistarts) deterministic dispersed starts. The broad legacy treated-coculture diagnostic sweep uses three-start successive-halving screening before compatible finalists receive the full budget. Delayed and stiff candidates use bounded Nelder-Mead; smooth candidates can be refined with bounded BFGS. GrowthParameterEstimation records failed starts, boundary profiles, fitted parameters, and prediction artifacts in each path workspace.</p>
+<details><summary><strong>Compatibility and screening limits</strong></summary><p>The current population-balance Stage 4 implementation requires delayed Hill-ramp A2780Naive treatment, a sensitive/tolerant A2780cis treatment model, and an LV competition equation. Other Stage 2 and Stage 3 candidates remain in the stage ranking tables but are not silently forced into an incompatible Stage 4 state system. The two seven-parameter interaction-scaled transit diagnostics remain available in the ordinary staged analysis, but are excluded from repeated beam-path refits after exceeding the per-candidate screening budget; the simpler additive transit model remains in the tournament.</p></details>
+<h3>Validation Of The Winning Path</h3><p>Boundary counts are shown above. The winning complete path receives a within-trajectory residual bootstrap with complete model refitting. Density, dose, mixture, and context blocks are also withheld and refitted in turn. These are distinct from endpoint well-resampling.</p>$(_validation_html(output))
+</section>"""
+end
+
+"Render the latest saved conditional tournament as an embeddable report section."
+function tournament_report_section(output)
+    ranking_path = joinpath(output, "complete_path_ranking.csv")
+    manifest_path = joinpath(output, "tournament_manifest.json")
+    isfile(ranking_path) || error("Missing conditional tournament ranking: $ranking_path")
+    isfile(manifest_path) || error("Missing conditional tournament manifest: $manifest_path")
+    manifest = JSON3.read(read(manifest_path, String))
+    config = (
+        multistarts = Int(manifest.config.multistarts),
+        bootstrap_replicates = Int(manifest.config.bootstrap_replicates),
+    )
+    return _report_section(CSV.read(ranking_path, DataFrame), config, String(manifest.generated_at), output)
+end
+
+function _report_html(results, config, generated, output)
     return """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>A2780 conditional model-path tournament</title>
-<style>:root{--ink:#172033;--muted:#5b6472;--line:#cbd3df;--soft:#f3f6fa;--accent:#3156d3}*{box-sizing:border-box}body{margin:0;font:16px/1.5 "Segoe UI",Arial,sans-serif;color:var(--ink)}main{width:min(1180px,calc(100% - 32px));margin:auto;padding:24px 0 64px}a{color:var(--accent)}h1{font-size:30px;margin:22px 0 8px;letter-spacing:0}h2{font-size:21px;margin:30px 0 8px;letter-spacing:0}p{max-width:920px;color:var(--muted)}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);margin:22px 0}.summary div{padding:14px;border-right:1px solid var(--line)}.summary div:last-child{border:0}.summary strong{display:block;font-size:22px}.table{overflow:auto;border:1px solid var(--line)}table{border-collapse:collapse;width:100%;min-width:900px}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{background:var(--soft);font-size:13px}tr:first-child td{font-weight:650;background:#f7f9ff}small{color:var(--muted)}details{border-top:1px solid var(--line);padding:14px 0}code{font-size:13px}@media(max-width:700px){.summary{grid-template-columns:1fr 1fr}.summary div:nth-child(2){border-right:0}}</style>
-</head><body><main><a href="../../../../index.html">&larr; Back</a><h1>Conditional Model-Path Tournament</h1>
-<p>Each retained Stage 1 lineage pair was carried into fresh Stage 2 and Stage 3 fits. The compatible winners were then inherited by a fresh linked Stage 4 fit. This is a conditional refit, not a visual substitution of previously exported curves.</p>
-<div class="summary"><div><small>Complete paths</small><strong>$(nrow(results))</strong></div><div><small>Starts per fit</small><strong>$(config.multistarts)</strong></div><div><small>Winner bootstrap refits</small><strong>$(config.bootstrap_replicates)</strong></div><div><small>Generated</small><strong>$(generated)</strong></div></div>
-<h2>Retained Complete Paths</h2><div class="table"><table><thead><tr><th>Rank</th><th>Stage 1 A2780Naive</th><th>Stage 1 A2780cis</th><th>Stage 3</th><th>Stage 4</th><th>Cumulative path score</th><th>Boundary flags</th></tr></thead><tbody>$(rows)</tbody></table></div>
-<h2>How To Read The Score</h2><p>Every stage retains its own BIC. The cumulative path score is the sum used to prune the beam and compare complete inheritance paths. It is not a new global BIC because fitted datasets and inherited information overlap across stages. Smaller values are favored only as a tournament heuristic.</p>
-<h2>Fitting Tournament</h2><p>Stages 1-3, linked Stage 4 finalists, and the winning complete chain use $(config.multistarts) deterministic dispersed starts. The broad legacy treated-coculture diagnostic sweep uses three-start successive-halving screening before compatible finalists receive the full budget. Delayed and stiff candidates use bounded Nelder-Mead; smooth candidates can be refined with bounded BFGS. GrowthParameterEstimation records failed starts, boundary profiles, fitted parameters, and prediction artifacts in each path workspace.</p>
-<details><summary><strong>Compatibility and screening limits</strong></summary><p>The current population-balance Stage 4 implementation requires delayed Hill-ramp A2780Naive treatment, a sensitive/tolerant A2780cis treatment model, and an LV competition equation. Other Stage 2 and Stage 3 candidates remain in the stage ranking tables but are not silently forced into an incompatible Stage 4 state system. The two seven-parameter interaction-scaled transit diagnostics remain available in the ordinary staged analysis, but are excluded from repeated beam-path refits after exceeding the per-candidate screening budget; the simpler additive transit model remains in the tournament.</p></details>
-<h2>Validation</h2><p>Boundary counts are shown above. The winning complete path receives a within-trajectory residual bootstrap with complete model refitting. Density, dose, mixture, and context blocks are also withheld and refitted in turn. These are distinct from endpoint well-resampling.</p>$(_validation_html(output))
+<meta http-equiv="refresh" content="0; url=optimal_control_one.html#tournament">
+<link rel="canonical" href="optimal_control_one.html#tournament"><title>Conditional Model Tournament</title>
+<style>body{font:16px/1.5 "Segoe UI",Arial,sans-serif;color:#172033;margin:32px}a{color:#3156d3}</style>
+</head><body><main><p>The conditional model tournament is now the first part of <a href="optimal_control_one.html#tournament">Optimal Control One</a>.</p>
 </main></body></html>"""
 end
 

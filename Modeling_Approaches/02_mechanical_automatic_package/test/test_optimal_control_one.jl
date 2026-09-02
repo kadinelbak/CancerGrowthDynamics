@@ -62,6 +62,8 @@ using DataFrames
     @test audited.median_nRMSE[2] > audited.median_nRMSE[1]
 
     report = read(normpath(joinpath(@__DIR__, "..", "outputs", "reports", "optimal_control_one.html")), String)
+    @test contains(report, "Conditional Model Tournament")
+    @test findfirst("Conditional Model Tournament", report) < findfirst("Stage 1: Untreated Monoculture", report)
     @test all(contains(report, "Stage $stage:") for stage in 1:4)
     @test contains(report, "Optimal control is gated off")
     @test contains(report, "Stage 4 Candidate Endpoint Audit")
