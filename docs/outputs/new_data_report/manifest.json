@@ -1,0 +1,178 @@
+[
+  {
+    "file": "A2780_IC25_1.47um_30k.csv",
+    "classification": "Mono-culture treated, IC25",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "A2780_IC50_1um_30k.csv",
+    "classification": "Mono-culture treated, IC50",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "A2780_IC75_0.62um_30k.csv",
+    "classification": "Mono-culture treated, IC75",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "A2780_Untreated_30k 1.csv",
+    "classification": "Mono-culture untreated",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "A2780cis_IC25_1.47um_30k.csv",
+    "classification": "Mono-culture treated, IC25",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "A2780cis_IC50_1um_30k.csv",
+    "classification": "Mono-culture treated, IC50",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "A2780cis_IC75_0.62um_30k.csv",
+    "classification": "Mono-culture treated, IC75",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "A2780cis_Untreated_30k.csv",
+    "classification": "Mono-culture untreated",
+    "sheet_count": 1,
+    "sheets": [
+      "CSV"
+    ]
+  },
+  {
+    "file": "ALL A2780-cis LR data.xlsx",
+    "classification": "Low-resource workbook",
+    "sheet_count": 22,
+    "sheets": [
+      "1 - A2780 20k 1-3",
+      "1 - A2780cis 20k 1-3",
+      "1 - A2780 30k 1-3",
+      "1 - A2780cis 30k 1-3",
+      "1 - A2780 20k 1-1",
+      "1 - A2780cis 20k 1-1",
+      "1 - A2780 30k 1-1",
+      "1 - A2780cis 30k 1-1",
+      "1 - A2780 20k 3-1",
+      "1 - A2780cis 20k 3-1",
+      "1 - A2780 30k 3-1",
+      "1 - A2780cis 30k 3-1",
+      "1 - mono A2780 20k",
+      "1 - mono A2780cis 20k",
+      "1 - mono A2780 30k",
+      "1 - mono A2780cis 30k",
+      "2 - A2780 30k 1-3",
+      "2 - A2780cis 30k 1-3",
+      "2 - A2780 30k 1-1",
+      "2 - A2780cis 30k 1-1",
+      "2 - A2780 30k 3-1",
+      "2 - A2780cis 30k 3-1"
+    ]
+  },
+  {
+    "file": "ALL Tyknu-cpr LR data.xlsx",
+    "classification": "Low-resource workbook",
+    "sheet_count": 22,
+    "sheets": [
+      "1 - Tyknu 30k 1-3",
+      "1 - Tyknu-cpr 30k 1-3",
+      "1 - Tyknu 40k 1-3",
+      "1 - Tyknu-cpr 40k 1-3",
+      "1 - Tyknu 30k 1-1",
+      "1 - Tyknu-cpr 30k 1-1",
+      "1 - Tyknu 40k 1-1",
+      "1 - Tyknu-cpr 40k 1-1",
+      "1 - Tyknu 30k 3-1",
+      "1 - Tyknu-cpr 30k 3-1",
+      "1 - Tyknu 40k 3-1",
+      "1 - Tyknu-cpr 40k 3-1",
+      "1 - mono Tyknu 30k",
+      "1 - mono Tyknu-cpr 30k",
+      "1 - mono Tyknu 40k",
+      "1 - mono Tyknu-cpr 40k",
+      "2 - Tyknu 40k 1-3",
+      "2 - Tyknu-cpr 40k 1-3",
+      "2 - Tyknu 40k 1-1",
+      "2 - Tyknu-cpr 40k 1-1",
+      "2 - Tyknu 40k 3-1",
+      "2 - Tyknu-cpr 40k 3-1"
+    ]
+  },
+  {
+    "file": "ce0_25S75R.xlsx",
+    "classification": "Co-culture untreated (ce0)",
+    "sheet_count": 2,
+    "sheets": [
+      "25Sensitive_Untreated",
+      "75Resistant_Untreated"
+    ]
+  },
+  {
+    "file": "ce0_50S50R.xlsx",
+    "classification": "Co-culture untreated (ce0)",
+    "sheet_count": 2,
+    "sheets": [
+      "50Sensitive_Untreated",
+      "50Resistant_Untreated"
+    ]
+  },
+  {
+    "file": "ce0_75S25R.xlsx",
+    "classification": "Co-culture untreated (ce0)",
+    "sheet_count": 2,
+    "sheets": [
+      "75Sensitive_Untreated",
+      "25Resistant_Untreated"
+    ]
+  },
+  {
+    "file": "ce1_25S75R.xlsx",
+    "classification": "Co-culture treated at IC50, 1 uM (ce1)",
+    "sheet_count": 2,
+    "sheets": [
+      "25Sensitive_Treated",
+      "75Resistant_Treated"
+    ]
+  },
+  {
+    "file": "ce1_50S50R.xlsx",
+    "classification": "Co-culture treated at IC50, 1 uM (ce1)",
+    "sheet_count": 2,
+    "sheets": [
+      "50Sensitive_Treated",
+      "50Resistant_Treated"
+    ]
+  },
+  {
+    "file": "ce1_75S25R.xlsx",
+    "classification": "Co-culture treated at IC50, 1 uM (ce1)",
+    "sheet_count": 2,
+    "sheets": [
+      "75Sensitive_Treated",
+      "25Resistant_Treated"
+    ]
+  }
+]
