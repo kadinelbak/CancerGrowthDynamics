@@ -76,6 +76,33 @@ function kind_and_notes(file, sheet)
     end
 end
 
+function record(section, title, notes, sources)
+    (section=section, title=title, notes=notes, sources=sources)
+end
+
+function series(file, sheet, df, label)
+    (file=file, sheet=sheet, df=df, label=label)
+end
+
+function ratio_label(sheet)
+    m = match(r"(\d-\d)", sheet)
+    m === nothing ? "matched coculture" : "sensitive:resistant $(m.captures[1])"
+end
+
+function counterpart(sheet)
+    lower = lowercase(sheet)
+    if occursin("a2780cis", lower)
+        return replace(sheet, "A2780cis" => "A2780")
+    elseif occursin("a2780", lower)
+        return replace(sheet, "A2780" => "A2780cis")
+    elseif occursin("tyknu-cpr", lower)
+        return replace(sheet, "Tyknu-cpr" => "Tyknu")
+    elseif occursin("tyknu", lower)
+        return replace(sheet, "Tyknu" => "Tyknu-cpr")
+    end
+    nothing
+end
+
 function read_sources()
     records = NamedTuple[]
     files = sort(filter(f -> endswith(lowercase(f), ".csv") || endswith(lowercase(f), ".xlsx"), readdir(DATA_DIR)))
@@ -84,38 +111,81 @@ function read_sources()
         if endswith(lowercase(file), ".csv")
             df = tidy(CSV.read(path, DataFrame; silencewarnings=true))
             df === nothing && continue
-            kind, notes = kind_and_notes(file, "CSV")
-            push!(records, (file=file, sheet="CSV", kind=kind, notes=notes, df=df))
+            untreated = occursin("untreated", lowercase(file))
+            section = untreated ? "untreated" : "treated"
+            kind = untreated ? "Mono-culture untreated" : "Mono-culture treated"
+            notes = untreated ? "Mono-culture at 30,000 cells/mL; untreated." : "Mono-culture at 30,000 cells/mL; treatment is stated in the filename."
+            push!(records, record(section, "$(kind): $(file) / CSV", notes, [series(file, "CSV", df, "$(file) / CSV")]))
         else
             book = XLSX.readxlsx(path)
-            for sheet in XLSX.sheetnames(book)
+            sheets = XLSX.sheetnames(book)
+            parsed = Dict{String,DataFrame}()
+            for sheet in sheets
                 df = matrix_df(book[sheet][:])
-                df === nothing && continue
-                kind, notes = kind_and_notes(file, sheet)
-                push!(records, (file=file, sheet=sheet, kind=kind, notes=notes, df=df))
+                df !== nothing && (parsed[sheet] = df)
+            end
+            if startswith(lowercase(file), "ce0_") || startswith(lowercase(file), "ce1_")
+                isempty(parsed) && continue
+                state = startswith(lowercase(file), "ce0_") ? "untreated (Ce0)" : "treated (Ce1, 1 uM IC50)"
+                notes = "Low-resource co-culture; Ce0 = untreated and Ce1 = 1 uM cisplatin at the IC50."
+                src = [series(file, s, d, s) for (s, d) in sort(collect(parsed); by=first)]
+                push!(records, record("coculture", "Co-culture $(state): $(file) / sensitive + resistant sheets", notes, src))
+            else
+                used = Set{String}()
+                for sheet in sheets
+                    haskey(parsed, sheet) && !(sheet in used) || continue
+                    df = parsed[sheet]
+                    if occursin("mono", lowercase(sheet))
+                        push!(records, record("low_resource", "Low-resource mono-culture: $(file) / $(sheet)", "Low-resource mono-culture source.", [series(file, sheet, df, sheet)]))
+                        push!(used, sheet)
+                    else
+                        other = counterpart(sheet)
+                        paired = other !== nothing && haskey(parsed, other) && !(other in used)
+                        src = paired ? [series(file, sheet, df, sheet), series(file, other, parsed[other], other)] : [series(file, sheet, df, sheet)]
+                        label = paired ? "$(ratio_label(sheet)); sensitive/naive + resistant/cis" : "$(ratio_label(sheet))"
+                        push!(records, record("low_resource", "Low-resource co-culture: $(file) / $(label)", "Low-resource co-culture; ratio is sensitive:resistant. The sensitive/naive and resistant/cis sheets are plotted together.", src))
+                        push!(used, sheet)
+                        paired && push!(used, other)
+                    end
+                end
             end
         end
     end
-    records
+    order = Dict("untreated" => 1, "treated" => 2, "coculture" => 3, "low_resource" => 4)
+    sort(records; by=r -> (order[r.section], r.title))
 end
 
-function svg_plot(df, title, subtitle)
-    x = Float64.(collect(skipmissing(df.Day)))
-    y = Float64.(collect(skipmissing(df[!, Symbol("Mean Cells")])))
-    n = min(length(x), length(y)); x = x[1:n]; y = y[1:n]
-    isempty(x) && return "<div class=\"empty\">No numeric trajectory available.</div>"
-    errcol = Symbol("SEM Cells") in propertynames(df) ? Symbol("SEM Cells") : Symbol("SD Cells")
-    e = errcol in propertynames(df) ? [ismissing(v) ? 0.0 : Float64(v) for v in df[1:n, errcol]] : zeros(n)
+function svg_plot(sources, title)
+    curves = NamedTuple[]
+    for (i, src) in enumerate(sources)
+        x = Float64.(collect(skipmissing(src.df.Day)))
+        y = Float64.(collect(skipmissing(src.df[!, Symbol("Mean Cells")])))
+        n = min(length(x), length(y)); n == 0 && continue
+        x = x[1:n]; y = y[1:n]
+        errcol = Symbol("SEM Cells") in propertynames(src.df) ? Symbol("SEM Cells") : Symbol("SD Cells")
+        e = errcol in propertynames(src.df) ? [ismissing(v) ? 0.0 : Float64(v) for v in src.df[1:n, errcol]] : zeros(n)
+        push!(curves, (x=x, y=y, e=e, label=src.label, color=["#176b87", "#d97706", "#8b5cf6", "#dc2626"][mod1(i, 4)]))
+    end
+    isempty(curves) && return "<div class=\"empty\">No numeric trajectory available.</div>"
+    xmin = minimum(minimum(c.x) for c in curves); xmax = maximum(maximum(c.x) for c in curves); xmax == xmin && (xmax = xmin + 1)
+    ymin = 0.0; ymax = max(maximum(maximum(c.y .+ c.e) for c in curves) * 1.12, 1.0)
     W, H, L, R, T, B = 760, 300, 72, 22, 28, 48
-    xmin, xmax = extrema(x); xmax == xmin && (xmax = xmin + 1)
-    ymin = 0.0; ymax = max(maximum(y .+ e) * 1.12, 1.0)
     sx(v) = L + (v - xmin) / (xmax - xmin) * (W - L - R)
     sy(v) = H - B - (v - ymin) / (ymax - ymin) * (H - T - B)
-    points = join([@sprintf("%.1f,%.1f", sx(x[i]), sy(y[i])) for i in eachindex(x)], " ")
-    bars = join([@sprintf("<line x1=\"%.1f\" x2=\"%.1f\" y1=\"%.1f\" y2=\"%.1f\"/><line x1=\"%.1f\" x2=\"%.1f\" y1=\"%.1f\" y2=\"%.1f\"/>", sx(x[i]), sx(x[i]), sy(y[i]-e[i]), sy(y[i]+e[i]), sx(x[i])-3, sx(x[i])+3, sy(y[i]-e[i]), sy(y[i]-e[i])) for i in eachindex(x)], "")
+    lines = String[]
+    bars = String[]
+    dots = String[]
+    legend = String[]
+    for c in curves
+        points = join([@sprintf("%.1f,%.1f", sx(c.x[i]), sy(c.y[i])) for i in eachindex(c.x)], " ")
+        push!(lines, "<polyline fill=\"none\" stroke=\"$(c.color)\" stroke-width=\"2.5\" points=\"$points\"/>")
+        push!(bars, join([@sprintf("<line stroke=\"%s\" stroke-width=\"1.2\" x1=\"%.1f\" x2=\"%.1f\" y1=\"%.1f\" y2=\"%.1f\"/><line stroke=\"%s\" stroke-width=\"1.2\" x1=\"%.1f\" x2=\"%.1f\" y1=\"%.1f\" y2=\"%.1f\"/>", c.color, sx(c.x[i]), sx(c.x[i]), sy(c.y[i]-c.e[i]), sy(c.y[i]+c.e[i]), c.color, sx(c.x[i])-3, sx(c.x[i])+3, sy(c.y[i]-c.e[i]), sy(c.y[i]-c.e[i])) for i in eachindex(c.x)], ""))
+        push!(dots, join([@sprintf("<circle fill=\"%s\" cx=\"%.1f\" cy=\"%.1f\" r=\"3\"/>", c.color, sx(c.x[i]), sy(c.y[i])) for i in eachindex(c.x)], ""))
+        push!(legend, "<span style=\"color:$(c.color)\">&#9679;</span> $(html_escape(c.label))")
+    end
     xticks = join([@sprintf("<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\">%.0f</text>", sx(v), H-12, v) for v in range(xmin, xmax; length=5)], "")
     yticks = join([@sprintf("<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"end\">%.0f</text><line x1=\"%d\" x2=\"%d\" y1=\"%.1f\" y2=\"%.1f\"/>", L-8, sy(v)+4, v, L, W-R, sy(v), sy(v)) for v in range(ymin, ymax; length=5)], "")
-    "<svg viewBox=\"0 0 $W $H\" role=\"img\" aria-label=\"$(html_escape(title))\"><style>text{font:12px sans-serif;fill:#344054} .grid{stroke:#e4e7ec;stroke-width:1} .axis{stroke:#667085;stroke-width:1} .err{stroke:#d97706;stroke-width:1.2} .line{fill:none;stroke:#176b87;stroke-width:2.5} .dot{fill:#176b87}</style><text x=\"$(W/2)\" y=\"16\" text-anchor=\"middle\" font-weight=\"700\">$(html_escape(title))</text><text x=\"$(W/2)\" y=\"$H\" text-anchor=\"middle\">Day</text><text transform=\"translate(14 $(H/2)) rotate(-90)\" text-anchor=\"middle\">Mean Cells</text>$yticks<line class=\"axis\" x1=\"$L\" x2=\"$(W-R)\" y1=\"$(H-B)\" y2=\"$(H-B)\"/><line class=\"axis\" x1=\"$L\" x2=\"$L\" y1=\"$T\" y2=\"$(H-B)\"/>$xticks<polyline class=\"line\" points=\"$points\"/>$bars$(join([@sprintf("<circle class=\\\"dot\\\" cx=\\\"%.1f\\\" cy=\\\"%.1f\\\" r=\\\"3\\\"/>", sx(x[i]), sy(y[i])) for i in eachindex(x)], ""))</svg>"
+    "<svg viewBox=\"0 0 $W $H\" role=\"img\" aria-label=\"$(html_escape(title))\"><style>text{font:12px sans-serif;fill:#344054}.axis{stroke:#667085;stroke-width:1}.legend{font:11px sans-serif}.legend span{font-size:15px}</style><text x=\"$(W/2)\" y=\"16\" text-anchor=\"middle\" font-weight=\"700\">$(html_escape(title))</text><text x=\"$(W/2)\" y=\"$H\" text-anchor=\"middle\">Day</text><text transform=\"translate(14 $(H/2)) rotate(-90)\" text-anchor=\"middle\">Mean Cells</text>$yticks<line class=\"axis\" x1=\"$L\" x2=\"$(W-R)\" y1=\"$(H-B)\" y2=\"$(H-B)\"/><line class=\"axis\" x1=\"$L\" x2=\"$L\" y1=\"$T\" y2=\"$(H-B)\"/>$xticks$(join(lines, ""))$(join(bars, ""))$(join(dots, ""))<foreignObject x=\"$(W-330)\" y=\"25\" width=\"310\" height=\"60\"><div xmlns=\"http://www.w3.org/1999/xhtml\" class=\"legend\">$(join(legend, "<br>"))</div></foreignObject></svg>"
 end
 
 function preview(df)
@@ -145,18 +215,17 @@ end
 function main()
     mkpath(OUT_DIR)
     records = read_sources()
-    cards = String[]
+    cards_by_section = Dict{String,Vector{String}}()
     for (i, r) in enumerate(records)
-        title = "$(r.kind): $(r.file) / $(r.sheet)"
-        push!(cards, "<article class=\"card\"><h3>$(html_escape(title))</h3><p class=\"meta\">$(html_escape(r.notes))</p>$(svg_plot(r.df, title, r.notes))<h4>Sheet preview</h4>$(preview(r.df))</article>")
+        previews = join(["<h4>Sheet preview: $(html_escape(s.label))</h4>$(preview(s.df))" for s in r.sources], "")
+        push!(get!(cards_by_section, r.section, String[]), "<article class=\"card section-$(r.section)\"><h3>$(html_escape(r.title))</h3><p class=\"meta\">$(html_escape(r.notes))</p>$(svg_plot(r.sources, r.title))$previews</article>")
     end
-    groups = Dict{String,Vector{String}}()
-    for r in records
-        push!(get!(groups, r.file, String[]), r.sheet)
-    end
-    manifest = "{\n  \"generated_by\": \"Julia $(VERSION)\",\n  \"generated_at\": \"$(Dates.now())\",\n  \"file_count\": $(length(groups)),\n  \"sheet_count\": $(length(records))\n}\n"
+    files = Set(s.file for r in records for s in r.sources)
+    manifest = "{\n  \"generated_by\": \"Julia $(VERSION)\",\n  \"generated_at\": \"$(Dates.now())\",\n  \"file_count\": $(length(files)),\n  \"plot_count\": $(length(records)),\n  \"sheet_count\": $(sum(length(r.sources) for r in records))\n}\n"
     write(joinpath(OUT_DIR, "manifest.json"), manifest)
-    body = join(cards, "\n")
+    section_titles = Dict("untreated" => "1. Untreated Mono-culture", "treated" => "2. Treated Mono-culture", "coculture" => "3. Co-culture", "low_resource" => "4. Low-Resource Data")
+    section_order = ["untreated", "treated", "coculture", "low_resource"]
+    body = join(["<section class=\"report-section\"><h2>$(section_titles[s])</h2>$(join(get(cards_by_section, s, String[]), "\\n"))</section>" for s in section_order], "\n")
     html = """<!doctype html><html><head><meta charset=\"utf-8\"><title>New Data Report</title><style>
 body{margin:0;background:#f4f7f8;color:#172b36;font:15px system-ui,sans-serif}main{max-width:1280px;margin:auto;padding:28px}h1{margin-bottom:8px}h2{margin-top:30px}.intro,.workbook{background:white;border:1px solid #d9e2e6;border-radius:14px;padding:20px;box-shadow:0 5px 18px #173b4d0d}.intro{border-left:6px solid #176b87}.card{margin-top:16px;border-top:1px solid #e6ecef;padding-top:16px}.meta{color:#52636b}.back{display:inline-block;margin:0 0 18px;color:#176b87;font-weight:700;text-decoration:none}.preview{border-collapse:collapse;width:100%;font-size:12px}.preview th,.preview td{border:1px solid #d9e2e6;padding:5px;text-align:right}.preview th{background:#eef5f6;text-align:left}.empty{padding:30px;background:#fff7ed;border-radius:8px}svg{width:100%;max-height:300px;background:#fbfdfd;border:1px solid #e4e7ec;border-radius:8px}code{background:#eef5f6;padding:2px 5px;border-radius:4px}</style></head><body><main><a class=\"back\" href=\"../../index.html\">&larr; Back to reports home</a><h1>New Data Report</h1><div class=\"intro\"><p>This report was generated entirely in Julia $(VERSION) from every CSV and XLSX source in <code>New Datasets</code>.</p><p><b>How to read the labels:</b> LR means low resource. Ce0 is untreated co-culture. Ce1 is treated co-culture at the 1 uM IC50. Ratios 1-1, 3-1, and 1-3 are co-culture sensitive:resistant ratios. Mono-culture files are at 30,000 cells/mL, with treatment specified in the filename. Each chart includes its source file and sheet name, and each card includes a three-row preview.</p><p>Plotted values are Mean Cells over Day. Error bars use SEM when available, otherwise SD.</p></div><h2>All source sheets ($(length(records)))</h2>$body</main></body></html>"""
     write(joinpath(OUT_DIR, "report.html"), html)
@@ -165,7 +234,7 @@ body{margin:0;background:#f4f7f8;color:#172b36;font:15px system-ui,sans-serif}ma
     cp(joinpath(OUT_DIR, "manifest.json"), joinpath(DOCS_OUT_DIR, "manifest.json"); force=true)
     ensure_back_buttons(joinpath(ROOT, "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "reports"))
     ensure_back_buttons(joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "reports"))
-    println("Generated $(length(records)) plots from $(length(groups)) files")
+    println("Generated $(length(records)) plots from $(length(files)) files")
     println(joinpath(OUT_DIR, "report.html"))
 end
 
