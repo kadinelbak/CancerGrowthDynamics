@@ -28,6 +28,8 @@ const A2780_DOSE_MAP = Dict(
 )
 const A2780_SOURCE_ORDER = ("IC75", "IC50", "IC25") # corrected 0.67, 1.0, 1.47 uM order
 const DEFAULT_GAMMA = 0.24 # 0.01 / hour converted to 1 / day
+const CONTROL_HORIZON_DAYS = 24.0
+const FITTED_DATA_HORIZON_DAYS = 14.0
 const CANDIDATE_MODELS = (
     "dose-specific exponential",
     "shared-K logistic",
@@ -887,8 +889,8 @@ function _tournament_control_config(package_root, winner_package)
 end
 
 function _run_exploratory_staged_control(config, figure_path; max_time, seed)
-    horizon = 14.0
-    intervals = 14
+    horizon = CONTROL_HORIZON_DAYS
+    intervals = Int(horizon)
     target_dose = 1.0
     lower_dose, upper_dose = 0.0, 1.47
     objective = raw -> begin
@@ -939,11 +941,15 @@ function _run_exploratory_staged_control(config, figure_path; max_time, seed)
             seriestype = :steppost, fillrange = 0, fillalpha = 0.10, label = false,
             xlabel = "Day", ylabel = "Cisplatin (uM)", title = "$name dose",
             xlims = (0, horizon), ylims = (0, 1.55), yticks = 0:0.5:1.5)
+        vspan!(dose_panel, [FITTED_DATA_HORIZON_DAYS, horizon]; color = :gray, alpha = 0.08, label = false)
+        vline!(dose_panel, [FITTED_DATA_HORIZON_DAYS]; color = :gray40, linestyle = :dash, linewidth = 1, label = false)
         population_panel = plot(result.times, total; color = :black, linewidth = 3, label = "Total",
             xlabel = "Day", ylabel = "Cell count", title = "$name populations | final total $(round(Int, total[end]))",
             xlims = (0, horizon), ylims = (0, 1.06population_max), legend = :topleft)
         plot!(population_panel, result.times, naive; color = :firebrick, linewidth = 2, label = "A2780Naive")
         plot!(population_panel, result.times, cis; color = :royalblue, linewidth = 2, label = "Total A2780cis")
+        vspan!(population_panel, [FITTED_DATA_HORIZON_DAYS, horizon]; color = :gray, alpha = 0.08, label = false)
+        vline!(population_panel, [FITTED_DATA_HORIZON_DAYS]; color = :gray40, linestyle = :dash, linewidth = 1, label = false)
         scatter!(population_panel, [horizon], [total[end]]; color = :black, markersize = 4, label = false)
         push!(panels, dose_panel, population_panel)
     end
@@ -966,7 +972,7 @@ $(tournament_section)
 <section><h2>How To Read The Audit</h2><p><strong>BIC</strong> balances fit against the number of free parameters; lower is better. <strong>Delta BIC</strong> is measured from the lowest BIC in the same stage and lineage group. <strong>Median and worst nRMSE</strong> divide trajectory RMSE by that trajectory's largest observed count, making shape errors comparable across seeding densities. These nRMSE values describe reproduction of fitted data and are not held-out prediction errors. <strong>Boundary</strong> marks a parameter at or near an allowed limit. <strong>Eligible</strong> means the staged workflow permits inheritance; an ineligible low-BIC model is shown for comparison but is not carried forward.</p></section>
 $(join(sections, "\n"))
 <section id="endpoint"><h2>Stage 4 Candidate Endpoint Audit</h2><p>Every linked treated-coculture candidate is checked against the same 12 day-14 bootstrap intervals. High endpoint coverage cannot rescue an ineligible inheritance model, but it can reveal whether the BIC winner generalizes poorly.</p>$(_table_html(first(endpoint_audit, min(12, nrow(endpoint_audit)))))</section>
-<section id="control"><h2>Exploratory Optimal Control</h2><div class="callout"><strong>The optimizer was run despite incomplete validation.</strong> The result is the mathematical optimum found for the selected fitted model under the stated constraints. It is a hypothesis for comparing schedules, not a validated experimental optimum.</div><p>The search minimizes the day-14 total population for the tournament-selected staged model. Dose is piecewise constant in 14 daily intervals, constrained to 0-1.47 &micro;M, and every schedule has the same 14 &micro;M-day commanded-dose budget as constant 1 &micro;M treatment. The initial condition is the measured 20k, 50:50 day-zero composition: 33.5 A2780Naive and 33.5 total A2780cis cells in the image-analysis scale.</p>$(_table_html(control_table))<figure class="control-figure"><img src="$(figures["control"])" alt="Five rows pairing each cisplatin schedule with its corresponding total, A2780Naive, and total A2780cis trajectories"></figure><h3>Why The Parameters Are Not Yet Reliable</h3><ul><li>The selected Stage 4 model covers only 3 of 12 treated-coculture day-14 bootstrap intervals.</li><li>No complete density, mixture, dose, or experiment was prospectively reserved before model selection.</li><li>Several inherited parameters sit at or near fitting limits, including treatment-effect amplitudes, activation rate, onset time, and the Stage 3 loss model.</li><li>The narrow residual-bootstrap ranges show repeated convergence to the same constrained solution; they do not repair the poor endpoint coverage or test structural model error.</li><li>The 1.0 &micro;M response is not intermediate between 0.67 and 1.47 &micro;M, so a smooth dose-response assumption can mis-rank schedules that spend time between measured doses.</li></ul><h3>Validation Status</h3>$(_table_html(readiness))<h3>Alternatives To Test</h3><ul><li>Optimize each well-supported complete model path and report schedule disagreement as model uncertainty.</li><li>Restrict controls to the measured dose set 0, 0.67, 1.0, and 1.47 &micro;M instead of continuous interpolation.</li><li>Use robust optimization against bootstrap and alternate-model ensembles rather than one parameter vector.</li><li>Collect an independent mixture, density, or treatment sequence and compare predictions without refitting.</li></ul></section>
+<section id="control"><h2>Exploratory Optimal Control</h2><div class="callout"><strong>The optimizer was run despite incomplete validation.</strong> The result is the mathematical optimum found for the selected fitted model under the stated constraints. It is a hypothesis for comparing schedules, not a validated experimental optimum.</div><p>The search minimizes the day-24 total population for the tournament-selected staged model. Dose is piecewise constant in 24 daily intervals, constrained to 0-1.47 &micro;M, and every schedule has the same 24 &micro;M-day commanded-dose budget as constant 1 &micro;M treatment. The initial condition is the measured 20k, 50:50 day-zero composition: 33.5 A2780Naive and 33.5 total A2780cis cells in the image-analysis scale.</p><div class="callout"><strong>Extrapolation:</strong> experimental fitting ends at day 14. Days 14-24 are forward model projections and are shaded in gray in every schedule panel.</div>$(_table_html(control_table))<figure class="control-figure"><img src="$(figures["control"])" alt="Five rows pairing each 24-day cisplatin schedule with its corresponding total, A2780Naive, and total A2780cis trajectories; days 14 through 24 are shaded as extrapolation"></figure><h3>Why The Parameters Are Not Yet Reliable</h3><ul><li>The selected Stage 4 model covers only 3 of 12 treated-coculture day-14 bootstrap intervals.</li><li>No complete density, mixture, dose, or experiment was prospectively reserved before model selection.</li><li>Several inherited parameters sit at or near fitting limits, including treatment-effect amplitudes, activation rate, onset time, and the Stage 3 loss model.</li><li>The narrow residual-bootstrap ranges show repeated convergence to the same constrained solution; they do not repair the poor endpoint coverage or test structural model error.</li><li>The 1.0 &micro;M response is not intermediate between 0.67 and 1.47 &micro;M, so a smooth dose-response assumption can mis-rank schedules that spend time between measured doses.</li></ul><h3>Validation Status</h3>$(_table_html(readiness))<h3>Alternatives To Test</h3><ul><li>Optimize each well-supported complete model path and report schedule disagreement as model uncertainty.</li><li>Restrict controls to the measured dose set 0, 0.67, 1.0, and 1.47 &micro;M instead of continuous interpolation.</li><li>Use robust optimization against bootstrap and alternate-model ensembles rather than one parameter vector.</li><li>Collect an independent mixture, density, or treatment sequence and compare predictions without refitting.</li></ul></section>
 </main><footer>Generated from the staged Julia ranking, inheritance, overlay, and bootstrap artifacts.</footer></body></html>"""
     mkpath(dirname(path)); write(path, html); return path
 end

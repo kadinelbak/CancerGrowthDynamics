@@ -798,7 +798,7 @@
 </tr>
 </tbody></table></div>
 </section>
-<section id="control"><h2>Exploratory Optimal Control</h2><div class="callout"><strong>The optimizer was run despite incomplete validation.</strong> The result is the mathematical optimum found for the selected fitted model under the stated constraints. It is a hypothesis for comparing schedules, not a validated experimental optimum.</div><p>The search minimizes the day-14 total population for the tournament-selected staged model. Dose is piecewise constant in 14 daily intervals, constrained to 0-1.47 &micro;M, and every schedule has the same 14 &micro;M-day commanded-dose budget as constant 1 &micro;M treatment. The initial condition is the measured 20k, 50:50 day-zero composition: 33.5 A2780Naive and 33.5 total A2780cis cells in the image-analysis scale.</p><div class="table-wrap"><table><thead><tr>
+<section id="control"><h2>Exploratory Optimal Control</h2><div class="callout"><strong>The optimizer was run despite incomplete validation.</strong> The result is the mathematical optimum found for the selected fitted model under the stated constraints. It is a hypothesis for comparing schedules, not a validated experimental optimum.</div><p>The search minimizes the day-24 total population for the tournament-selected staged model. Dose is piecewise constant in 24 daily intervals, constrained to 0-1.47 &micro;M, and every schedule has the same 24 &micro;M-day commanded-dose budget as constant 1 &micro;M treatment. The initial condition is the measured 20k, 50:50 day-zero composition: 33.5 A2780Naive and 33.5 total A2780cis cells in the image-analysis scale.</p><div class="callout"><strong>Extrapolation:</strong> experimental fitting ends at day 14. Days 14-24 are forward model projections and are shaded in gray in every schedule panel.</div><div class="table-wrap"><table><thead><tr>
 <th>schedule</th>
 <th>final_total</th>
 <th>final_A2780Naive</th>
@@ -810,56 +810,56 @@
 </tr></thead><tbody>
 <tr>
 <td>Optimized</td>
-<td>2738.0796</td>
-<td>1233.2233</td>
-<td>1504.8563</td>
-<td>24900.4386</td>
-<td>8145.0922</td>
-<td>14.0</td>
-<td>1.47, 1.47, 1.15, 0.54, 0.82, 0.67, 0.62, 0.7, 0.83, 0.76, 0.75, 1.29, 1.47, 1.47</td>
+<td>3099.4034</td>
+<td>975.3453</td>
+<td>2124.0581</td>
+<td>58170.9836</td>
+<td>27396.4568</td>
+<td>24.0</td>
+<td>1.29, 1.47, 1.08, 1.35, 0.73, 0.75, 0.99, 0.99, 0.51, 0.89, 0.55, 1.44, 0.37, 0.63, 1.13, 0.76, 1.47, 0.71, 0.5, 1.21, 0.77, 1.47, 1.47, 1.47</td>
 </tr>
 <tr>
 <td>Constant 1 uM</td>
-<td>3410.1922</td>
-<td>1306.2509</td>
-<td>2103.9413</td>
-<td>24891.7971</td>
-<td>13317.8289</td>
-<td>14.0</td>
-<td>1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0</td>
+<td>3405.342</td>
+<td>1379.1279</td>
+<td>2026.2141</td>
+<td>59051.8037</td>
+<td>33984.3094</td>
+<td>24.0</td>
+<td>1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0</td>
 </tr>
 <tr>
 <td>Front-loaded</td>
-<td>4078.2066</td>
-<td>1825.5348</td>
-<td>2252.6718</td>
-<td>26197.3155</td>
-<td>15608.6627</td>
-<td>14.0</td>
-<td>1.47, 1.47, 1.47, 1.44, 1.32, 1.21, 1.1, 0.98, 0.87, 0.76, 0.65, 0.53, 0.42, 0.31</td>
+<td>4899.3152</td>
+<td>1739.8784</td>
+<td>3159.4368</td>
+<td>68065.663</td>
+<td>52532.7266</td>
+<td>24.0</td>
+<td>1.47, 1.47, 1.47, 1.47, 1.47, 1.45, 1.39, 1.32, 1.26, 1.2, 1.13, 1.07, 1.0, 0.94, 0.88, 0.81, 0.75, 0.68, 0.62, 0.56, 0.49, 0.43, 0.37, 0.3</td>
 </tr>
 <tr>
 <td>Back-loaded</td>
-<td>3383.2535</td>
-<td>520.7626</td>
-<td>2862.4909</td>
-<td>24234.9679</td>
-<td>13415.6129</td>
-<td>14.0</td>
-<td>0.31, 0.42, 0.53, 0.65, 0.76, 0.87, 0.98, 1.1, 1.21, 1.32, 1.44, 1.47, 1.47, 1.47</td>
+<td>3587.1828</td>
+<td>327.9714</td>
+<td>3259.2114</td>
+<td>57507.249</td>
+<td>30501.7758</td>
+<td>24.0</td>
+<td>0.3, 0.37, 0.43, 0.49, 0.56, 0.62, 0.68, 0.75, 0.81, 0.88, 0.94, 1.0, 1.07, 1.13, 1.2, 1.26, 1.32, 1.39, 1.45, 1.47, 1.47, 1.47, 1.47, 1.47</td>
 </tr>
 <tr>
 <td>Pulsed</td>
-<td>3578.666</td>
-<td>1213.4102</td>
-<td>2365.2557</td>
-<td>24860.6886</td>
-<td>14424.6041</td>
-<td>14.0</td>
-<td>1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53</td>
+<td>3648.4932</td>
+<td>1213.0061</td>
+<td>2435.4871</td>
+<td>60005.6452</td>
+<td>38549.6114</td>
+<td>24.0</td>
+<td>1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53, 1.47, 0.53</td>
 </tr>
 </tbody></table></div>
-<figure class="control-figure"><img src="../csv/optimal_control_one/figures/exploratory_staged_control.png" alt="Five rows pairing each cisplatin schedule with its corresponding total, A2780Naive, and total A2780cis trajectories"></figure><h3>Why The Parameters Are Not Yet Reliable</h3><ul><li>The selected Stage 4 model covers only 3 of 12 treated-coculture day-14 bootstrap intervals.</li><li>No complete density, mixture, dose, or experiment was prospectively reserved before model selection.</li><li>Several inherited parameters sit at or near fitting limits, including treatment-effect amplitudes, activation rate, onset time, and the Stage 3 loss model.</li><li>The narrow residual-bootstrap ranges show repeated convergence to the same constrained solution; they do not repair the poor endpoint coverage or test structural model error.</li><li>The 1.0 &micro;M response is not intermediate between 0.67 and 1.47 &micro;M, so a smooth dose-response assumption can mis-rank schedules that spend time between measured doses.</li></ul><h3>Validation Status</h3><div class="table-wrap"><table><thead><tr>
+<figure class="control-figure"><img src="../csv/optimal_control_one/figures/exploratory_staged_control.png" alt="Five rows pairing each 24-day cisplatin schedule with its corresponding total, A2780Naive, and total A2780cis trajectories; days 14 through 24 are shaded as extrapolation"></figure><h3>Why The Parameters Are Not Yet Reliable</h3><ul><li>The selected Stage 4 model covers only 3 of 12 treated-coculture day-14 bootstrap intervals.</li><li>No complete density, mixture, dose, or experiment was prospectively reserved before model selection.</li><li>Several inherited parameters sit at or near fitting limits, including treatment-effect amplitudes, activation rate, onset time, and the Stage 3 loss model.</li><li>The narrow residual-bootstrap ranges show repeated convergence to the same constrained solution; they do not repair the poor endpoint coverage or test structural model error.</li><li>The 1.0 &micro;M response is not intermediate between 0.67 and 1.47 &micro;M, so a smooth dose-response assumption can mis-rank schedules that spend time between measured doses.</li></ul><h3>Validation Status</h3><div class="table-wrap"><table><thead><tr>
 <th>criterion</th>
 <th>passed</th>
 <th>evidence</th>

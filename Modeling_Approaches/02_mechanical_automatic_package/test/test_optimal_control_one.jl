@@ -68,12 +68,17 @@ using CSV
     @test all(contains(report, "Stage $stage:") for stage in 1:4)
     @test contains(report, "The optimizer was run despite incomplete validation")
     @test contains(report, "Why The Parameters Are Not Yet Reliable")
-    @test contains(report, "Five rows pairing each cisplatin schedule")
+    @test contains(report, "Five rows pairing each 24-day cisplatin schedule")
+    @test contains(report, "Days 14-24 are forward model projections")
     @test contains(report, "Stage 4 Candidate Endpoint Audit")
     @test !contains(report, "endpoint-only prediction")
 
     control = CSV.read(normpath(joinpath(@__DIR__, "..", "outputs", "csv", "optimal_control_one", "control_metrics.csv")), DataFrame)
     @test Set(control.schedule) == Set(["Optimized", "Constant 1 uM", "Front-loaded", "Back-loaded", "Pulsed"])
     @test maximum(control.dose_AUC) - minimum(control.dose_AUC) < 1e-8
+    @test isapprox(only(filter(:schedule => ==("Constant 1 uM"), control).dose_AUC), 24.0; atol = 1e-8)
     @test only(filter(:schedule => ==("Optimized"), control).final_total) <= only(filter(:schedule => ==("Constant 1 uM"), control).final_total)
+
+    trajectories = CSV.read(normpath(joinpath(@__DIR__, "..", "outputs", "csv", "optimal_control_one", "control_trajectories.csv")), DataFrame)
+    @test isapprox(maximum(trajectories.time_day), 24.0; atol = 1e-8)
 end
