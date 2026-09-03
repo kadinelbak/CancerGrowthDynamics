@@ -127,6 +127,21 @@ function preview(df)
     "<table class=\"preview\"><thead><tr>$th</tr></thead><tbody>$rows</tbody></table>"
 end
 
+function ensure_back_buttons(dir)
+    isdir(dir) || return
+    link = "<p><a class=\"back-home\" href=\"../../../../index.html\" style=\"display:inline-block;margin:0 0 16px;color:#176b87;font-weight:700;text-decoration:none\">&larr; Back to reports home</a></p>"
+    for path in readdir(dir; join=true)
+        endswith(lowercase(path), ".html") || continue
+        html = read(path, String)
+        occursin("reports home", lowercase(html)) && continue
+        body_tag = match(r"<body[^>]*>", html)
+        body_tag === nothing && continue
+        pos = body_tag.offset + ncodeunits(body_tag.match)
+        html = html[1:pos-1] * link * html[pos:end]
+        write(path, html)
+    end
+end
+
 function main()
     mkpath(OUT_DIR)
     records = read_sources()
@@ -143,11 +158,13 @@ function main()
     write(joinpath(OUT_DIR, "manifest.json"), manifest)
     body = join(cards, "\n")
     html = """<!doctype html><html><head><meta charset=\"utf-8\"><title>New Data Report</title><style>
-body{margin:0;background:#f4f7f8;color:#172b36;font:15px system-ui,sans-serif}main{max-width:1280px;margin:auto;padding:28px}h1{margin-bottom:8px}h2{margin-top:30px}.intro,.workbook{background:white;border:1px solid #d9e2e6;border-radius:14px;padding:20px;box-shadow:0 5px 18px #173b4d0d}.intro{border-left:6px solid #176b87}.card{margin-top:16px;border-top:1px solid #e6ecef;padding-top:16px}.meta{color:#52636b}.preview{border-collapse:collapse;width:100%;font-size:12px}.preview th,.preview td{border:1px solid #d9e2e6;padding:5px;text-align:right}.preview th{background:#eef5f6;text-align:left}.empty{padding:30px;background:#fff7ed;border-radius:8px}svg{width:100%;max-height:300px;background:#fbfdfd;border:1px solid #e4e7ec;border-radius:8px}code{background:#eef5f6;padding:2px 5px;border-radius:4px}</style></head><body><main><h1>New Data Report</h1><div class=\"intro\"><p>This report was generated entirely in Julia $(VERSION) from every CSV and XLSX source in <code>New Datasets</code>.</p><p><b>How to read the labels:</b> LR means low resource. Ce0 is untreated co-culture. Ce1 is treated co-culture at the 1 uM IC50. Ratios 1-1, 3-1, and 1-3 are co-culture sensitive:resistant ratios. Mono-culture files are at 30,000 cells/mL, with treatment specified in the filename. Each chart includes its source file and sheet name, and each card includes a three-row preview.</p><p>Plotted values are Mean Cells over Day. Error bars use SEM when available, otherwise SD.</p></div><h2>All source sheets ($(length(records)))</h2>$body</main></body></html>"""
+body{margin:0;background:#f4f7f8;color:#172b36;font:15px system-ui,sans-serif}main{max-width:1280px;margin:auto;padding:28px}h1{margin-bottom:8px}h2{margin-top:30px}.intro,.workbook{background:white;border:1px solid #d9e2e6;border-radius:14px;padding:20px;box-shadow:0 5px 18px #173b4d0d}.intro{border-left:6px solid #176b87}.card{margin-top:16px;border-top:1px solid #e6ecef;padding-top:16px}.meta{color:#52636b}.back{display:inline-block;margin:0 0 18px;color:#176b87;font-weight:700;text-decoration:none}.preview{border-collapse:collapse;width:100%;font-size:12px}.preview th,.preview td{border:1px solid #d9e2e6;padding:5px;text-align:right}.preview th{background:#eef5f6;text-align:left}.empty{padding:30px;background:#fff7ed;border-radius:8px}svg{width:100%;max-height:300px;background:#fbfdfd;border:1px solid #e4e7ec;border-radius:8px}code{background:#eef5f6;padding:2px 5px;border-radius:4px}</style></head><body><main><a class=\"back\" href=\"../../index.html\">&larr; Back to reports home</a><h1>New Data Report</h1><div class=\"intro\"><p>This report was generated entirely in Julia $(VERSION) from every CSV and XLSX source in <code>New Datasets</code>.</p><p><b>How to read the labels:</b> LR means low resource. Ce0 is untreated co-culture. Ce1 is treated co-culture at the 1 uM IC50. Ratios 1-1, 3-1, and 1-3 are co-culture sensitive:resistant ratios. Mono-culture files are at 30,000 cells/mL, with treatment specified in the filename. Each chart includes its source file and sheet name, and each card includes a three-row preview.</p><p>Plotted values are Mean Cells over Day. Error bars use SEM when available, otherwise SD.</p></div><h2>All source sheets ($(length(records)))</h2>$body</main></body></html>"""
     write(joinpath(OUT_DIR, "report.html"), html)
     mkpath(DOCS_OUT_DIR)
     cp(joinpath(OUT_DIR, "report.html"), joinpath(DOCS_OUT_DIR, "report.html"); force=true)
     cp(joinpath(OUT_DIR, "manifest.json"), joinpath(DOCS_OUT_DIR, "manifest.json"); force=true)
+    ensure_back_buttons(joinpath(ROOT, "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "reports"))
+    ensure_back_buttons(joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "reports"))
     println("Generated $(length(records)) plots from $(length(groups)) files")
     println(joinpath(OUT_DIR, "report.html"))
 end
