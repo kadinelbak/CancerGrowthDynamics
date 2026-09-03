@@ -1,0 +1,59 @@
+name: Validate Strobl model benchmarks
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/strobl-model-benchmarks
+    paths:
+      - ".github/workflows/validate-strobl-models.yml"
+      - "Modeling_Approaches/02_mechanical_automatic_package/**"
+  pull_request:
+    paths:
+      - ".github/workflows/validate-strobl-models.yml"
+      - "Modeling_Approaches/02_mechanical_automatic_package/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Modeling_Approaches/02_mechanical_automatic_package
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+      - uses: julia-actions/cache@v2
+      - name: Instantiate and test
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+  refit:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[strobl-refit]'))
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    defaults:
+      run:
+        working-directory: Modeling_Approaches/02_mechanical_automatic_package
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+      - uses: julia-actions/cache@v2
+      - name: Refit literature benchmarks and rebuild report
+        env:
+          A2780_MAX_TIME_PER_FIT: "2.0"
+        run: julia --project=. run_a2780_strobl_refit.jl
+      - name: Upload fitted artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: a2780-strobl-benchmark-artifacts
+          retention-days: 14
+          path: |
+            Modeling_Approaches/02_mechanical_automatic_package/outputs/csv/coculture_untreated
+            Modeling_Approaches/02_mechanical_automatic_package/outputs/csv/coculture_treated
+            Modeling_Approaches/02_mechanical_automatic_package/outputs/images/coculture_untreated
+            Modeling_Approaches/02_mechanical_automatic_package/outputs/images/coculture_treated
+            Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_staged_model_comparison.html

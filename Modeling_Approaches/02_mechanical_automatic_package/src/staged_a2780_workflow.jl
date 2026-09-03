@@ -7,6 +7,7 @@ using Dates
 using JSON3
 using OrdinaryDiffEq
 using Plots
+using Random
 using Statistics
 
 using ..IOUtils
@@ -740,6 +741,9 @@ end
 const REPORT_MODEL_LABELS = Dict(
     "logistic_growth" => "Logistic growth",
     "theta_logistic_growth" => "Theta-logistic growth",
+    "lagged_theta_logistic_growth" => "Hard-lag theta-logistic growth",
+    "baranyi_theta_logistic_growth" => "Baranyi-adjusted theta-logistic growth",
+    "adaptation_theta_logistic_growth" => "Smooth adaptation theta-logistic growth",
     "gompertz_growth" => "Gompertz growth",
     "joint_ic_effect_hill_ramp_onset" => "Delayed Hill-ramp kill",
     "joint_ic_effect_transit_death" => "Transit damage/death",
@@ -753,6 +757,13 @@ const REPORT_MODEL_LABELS = Dict(
     "lv_symmetric_competition" => "Symmetric competition",
     "lv_asymmetric_competition" => "Asymmetric competition",
     "lv_asymmetric_competition_death" => "Asymmetric competition with death",
+    "strobl_birth_no_cost_no_turnover" => "Strobl birth model: no cost or turnover",
+    "strobl_birth_growth_cost_only" => "Strobl birth model: growth cost only",
+    "strobl_birth_turnover_only" => "Strobl birth model: turnover only",
+    "strobl_birth_growth_cost_turnover" => "Strobl birth model: growth cost and turnover",
+    "strobl_birth_capacity_cost_turnover" => "Strobl birth model: carrying-capacity cost",
+    "strobl_birth_death_cost_turnover" => "Strobl birth model: death cost",
+    "strobl_density_dependent_death" => "Strobl density-dependent-death model",
     "strict_inheritance" => "Strict drug-effect inheritance",
     "competitor_scaled" => "Competitor-scaled drug effect",
     "load_scaled" => "Total-load-scaled drug effect",
@@ -767,6 +778,9 @@ const REPORT_MODEL_LABELS = Dict(
 const REPORT_MODEL_EQUATIONS = Dict(
     "logistic_growth" => raw"\(\displaystyle \frac{dX}{dt}=rX\left(1-\frac{X}{K}\right)\)",
     "theta_logistic_growth" => raw"\(\displaystyle \frac{dX}{dt}=rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)",
+    "lagged_theta_logistic_growth" => raw"\(\displaystyle \frac{dX}{dt}=\mathbf{1}_{t>\tau}\,rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right]\)",
+    "baranyi_theta_logistic_growth" => raw"\(\displaystyle \frac{dX}{dt}=\alpha_B(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad \alpha_B(t)=\frac{q_0}{q_0+e^{-rt}}\)",
+    "adaptation_theta_logistic_growth" => raw"\(\displaystyle \frac{dX}{dt}=A(t)rX\left[1-\left(\frac{X}{K}\right)^{\theta}\right],\quad A(t)=1-e^{-\lambda_A t}\)",
     "gompertz_growth" => raw"\(\displaystyle \frac{dX}{dt}=rX\ln\!\left(\frac{K}{X}\right)\)",
     "joint_ic_effect_hill_ramp_onset" => raw"\(\displaystyle \frac{dX}{dt}=G_i(X)-A_i(t)H_i(z)X,\quad A_i(t)=\mathbf{1}_{t>t_{\mathrm{on},i}}\left[1-e^{-\lambda_i(t-t_{\mathrm{on},i})}\right]\)",
     "joint_ic_effect_transit_death" => raw"\(\displaystyle \frac{dP}{dt}=G_i(P)-A_i(t)H_i(z)P,\quad \frac{dD}{dt}=A_i(t)H_i(z)P-k_{\mathrm{clear}}D,\quad \widehat y=P+\tfrac12D\)",
@@ -780,6 +794,13 @@ const REPORT_MODEL_EQUATIONS = Dict(
     "lv_symmetric_competition" => raw"\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha C),\quad \frac{dC}{dt}=G_C(C,C+\alpha N)\)",
     "lv_asymmetric_competition" => raw"\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C),\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)\)",
     "lv_asymmetric_competition_death" => raw"\(\displaystyle \frac{dN}{dt}=G_N(N,N+\alpha_{NC}C)-d_NN,\quad \frac{dC}{dt}=G_C(C,C+\alpha_{CN}N)-d_CC\)",
+    "strobl_birth_no_cost_no_turnover" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S,\quad \dot R=r_S\!\left(1-\frac{S+R}{K}\right)R\)",
+    "strobl_birth_growth_cost_only" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S,\quad \dot R=(1-c)r_S\!\left(1-\frac{S+R}{K}\right)R\)",
+    "strobl_birth_turnover_only" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S-d_TS,\quad \dot R=r_S\!\left(1-\frac{S+R}{K}\right)R-d_TR\)",
+    "strobl_birth_growth_cost_turnover" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{S+R}{K}\right)\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S-d_TS,\quad \dot R=(1-c)r_S\!\left(1-\frac{S+R}{K}\right)R-d_TR\)",
+    "strobl_birth_capacity_cost_turnover" => raw"\(\displaystyle K_S=K,\ K_R=(1-c)K,\quad \dot X_i=r_i\!\left(1-\frac{S+R}{K_i}\right)X_i-d_iX_i\)",
+    "strobl_birth_death_cost_turnover" => raw"\(\displaystyle d_S=d_T,\ d_R=(1+c)d_T,\quad \dot X_i=r_i\!\left(1-\frac{S+R}{K}\right)X_i-d_iX_i\)",
+    "strobl_density_dependent_death" => raw"\(\displaystyle \dot S=r_S\!\left(1-\frac{2d_DD(t)}{D_{\max}}\right)S-d_T^{\dagger}\frac{S+R}{K}S,\quad \dot R=(1-c)r_SR-d_T^{\dagger}\frac{S+R}{K}R\)",
     "strict_inheritance" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-E_i^{\mathrm{mono}}(t,z)X_i\)",
     "competitor_scaled" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-e^{\beta_i\alpha_{ij}X_j/K_i}E_i^{\mathrm{mono}}(t,z)X_i\)",
     "load_scaled" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-e^{\beta_iL_i/K_i}E_i^{\mathrm{mono}}(t,z)X_i\)",
@@ -791,40 +812,98 @@ const REPORT_MODEL_EQUATIONS = Dict(
     "fully_free_context_diagnostic" => raw"\(\displaystyle \frac{dX_i}{dt}=G_i^{\mathrm{co}}-E_i^{\mathrm{co}}(t,z)X_i,\quad \mathbf q_{\mathrm{drug}}^{\mathrm{co}}\ne\mathbf q_{\mathrm{drug}}^{\mathrm{mono}}\)",
 )
 
-function _report_ranking_table(df::DataFrame)
+function _report_parameter_count(row)
+    for column in (:n_parameters, :parameter_count)
+        column in propertynames(row) || continue
+        value = row[column]
+        value === missing && continue
+        parsed = tryparse(Int, string(value))
+        parsed === nothing || return parsed
+    end
+    return typemax(Int)
+end
+
+function _report_ranked_rows(df::DataFrame)
     valid = [_is_valid_metric(value) && abs(Float64(value)) < 1e11 for value in df.bic]
     ranked = copy(df[valid, :])
-    rank_column = :rank_within_cell_line in propertynames(ranked) ? :rank_within_cell_line :
-        (:rank in propertynames(ranked) ? :rank : nothing)
-    rank_column === nothing ? sort!(ranked, :bic) : sort!(ranked, rank_column)
+    sort!(ranked, :bic)
+    ranked[!, :report_rank] = collect(1:nrow(ranked))
+    ranked[!, :report_delta_bic] = Float64.(ranked.bic) .- minimum(Float64.(ranked.bic))
+    return ranked
+end
+
+function _report_display_rows(df::DataFrame; limit::Int = 5)
+    ranked = _report_ranked_rows(df)
+    isempty(ranked) && return ranked
+    shown_indices = collect(1:min(limit, nrow(ranked)))
+    counts = [_report_parameter_count(row) for row in eachrow(ranked)]
+    simplest_count = minimum(counts)
+    simplest_index = findfirst(==(simplest_count), counts)
+    simplest_index in shown_indices || push!(shown_indices, simplest_index)
+    return ranked[shown_indices, :]
+end
+
+function _report_ranking_table(df::DataFrame; display_subset::Bool = true)
+    all_ranked = _report_ranked_rows(df)
+    ranked = display_subset ? _report_display_rows(df) : _report_ranked_rows(df)
     model_names = String.(ranked.model)
-    ranks = rank_column === nothing ? collect(1:nrow(ranked)) : Int.(ranked[!, rank_column])
+    ranks = Int.(ranked.report_rank)
     pooling = :pooling_mode in propertynames(ranked) ? String.(ranked.pooling_mode) : fill("", nrow(ranked))
-    delta_bic = :delta_bic in propertynames(ranked) ? round.(Float64.(ranked.delta_bic); digits = 3) :
-        round.(Float64.(ranked.bic) .- minimum(Float64.(ranked.bic)); digits = 3)
+    counts = [_report_parameter_count(row) for row in eachrow(ranked)]
+    all_counts = [_report_parameter_count(row) for row in eachrow(all_ranked)]
+    simplest_count = minimum(all_counts)
+    eligible_mask = :eligible_for_inheritance in propertynames(all_ranked) ?
+        [value !== missing && Bool(value) for value in all_ranked.eligible_for_inheritance] : trues(nrow(all_ranked))
+    selected_rank = any(eligible_mask) ? minimum(Int.(all_ranked.report_rank[eligible_mask])) : 1
+    diagnostics = [
+        (:diagnostic_model in propertynames(row) && row.diagnostic_model !== missing && Bool(row.diagnostic_model)) ||
+        (:eligible_for_inheritance in propertynames(row) && row.eligible_for_inheritance !== missing && !Bool(row.eligible_for_inheritance))
+        for row in eachrow(ranked)
+    ]
+    roles = [diagnostic ? (count == simplest_count ? "Literature/diagnostic benchmark; simplest" : "Literature/diagnostic benchmark") :
+        (rank == selected_rank && count == simplest_count ? "Selected for inheritance; simplest" :
+        (rank == selected_rank ? "Selected for inheritance" : (count == simplest_count ? "Simplest candidate" : "Leading candidate")))
+        for (rank, count, diagnostic) in zip(ranks, counts, diagnostics)]
     return DataFrame(
-        Rank = ranks,
+        ID = ["M$(rank)" for rank in ranks],
         Model = [get(REPORT_MODEL_LABELS, model, model) for model in model_names],
         Pooling = pooling,
         Equation = [get(REPORT_MODEL_EQUATIONS, model, "See the model source and CSV parameter artifact") for model in model_names],
-        BIC = round.(Float64.(ranked.bic); digits = 3),
-        delta_BIC = delta_bic,
+        delta_BIC = round.(Float64.(ranked.report_delta_bic); digits = 3),
+        Role = roles,
     )
 end
 
-function _report_top_five_html(path::AbstractString; by_cell_line::Bool = false)
+function _report_bic_plot_html(df::DataFrame; title::AbstractString = "Model comparison")
+    shown = _report_display_rows(df)
+    isempty(shown) && return ""
+    max_delta = maximum(Float64.(shown.report_delta_bic))
+    rows = String[]
+    for row in eachrow(shown)
+        delta = Float64(row.report_delta_bic)
+        width = max_delta > 0 ? max(1.5, 100 * delta / max_delta) : 1.5
+        label = get(REPORT_MODEL_LABELS, String(row.model), String(row.model))
+        push!(rows, """<div class="bic-row"><div class="bic-label"><strong>M$(row.report_rank)</strong><span>$(_html_escape(label))</span></div><div class="bic-track"><span class="bic-bar" style="width:$(round(width; digits=2))%"></span></div><output>$(round(delta; digits=2))</output></div>""")
+    end
+    return """<figure class="bic-figure"><h4>$(_html_escape(title)): Delta BIC</h4><div class="bic-axis" aria-label="$(_html_escape(title)) Delta BIC bar plot">$(join(rows))</div><figcaption>Horizontal bars show Delta BIC relative to M1 within this table. Shorter is better; M1 is zero by definition.</figcaption></figure>"""
+end
+
+function _report_top_five_html(path::AbstractString; by_cell_line::Bool = false, label::AbstractString = "Model comparison")
     isfile(path) || return "<p class=\"missing\">Ranking CSV not found: $(_html_escape(path))</p>"
     ranking = CSV.read(path, DataFrame)
     if by_cell_line && :cell_line in propertynames(ranking)
         blocks = String[]
         for group in groupby(ranking, :cell_line; sort = true)
             cell_line = String(first(group.cell_line))
+            group_df = DataFrame(group)
             push!(blocks, "<h3>$(_html_escape(cell_line))</h3><div class=\"table-wrap\">" *
-                _table_html(first(_report_ranking_table(DataFrame(group)), 5); limit = 5) * "</div>")
+                _table_html(_report_ranking_table(group_df); limit = 6) * "</div>" *
+                _report_bic_plot_html(group_df; title = "$(label), $(cell_line)"))
         end
         return join(blocks, "\n")
     end
-    return "<div class=\"table-wrap\">" * _table_html(first(_report_ranking_table(ranking), 5); limit = 5) * "</div>"
+    return "<div class=\"table-wrap\">" * _table_html(_report_ranking_table(ranking); limit = 6) * "</div>" *
+        _report_bic_plot_html(ranking; title = label)
 end
 
 function _report_stage_figure(path::AbstractString, report_dir::AbstractString, alt::AbstractString, caption::AbstractString)
@@ -833,13 +912,330 @@ function _report_stage_figure(path::AbstractString, report_dir::AbstractString, 
     return "<figure><img src=\"$relative_path\" alt=\"$(_html_escape(alt))\"><figcaption>$(_html_escape(caption))</figcaption></figure>"
 end
 
+function _path_candidate(row)
+    model = String(row.model)
+    pooling = :pooling_mode in propertynames(row) ? String(row.pooling_mode) : ""
+    return Dict(
+        "id" => "$(model)|$(pooling)",
+        "model" => model,
+        "label" => get(REPORT_MODEL_LABELS, model, model),
+        "pooling" => pooling,
+        "bic" => Float64(row.bic),
+        "delta_bic" => Float64(row.report_delta_bic),
+        "parameters" => (:params in propertynames(row) ? String(row.params) : "Not exported"),
+        "growth_family" => (:growth_family in propertynames(row) ? String(row.growth_family) : ""),
+        "eligible" => (:eligible_for_inheritance in propertynames(row) ? Bool(row.eligible_for_inheritance) : true),
+    )
+end
+
+function _path_candidates(ranking::DataFrame; cell_line::Union{Nothing,String} = nothing, include_model::Union{Nothing,String} = nothing)
+    selected = if cell_line === nothing || !(:cell_line in propertynames(ranking))
+        ranking
+    else
+        ranking[String.(ranking.cell_line) .== cell_line, :]
+    end
+    ranked = _report_ranked_rows(selected)
+    model_order = String[]
+    for row in eachrow(ranked)
+        model = String(row.model)
+        model in model_order || push!(model_order, model)
+        length(model_order) >= 5 && break
+    end
+    if include_model !== nothing && !(include_model in model_order)
+        isempty(model_order) ? push!(model_order, include_model) : (model_order[end] = include_model)
+    end
+    candidates = ranked[in.(String.(ranked.model), Ref(model_order)), :]
+    sort!(candidates, :report_rank)
+    return [_path_candidate(row) for row in eachrow(candidates)]
+end
+
+function _plot_rows(path::AbstractString; filters = Pair{Symbol,String}[], fields::Vector{Symbol})
+    isfile(path) || return Dict{String,Any}[]
+    rows = CSV.read(path, DataFrame)
+    for (column, value) in filters
+        column in propertynames(rows) || continue
+        rows = rows[String.(rows[!, column]) .== value, :]
+    end
+    result = Dict{String,Any}[]
+    for row in eachrow(rows)
+        item = Dict{String,Any}()
+        for field in fields
+            field in propertynames(row) || continue
+            value = row[field]
+            item[String(field)] = value isa Real ? Float64(value) : String(value)
+        end
+        push!(result, item)
+    end
+    return result
+end
+
+function _effective_parameter_payload(path::AbstractString; lineage::Bool = false)
+    isfile(path) || return Dict{String,Any}()
+    parameters = CSV.read(path, DataFrame)
+    result = Dict{String,Any}()
+    for row in eachrow(parameters)
+        model = String(row.model)
+        pooling = String(row.pooling_mode)
+        key = lineage ? "$(row.cell_line)|$(model)|$(pooling)" : "$(model)|$(pooling)"
+        density = :density in propertynames(row) ? String(row.density) : "all"
+        candidate = get!(result, key, Dict{String,Any}())
+        density_values = get!(candidate, density, Dict{String,Float64}())
+        value_column = :effective_value in propertynames(row) ? :effective_value : :estimate
+        value = row[value_column]
+        value === missing || (density_values[String(row.parameter)] = Float64(value))
+    end
+    return result
+end
+
+function _model_path_payload(csv_root::AbstractString)
+    stage1_ranking = CSV.read(joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_model_ranking.csv"), DataFrame)
+    stage2_ranking = CSV.read(joinpath(csv_root, "monoculture_treated", "monoculture_treated_pooling_model_ranking.csv"), DataFrame)
+    stage3_ranking = CSV.read(joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_model_ranking.csv"), DataFrame)
+    stage4_ranking = CSV.read(joinpath(csv_root, "coculture_treated", "linked_treatment_model_ranking.csv"), DataFrame)
+
+    stage1_overlay = joinpath(csv_root, "monoculture_untreated", "figures", "monoculture_untreated_pooling_overlays.csv")
+    stage2_overlay = joinpath(csv_root, "monoculture_treated", "figures", "monoculture_treated_joint_dose_overlays.csv")
+    stage3_overlay = joinpath(csv_root, "coculture_untreated", "figures", "coculture_untreated_joint_overlays.csv")
+    stage4_overlay = joinpath(csv_root, "coculture_treated", "figures", "linked_treatment_combined_overlays.csv")
+    stage1_parameters = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_parameter_estimates.csv")
+    stage3_parameters = joinpath(csv_root, "coculture_untreated", "coculture_untreated_joint_parameter_estimates.csv")
+
+    candidate_groups = Dict{String,Any}()
+    plot_rows = Dict{String,Any}()
+    for lineage in ("A2780Naive", "A2780cis")
+        key1 = "stage1_$(lineage)"
+        candidate_groups[key1] = _path_candidates(stage1_ranking; cell_line = lineage, include_model = "logistic_growth")
+        plot_rows[key1] = _plot_rows(stage1_overlay;
+            filters = [:cell_line => lineage],
+            fields = [:time, :observed, :predicted, :model, :pooling_mode, :cell_line, :density])
+
+        key2 = "stage2_$(lineage)"
+        candidate_groups[key2] = _path_candidates(stage2_ranking; cell_line = lineage)
+        plot_rows[key2] = _plot_rows(stage2_overlay;
+            filters = [:cell_line => lineage],
+            fields = [:time, :observed, :predicted, :model, :pooling_mode, :cell_line, :density, :dose, :ic_label, :growth_family])
+    end
+    candidate_groups["stage3"] = _path_candidates(stage3_ranking)
+    plot_rows["stage3"] = _plot_rows(stage3_overlay;
+        fields = [:time, :observed, :predicted, :model, :pooling_mode, :density, :mix, :component])
+    candidate_groups["stage4"] = _path_candidates(stage4_ranking)
+    plot_rows["stage4"] = _plot_rows(stage4_overlay;
+        filters = [:context => "coculture"],
+        fields = [:time, :observed, :predicted, :model, :pooling_mode, :density, :mix, :component])
+
+    default_ids = Dict{String,String}()
+    for (key, values) in candidate_groups
+        selected = findfirst(item -> Bool(item["eligible"]), values)
+        default_ids[key] = isempty(values) ? "" : values[something(selected, 1)]["id"]
+    end
+    seed_audit_path = joinpath(csv_root, "coculture_treated", "linked_treatment_stage2_seed_audit.csv")
+    if isfile(seed_audit_path)
+        seed_audit = unique(CSV.read(seed_audit_path, DataFrame), [:cell_line, :treatment_family, :pooling_mode])
+        for row in eachrow(seed_audit)
+            key = "stage2_$(row.cell_line)"
+            inherited_id = "$(row.treatment_family)|$(row.pooling_mode)"
+            any(item -> item["id"] == inherited_id, get(candidate_groups, key, [])) && (default_ids[key] = inherited_id)
+        end
+    end
+    payload = Dict(
+        "candidate_groups" => candidate_groups,
+        "plot_rows" => plot_rows,
+        "default_ids" => default_ids,
+        "effective_parameters" => Dict(
+            "stage1" => _effective_parameter_payload(stage1_parameters; lineage = true),
+            "stage3" => _effective_parameter_payload(stage3_parameters),
+        ),
+    )
+    return replace(JSON3.write(payload), "</" => "<\\/")
+end
+
+function _model_path_selector_html(stage::Int)
+    groups = stage in (1, 2) ? ["A2780Naive", "A2780cis"] : [""]
+    selectors = String[]
+    for lineage in groups
+        key = isempty(lineage) ? "stage$(stage)" : "stage$(stage)_$(lineage)"
+        title = isempty(lineage) ? "Stage $(stage) candidates" : lineage
+        push!(selectors, """
+        <fieldset class="path-choice" data-choice-group="$key">
+          <legend>$(_html_escape(title))</legend>
+          <span class="choice-label">Model</span>
+          <div class="model-options" role="radiogroup" aria-label="$(_html_escape(title)) model family"></div>
+          <span class="choice-label">Pooling</span>
+          <div class="pooling-options" role="radiogroup" aria-label="$(_html_escape(title)) pooling method"></div>
+          <p class="inheritance-line" data-inheritance-for="$key"></p>
+        </fieldset>
+        """)
+    end
+    return """
+<div class="path-explorer" data-stage="$stage">
+  <div class="path-explorer-heading"><h3>Compare fitted assumptions</h3><span>Choose a model, then its fitted pooling method</span></div>
+  <div class="path-choice-grid">$(join(selectors))</div>
+  <div class="path-warning" data-stage-warning="$stage" hidden></div>
+  <div class="live-equation" data-equation-stage="$stage" aria-live="polite"></div>
+  <div class="reactive-plot" data-plot-stage="$stage" aria-live="polite"></div>
+</div>
+"""
+end
+
+function _percentile(values::Vector{Float64}, probability::Float64)
+    isempty(values) && return NaN
+    sorted = sort(values)
+    index = clamp(ceil(Int, probability * length(sorted)), 1, length(sorted))
+    return sorted[index]
+end
+
+function _treated_coculture_endpoint_bootstrap(csv_root::AbstractString, winner::AbstractString; n_bootstrap::Int = 5000, seed::Int = 4040)
+    decoded_path = joinpath(csv_root, "coculture_treated", "coculture_treated_a2780_decoded.csv")
+    overlay_path = joinpath(csv_root, "coculture_treated", "figures", "linked_treatment_combined_overlays.csv")
+    isfile(decoded_path) && isfile(overlay_path) || return DataFrame()
+    decoded = CSV.read(decoded_path, DataFrame)
+    wells = filter(row -> occursin("_well_day_averages", String(row.source_file)), decoded)
+    isempty(wells) && return DataFrame()
+    endpoint_day = maximum(Float64.(wells.time))
+    endpoint = wells[Float64.(wells.time) .== endpoint_day, :]
+    overlay = CSV.read(overlay_path, DataFrame)
+    selected = overlay[(String.(overlay.model) .== winner) .&
+        (String.(overlay.context) .== "coculture") .&
+        (Float64.(overlay.time) .== endpoint_day), :]
+    rng = MersenneTwister(seed)
+    rows = NamedTuple[]
+    for group in groupby(endpoint, [:density, :mix, :cell_line]; sort = true)
+        values = Float64.(group.count)
+        samples = [mean(rand(rng, values, length(values))) for _ in 1:n_bootstrap]
+        lineage = String(first(group.cell_line))
+        component = lineage == "A2780Naive" ? "sensitive" : "resistant"
+        prediction_rows = selected[(String.(selected.density) .== String(first(group.density))) .&
+            (String.(selected.mix) .== String(first(group.mix))) .&
+            (String.(selected.component) .== component), :]
+        prediction = isempty(prediction_rows) ? NaN : Float64(first(prediction_rows.predicted))
+        lower = _percentile(samples, 0.025)
+        upper = _percentile(samples, 0.975)
+        push!(rows, (
+            density = String(first(group.density)),
+            mix = String(first(group.mix)),
+            lineage = lineage,
+            endpoint_day = endpoint_day,
+            n_wells = length(values),
+            observed_mean = mean(values),
+            ci95_lower = lower,
+            ci95_upper = upper,
+            model_prediction = prediction,
+            model_within_observed_ci95 = isfinite(prediction) && lower <= prediction <= upper,
+            bootstrap_method = "nonparametric well-resampling within condition",
+            n_bootstrap = n_bootstrap,
+            seed = seed,
+        ))
+    end
+    result = DataFrame(rows)
+    CSV.write(joinpath(csv_root, "coculture_treated", "linked_treatment_endpoint_bootstrap.csv"), result)
+    return result
+end
+
+function _endpoint_bootstrap_html(endpoint::DataFrame, winner::AbstractString)
+    isempty(endpoint) && return "<p class=\"missing\">Endpoint bootstrap could not be generated.</p>"
+    shown = select(endpoint,
+        :density => :Density,
+        :mix => :Mix,
+        :lineage => :Lineage,
+        :n_wells => :Wells,
+        :observed_mean => ByRow(x -> round(x; digits = 1)) => :Observed_mean,
+        :ci95_lower => ByRow(x -> round(x; digits = 1)) => :CI95_lower,
+        :ci95_upper => ByRow(x -> round(x; digits = 1)) => :CI95_upper,
+        :model_prediction => ByRow(x -> round(x; digits = 1)) => :Model_prediction,
+        :model_within_observed_ci95 => :Prediction_inside_CI)
+    return """
+<div class="uncertainty-audit">
+<h3>Day-$(Int(first(endpoint.endpoint_day))) endpoint bootstrap: 95% confidence intervals</h3>
+<p>For each density, mixture, and lineage, the six well-level endpoint measurements were resampled with replacement 5,000 times. The interval is the 2.5th to 97.5th percentile of the bootstrapped well mean. The separately exported aggregate row was excluded, preventing double-counting. The selected <code>$(_html_escape(winner))</code> prediction is shown for comparison.</p>
+<div class="table-wrap">$(_table_html(shown; limit = nrow(shown)))</div>
+<p class="audit-warning"><strong>Interpretation limit:</strong> these are confidence intervals for the observed endpoint mean, not confidence intervals for every fitted parameter and not proof that the latent sensitive/tolerant mechanism is identifiable.</p>
+</div>
+"""
+end
+
+function _linked_sensitivity_html(csv_root::AbstractString)
+    path = joinpath(csv_root, "coculture_treated", "linked_treatment_identifiability.csv")
+    isfile(path) || return ""
+    sensitivity = CSV.read(path, DataFrame)
+    shown = select(sensitivity,
+        :parameter => :Parameter,
+        :estimate => ByRow(x -> round(Float64(x); sigdigits = 5)) => :Estimate,
+        :lower_bound => ByRow(x -> round(Float64(x); sigdigits = 5)) => :Lower_bound,
+        :upper_bound => ByRow(x -> round(Float64(x); sigdigits = 5)) => :Upper_bound,
+        :bound_position => ByRow(x -> round(Float64(x); digits = 3)) => :Bound_position,
+        :identifiability => :Profile_status)
+    return """
+<div class="uncertainty-audit">
+<h3>GrowthParameterEstimation two-sided sensitivity and bound profile</h3>
+<p>The winning linked fit was passed through <code>profile_joint_fit_bounds_two_sided</code>. Each fitted dimension is challenged toward both bounds and classified by its position in the accepted interval. A value near 0 or 1 indicates that the optimum remains close to a bound and is practically weakly identified on that side.</p>
+<div class="table-wrap compact-parameters">$(_table_html(shown; limit = nrow(shown)))</div>
+</div>
+"""
+end
+
+function _structured_parameter_summary(parameter_df::DataFrame, row)
+    isempty(parameter_df) && return nothing
+    mask = trues(nrow(parameter_df))
+    if :model in propertynames(parameter_df) && :model in propertynames(row)
+        mask .&= String.(parameter_df.model) .== String(row.model)
+    elseif :timing_hypothesis in propertynames(parameter_df) && :model in propertynames(row)
+        mask .&= String.(parameter_df.timing_hypothesis) .== String(row.model)
+    end
+    for column in (:cell_line, :pooling_mode)
+        column in propertynames(parameter_df) && column in propertynames(row) || continue
+        mask .&= String.(parameter_df[!, column]) .== String(row[column])
+    end
+    selected = parameter_df[mask, :]
+    isempty(selected) && return nothing
+    value_column = :effective_value in propertynames(selected) ? :effective_value :
+        (:estimate in propertynames(selected) ? :estimate : nothing)
+    value_column === nothing && return nothing
+    entries = String[]
+    for parameter_row in eachrow(selected)
+        density = :density in propertynames(parameter_row) ? "$(parameter_row.density): " : ""
+        value = round(Float64(parameter_row[value_column]); sigdigits = 7)
+        push!(entries, "$(density)$(parameter_row.parameter)=$(value)")
+    end
+    return join(entries, "; ")
+end
+
+function _appendix_ranking_html(path::AbstractString; title::AbstractString, by_cell_line::Bool = false, parameter_path::Union{Nothing,AbstractString} = nothing)
+    isfile(path) || return ""
+    ranking = CSV.read(path, DataFrame)
+    parameter_df = parameter_path !== nothing && isfile(parameter_path) ? CSV.read(parameter_path, DataFrame) : DataFrame()
+    groups = by_cell_line && :cell_line in propertynames(ranking) ? groupby(ranking, :cell_line; sort = true) : [ranking]
+    blocks = String[]
+    for group in groups
+        group_df = DataFrame(group)
+        ranked = _report_ranked_rows(group_df)
+        pooling = :pooling_mode in propertynames(ranked) ? String.(ranked.pooling_mode) : fill("", nrow(ranked))
+        boundary = :boundary_issue in propertynames(ranked) ? string.(ranked.boundary_issue) : fill("", nrow(ranked))
+        fallback_params = :params in propertynames(ranked) ? String.(ranked.params) : fill("Not exported", nrow(ranked))
+        params = [something(_structured_parameter_summary(parameter_df, row), fallback)
+            for (row, fallback) in zip(eachrow(ranked), fallback_params)]
+        appendix = DataFrame(
+            ID = ["M$(rank)" for rank in ranked.report_rank],
+            Model = [get(REPORT_MODEL_LABELS, String(model), String(model)) for model in ranked.model],
+            Code = String.(ranked.model),
+            Pooling = pooling,
+            BIC = round.(Float64.(ranked.bic); digits = 3),
+            delta_BIC = round.(Float64.(ranked.report_delta_bic); digits = 3),
+            Free_parameters = [_report_parameter_count(row) for row in eachrow(ranked)],
+            Boundary_issue = boundary,
+            Parameters = params,
+        )
+        suffix = by_cell_line ? ": $(String(first(group_df.cell_line)))" : ""
+        push!(blocks, "<h3>$(_html_escape(title * suffix))</h3><div class=\"table-wrap appendix-table\">$(_table_html(appendix; limit = nrow(appendix)))</div>")
+    end
+    return join(blocks)
+end
+
 function _report_stage4_expanded_equations_html()
     return raw"""
 <div class="notation-key equation-detail"><h3>Stage 4 expanded treated-coculture equations</h3>
 <p>The BIC table below names the candidate-specific change. The full linked system inherits Stage 1 growth, Stage 2 treatment timing/Hill response, and Stage 3 coculture competition/death.</p>
 <div class="math">\[C=S+T,\qquad L_N=N+\alpha_{NC,d}C,\qquad L_C=C+\alpha_{CN,d}N\]</div>
-<div class="math">\[G_N^{\mathrm{co}}=r_{N,d}N\left(1-\frac{L_N}{K_{N,d}}\right)-d_NN\]</div>
-<div class="math">\[G_C^{\mathrm{co}}=r_CC\left[1-\left(\frac{L_C}{K_C}\right)^{\theta_C}\right]-d_CC\]</div>
+<div class="math">\[G_N^{\mathrm{co}}=G_N(N,L_N,t)-d_NN,\qquad G_C^{\mathrm{co}}=G_C(C,L_C,t)-d_CC\]</div>
 <div class="math">\[M_N=e^{\beta_NL_N/K_{N,d}},\qquad M_C=e^{\beta_CL_C/K_C}\]</div>
 <div class="math">\[f_{T0}^{\mathrm{co}}=\operatorname{logit}^{-1}\!\left(\operatorname{logit}(f_{T0})+\delta_f\right),\qquad H_{CT}^{\mathrm{co}}(z)=e^{\gamma_T}H_{CT}(z),\qquad \rho_T=e^{\gamma_{r,T}}\]</div>
 <div class="math">\[\frac{dN}{dt}=G_N^{\mathrm{co}}-M_NA_N(t)H_N(z)N\]</div>
@@ -856,6 +1252,7 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     mkpath(report_dir)
     csv_root = joinpath(root, "outputs", "csv")
     image_root = joinpath(root, "outputs", "images")
+    model_path_payload = _model_path_payload(csv_root)
     timing_ranking_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_timing_hypothesis_ranking.csv")
     timing_figure_path = joinpath(image_root, "monoculture_treated", "figures", "monoculture_treated_timing_hypothesis_grid.png")
     timing_winner = if isfile(timing_ranking_path)
@@ -876,6 +1273,53 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     else
         "load_scaled"
     end
+    linked_context_description = get(Dict(
+        "strict_inheritance" => "no additional coculture treatment modifier",
+        "competitor_scaled" => "competitor-load drug scaling",
+        "load_scaled" => "total-load drug scaling",
+        "load_plus_context_amplitude" => "total-load scaling and context amplitude",
+        "tolerant_context_shift" => "initial tolerant-fraction and tolerant-kill shifts",
+        "subpopulation_load_scaled" => "subpopulation-specific load scaling",
+        "load_plus_tolerant_context" => "total-load scaling, an initial tolerant-fraction shift, and tolerant-kill attenuation",
+        "load_plus_tolerant_growth_context" => "total-load scaling, tolerant-state shifts, and tolerant-growth plasticity",
+        "fully_free_context_diagnostic" => "a fully separate diagnostic treatment vector",
+    ), linked_winner, "the candidate-specific context terms listed in its ranking row")
+    seed_audit_path = joinpath(csv_root, "coculture_treated", "linked_treatment_stage2_seed_audit.csv")
+    stage4_inheritance_note = ""
+    if isfile(seed_audit_path)
+        seed_audit = CSV.read(seed_audit_path, DataFrame)
+        cis_seed = seed_audit[String.(seed_audit.cell_line) .== "A2780cis", :]
+        if nrow(cis_seed) > 0 && :nominal_stage2_winner in propertynames(cis_seed)
+            row = first(cis_seed)
+            if String(row.nominal_stage2_winner) != String(row.treatment_family)
+                stage4_inheritance_note = " Stage 2 nominally selected $(row.nominal_stage2_winner), but Stage 4 uses the best population-balance-compatible $(row.treatment_family) candidate (Delta BIC=$(round(Float64(row.compatible_delta_bic); digits = 2))); the mechanisms are not separated by Delta BIC >= 2."
+            end
+        end
+    end
+    untreated_baseline_path = joinpath(csv_root, "monoculture_untreated", "untreated_group_baselines.csv")
+    untreated_baselines = isfile(untreated_baseline_path) ? CSV.read(untreated_baseline_path, DataFrame) : DataFrame()
+    function selected_growth_model(cell_line, fallback)
+        isempty(untreated_baselines) && return fallback
+        rows = untreated_baselines[String.(untreated_baselines.cell_line) .== cell_line, :]
+        isempty(rows) ? fallback : String(first(rows.best_model))
+    end
+    naive_growth_model = selected_growth_model("A2780Naive", "logistic_growth")
+    cis_growth_model = selected_growth_model("A2780cis", "theta_logistic_growth")
+    naive_growth_label = get(REPORT_MODEL_LABELS, naive_growth_model, naive_growth_model)
+    cis_growth_label = get(REPORT_MODEL_LABELS, cis_growth_model, cis_growth_model)
+    naive_growth_equation = get(REPORT_MODEL_EQUATIONS, naive_growth_model, "")
+    cis_growth_equation = get(REPORT_MODEL_EQUATIONS, cis_growth_model, "")
+    treated_status_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_pooling_status.csv")
+    treated_status = isfile(treated_status_path) ? CSV.read(treated_status_path, DataFrame) : DataFrame()
+    function selected_treatment_model(cell_line, fallback)
+        isempty(treated_status) && return fallback
+        rows = treated_status[String.(treated_status.cell_line) .== cell_line, :]
+        isempty(rows) ? fallback : String(first(rows.winning_model))
+    end
+    naive_treatment_model = selected_treatment_model("A2780Naive", "joint_ic_effect_hill_ramp_onset")
+    cis_treatment_model = selected_treatment_model("A2780cis", "joint_ic_effect_transit_death")
+    naive_treatment_label = get(REPORT_MODEL_LABELS, naive_treatment_model, naive_treatment_model)
+    cis_treatment_label = get(REPORT_MODEL_LABELS, cis_treatment_model, cis_treatment_model)
 
     stages = [
         (
@@ -886,14 +1330,15 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <div class="notation-key"><h3>Stage 1 notation key</h3><dl>
 <dt>\(X_i(t)\)</dt><dd>Observed total population for cell line \(i\); \(i=N\) means A2780Naive and \(i=C\) means A2780cis.</dd>
 <dt>\(\dot X_i=dX_i/dt\)</dt><dd>Rate of change of that total population, in measured cells per day.</dd>
-<dt>\(G_i(X_i)\)</dt><dd>Candidate intrinsic growth law: logistic, theta-logistic, or Gompertz.</dd>
+<dt>\(G_i(X_i,t)\)</dt><dd>Candidate intrinsic growth law: logistic, theta-logistic, Gompertz, hard-lag theta-logistic, Baranyi-adjusted theta-logistic, or smooth-adaptation theta-logistic.</dd>
 <dt>\(r_i,K_i,\theta_i\)</dt><dd>Intrinsic growth rate, carrying capacity, and optional theta-logistic shape.</dd>
+<dt>\(\tau_i,q_{0,i},\lambda_{A,i}\)</dt><dd>Optional hard-lag duration, Baranyi initial physiological-state parameter, or smooth adaptation rate. Only the parameter belonging to the candidate being fitted is used.</dd>
 </dl></div>
 """,
-            ranking = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_top5.csv"),
+            ranking = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_model_ranking.csv"),
             by_cell_line = true,
             figure = joinpath(image_root, "monoculture_untreated", "figures", "monoculture_untreated_pooling_model_grid.png"),
-            caption = "Joint 20k/30k untreated fits. Curves use the selected cell-line growth family and density-aware pooling mode.",
+            caption = "Models shown: A2780Naive $(naive_growth_label) and A2780cis $(cis_growth_label), each using its selected density-pooling mode. These are joint 20k/30k untreated fits; every panel uses the same y-axis range.",
         ),
         (
             number = 2,
@@ -912,10 +1357,10 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(A_i(t)H_i(z)\)</dt><dd>The active per-capita treatment effect applied to a live/proliferating state. Transit models route this effect into a damaged-visible compartment before clearance.</dd>
 </dl><p><strong>Why the derivatives differ:</strong> \(dX/dt\), \(dP/dt\), and \(dS/dt\) are rates for different biological state variables, not interchangeable names for the same quantity.</p></div>
 """,
-            ranking = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_cell_line_top5.csv"),
+            ranking = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_dose_model_ranking.csv"),
             by_cell_line = true,
             figure = joinpath(image_root, "monoculture_treated", "figures", "monoculture_treated_best_joint_model_by_environment.png"),
-            caption = "Best treated model in every cell-line, density, and dose environment; one joint BIC winner is used across each cell line.",
+            caption = "Models shown: A2780Naive $(naive_treatment_label) and A2780cis $(cis_treatment_label), with the selected pooling mode for each lineage. One joint winner is used across both densities and all three doses for each cell line; every panel uses the same y-axis range.",
         ),
         (
             number = 3,
@@ -931,15 +1376,15 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(d_N,d_C\)</dt><dd>Optional first-order lineage loss rates in the competition-plus-death candidate.</dd>
 </dl></div>
 """,
-            ranking = joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_top5.csv"),
+            ranking = joinpath(csv_root, "coculture_untreated", "coculture_untreated_pooling_model_ranking.csv"),
             by_cell_line = false,
             figure = joinpath(image_root, "coculture_untreated", "figures", "coculture_untreated_best_mechanistic_fit_grid.png"),
-            caption = "Best coupled competition model across 20k/30k and 25:75, 50:50, and 75:25 starting mixtures.",
+            caption = "Model shown: asymmetric competition with lineage-specific loss using partial_5pct pooling, fitted jointly across 20k/30k and all three starting mixtures. Every panel uses the same y-axis range.",
         ),
         (
             number = 4,
             title = "Treated coculture",
-            note = "Top five linked treatment hypotheses across all treated monoculture and coculture environments. Coculture treatment is IC50 at 1.0 uM (Hill effect signal z = 0.50). Stage-2 drug parameters are inherited within a +/-5% validation margin; every additional context effect is named explicitly.",
+            note = "Top five linked treatment hypotheses across all treated monoculture and coculture environments. Coculture treatment is IC50 at 1.0 uM (Hill effect signal z = 0.50). Stage-2 drug parameters are inherited within a +/-5% validation margin; every additional context effect is named explicitly.$(stage4_inheritance_note)",
             notation = raw"""
 <div class="notation-key"><h3>Stage 4 notation key</h3><dl>
 <dt>\(N(t),C(t)\)</dt><dd>Total A2780Naive and A2780cis populations. For the resistant population-balance model, \(C=S+T\).</dd>
@@ -951,28 +1396,36 @@ function render_a2780_report_html(; start::AbstractString = pwd())
 <dt>\(\rho_T\)</dt><dd>Multiplier on tolerant-state growth in treated coculture; \(\rho_T=1\) means no growth-context change.</dd>
 </dl></div>
 """,
-            ranking = joinpath(csv_root, "coculture_treated", "linked_treatment_top5.csv"),
+            ranking = joinpath(csv_root, "coculture_treated", "linked_treatment_model_ranking.csv"),
             by_cell_line = false,
             figure = joinpath(image_root, "coculture_treated", "figures", "linked_treatment_coculture_grid.png"),
-            caption = "Best linked treatment model across both seeding densities and all mixture environments.",
+            caption = "Model shown: $(get(REPORT_MODEL_LABELS, linked_winner, linked_winner)) with linked_global pooling, fitted across both seeding densities and all mixture environments. Every panel uses the same y-axis range.",
         ),
     ]
 
     sections = String[
-        "<header><a class=\"back-home\" href=\"../../../../index.html\">Back to reports home</a><h1>A2780 staged model comparison</h1><p>Top-five mechanistic equations, BIC rankings, and fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Detailed parameters, diagnostics, provenance, and inheritance audits are retained in <code>outputs/csv</code>.</p></header>",
+        "<header><a class=\"back-home\" href=\"../../../../index.html\">&#8592; Back</a><h1>A2780 staged model comparison</h1><p>Mechanistic equations, Delta-BIC rankings, and explicitly labeled fitted graph grids for the four-stage analysis.</p><p class=\"artifact-note\">Each teaching table shows the five leading candidates plus the simplest tested candidate when it is not already present. Absolute BIC values and complete parameter vectors are retained in the appendix and <code>outputs/csv</code>.</p></header>",
     ]
     for stage in stages
-        table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line)
+        table = _report_top_five_html(stage.ranking; by_cell_line = stage.by_cell_line, label = "Stage $(stage.number) $(stage.title)")
         graph = _report_stage_figure(stage.figure, report_dir, stage.title, stage.caption)
+        explorer = _model_path_selector_html(stage.number)
+        fixed_graph = "<details class=\"fixed-fit-plot\"><summary>Open the fixed, data-selected export</summary>$(graph)</details>"
         stage_details = stage.number == 4 ? _report_stage4_expanded_equations_html() : ""
-        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(stage_details)$(table)$(graph)</section>")
+        uncertainty = if stage.number == 4
+            endpoint = _treated_coculture_endpoint_bootstrap(csv_root, linked_winner)
+            _linked_sensitivity_html(csv_root) * _endpoint_bootstrap_html(endpoint, linked_winner)
+        else
+            ""
+        end
+        push!(sections, "<section><div class=\"stage-heading\"><span>Stage $(stage.number)</span><h2>$(_html_escape(stage.title))</h2></div><p>$(_html_escape(stage.note))</p>$(stage.notation)$(stage_details)$(explorer)$(table)$(fixed_graph)$(uncertainty)</section>")
         if stage.number == 2 && isfile(timing_ranking_path)
-            timing_table = _report_top_five_html(timing_ranking_path)
+            timing_table = _report_top_five_html(timing_ranking_path; label = "Stage 2 timing audit")
             timing_graph = _report_stage_figure(
                 timing_figure_path,
                 report_dir,
                 "Treated monoculture timing hypotheses",
-                "The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is $(get(REPORT_MODEL_LABELS, timing_winner, timing_winner)).",
+                "The top three timing architectures are overlaid in every cell-line, density, and dose panel. The BIC-selected resistant timing is $(get(REPORT_MODEL_LABELS, timing_winner, timing_winner)); every panel uses the same y-axis range.",
             )
             timing_notation = raw"""
 <div class="notation-key"><h3>Timing-audit notation key</h3><dl>
@@ -1003,9 +1456,11 @@ function render_a2780_report_html(; start::AbstractString = pwd())
   </article>
   <article>
     <h3>1. Intrinsic untreated monoculture growth</h3>
-    <div class="math">\\[\\frac{dN}{dt}=r_{N,d}N\\left[1-\\frac{N}{K_{N,d}}\\right]_+\\qquad\\text{(A2780Naive)}\\]</div>
-    <div class="math">\\[\\frac{dC}{dt}=r_CC\\left[1-\\left(\\frac{C}{K_C}\\right)^{\\theta_C}\\right]_+\\qquad\\text{(A2780cis)}\\]</div>
-    <p>The selected winners are density-partially-pooled logistic growth for A2780Naive and shared theta-logistic growth for A2780cis. These exact families and effective parameters are inherited by all later stages.</p>
+    <p><strong>A2780Naive: $(_html_escape(naive_growth_label)).</strong></p>
+    <div class="math">$(naive_growth_equation)</div>
+    <p><strong>A2780cis: $(_html_escape(cis_growth_label)).</strong></p>
+    <div class="math">$(cis_growth_equation)</div>
+    <p>The displayed equations are read from the selected Stage 1 baseline artifact when this report is built. The exact winning family, including any fitted lag or adaptation term, and its density-specific effective parameters are inherited by all later stages. The Baranyi candidate is used only as a phenomenological lag description here; its original biological interpretation was developed for microbial growth and is not evidence of an ovarian-cancer mechanism.</p>
   </article>
   <article>
     <h3>2. Add treated-monoculture effects</h3>
@@ -1016,10 +1471,10 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <div class="math">\\[H_{N,d}(z)=\\frac{E_{\\max,N,d}z^{h_N}}{EC_{50,N}^{h_N}+z^{h_N}+\\varepsilon}\\]</div>
     <div class="math">\\[H_{CS,d}(z)=\\frac{E_{\\max,CS,d}z^4}{0.5^4+z^4+\\varepsilon},\\qquad H_{CT,d}(z)=\\frac{E_{\\max,CT,d}z^4}{0.5^4+z^4+\\varepsilon}\\]</div>
     <div class="math">\\[E_{\\max,i,d}=E_{\\max,i,\\mathrm{center}}e^{s_d\\delta_{E,i}},\\qquad |\\delta_{E,i}|\\le\\ln(1.05)\\]</div>
-    <div class="math">\\[\\frac{dN}{dt}=r_{N,d}N\\left[1-\\frac{N}{K_{N,d}}\\right]_+-A_N(t)H_{N,d}(z)N\\]</div>
+    <div class="math">\\[\\frac{dN}{dt}=G_N(N,t)-A_N(t)H_{N,d}(z)N\\]</div>
     <div class="math">\\[C=S+T\\]</div>
-    <div class="math">\\[\\frac{dS}{dt}=r_CC\\left[1-\\left(\\frac{C}{K_C}\\right)^{\\theta_C}\\right]_+\\frac{S}{C}-A_C(t)H_{CS,d}(z)S\\]</div>
-    <div class="math">\\[\\frac{dT}{dt}=r_CC\\left[1-\\left(\\frac{C}{K_C}\\right)^{\\theta_C}\\right]_+\\frac{T}{C}-A_C(t)H_{CT,d}(z)T\\]</div>
+    <div class="math">\\[\\frac{dS}{dt}=G_C(C,t)\\frac{S}{C}-A_C(t)H_{CS,d}(z)S\\]</div>
+    <div class="math">\\[\\frac{dT}{dt}=G_C(C,t)\\frac{T}{C}-A_C(t)H_{CT,d}(z)T\\]</div>
     <p>The A2780Naive winner is delayed Hill-ramp kill. The A2780cis winner has separate sensitive and tolerant kill amplitudes and an estimated initial tolerant fraction. A five-model timing audit selected <code>$(timing_winner)</code> by BIC; onset, gradual activation, shared-onset, and bounded-onset alternatives remain in the ranking rather than being silently discarded.</p>
   </article>
   <article>
@@ -1027,10 +1482,10 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <div class="math">\\[C=S+T\\]</div>
     <div class="math">\\[\\alpha_{NC,d}=\\alpha_{NC,\\mathrm{center}}e^{s_d\\delta_\\alpha},\\qquad \\alpha_{CN,d}=\\alpha_{CN,\\mathrm{center}}e^{s_d\\delta_\\alpha}\\]</div>
     <div class="math">\\[L_N=N+\\alpha_{NC,d}C,\\qquad L_C=C+\\alpha_{CN,d}N\\]</div>
-    <div class="math">\\[G_N^{\\mathrm{co}}=r_{N,d}N\\left(1-\\frac{L_N}{K_{N,d}}\\right)-d_NN\\]</div>
-    <div class="math">\\[G_C^{\\mathrm{co}}=r_CC\\left[1-\\left(\\frac{L_C}{K_C}\\right)^{\\theta_C}\\right]-d_CC\\]</div>
+    <div class="math">\\[G_N^{\\mathrm{co}}=G_N(N,L_N,t)-d_NN\\]</div>
+    <div class="math">\\[G_C^{\\mathrm{co}}=G_C(C,L_C,t)-d_CC\\]</div>
     <div class="math">\\[\\frac{dN}{dt}=G_N^{\\mathrm{co}},\\qquad \\frac{dC}{dt}=G_C^{\\mathrm{co}}\\qquad\\text{(untreated coculture)}\\]</div>
-    <p>The winner is asymmetric competition with lineage-specific death. The two competition coefficients may differ by direction; their common density contrast is bounded at plus-or-minus five percent. Death rates are shared across density. Monoculture <code>r</code>, <code>K</code>, and <code>theta</code> remain fixed.</p>
+    <p>The winner is asymmetric competition with lineage-specific death. The two competition coefficients may differ by direction; their common density contrast is bounded at plus-or-minus five percent. Death rates are shared across density. Every selected monoculture growth parameter, including a lag/adaptation parameter when present, remains fixed.</p>
   </article>
   <article>
     <h3>4. Fully expanded treated-coculture winner</h3>
@@ -1038,18 +1493,26 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <div class="math">\\[M_N=\\exp\\!\\left(\\operatorname{clamp}\\!\\left[\\beta_N\\frac{L_N}{K_{N,d}},-4,4\\right]\\right),\\qquad M_C=\\exp\\!\\left(\\operatorname{clamp}\\!\\left[\\beta_C\\frac{L_C}{K_C},-4,4\\right]\\right)\\]</div>
     <div class="math">\\[f_{T0}^{\\mathrm{co}}=\\operatorname{logit}^{-1}\\!\\left[\\operatorname{logit}(f_{T0})+\\delta_f\\right]\\]</div>
     <div class="math">\\[H_{CT,d}^{\\mathrm{co}}(0.50)=e^{\\gamma_T}H_{CT,d}(0.50),\\qquad \\rho_T=e^{\\gamma_{r,T}}\\]</div>
-    <div class="math">\\[\\frac{dN}{dt}=r_{N,d}N\\left(1-\\frac{L_N}{K_{N,d}}\\right)-d_NN-M_NA_N(t)H_{N,d}(0.50)N\\]</div>
-    <div class="math">\\[\\frac{dS}{dt}=\\left\\{r_CC\\left[1-\\left(\\frac{L_C}{K_C}\\right)^{\\theta_C}\\right]-d_CC\\right\\}\\frac{S}{C}-M_CA_C(t)H_{CS,d}(0.50)S\\]</div>
-    <div class="math">\\[\\frac{dT}{dt}=\\rho_T\\left\\{r_CC\\left[1-\\left(\\frac{L_C}{K_C}\\right)^{\\theta_C}\\right]-d_CC\\right\\}\\frac{T}{C}-M_CA_C(t)H_{CT,d}^{\\mathrm{co}}(0.50)T\\]</div>
+    <div class="math">\\[\\frac{dN}{dt}=G_N^{\\mathrm{co}}-M_NA_N(t)H_{N,d}(0.50)N\\]</div>
+    <div class="math">\\[\\frac{dS}{dt}=G_C^{\\mathrm{co}}\\frac{S}{C}-M_CA_C(t)H_{CS,d}(0.50)S\\]</div>
+    <div class="math">\\[\\frac{dT}{dt}=\\rho_TG_C^{\\mathrm{co}}\\frac{T}{C}-M_CA_C(t)H_{CT,d}^{\\mathrm{co}}(0.50)T\\]</div>
     <div class="math">\\[C=S+T,\\qquad L_N=N+\\alpha_{NC,d}C,\\qquad L_C=C+\\alpha_{CN,d}N\\]</div>
-    <p>This is the selected <code>$(linked_winner)</code> model. Intrinsic growth and untreated competition/death parameters are fixed from Stages 1 and 3. Stage 2 drug parameters and the BIC-selected timing architecture are inherited within a plus-or-minus five-percent validation window. The fitted context terms are total-load drug scaling <code>beta_N,beta_C</code>, a resistant tolerant-fraction shift <code>delta_f</code>, tolerant-kill attenuation <code>gamma_T</code>, and a tolerant-growth plasticity multiplier <code>rho_T</code>.</p>
+    <p>This is the selected <code>$(linked_winner)</code> model. Intrinsic growth and untreated competition/death parameters are fixed from Stages 1 and 3. Stage 2 drug parameters and the BIC-selected timing architecture are inherited within a plus-or-minus five-percent validation window. Its fitted context structure is $(_html_escape(linked_context_description)); modifiers not named by this winner are fixed at their neutral values.</p>
   </article>
   <article>
-    <h3>Fitting and BIC selection</h3>
+    <h3>Fitting, scale normalization, and BIC selection</h3>
     <div class="math">\\[s_j=\\max_t y_j(t)\\]</div>
     <div class="math">\\[\\mathrm{SSE}_{\\mathrm{scaled}}=\\sum_j\\sum_t\\left[\\frac{y_j(t)-\\widehat y_j(t)}{s_j}\\right]^2\\]</div>
+    <div class="math">\\[\\mathrm{SSE}_{\\mathrm{raw}}=\\sum_j\\sum_t\\left[y_j(t)-\\widehat y_j(t)\\right]^2\\]</div>
     <div class="math">\\[\\mathrm{BIC}=n\\ln\\!\\left(\\frac{\\mathrm{SSE}_{\\mathrm{scaled}}}{n}\\right)+k\\ln n\\]</div>
-    <p>Every candidate is fitted jointly across the environments stated in its stage. Here <code>n</code> is the total number of observations and <code>k</code> counts all fitted center, shape, modifier, and pooling-contrast parameters. Fixed inherited parameters and fixed day-zero populations are not counted again.</p>
+    <p><strong>Small-to-large trajectory normalization.</strong> Each trajectory \\(j\\) is divided by its own observed peak \\(s_j\\). A 500-cell trajectory and a 4,000-cell trajectory therefore contribute comparable relative errors instead of the larger curve dominating merely because its residuals have larger units. The scaled SSE is dimensionless and drives optimization and BIC; raw SSE in squared cell-count units is also exported for scale-aware interpretation.</p>
+    <p><strong>What is jointly fitted.</strong> Every candidate is fitted across all trajectories stated in its stage with one objective. In the canonical report, image tiles are averaged within wells and then biological samples are averaged at each time point. The sample-aware report preserves sample-level trajectories after within-well averaging and displays their between-sample uncertainty bands.</p>
+    <p><strong>BIC counting.</strong> Here \\(n\\) is the total number of fitted time-point observations across all joint trajectories, not the number of wells, tiles, or environments. The count \\(k\\) includes every freely optimized center, shape, treatment, context, and pooling-contrast parameter. Fixed inherited parameters and fixed day-zero populations are not counted again. Lower BIC is better only relative to candidates fitted to the same observations and objective; it is not proof that the winning biological mechanism is true.</p>
+    <p><strong>How to read Delta BIC.</strong> For candidate <code>m</code>, <code>Delta BIC(m) = BIC(m) - minimum BIC</code>, so the table winner is always zero. As descriptive evidence bands, 0-2 means little separation from the winner, 2-6 indicates positive separation, 6-10 strong separation, and values above 10 very strong separation. These are relative model-selection heuristics, not probabilities, confidence intervals, or proof of mechanism. Comparisons are valid only within a table whose candidates use the same observations and residual objective.</p>
+    <p><strong>Initial conditions and time origin.</strong> Day zero is fixed at 67 measured cells for 20k seeding and 100 for 30k seeding. The first observed point is day 1. These anchors are passed through the package's fixed-initial-time and initial-state builder interface and are not estimated kinetic parameters.</p>
+    <p><strong>Pooling.</strong> Shared models use one parameter value across 20k and 30k. Partial pooling permits only \\(r\\) and \\(K\\), or the stage-specific named effects, to differ through symmetric log contrasts bounded at plus-or-minus five percent: \\(p_{20k}=p_c e^{-\\delta_p}\\), \\(p_{30k}=p_c e^{\\delta_p}\\), \\(|\\delta_p|\\le\\ln(1.05)\\). Fully independent density fits are retained as diagnostics but cannot silently become inherited defaults.</p>
+    <p><strong>Fit validity.</strong> A fit is rejected if any parameter, prediction, SSE, or BIC is non-finite, or if its objective retains the failure sentinel. Boundary profiles expand requested bounds and accept an expansion only when the improvement is scientifically material under the configured BIC and margin rules. Multistart results and parameter-stability summaries are retained where that stage uses multistart optimization.</p>
+    <p><strong>Uncertainty and weighting.</strong> Error ribbons show empirical variation; they are not inverse-variance weights in the canonical scaled-SSE objective. Later-stage fits inherit only eligible finite winners and record the exact source family and parameters in inheritance audit CSVs. This prevents a downstream stage from quietly replacing a selected lag, growth, dose-response, or competition law.</p>
   </article>
 </div>
 <div class="model-guide">
@@ -1077,6 +1540,9 @@ function render_a2780_report_html(; start::AbstractString = pwd())
         <dt><code>r_i</code></dt><dd>Intrinsic per-capita growth rate, with units day^-1.</dd>
         <dt><code>K_i</code></dt><dd>Carrying capacity on the measured cell-count scale.</dd>
         <dt><code>theta_i</code></dt><dd>Dimensionless theta-logistic shape. \\(\\theta=1\\) recovers ordinary logistic growth; other values shift how sharply crowding suppresses growth.</dd>
+        <dt><code>tau_i</code></dt><dd>Hard-lag duration in days. The hard-lag candidate sets intrinsic growth to zero until \\(t>\\tau_i\\), then switches the fitted theta-logistic law on.</dd>
+        <dt><code>q0_i</code></dt><dd>Positive Baranyi initial-state parameter. It defines \\(\\alpha_B(t)=q_0/(q_0+e^{-r_it})\\), which smoothly raises the fraction of the intrinsic growth rate expressed over time.</dd>
+        <dt><code>lambda_A,i</code></dt><dd>Smooth adaptation rate in day\\(^{-1}\\). It defines \\(A_i(t)=1-e^{-\\lambda_{A,i}t}\\), equivalent to \\(dA_i/dt=\\lambda_{A,i}(1-A_i)\\) with \\(A_i(0)=0\\).</dd>
         <dt><code>[x]_+</code></dt><dd>Positive part \\([x]_+=\\max(x,0)\\), used in monoculture fits to prevent the inherited growth term from becoming artificial negative crowding death above <code>K</code>.</dd>
       </dl>
     </article>
@@ -1195,6 +1661,11 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <p>Each lineage can affect the other differently.</p>
     <p class="equation-label"><strong>Asymmetric competition plus death</strong></p><div class="math">\\[\\frac{dN}{dt}=G_N(L_N)-d_NN,\\qquad \\frac{dC}{dt}=G_C(L_C)-d_CC\\]</div>
     <p>Adds lineage-specific loss beyond competitive growth suppression. This is the selected Stage 3 model. All six density/mix environments are fitted together.</p>
+    <p class="equation-label"><strong>Strobl density-dependent-birth family</strong></p><div class="math">\\[\\frac{dS}{dt}=r_S\\left(1-\\frac{S+R}{K_S}\\right)\\left(1-\\frac{2d_DD(t)}{D_{\\max}}\\right)S-d_SS,\\qquad \\frac{dR}{dt}=r_R\\left(1-\\frac{S+R}{K_R}\\right)R-d_RR\\]</div>
+    <p>The four main-paper reductions test neither cost nor turnover, growth cost only, turnover only, and growth cost plus turnover. The supplementary variants place the same relative cost in resistant carrying capacity, \\(K_R=(1-c)K\\), or resistant death, \\(d_R=(1+c)d_T\\). For untreated Stage 3, \\(D(t)=0\\).</p>
+    <p class="equation-label"><strong>Strobl density-dependent-death alternative</strong></p><div class="math">\\[\\frac{dS}{dt}=r_S\\left(1-\\frac{2d_DD(t)}{D_{\\max}}\\right)S-d_T^{\\dagger}\\frac{S+R}{K}S,\\qquad \\frac{dR}{dt}=r_RR-d_T^{\\dagger}\\frac{S+R}{K}R\\]</div>
+    <p>This supplementary model moves density regulation from proliferation to death. It is fitted as a diagnostic because the paper's \\(S/R\\) phenotypes are mapped here to two separately measured A2780 cell lines. The mapping is useful as a structural benchmark but is not proof that the lines are interchangeable with within-tumor sensitive and resistant phenotypes.</p>
+    <p><strong>Primary sources:</strong> <a href="$(FitWorkflows.STROBL_REFERENCE_URL)">Strobl et al. main paper</a>, <a href="$(FitWorkflows.STROBL_SUPPLEMENT_URL)">mathematical supplement</a>, and <a href="https://github.com/MathOnco/AT_costOfResistance_LVModel">authors' fitting code</a>. The report preserves the published equation structures; A2780-specific parameter estimates are refitted against this experiment.</p>
   </article>
   <article class="model-family">
     <h3>Stage 4: linked treated-coculture hypotheses</h3>
@@ -1216,6 +1687,8 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <p>Adds one bounded phenotype-specific growth-plasticity multiplier to the preceding model. This is the selected Stage 4 mechanism; BIC pays for the additional fitted parameter.</p>
     <p class="equation-label"><strong>Fully free context diagnostic</strong></p><div class="math">\\[\\mathbf q_{\\mathrm{drug}}^{\\mathrm{co}}\\ne\\mathbf q_{\\mathrm{drug}}^{\\mathrm{mono}}\\]</div>
     <p>Fits separate complete drug vectors by context. It tests whether inheritance fails, but is deliberately diagnostic because it gives up mechanistic sharing.</p>
+    <p class="equation-label"><strong>Strobl linked-treatment benchmarks</strong></p><div class="math">\\[\\bar D(t)=\\frac{D(t)}{D_{\\max}},\\qquad \\text{drug modifies sensitive-cell proliferation by }1-2d_D\\bar D(t)\\]</div>
+    <p>Each Strobl variant is also fitted to the identical 24-trajectory Stage 4 objective. Physical cisplatin concentrations are normalized by the largest measured dose, 1.47 uM; \\(d_D\\) is refitted for A2780 rather than copied from the prostate-cancer parameterization. A2780cis receives no direct drug term because the paper defines \\(R\\) as fully resistant. This is a stringent, low-parameter benchmark and may fit poorly if A2780cis retains measurable cisplatin response.</p>
     <p><strong>Important:</strong> Stage 4 does not attach an arbitrary coefficient to every term. Growth and untreated interaction parameters are fixed from earlier stages, and the Stage 2 drug vector is restricted to a plus-or-minus five-percent inheritance window. Candidate-specific context terms are counted in BIC, and the fully free context vector remains diagnostic only.</p>
   </article>
 
@@ -1227,6 +1700,75 @@ function render_a2780_report_html(; start::AbstractString = pwd())
     <li><strong>Stage 4 combines the mechanisms.</strong> Stage 1 growth and Stage 3 interaction are fixed. Stage 2 drug parameters are inherited within plus-or-minus five percent. BIC then tests strict inheritance, load effects, resistant-state shifts, tolerant growth plasticity, and a fully separate diagnostic vector across the combined treated data.</li>
   </ol>
 </div>
+</section>
+""")
+
+    push!(sections, raw"""
+<section class="path-summary" id="model-path-summary">
+  <div class="stage-heading"><span>Selection</span><h2>Selected inheritance path</h2></div>
+  <p>The ledger records the exact fitted rows selected above. The running value is the sum of the displayed stage-local Delta BIC penalties. It is a comparison aid, not a new global BIC, because Stage 4 reuses treated-monoculture observations and only the data-selected path has been refitted end to end.</p>
+  <div class="path-ledger" data-path-ledger></div>
+  <div class="path-total"><span>Running Delta BIC penalty</span><strong data-path-total>0.00</strong></div>
+  <p class="path-validity" data-path-validity></p>
+  <div class="hybrid-refit" data-refit-panel>
+    <div>
+      <strong data-refit-mode>Preview</strong>
+      <p data-refit-status>Stored fits update immediately. Connect the local Julia service to conditionally refit downstream stages under this exact inheritance path.</p>
+    </div>
+    <button type="button" class="refit-button" data-refit-button>Refit downstream</button>
+  </div>
+  <details class="refit-details" data-refit-details hidden>
+    <summary>Conditional-refit provenance</summary>
+    <pre data-refit-result></pre>
+  </details>
+  <details class="refit-details hybrid-method">
+    <summary>How preview and refitting work</summary>
+    <p><strong>Preview</strong> switches among stored top-candidate trajectories immediately. <strong>Refit downstream</strong> sends the exact model and pooling path to a local Julia service, which calls the package fitting functions, carries fitted parameters into later stages, and caches the result by path.</p>
+    <p>If a selected treatment model lacks the latent states required by the linked Stage 4 equation, or a selected competition family cannot be inherited by that equation, Stages 1-3 are still recomputed and the result is labeled <strong>Partially refitted</strong>. The static GitHub Pages copy remains fully usable for preview but cannot start Julia by itself.</p>
+  </details>
+</section>
+
+<section class="pooling-glossary" id="pooling-notation">
+  <div class="stage-heading"><span>Notation</span><h2>What pooling means</h2></div>
+  <p>Pooling describes which experimental groups share a fitted parameter. It does not mean averaging cell lines together, and it is separate from averaging technical wells within a biological sample.</p>
+  <dl>
+    <dt>Shared pooling</dt>
+    <dd>One parameter value is fitted jointly to every included density or environment. For example, (r_{20k}=r_{30k}=r). All trajectories inform the same estimate, reducing free parameters but assuming no density-specific difference.</dd>
+    <dt>Partial pooling, <code>partial_5pct</code></dt>
+    <dd>A shared center is fitted with a small, symmetric density contrast: (p_{20k}=p_{mathrm{center}}e^{-delta_p}), (p_{30k}=p_{mathrm{center}}e^{+delta_p}), and (|delta_p|leqln(1.05)). The densities may differ by roughly five percent in either direction while remaining anchored to one biological estimate. Which parameters receive this contrast is stated in each stage.</dd>
+    <dt>Independent diagnostic</dt>
+    <dd>Each density or group receives its own unconstrained parameter vector. This can reveal heterogeneity or model misspecification, but it uses more free parameters and is not automatically eligible for inheritance because the later stages require a coherent shared baseline.</dd>
+    <dt>Linked global</dt>
+    <dd>One combined objective is fitted across all linked monoculture and coculture trajectories. Intrinsic drug parameters are shared across contexts, while only the candidate's explicitly named coculture modifiers are added.</dd>
+    <dt>Strobl joint</dt>
+    <dd>The complete two-population Strobl equation is fitted jointly across the relevant density and mixture environments. Its parameter sharing follows that published model structure rather than the project's ordinary density-contrast rule.</dd>
+    <dt>Well and sample aggregation</dt>
+    <dd>Technical wells are first summarized within their experimental sample. A sample-aware analysis then retains between-sample variation and uncertainty. This observation-level aggregation changes the data entering the objective; it is distinct from parameter pooling.</dd>
+  </dl>
+  <p><strong>BIC accounting:</strong> (k) counts parameters estimated in that candidate's objective. Parameters fixed from an earlier stage are inherited parameters, not free parameters again in the downstream BIC. A partial-pooling contrast is free and is counted once.</p>
+</section>
+""")
+
+    appendix_blocks = [
+        _appendix_ranking_html(stages[1].ranking; title = "Stage 1 untreated monoculture", by_cell_line = true,
+            parameter_path = joinpath(csv_root, "monoculture_untreated", "monoculture_untreated_pooling_parameter_estimates.csv")),
+        _appendix_ranking_html(stages[2].ranking; title = "Stage 2 treated monoculture", by_cell_line = true,
+            parameter_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_joint_parameter_estimates.csv")),
+        _appendix_ranking_html(timing_ranking_path; title = "Stage 2 timing audit",
+            parameter_path = joinpath(csv_root, "monoculture_treated", "monoculture_treated_timing_hypothesis_parameters.csv")),
+        _appendix_ranking_html(stages[3].ranking; title = "Stage 3 untreated coculture",
+            parameter_path = joinpath(csv_root, "coculture_untreated", "coculture_untreated_joint_parameter_estimates.csv")),
+        _appendix_ranking_html(stages[4].ranking; title = "Stage 4 treated coculture"),
+    ]
+    push!(sections, """
+<section class="report-appendix" id="model-appendix">
+<details class="appendix-disclosure">
+<summary><span class="appendix-kicker">Appendix</span><span class="appendix-title">Complete model, BIC, and parameter audit</span><span class="appendix-action" aria-hidden="true"></span></summary>
+<div class="appendix-content">
+<p>This appendix is the archival view. Unlike the teaching tables above, it lists every finite tested candidate, its absolute BIC, Delta BIC, free-parameter count, boundary flag, and complete exported fitted parameter vector. Model IDs restart within each table and match the corresponding Delta-BIC chart.</p>
+$(join(appendix_blocks))
+</div>
+</details>
 </section>
 """)
 
@@ -1260,6 +1802,103 @@ td:nth-child(4) { min-width: 360px; font-family: Consolas, "Courier New", monosp
 figure { margin: 28px 0 0; }
 img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
 figcaption { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.bic-figure { margin: 8px 0 34px; padding: 16px 18px; border: 1px solid var(--line); }
+.bic-figure h4 { margin: 0 0 14px; font-size: 14px; }
+.bic-axis { display: grid; gap: 9px; }
+.bic-row { display: grid; grid-template-columns: minmax(220px, 0.36fr) minmax(180px, 1fr) 64px; gap: 10px; align-items: center; }
+.bic-label { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 5px; font-size: 12px; }
+.bic-label span { overflow-wrap: anywhere; }
+.bic-track { height: 14px; background: var(--soft); border-left: 2px solid var(--ink); }
+.bic-bar { display: block; height: 100%; min-width: 3px; background: var(--accent); }
+.bic-row output { font-variant-numeric: tabular-nums; font-size: 12px; }
+.path-explorer { margin: 24px 0 30px; padding: 18px 0 22px; border-top: 3px solid var(--ink); border-bottom: 1px solid var(--line); }
+.path-explorer-heading { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; margin-bottom: 14px; }
+.path-explorer-heading h3 { margin: 0; font-size: 18px; }
+.path-explorer-heading span { color: var(--muted); font-size: 12px; }
+.path-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.path-choice-grid > :only-child { grid-column: 1 / -1; }
+.path-choice { min-width: 0; margin: 0; padding: 0; border: 0; }
+.path-choice legend { margin-bottom: 8px; font-size: 13px; font-weight: 750; }
+.choice-label { display: block; margin: 9px 0 5px; color: var(--muted); font-size: 10px; font-weight: 750; text-transform: uppercase; }
+.model-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pooling-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.model-option { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 1px 6px; min-height: 76px; padding: 8px; border: 1px solid var(--line); cursor: pointer; background: #fff; }
+.model-option:hover { border-color: var(--ink); }
+.model-option.selected { border: 2px solid var(--accent); padding: 7px; background: #fff8fa; }
+.model-option input { position: absolute; opacity: 0; pointer-events: none; }
+.model-rank { grid-row: 1 / 3; display: grid; place-items: center; width: 24px; height: 24px; color: #fff; background: var(--ink); font-size: 11px; font-weight: 750; }
+.model-option.selected .model-rank { background: var(--accent); }
+.model-name { min-width: 0; font-size: 12px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.model-meta { grid-column: 2; color: var(--muted); font-size: 10px; line-height: 1.3; }
+.pooling-option { position: relative; display: inline-flex; align-items: center; min-height: 34px; padding: 7px 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
+.pooling-option:hover { border-color: var(--ink); }
+.pooling-option.selected { border: 2px solid var(--accent); padding: 6px 9px; color: var(--accent); background: #fff8fa; }
+.pooling-option input { position: absolute; opacity: 0; pointer-events: none; }
+.pooling-option small { margin-left: 6px; color: var(--muted); font-size: 9px; font-weight: 500; }
+.inheritance-line { min-height: 34px; margin: 8px 0 0; font-size: 11px; }
+.live-equation { margin: 14px 0 4px; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--soft); }
+.live-equation h4 { margin: 0 0 8px; font-size: 12px; }
+.equation-chain { display: grid; gap: 6px; }
+.equation-chain code { display: block; width: 100%; padding: 6px 8px; color: var(--ink); background: #fff; border: 1px solid var(--line); white-space: normal; overflow-wrap: anywhere; font-size: 11px; line-height: 1.45; }
+.equation-chain small { color: var(--muted); }
+.compatible { color: #176538 !important; }
+.incompatible { color: #8b1d2c !important; }
+.path-warning { margin: 12px 0; padding: 10px 12px; color: #8b1d2c; background: #fff4f4; border-left: 3px solid #8b1d2c; font-size: 12px; }
+.reactive-plot { margin-top: 18px; }
+.plot-key { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 11px; }
+.plot-key i { display: inline-block; margin-right: 5px; vertical-align: middle; }
+.plot-key .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); opacity: .65; }
+.plot-key .line { width: 18px; border-top: 2px solid var(--ink); }
+.sensitive-key::before, .resistant-key::before { content: ""; display: inline-block; width: 14px; margin-right: 5px; border-top: 2px solid; vertical-align: middle; }
+.sensitive-key::before { border-color: #a21f3d; }
+.resistant-key::before { border-color: #2d65b0; }
+.mini-plot-grid { display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: 10px; margin-top: 8px; }
+.mini-plot { min-width: 0; margin: 0; border: 1px solid var(--line); }
+.mini-plot svg { display: block; width: 100%; height: auto; background: #fff; }
+.mini-plot .axis { stroke: #7a878c; stroke-width: 1; }
+.mini-plot .plot-title { font-size: 11px; font-weight: 650; fill: var(--ink); }
+.mini-plot .tick { font-size: 9px; fill: var(--muted); }
+.fixed-fit-plot { margin-top: 22px; border-top: 1px solid var(--line); }
+.fixed-fit-plot summary { padding: 12px 0; color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
+.path-ledger { border-top: 2px solid var(--ink); }
+.ledger-row { display: grid; grid-template-columns: 155px minmax(260px, 1fr) 150px 70px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.ledger-row span { color: var(--muted); text-transform: capitalize; }
+.ledger-row code { overflow-wrap: anywhere; }
+.ledger-row output { text-align: right; font-variant-numeric: tabular-nums; }
+.ledger-row details { grid-column: 1 / -1; }
+.ledger-row summary { width: fit-content; color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 650; }
+.ledger-row pre { max-width: 100%; margin: 7px 0 2px; padding: 9px; background: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; }
+.path-total { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 0 4px; }
+.path-total span { font-weight: 700; }
+.path-total strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.path-validity { margin-top: 6px; font-weight: 650; }
+.hybrid-refit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; margin-top: 16px; padding: 14px 0; border-top: 1px solid var(--line); }
+.hybrid-refit strong { display: inline-block; margin-bottom: 3px; color: var(--accent); }
+.hybrid-refit p { margin: 0; font-size: 12px; }
+.refit-button { min-height: 40px; padding: 9px 14px; border: 1px solid var(--ink); color: #fff; background: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.refit-button:hover { background: var(--accent); border-color: var(--accent); }
+.refit-button:disabled { cursor: wait; opacity: .55; }
+.refit-details { margin-top: 4px; }
+.refit-details summary { color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 700; }
+.refit-details pre { max-height: 280px; overflow: auto; padding: 10px; background: var(--soft); white-space: pre-wrap; font-size: 10px; }
+.hybrid-method p { max-width: 1050px; font-size: 12px; }
+.pooling-glossary dl { grid-template-columns: minmax(190px, .25fr) minmax(0, 1fr); }
+.uncertainty-audit { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
+.uncertainty-audit h3 { margin-top: 0; }
+.audit-warning { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--soft); }
+.report-appendix { width: min(1720px, calc(100% - 48px)); }
+.appendix-disclosure { border-top: 3px solid var(--ink); border-bottom: 1px solid var(--line); }
+.appendix-disclosure summary { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 22px 0; cursor: pointer; list-style-position: outside; }
+.appendix-disclosure summary:hover .appendix-title { color: var(--accent); }
+.appendix-disclosure summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; }
+.appendix-kicker { color: var(--accent); font-size: 12px; font-weight: 750; text-transform: uppercase; }
+.appendix-title { font-size: 24px; font-weight: 700; }
+.appendix-action::before { content: "Show appendix"; color: var(--accent); font-size: 13px; font-weight: 700; }
+.appendix-disclosure[open] .appendix-action::before { content: "Hide appendix"; }
+.appendix-content { padding: 0 0 36px; }
+.appendix-table table { min-width: 1260px; }
+.appendix-table td:last-child { min-width: 620px; font-family: Consolas, "Courier New", monospace; font-size: 11px; overflow-wrap: anywhere; }
+.compact-parameters table { min-width: 760px; }
 .notation-key { margin: 20px 0 24px; padding: 12px 0 14px; border-top: 2px solid var(--line); border-bottom: 1px solid var(--line); }
 .notation-key h3 { margin: 0 0 10px; font-size: 15px; }
 .notation-key dl { grid-template-columns: minmax(160px, 0.25fr) minmax(0, 1fr); }
@@ -1296,8 +1935,27 @@ code { font-family: Consolas, "Courier New", monospace; }
   h2 { font-size: 21px; }
   .stage-heading { display: block; }
   .guide-grid { grid-template-columns: minmax(0, 1fr); }
+  .bic-row { grid-template-columns: minmax(0, 1fr) 50px; }
+  .bic-label { grid-column: 1 / -1; }
   dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
-  dd { margin-bottom: 8px; }
+  .notation-key dl { grid-template-columns: minmax(0, 1fr); }
+  .appendix-disclosure summary { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+  .appendix-kicker { grid-column: 1 / -1; }
+  .appendix-title { font-size: 20px; }
+  .path-choice-grid { grid-template-columns: minmax(0, 1fr); }
+  .model-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mini-plot-grid { grid-template-columns: minmax(0, 1fr); }
+  .ledger-row { grid-template-columns: minmax(0, 1fr) 58px; gap: 3px 10px; }
+  .ledger-row strong, .ledger-row code { grid-column: 1; }
+  .ledger-row output { grid-column: 2; grid-row: 1 / 4; }
+  .pooling-glossary dl { grid-template-columns: minmax(0, 1fr); }
+  .hybrid-refit { grid-template-columns: minmax(0, 1fr); }
+  .refit-button { width: 100%; }
+  dd { max-width: 100%; margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; }
+}
+@media print {
+  .appendix-disclosure summary { display: none; }
+  .appendix-content { display: block !important; }
 }
     .back-home { display: inline-block; margin: 0 0 18px; color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
     .back-home:hover { text-decoration: underline; }
@@ -1305,6 +1963,379 @@ code { font-family: Consolas, "Courier New", monospace; }
 </head>
 <body>
 $(join(sections, "\n"))
+<script id="model-path-data" type="application/json">$(model_path_payload)</script>
+""" * raw"""
+<script>
+(() => {
+  const payload = JSON.parse(document.getElementById('model-path-data').textContent);
+  const selected = {...payload.default_ids};
+  const colors = {sensitive:'#a21f3d', resistant:'#2d65b0', total:'#1d2529'};
+  const groupOrder = ['stage1_A2780Naive','stage1_A2780cis','stage2_A2780Naive','stage2_A2780cis','stage3','stage4'];
+  const escapeHtml = value => String(value).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const candidate = key => (payload.candidate_groups[key] || []).find(item => item.id === selected[key]);
+  const isDefault = key => selected[key] === payload.default_ids[key];
+  const poolingLabel = value => ({shared:'Shared',partial_5pct:'Partial 5%',independent_diagnostic:'Independent',linked_global:'Linked global',strobl_joint:'Strobl joint'})[value] || value || 'Unpooled';
+  const refitService = 'http://127.0.0.1:8766';
+  let serviceAvailable = false;
+  let refittedSignature = null;
+  let activeJob = null;
+
+  const selectionRequest = () => ({
+    selections: Object.fromEntries(groupOrder.map(key => [key, {model:candidate(key).model, pooling:candidate(key).pooling}])),
+    max_time_per_fit: 12.0
+  });
+  const selectionSignature = () => JSON.stringify(selectionRequest().selections);
+  const setRefitState = (mode, message, busy=false) => {
+    document.querySelector('[data-refit-mode]').textContent = mode;
+    document.querySelector('[data-refit-status]').textContent = message;
+    const button = document.querySelector('[data-refit-button]');
+    button.disabled = busy;
+    button.textContent = busy ? 'Refitting...' : 'Refit downstream';
+  };
+
+  async function checkRefitService() {
+    try {
+      const response = await fetch(`${refitService}/health`, {signal: AbortSignal.timeout(1200)});
+      serviceAvailable = response.ok;
+    } catch (_) {
+      serviceAvailable = false;
+    }
+    if (refittedSignature === selectionSignature()) return;
+    setRefitState('Preview', serviceAvailable
+      ? 'Stored trajectories are shown. Julia is connected and can refit downstream stages under this exact path.'
+      : 'Stored trajectories are shown. Start the local Julia refit service to recompute this inheritance path.');
+  }
+
+  async function pollRefit(jobId, signature) {
+    for (;;) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const response = await fetch(`${refitService}/api/refits/${jobId}`);
+      const job = await response.json();
+      if (job.status === 'queued' || job.status === 'running') {
+        setRefitState('Refitting', 'Julia is fitting the selected downstream path. You may continue inspecting the stored preview.', true);
+        continue;
+      }
+      if (job.status === 'failed') throw new Error(job.error || 'Conditional refit failed');
+      const result = job.result || job;
+      activeJob = null;
+      if (signature === selectionSignature()) refittedSignature = signature;
+      const partial = job.status === 'partial' || result.status === 'partial';
+      setRefitState(partial ? 'Partially refitted' : 'Conditionally refitted',
+        partial ? (result.note || 'Upstream stages were refitted, but this path is not structurally compatible with Stage 4.') :
+          'The selected upstream equations and parameters were recomputed and inherited by the downstream fit.');
+      const details = document.querySelector('[data-refit-details]');
+      details.hidden = false;
+      document.querySelector('[data-refit-result]').textContent = JSON.stringify({
+        job_id: result.job_id || jobId,
+        status: result.status || job.status,
+        completed_at: result.completed_at,
+        provenance: result.provenance,
+        note: result.note || '',
+        cache: 'content-addressed by the exact model and pooling path'
+      }, null, 2);
+      renderLedger();
+      return;
+    }
+  }
+
+  async function requestRefit() {
+    const signature = selectionSignature();
+    if (!groupOrder.every(key => candidate(key).eligible)) {
+      setRefitState('Preview only', 'Diagnostic pooling cannot be inherited. Choose an eligible pooling option before refitting.');
+      return;
+    }
+    if (!serviceAvailable) {
+      await checkRefitService();
+      if (!serviceAvailable) {
+        setRefitState('Preview', 'The Julia service is not connected at http://127.0.0.1:8766. The public report remains preview-only.');
+        return;
+      }
+    }
+    setRefitState('Submitting', 'Validating the selected equations, pooling choices, and inherited parameter artifacts.', true);
+    try {
+      const response = await fetch(`${refitService}/api/refits`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(selectionRequest())
+      });
+      const job = await response.json();
+      if (!response.ok) throw new Error(job.error || 'The refit request was rejected');
+      activeJob = job.job_id;
+      if (job.cached && job.result) {
+        activeJob = null;
+        refittedSignature = signature;
+        setRefitState(job.result.status === 'partial' ? 'Partially refitted' : 'Conditionally refitted', job.result.note || 'Loaded the cached conditional fit for this exact path.');
+        document.querySelector('[data-refit-details]').hidden = false;
+        document.querySelector('[data-refit-result]').textContent = JSON.stringify(job.result, null, 2);
+        renderLedger();
+      } else {
+        await pollRefit(job.job_id, signature);
+      }
+    } catch (error) {
+      activeJob = null;
+      setRefitState('Refit unavailable', error.message || String(error));
+    }
+  }
+
+  function renderOptions(key) {
+    const fieldset = document.querySelector(`[data-choice-group="${key}"]`);
+    if (!fieldset) return;
+    const choices = payload.candidate_groups[key] || [];
+    const current = candidate(key);
+    const models = [...new Map(choices.map(item => [item.model, item])).values()];
+    const modelHost = fieldset.querySelector('.model-options');
+    modelHost.innerHTML = models.map((representative, index) => {
+      const variants = choices.filter(item => item.model === representative.model);
+      const best = variants.reduce((winner, item) => item.delta_bic < winner.delta_bic ? item : winner, variants[0]);
+      return `
+      <label class="model-option ${current.model === representative.model ? 'selected' : ''}">
+        <input type="radio" name="${key}_model" value="${escapeHtml(representative.model)}" ${current.model === representative.model ? 'checked' : ''}>
+        <span class="model-rank">${index + 1}</span>
+        <span class="model-name">${escapeHtml(representative.label)}</span>
+        <span class="model-meta">Best Delta BIC ${best.delta_bic.toFixed(2)} · ${variants.length} pooling ${variants.length === 1 ? 'fit' : 'fits'}</span>
+      </label>`;
+    }).join('');
+    modelHost.querySelectorAll('input').forEach(input => input.addEventListener('change', event => {
+      const variants = choices.filter(item => item.model === event.target.value);
+      const samePooling = variants.find(item => item.pooling === current.pooling);
+      const inherited = variants.find(item => item.eligible);
+      selected[key] = (samePooling || inherited || variants[0]).id;
+      renderAll();
+    }));
+
+    const poolingHost = fieldset.querySelector('.pooling-options');
+    const poolings = choices.filter(item => item.model === current.model);
+    poolingHost.innerHTML = poolings.map(item => `
+      <label class="pooling-option ${selected[key] === item.id ? 'selected' : ''}">
+        <input type="radio" name="${key}_pooling" value="${escapeHtml(item.id)}" ${selected[key] === item.id ? 'checked' : ''}>
+        <span>${escapeHtml(poolingLabel(item.pooling))}</span><small>Delta BIC ${item.delta_bic.toFixed(2)}${item.eligible ? '' : ' · diagnostic'}</small>
+      </label>`).join('');
+    poolingHost.querySelectorAll('input').forEach(input => input.addEventListener('change', event => {
+      selected[key] = event.target.value;
+      renderAll();
+    }));
+  }
+
+  function panelGroups(stage, rows) {
+    const fields = stage <= 2 ? ['cell_line','density', ...(stage === 2 ? ['dose'] : [])] : ['density','mix'];
+    const groups = new Map();
+    rows.forEach(row => {
+      const id = fields.map(field => row[field] || '').join('|');
+      if (!groups.has(id)) groups.set(id, {title: fields.map(field => row[field] || '').filter(Boolean).join(', '), rows: []});
+      groups.get(id).rows.push(row);
+    });
+    return [...groups.values()];
+  }
+
+  function svgPanel(panel, sharedYmax) {
+    const width = 360, height = 230, margin = {l:48,r:12,t:28,b:34};
+    const xs = panel.rows.map(row => +row.time), ys = panel.rows.flatMap(row => [+row.observed,+row.predicted]).filter(Number.isFinite);
+    const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = 0, ymax = sharedYmax;
+    const sx = x => margin.l + (x - xmin) / Math.max(xmax - xmin, 1) * (width-margin.l-margin.r);
+    const sy = y => height-margin.b - (y-ymin) / Math.max(ymax-ymin,1) * (height-margin.t-margin.b);
+    const components = [...new Set(panel.rows.map(row => row.component || 'total'))];
+    let marks = '';
+    components.forEach(component => {
+      const rows = panel.rows.filter(row => (row.component || 'total') === component).sort((a,b) => a.time-b.time);
+      const color = colors[component] || colors.total;
+      const points = rows.map(row => `${sx(+row.time).toFixed(1)},${sy(+row.predicted).toFixed(1)}`).join(' ');
+      marks += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.4"/>`;
+      marks += rows.map(row => `<circle cx="${sx(+row.time).toFixed(1)}" cy="${sy(+row.observed).toFixed(1)}" r="2.5" fill="${color}" opacity=".65"/>`).join('');
+    });
+    return `<figure class="mini-plot"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(panel.title)} fitted trajectory">
+      <text x="${margin.l}" y="18" class="plot-title">${escapeHtml(panel.title)}</text>
+      <line x1="${margin.l}" y1="${height-margin.b}" x2="${width-margin.r}" y2="${height-margin.b}" class="axis"/>
+      <line x1="${margin.l}" y1="${margin.t}" x2="${margin.l}" y2="${height-margin.b}" class="axis"/>
+      <text x="${margin.l}" y="${height-10}" class="tick">${xmin}</text><text x="${width-margin.r}" y="${height-10}" text-anchor="end" class="tick">${xmax} d</text>
+      <text x="${margin.l-6}" y="${height-margin.b}" text-anchor="end" class="tick">0</text><text x="${margin.l-6}" y="${margin.t+4}" text-anchor="end" class="tick">${Math.round(ymax)}</text>
+      ${marks}</svg></figure>`;
+  }
+
+  function selectedRows(key) {
+    const item = candidate(key);
+    return (payload.plot_rows[key] || []).filter(row => `${row.model}|${row.pooling_mode || ''}` === item.id);
+  }
+
+  function effectiveParameters(stage, item, density, lineage='') {
+    const catalog = payload.effective_parameters?.[stage] || {};
+    const key = stage === 'stage1' ? `${lineage}|${item.model}|${item.pooling}` : `${item.model}|${item.pooling}`;
+    return catalog[key]?.[density] || catalog[key]?.all || null;
+  }
+
+  const number = (values, key, fallback=0) => Number.isFinite(+values?.[key]) ? +values[key] : fallback;
+
+  function growthRate(base, population, load, time) {
+    if (!base) return 0;
+    const r = number(base, 'r'), K = Math.max(number(base, 'K', 1), 1e-8);
+    const N = Math.max(population, 0), L = Math.max(load, 1e-8);
+    const model = base.__model || 'logistic_growth';
+    let adjustment = 1;
+    if (model === 'lagged_theta_logistic_growth') adjustment = time <= number(base, 'lag_time') ? 0 : 1;
+    if (model === 'baranyi_theta_logistic_growth') {
+      const q0 = Math.max(number(base, 'q0', 1), 1e-8);
+      adjustment = q0 / (q0 + Math.exp(-Math.max(r, 0) * Math.max(time, 0)));
+    }
+    if (model === 'adaptation_theta_logistic_growth') {
+      adjustment = 1 - Math.exp(-Math.max(number(base, 'adaptation_rate', 1), 1e-8) * Math.max(time, 0));
+    }
+    if (model === 'gompertz_growth') return adjustment * r * N * Math.log(K / L);
+    if (model.includes('theta_logistic_growth')) {
+      const theta = Math.max(number(base, 'theta', 1), .05);
+      return adjustment * r * N * Math.max(0, 1 - Math.pow(L / K, theta));
+    }
+    if (model === 'logistic_simple_death') return r*N*Math.max(0,1-L/K) - Math.max(number(base,'death_rate'),0)*N;
+    if (model === 'allee_growth') {
+      const threshold = Math.max(number(base,'allee_threshold',1),1e-8);
+      return r*N*Math.max(0,1-L/K)*(N/threshold-1);
+    }
+    return r * N * Math.max(0, 1 - L / K);
+  }
+
+  function stage3ForwardRows() {
+    const interaction = candidate('stage3');
+    if (!interaction.model.startsWith('lv_')) return selectedRows('stage3');
+    const source = selectedRows('stage3');
+    const panels = panelGroups(3, source);
+    const output = [];
+    panels.forEach(panel => {
+      const density = panel.rows[0]?.density || '20k';
+      const naiveItem = candidate('stage1_A2780Naive'), cisItem = candidate('stage1_A2780cis');
+      const naive = effectiveParameters('stage1', naiveItem, density, 'A2780Naive');
+      const cis = effectiveParameters('stage1', cisItem, density, 'A2780cis');
+      const interactions = effectiveParameters('stage3', interaction, density);
+      if (!naive || !cis || !interactions) { output.push(...panel.rows); return; }
+      naive.__model = naiveItem.model; cis.__model = cisItem.model;
+      const times = [...new Set(panel.rows.map(row => +row.time))].sort((a,b) => a-b);
+      const firstTime = times[0];
+      const n0row = panel.rows.find(row => row.component === 'sensitive' && +row.time === firstTime);
+      const c0row = panel.rows.find(row => row.component === 'resistant' && +row.time === firstTime);
+      let state = [Math.max(+n0row?.observed || 0,0), Math.max(+c0row?.observed || 0,0)], current = firstTime;
+      const alphaNC = number(interactions, interaction.model === 'lv_symmetric_competition' ? 'alpha' : 'alpha_sr', 1);
+      const alphaCN = number(interactions, interaction.model === 'lv_symmetric_competition' ? 'alpha' : 'alpha_rs', 1);
+      const deathN = number(interactions, 'death_sensitive'), deathC = number(interactions, 'death_resistant');
+      const derivative = (values,t) => {
+        const [N,C] = values;
+        return [growthRate(naive,N,N+alphaNC*C,t)-deathN*N, growthRate(cis,C,C+alphaCN*N,t)-deathC*C];
+      };
+      const advance = target => {
+        while (current < target - 1e-10) {
+          const h = Math.min(.025, target-current), k1=derivative(state,current);
+          const s2=state.map((v,i)=>v+h*k1[i]/2), k2=derivative(s2,current+h/2);
+          const s3=state.map((v,i)=>v+h*k2[i]/2), k3=derivative(s3,current+h/2);
+          const s4=state.map((v,i)=>v+h*k3[i]), k4=derivative(s4,current+h);
+          state=state.map((v,i)=>Math.max(0,v+h*(k1[i]+2*k2[i]+2*k3[i]+k4[i])/6)); current+=h;
+        }
+      };
+      times.forEach(time => {
+        advance(time);
+        panel.rows.filter(row => +row.time === time).forEach(row => output.push({...row, predicted: row.component === 'sensitive' ? state[0] : state[1], hot_preview:true}));
+      });
+    });
+    return output;
+  }
+
+  function growthEquation(item, symbol) {
+    const X=symbol, m=item.model;
+    if (m === 'gompertz_growth') return `G_${X}=r_${X}${X} log(K_${X}/L_${X})`;
+    if (m.includes('theta_logistic_growth')) {
+      const prefix=m.startsWith('baranyi_') ? `q_${X}(t)/[1+q_${X}(t)] ` : m.startsWith('adaptation_') ? `[1-exp(-a_${X}t)] ` : m.startsWith('lagged_') ? `I(t>tau_${X}) ` : '';
+      return `G_${X}=${prefix}r_${X}${X}[1-(L_${X}/K_${X})^theta_${X}]`;
+    }
+    if (m === 'logistic_simple_death') return `G_${X}=r_${X}${X}(1-L_${X}/K_${X})-d_${X}${X}`;
+    if (m === 'allee_growth') return `G_${X}=r_${X}${X}(1-L_${X}/K_${X})(${X}/A_${X}-1)`;
+    return `G_${X}=r_${X}${X}(1-L_${X}/K_${X})`;
+  }
+
+  function treatmentTerm(item, symbol) {
+    const m=item.model, X=symbol;
+    if (m.includes('two_population')) return `C=S+T; dS/dt=G_C S/C-A_CS(t)H_CS(D)S; dT/dt=G_C T/C-A_CT(t)H_CT(D)T`;
+    if (m.includes('transit')) return `d${X}/dt=G_${X}-A_${X}(t)H_${X}(D)${X}; dZ_${X}/dt=A_${X}(t)H_${X}(D)${X}-k_clear Z_${X}`;
+    if (m.includes('hill')) return `d${X}/dt=G_${X}-A_${X}(t)[Emax_${X}D^h/(EC50_${X}^h+D^h)]${X}`;
+    return `d${X}/dt=G_${X}-Q_${X}(t,D)${X}`;
+  }
+
+  function renderEquation(stage) {
+    const host=document.querySelector(`[data-equation-stage="${stage}"]`); if(!host) return;
+    const n=candidate('stage1_A2780Naive'), c=candidate('stage1_A2780cis');
+    const lines=[growthEquation(n,'N'), growthEquation(c,'C')];
+    if(stage>=2) lines.push(treatmentTerm(candidate('stage2_A2780Naive'),'N'), treatmentTerm(candidate('stage2_A2780cis'),'C'));
+    if(stage>=3) {
+      const s3=candidate('stage3'), symmetric=s3.model==='lv_symmetric_competition';
+      if(s3.model.startsWith('lv_')) {
+        const loss=s3.model.includes('_death') ? '-d_N N;  -d_C C' : '';
+        lines.push(`L_N=N+${symmetric?'alpha':'alpha_NC'}C; L_C=C+${symmetric?'alpha':'alpha_CN'}N`, `dN/dt=G_N(N,L_N,t) ${loss.split(';')[0]||''}; dC/dt=G_C(C,L_C,t) ${loss.split(';')[1]||''}`);
+      } else {
+        lines.push(`Stage 3 replacement system: ${s3.label}`, 'dN/dt=r_N[1-(N+C)/K_N]N-d_N N; dC/dt=r_C[1-(N+C)/K_C]C-d_C C');
+      }
+    }
+    if(stage>=4) {
+      const s4=candidate('stage4');
+      lines.push(`Stage 4 context: ${s4.label}`, `dN/dt=G_N^co-M_N A_N(t)H_N(D)N; dC/dt=G_C^co-M_C A_C(t)H_C(D)C`);
+    }
+    host.innerHTML=`<h4>Live inherited equation set through Stage ${stage}</h4><div class="equation-chain">${lines.map(line=>`<code>${escapeHtml(line)}</code>`).join('')}</div><small>Updates with the selected model and pooling assumptions. Numeric parameters are listed in the selection ledger.</small>`;
+  }
+
+  function renderPlot(stage) {
+    const host = document.querySelector(`[data-plot-stage="${stage}"]`);
+    if (!host) return;
+    let rows = [];
+    if (stage <= 2) rows = ['A2780Naive','A2780cis'].flatMap(lineage => selectedRows(`stage${stage}_${lineage}`));
+    else rows = stage === 3 ? stage3ForwardRows() : selectedRows(`stage${stage}`);
+    const panels = panelGroups(stage, rows);
+    const sharedYmax = Math.max(1, ...rows.flatMap(row => [+row.observed,+row.predicted]).filter(Number.isFinite)) * 1.06;
+    const hot = stage === 3 && rows.some(row => row.hot_preview);
+    host.innerHTML = `<div class="plot-key"><span><i class="dot"></i> observations</span><span><i class="line"></i> ${hot ? 'hot inherited forward preview' : 'selected fit'}</span><span>shared y-axis: 0-${Math.round(sharedYmax)}</span>${stage >= 3 ? '<span class="sensitive-key">Naive</span><span class="resistant-key">cis</span>' : ''}</div><div class="mini-plot-grid">${panels.map(panel => svgPanel(panel, sharedYmax)).join('')}</div>`;
+  }
+
+  function renderInheritance() {
+    const s1n = candidate('stage1_A2780Naive'), s1c = candidate('stage1_A2780cis');
+    ['A2780Naive','A2780cis'].forEach(lineage => {
+      const base = lineage === 'A2780Naive' ? s1n : s1c;
+      const treatment = candidate(`stage2_${lineage}`);
+      const line = document.querySelector(`[data-inheritance-for="stage2_${lineage}"]`);
+      const match = treatment.growth_family === base.model;
+      line.className = `inheritance-line ${match ? 'compatible' : 'incompatible'}`;
+      line.innerHTML = `<strong>Inherited base:</strong> ${escapeHtml(base.label)}. ${match ? 'This exported treatment fit used that base.' : `The stored treatment fit used ${escapeHtml(treatment.growth_family)}; a conditional refit is required.`}`;
+    });
+    const upstreamChanged = !isDefault('stage1_A2780Naive') || !isDefault('stage1_A2780cis');
+    const stage3Model = candidate('stage3');
+    const stage3 = document.querySelector('[data-stage-warning="3"]');
+    stage3.hidden = !upstreamChanged;
+    stage3.textContent = upstreamChanged ? (stage3Model.model.startsWith('lv_') ? 'Stage 3 now propagates the selected Stage 1 growth equations and parameters as a live forward preview. Its competition/death parameters remain at their stored estimates until Julia conditionally refits them.' : 'This Strobl candidate is a complete replacement growth-and-competition system, so it does not inherit the selected Stage 1 equations. Choose an LV candidate to preview the Stage 1 handoff, or conditionally refit this replacement system.') : '';
+    const stage4Changed = upstreamChanged || !isDefault('stage2_A2780Naive') || !isDefault('stage2_A2780cis') || !isDefault('stage3');
+    const stage4 = document.querySelector('[data-stage-warning="4"]');
+    stage4.hidden = !stage4Changed;
+    stage4.textContent = stage4Changed ? 'Stage 4 was exported under the data-selected upstream chain. The selected Stage 4 curve is a local comparison, not a refit under your altered path.' : '';
+  }
+
+  function renderLedger() {
+    const rows = groupOrder.map(key => {
+      const item = candidate(key);
+      return `<div class="ledger-row"><span>${escapeHtml(key.replace('_',' · ').replaceAll('_',' '))}</span><strong>${escapeHtml(item.label)}</strong><code>${escapeHtml(item.pooling)}</code><output>${item.delta_bic.toFixed(2)}</output><details><summary>Parameters carried from this fit</summary><pre>${escapeHtml(item.parameters)}</pre></details></div>`;
+    });
+    document.querySelector('[data-path-ledger]').innerHTML = rows.join('');
+    const total = groupOrder.reduce((sum,key) => sum + candidate(key).delta_bic, 0);
+    document.querySelector('[data-path-total]').textContent = total.toFixed(2);
+    const conditionallyRefitted = refittedSignature === selectionSignature();
+    const valid = (groupOrder.every(isDefault) || conditionallyRefitted) && groupOrder.every(key => candidate(key).eligible);
+    const validity = document.querySelector('[data-path-validity]');
+    validity.className = `path-validity ${valid ? 'compatible' : 'incompatible'}`;
+    validity.textContent = valid ? (conditionallyRefitted ? 'Conditionally refitted path: downstream fits inherited the selected equations and fitted parameters.' : 'Fully inheritance-consistent: every stage is the exported conditional fit used by the next stage.') : 'Exploratory preview: at least one downstream stage has not been conditionally refitted under the selected upstream model and parameters.';
+  }
+
+  function renderAll() {
+    if (refittedSignature !== selectionSignature() && !activeJob) {
+      setRefitState('Preview', serviceAvailable ? 'Stored trajectories are shown. Refit to carry this exact path downstream.' : 'Stored trajectories are shown. Connect the local Julia service to refit this exact path.');
+    }
+    groupOrder.forEach(renderOptions);
+    [1,2,3,4].forEach(stage => { renderEquation(stage); renderPlot(stage); });
+    renderInheritance();
+    renderLedger();
+  }
+  document.querySelector('[data-refit-button]').addEventListener('click', requestRefit);
+  renderAll();
+  checkRefitService();
+})();
+</script>
+""" * """
 </body>
 </html>
 """

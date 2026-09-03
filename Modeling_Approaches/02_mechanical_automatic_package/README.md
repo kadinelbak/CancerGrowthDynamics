@@ -38,7 +38,54 @@ Each notebook follows the same flow:
 - `src/coculture_joint.jl`: coupled sensitive/resistant fitting across seeding densities and mix ratios.
 - `src/linked_treatment_joint.jl`: linked treated-monoculture and treated-coculture hypothesis tests for A2780 drug-inheritance analysis.
 - `src/analysis_workflows.jl`: post-fit metrics, sensitivity export, and analysis plotting.
+- `src/sample_aware_report.jl`: well-preserving staged summaries, between-well variability bands, direction audits, and report rendering.
+- `src/adaptive_simulation_engine.jl`: model-agnostic treatment windows, feedback decisions, ensembles, reverse lookup, and outcome metrics.
+- `src/a2780_adaptive_adapter.jl`: strict staged-artifact selection and A2780 observable adapter for the simulator.
 - `src/MechanicalAutomaticModeling.jl`: entry module including all shared modules.
+
+## Adaptive Simulator
+
+`AdaptiveSimulationEngine` is deliberately independent of A2780 names, files,
+HTML, and ODE libraries. A `SimulationScenario` receives a segment-simulation
+callback so treatment, refresh, and monitoring events can be orchestrated
+without coupling the engine to a particular solver.
+
+The A2780 adapter resolves each default from ranking and status exports. It
+rejects candidates with missing/non-finite parameters, diagnostic-only status,
+or invalid inheritance and records why a higher-ranked candidate was skipped.
+The default browser output contains only A2780Naive, total A2780cis, and total
+population. Any internal cis substructure is hidden unless the user enables an
+advanced diagnostic view.
+
+Rebuild the browser configuration and Pages mirror with:
+
+```julia
+julia +1.10.4 --compiled-modules=no --startup-file=no --project=. scripts/build_adaptive_simulator_report.jl
+```
+
+The JSON and JavaScript configuration files beside the report are generated
+from Julia artifacts. Results after day 14 are extrapolation and use an
+ensemble sensitivity band. Experimental dose values outside 0.67-1.47 uM are
+flagged as extrapolation; translational mode reports normalized exposure only.
+
+## Sample-Aware Staged Report
+
+The sample-aware companion report keeps image tiles averaged within each well,
+but does not average the replicate wells into a single observed trajectory. It
+shows each well, the across-well mean plus or minus one standard deviation, and
+the selected canonical staged fit. Its rankings and equations are inherited
+from the validated staged report; the well-level view audits reproducibility
+and does not recompute ordinary BIC with correlated measurements treated as
+independent.
+
+Rebuild the report, CSV findings, figures, and Pages mirror with:
+
+```julia
+julia +1.10.4 --compiled-modules=no --startup-file=no --project=. scripts/build_sample_aware_report.jl
+```
+
+The generated report is
+`outputs/reports/a2780_sample_aware_staged_model_comparison.html`.
 
 ## Outputs
 All condition outputs are written under condition-specific subfolders:
@@ -80,6 +127,31 @@ legacy `coculture_treated_automatic_best_models_top10.csv` artifact.
 ## Environment
 Dependencies are defined in `Project.toml` and pinned to registered
 GrowthParameterEstimation `0.4.1`.
+
+The checked-in manifest was resolved with Julia `1.10.4`. Use that runtime for
+reproducible local validation.
+
+### Windows Application Control
+
+On Windows systems where Application Control blocks Julia-generated package
+image DLLs under `.julia/compiled`, run this project with compiled modules
+disabled. This bypasses Julia's cache files without changing Windows security
+policy or the scientific environment:
+
+```powershell
+./scripts/run_tests_windows.ps1
+```
+
+For report or validation scripts, use the same launch options:
+
+```powershell
+julia +1.10.4 --compiled-modules=no --startup-file=no --project=. path/to/script.jl
+```
+
+The first cache-free load is slower because code is compiled in memory. Do not
+use an unqualified Julia `1.12` invocation with this manifest: it re-resolves
+dependencies and can create native package images that the local Windows policy
+then rejects as `Bad Image` files.
 
 ## Validation
 Run `validate_density_pooling.jl` for monoculture pooling tests and

@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A2780 Low-Resource Modeling Plan</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    :root { --ink:#182230; --muted:#52606d; --line:#c9d2dc; --bg:#f6f8fa; --panel:#fff; --blue:#2457d6; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; color:var(--ink); background:var(--bg); font-family:Arial,Helvetica,sans-serif; line-height:1.5; }
+    header, main, footer { width:min(1080px,100%); margin:0 auto; padding:22px 26px; }
+    header { padding-top:28px; padding-bottom:14px; }
+    h1 { margin:14px 0 4px; font-size:34px; line-height:1.15; }
+    h2 { margin:0 0 12px; font-size:25px; }
+    h3 { margin:18px 0 6px; font-size:18px; }
+    p { margin:6px 0; }
+    section { padding:22px 0; border-top:1px solid var(--line); }
+    .back { color:var(--ink); font-weight:700; text-decoration:none; }
+    .header-actions { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+    .toc { position:relative; }
+    .toc > summary { display:grid; place-items:center; width:40px; height:40px; cursor:pointer; list-style:none; border:1px solid var(--line); border-radius:4px; background:var(--ink); color:#fff; font-size:22px; }
+    .toc > summary::-webkit-details-marker { display:none; }
+    .toc nav { position:absolute; top:47px; right:0; z-index:10; display:grid; width:250px; border:1px solid var(--line); background:#fff; padding:6px; box-shadow:0 10px 26px rgba(24,34,48,.16); }
+    .toc nav a { color:var(--ink); padding:7px 9px; text-decoration:none; }
+    .toc nav a:hover, .toc nav a:focus { background:#eef2f6; }
+    .model { padding:12px 0 16px; border-bottom:1px solid var(--line); }
+    .model:last-of-type { border-bottom:0; }
+    .equation { overflow-x:auto; margin:8px 0; padding:8px 12px; border-left:4px solid var(--blue); background:var(--panel); }
+    .notation { display:grid; grid-template-columns:150px minmax(0,1fr); gap:5px 14px; margin:12px 0 0; }
+    .notation dt { font-weight:700; }
+    .notation dd { margin:0; color:var(--muted); }
+    footer { color:var(--muted); padding-bottom:40px; }
+    @media (max-width:700px) {
+      header, main, footer { padding-left:16px; padding-right:16px; }
+      h1 { font-size:28px; }
+      .notation { grid-template-columns:1fr; gap:2px; }
+      .notation dd { margin-bottom:7px; }
+      .toc nav { width:min(270px,calc(100vw - 32px)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-actions">
+      <a class="back" href="../../../../index.html">&#8592; Back</a>
+      <details class="toc">
+        <summary aria-label="Table of contents" title="Table of contents"><span aria-hidden="true">&#9776;</span></summary>
+        <nav aria-label="Report sections">
+          <a href="#untreated-monoculture">Untreated monoculture</a>
+          <a href="#treated-monoculture">Treated monoculture</a>
+          <a href="#untreated-coculture">Untreated coculture</a>
+          <a href="#treated-coculture">Treated coculture</a>
+          <a href="#low-resource">Low resource</a>
+          <a href="#low-resource-treated-monoculture">Low-resource treated monoculture</a>
+          <a href="#low-resource-coculture">Low-resource coculture</a>
+          <a href="#low-resource-treated-coculture">Low-resource treated coculture</a>
+          <a href="#low-resource-treated-coculture-transfer">Resource-driven transfer variant</a>
+        </nav>
+      </details>
+    </div>
+    <h1>A2780 Low-Resource Modeling Plan</h1>
+  </header>
+
+  <main>
+    <section id="untreated-monoculture">
+      <h2>Untreated Monoculture</h2>
+
+      <div class="model">
+        <h3>Logistic <span aria-label="carried forward">&#9733;</span></h3>
+        <div class="equation">\[\frac{dX}{dt}=r_X X\left(1-\frac{X}{K_X}\right)\]</div>
+      </div>
+
+      <div class="model">
+        <h3>Theta Logistic</h3>
+        <div class="equation">\[\frac{dX}{dt}=r_X X\left[1-\left(\frac{X}{K_X}\right)^{\theta_X}\right]\]</div>
+      </div>
+
+      <div class="model">
+        <h3>Gompertz</h3>
+        <div class="equation">\[\frac{dX}{dt}=r_X X\log\left(\frac{K_X}{X}\right)\]</div>
+      </div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(X(t)\)</dt><dd>Measured population of the monoculture cell line.</dd>
+        <dt>\(r_X\)</dt><dd>Cell-line growth-rate parameter.</dd>
+        <dt>\(K_X\)</dt><dd>Cell-line carrying capacity in the assay.</dd>
+        <dt>\(\theta_X\)</dt><dd>Theta-logistic shape parameter.</dd>
+      </dl>
+    </section>
+
+    <section id="treated-monoculture">
+      <h2>Treated Monoculture</h2>
+
+      <div class="model">
+        <h3>Time-Delayed Hill Function <span aria-label="carried forward">&#9733;</span></h3>
+        <div class="equation">\[
+        A_X(t)=1-e^{-\lambda_X t},\qquad t\ge0
+        \]
+        \[
+        H_X(D)=\frac{D^{h_X}}{EC_{50,X}^{h_X}+D^{h_X}}
+        \]
+        \[
+        \frac{dX}{dt}=r_X X\left(1-\frac{X}{K_X}\right)-\beta_XA_X(t)H_X(D)X
+        \]</div>
+      </div>
+
+      <div class="model">
+        <h3>Drug Effect Distributed Into Logistic Growth <span aria-label="carried forward">&#9733;</span></h3>
+        <div class="equation">\[
+        \text{Normal logistic form:}\qquad
+        \frac{dX}{dt}=r_X\,X\left(1-\frac{X}{K_X}\right)-\beta_X\,A_X(t)\,H_X(D)\,X
+        \]</div>
+        <div class="equation">\[
+        \text{Distributed form:}\qquad
+        \frac{dX}{dt}=\underbrace{r_X\,X}_{\text{unrestricted growth}}
+        -\underbrace{\frac{r_X}{K_X}X^2}_{\text{density-dependent loss}}
+        -\underbrace{\beta_X\,A_X(t)\,H_X(D)\,X}_{\text{drug-associated loss}}
+        \]</div>
+        <div class="equation">\[
+        \text{Normal logistic without Hill saturation:}\qquad
+        \frac{dX}{dt}=r_X\,X\left(1-\frac{X}{K_X}\right)-\beta_X\,A_X(t)\,D\,X
+        \]
+        \[
+        \text{Distributed without Hill saturation:}\qquad
+        \frac{dX}{dt}=r_X\,X-\frac{r_X}{K_X}X^2-\beta_X\,A_X(t)\,D\,X
+        \]</div>
+      </div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(D\)</dt><dd>Cisplatin concentration.</dd>
+        <dt>\(A_X(t)\)</dt><dd>Exponential delay multiplier between 0 and 1.</dd>
+        <dt>\(\lambda_X\)</dt><dd>Rate at which the effect rises continuously from zero toward full strength.</dd>
+        <dt>\(H_X(D)\)</dt><dd>Bounded Hill transformation of dose between 0 and 1.</dd>
+        <dt>\(\beta_X\)</dt><dd>Drug-effect parameter.</dd>
+        <dt>\(EC_{50,X}\)</dt><dd>Concentration producing half of the maximum Hill effect.</dd>
+        <dt>\(h_X\)</dt><dd>Hill-curve shape parameter.</dd>
+      </dl>
+    </section>
+
+    <section id="untreated-coculture">
+      <h2>Untreated Coculture <span style="color:var(--muted);font-size:16px">(optional stage)</span></h2>
+
+      <div class="model">
+        <h3>Asymmetric Crowding <span aria-label="carried forward">&#9733;</span></h3>
+        <div class="equation">\[
+        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)
+        \]
+        \[
+        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)
+        \]</div>
+      </div>
+
+      <div class="model">
+        <h3>Asymmetric Crowding Plus Death</h3>
+        <div class="equation">\[
+        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_NN
+        \]
+        \[
+        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_CC
+        \]</div>
+      </div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(N(t),C(t)\)</dt><dd>Measured A2780Naive and total A2780cis populations.</dd>
+        <dt>\(K\)</dt><dd>Given carrying capacity shared by both lineages in coculture; it is not fitted separately for each lineage.</dd>
+        <dt>\(\alpha_{NC}\)</dt><dd>Effect of A2780cis crowding on A2780Naive.</dd>
+        <dt>\(\alpha_{CN}\)</dt><dd>Effect of A2780Naive crowding on A2780cis.</dd>
+        <dt>\(d_N,d_C\)</dt><dd>Lineage-specific death or loss-rate parameters.</dd>
+      </dl>
+    </section>
+
+    <section id="treated-coculture">
+      <h2>Treated Coculture</h2>
+
+      <div class="model">
+        <h3>Asymmetric Crowding Plus Time-Delayed Hill Function <span aria-label="carried forward">&#9733;</span></h3>
+        <div class="equation">\[
+        \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-\beta_NA_N(t)H_N(D)N
+        \]
+        \[
+        \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-\beta_CA_C(t)H_C(D)C
+        \]</div>
+      </div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(K\)</dt><dd>Inherited given carrying capacity shared by both lineages.</dd>
+        <dt>\(\alpha_{NC},\alpha_{CN}\)</dt><dd>Inherited asymmetric crowding parameters; ordinary coculture death terms are not carried forward.</dd>
+        <dt>\(A_N(t),A_C(t)\)</dt><dd>Inherited lineage-specific exponential delay multipliers.</dd>
+        <dt>\(H_N(D),H_C(D)\)</dt><dd>Lineage-specific Hill dose-response functions.</dd>
+        <dt>\(\beta_N,\beta_C\)</dt><dd>Lineage-specific drug-effect parameters.</dd>
+      </dl>
+    </section>
+
+    <section id="low-resource">
+      <h2>Low Resource</h2>
+
+      <div class="model">
+        <h3>Growth-Rate And Carrying-Capacity Modifiers</h3>
+        <div class="equation">\[
+        \frac{dX}{dt}=\rho_r r_X X\left(1-\frac{X}{\rho_KK_X}\right)
+        \]</div>
+      </div>
+
+      <div class="model">
+        <h3>Separately Fitted Growth Rate</h3>
+        <div class="equation">\[
+        \frac{dX}{dt}=r_X^{LR}X\left(1-\frac{X}{K_X}\right)
+        \]</div>
+      </div>
+
+      <div class="model">
+        <h3>Lineage-Specific Subtractive Loss <span aria-label="carried forward">&#9733;</span></h3>
+        <div class="equation">\[
+        u_R(t)=\frac{10-F(t)}{10-0.05},\qquad 0.05\le F(t)\le 10
+        \]
+        \[
+        \frac{dN}{dt}=r_NN\left(1-\frac{N}{K_N}\right)-d_N^{LR}u_R(t)N
+        \]
+        \[
+        \frac{dC}{dt}=r_CC\left(1-\frac{C}{K_C}\right)-d_C^{LR}u_R(t)C
+        \]</div>
+      </div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(\rho_r\)</dt><dd>Low-resource multiplier on the inherited growth rate.</dd>
+        <dt>\(\rho_K\)</dt><dd>Low-resource multiplier on the inherited carrying capacity.</dd>
+        <dt>\(r_X^{LR}\)</dt><dd>Growth rate fitted directly to the low-resource environment.</dd>
+        <dt>\(F(t)\)</dt><dd>Controllable serum concentration in percent FBS, from 0.05% to 10%.</dd>
+        <dt>\(u_R(t)\)</dt><dd>Normalized resource deficit: 0 at 10% FBS and 1 at 0.05% FBS.</dd>
+        <dt>\(d_N^{LR}\)</dt><dd>Maximum additional low-resource per-capita loss rate fitted for A2780Naive monoculture.</dd>
+        <dt>\(d_C^{LR}\)</dt><dd>Maximum additional low-resource per-capita loss rate fitted for A2780cis-resistant monoculture.</dd>
+      </dl>
+    </section>
+
+    <section id="low-resource-treated-monoculture">
+      <h2>Low-Resource Treated Monoculture <span aria-label="carried forward">&#9733;</span></h2>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_NN\left(1-\frac{N}{K_N}\right)-d_N^{LR}u_R(t)N-\beta_NA_N(t)H_N(D)N
+      \]
+      \[
+      \frac{dC}{dt}=r_CC\left(1-\frac{C}{K_C}\right)-d_C^{LR}u_R(t)C-\beta_CA_C(t)H_C(D)C
+      \]</div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(d_N^{LR},d_C^{LR},u_R(t)\)</dt><dd>Only the controllable lineage-specific subtractive low-resource losses are carried from low-resource monoculture.</dd>
+        <dt>\(A_N(t),A_C(t)\)</dt><dd>Inherited lineage-specific exponential delay multipliers.</dd>
+        <dt>\(H_N(D),H_C(D)\)</dt><dd>Inherited lineage-specific Hill dose-response functions.</dd>
+        <dt>\(\beta_N,\beta_C\)</dt><dd>Inherited lineage-specific drug-effect parameters.</dd>
+      </dl>
+    </section>
+
+    <section id="low-resource-coculture">
+      <h2>Low-Resource Coculture <span aria-label="carried forward">&#9733;</span></h2>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_N^{LR}u_R(t)N
+      \]
+      \[
+      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_C^{LR}u_R(t)C
+      \]</div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(K\)</dt><dd>Inherited given carrying capacity shared by both lineages.</dd>
+        <dt>\(\alpha_{NC},\alpha_{CN}\)</dt><dd>Inherited asymmetric crowding parameters.</dd>
+        <dt>\(d_N^{LR},d_C^{LR},u_R(t)\)</dt><dd>Carried controllable low-resource subtractive losses; no ordinary coculture death term is inherited.</dd>
+      </dl>
+    </section>
+
+    <section id="low-resource-treated-coculture">
+      <h2>Low-Resource Treated Coculture</h2>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_N^{LR}u_R(t)N-\beta_NA_N(t)H_N(D)N
+      \]
+      \[
+      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_C^{LR}u_R(t)C-\beta_CA_C(t)H_C(D)C
+      \]</div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(K\)</dt><dd>Inherited given carrying capacity shared by both lineages.</dd>
+        <dt>\(\alpha_{NC},\alpha_{CN}\)</dt><dd>Inherited asymmetric crowding parameters.</dd>
+        <dt>\(d_N^{LR},d_C^{LR},u_R(t)\)</dt><dd>Carried controllable low-resource subtractive losses; no ordinary coculture death term is inherited.</dd>
+        <dt>\(A_N(t),A_C(t)\)</dt><dd>Inherited lineage-specific exponential delay multipliers.</dd>
+        <dt>\(H_N(D),H_C(D)\)</dt><dd>Inherited lineage-specific Hill functions.</dd>
+        <dt>\(\beta_N,\beta_C\)</dt><dd>Inherited lineage-specific drug-effect parameters.</dd>
+      </dl>
+    </section>
+
+    <section id="low-resource-treated-coculture-transfer">
+      <h2>Low-Resource Treated Coculture With Resource-Driven Sensitive-To-Resistant Transfer</h2>
+      <div class="equation">\[
+      \frac{dN}{dt}=r_NN\left(1-\frac{N+\alpha_{NC}C}{K}\right)-d_N^{LR}u_R(t)N-\beta_NA_N(t)H_N(D(t))N-\gamma u_R(t)N
+      \]
+      \[
+      \frac{dC}{dt}=r_CC\left(1-\frac{C+\alpha_{CN}N}{K}\right)-d_C^{LR}u_R(t)C-\beta_CA_C(t)H_C(D(t))C+\gamma u_R(t)N
+      \]</div>
+
+      <h3>Notation</h3>
+      <dl class="notation">
+        <dt>\(N(t),C(t)\)</dt><dd>Modeled sensitive and resistant populations.</dd>
+        <dt>\(D(t)\)</dt><dd>Time-varying cisplatin concentration.</dd>
+        <dt>\(u_R(t)\)</dt><dd>Normalized FBS deficit that scales linearly from 0 at 10% FBS to 1 at 0.05% FBS.</dd>
+        <dt>\(\gamma\)</dt><dd>Resource-driven sensitive-to-resistant transfer-rate parameter.</dd>
+        <dt>\(-\gamma u_R(t)N,+\gamma u_R(t)N\)</dt><dd>Equal-and-opposite transfer terms that move cells from the sensitive population into the resistant population.</dd>
+      </dl>
+    </section>
+  </main>
+
+  <footer>Model equations and notation by experimental environment.</footer>
+</body>
+</html>

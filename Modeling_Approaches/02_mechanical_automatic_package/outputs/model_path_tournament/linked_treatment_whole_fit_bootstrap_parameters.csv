@@ -1,0 +1,17 @@
+parameter_index,ci95_lower,median,ci95_upper,successful_replicates,parameter,method,requested_replicates
+1,4.914719524280244,4.972795159608599,4.991428829117414,200,naive_emax,within-trajectory residual bootstrap with complete joint refitting,200
+2,1.4449673812571537,1.4449673812571537,1.4511178055951568,200,naive_ec50_effect,within-trajectory residual bootstrap with complete joint refitting,200
+3,2.0959388955950278,2.114493950041648,2.117211854715394,200,naive_hill_n,within-trajectory residual bootstrap with complete joint refitting,200
+4,0.6564497764681557,0.6573533727311189,0.6582885861549514,200,naive_lambda,within-trajectory residual bootstrap with complete joint refitting,200
+5,2.513199908602345,2.5515671115664764,2.574246841248714,200,naive_t_onset,within-trajectory residual bootstrap with complete joint refitting,200
+6,-0.048790163323939865,-0.04879016172992384,-0.04879016172992384,200,naive_log_contrast_density,within-trajectory residual bootstrap with complete joint refitting,200
+7,4.810757449899868,4.814398653676305,4.814398653676305,200,cis_emax_sensitive,within-trajectory residual bootstrap with complete joint refitting,200
+8,0.32402275250518103,0.32402275250518103,0.32445896805143476,200,cis_emax_tolerant,within-trajectory residual bootstrap with complete joint refitting,200
+9,4.985247744776158,4.985247744776158,4.987987851644356,200,cis_lambda,within-trajectory residual bootstrap with complete joint refitting,200
+10,6.974945873275295,6.974945873275295,6.980131604638702,200,cis_t_onset,within-trajectory residual bootstrap with complete joint refitting,200
+11,0.5743871812208794,0.5743871812208794,0.5746062355038115,200,cis_f_tolerant0,within-trajectory residual bootstrap with complete joint refitting,200
+12,6.648684933168986e-5,6.648684933168986e-5,6.988812439653531e-5,200,cis_log_contrast_density,within-trajectory residual bootstrap with complete joint refitting,200
+13,-2.1801994340153383,-2.018977686872419,-1.9865376161109811,200,beta_naive,within-trajectory residual bootstrap with complete joint refitting,200
+14,0.05920612218226884,0.05920612218226884,0.0695310030305425,200,beta_cis,within-trajectory residual bootstrap with complete joint refitting,200
+15,-3.850260441536897,-3.560134694613758,-3.4751709381709865,200,log_cis_tolerant_context,within-trajectory residual bootstrap with complete joint refitting,200
+16,2.858790255126027,2.858790255126027,2.893773360699575,200,cis_tolerant_logit_shift,within-trajectory residual bootstrap with complete joint refitting,200

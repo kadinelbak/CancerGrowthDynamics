@@ -28,10 +28,13 @@ function _linked_treatment_seed(start)
     base = joinpath(root, "outputs", "csv", "monoculture_treated")
     status_path = joinpath(base, "monoculture_treated_pooling_status.csv")
     parameter_path = joinpath(base, "monoculture_treated_joint_parameter_estimates.csv")
+    ranking_path = joinpath(base, "monoculture_treated_pooling_model_ranking.csv")
     isfile(status_path) || error("Treated-monoculture pooling status is required for linked treatment fitting")
     isfile(parameter_path) || error("Treated-monoculture parameter estimates are required for linked treatment fitting")
+    isfile(ranking_path) || error("Treated-monoculture model ranking is required for linked treatment fitting")
     status = CSV.read(status_path, DataFrame)
     parameters = CSV.read(parameter_path, DataFrame)
+    ranking = CSV.read(ranking_path, DataFrame)
 
     expected = Dict(
         "A2780Naive" => "joint_ic_effect_hill_ramp_onset",
@@ -43,12 +46,26 @@ function _linked_treatment_seed(start)
         selected = status[String.(status.cell_line) .== cell_line, :]
         nrow(selected) == 1 || error("Expected one treated-monoculture winner for $(cell_line)")
         winner = first(selected)
-        String(winner.winning_model) == expected_model ||
-            error("Linked treatment adapter requires $(expected_model) for $(cell_line), found $(winner.winning_model)")
+        nominal_model = String(winner.winning_model)
+        compatible = ranking[
+            (String.(ranking.cell_line) .== cell_line) .&
+            (String.(ranking.model) .== expected_model) .&
+            Bool.(ranking.eligible_for_inheritance),
+            :,
+        ]
+        isempty(compatible) && error("No eligible $(expected_model) fit is available for linked $(cell_line) treatment")
+        sort!(compatible, :bic)
+        compatible_winner = first(compatible)
+        selected_pooling = String(compatible_winner.pooling_mode)
+        nominal_bic = Float64(winner.winning_bic)
+        compatible_bic = Float64(compatible_winner.bic)
+        selection_reason = nominal_model == expected_model ?
+            "nominal_stage2_winner" :
+            "best_stage2_candidate_compatible_with_population_balance_stage4"
         winner_parameters = parameters[
             (String.(parameters.cell_line) .== cell_line) .&
             (String.(parameters.model) .== expected_model) .&
-            (String.(parameters.pooling_mode) .== String(winner.winning_pooling_mode)),
+            (String.(parameters.pooling_mode) .== selected_pooling),
             :,
         ]
         for parameter in unique(String.(winner_parameters.parameter))
@@ -58,16 +75,21 @@ function _linked_treatment_seed(start)
             push!(rows, (
                 cell_line = cell_line,
                 treatment_family = expected_model,
-                pooling_mode = String(winner.winning_pooling_mode),
+                pooling_mode = selected_pooling,
                 parameter = parameter,
                 sequential_stage2_center = center,
+                nominal_stage2_winner = nominal_model,
+                nominal_stage2_bic = nominal_bic,
+                compatible_stage2_bic = compatible_bic,
+                compatible_delta_bic = compatible_bic - nominal_bic,
+                selection_reason = selection_reason,
                 source_path = parameter_path,
             ))
         end
         contrast_rows = parameters[
             (String.(parameters.cell_line) .== cell_line) .&
             (String.(parameters.model) .== expected_model) .&
-            (String.(parameters.pooling_mode) .== String(winner.winning_pooling_mode)) .&
+            (String.(parameters.pooling_mode) .== selected_pooling) .&
             (String.(parameters.parameter) .== (cell_line == "A2780Naive" ? "emax" : "emax_sensitive")),
             :,
         ]
@@ -103,6 +125,11 @@ function _linked_treatment_seed(start)
                 pooling_mode = "joint across both cell lines, densities, and doses",
                 parameter = String(name),
                 sequential_stage2_center = estimate,
+                nominal_stage2_winner = timing_winner,
+                nominal_stage2_bic = Float64(first(timing_ranking.bic)),
+                compatible_stage2_bic = Float64(first(timing_ranking.bic)),
+                compatible_delta_bic = 0.0,
+                selection_reason = "timing_audit_winner",
                 source_path = timing_parameter_path,
             ))
         end
@@ -330,16 +357,8 @@ function _linked_context_scales(p, hypothesis, sensitive_burden, resistant_burde
     )
 end
 
-function _linked_intrinsic_growth(population, baseline)
-    N = max(population, zero(population))
-    K = max(baseline.K, 1e-8)
-    if String(baseline.model) == "gompertz_growth"
-        return baseline.r * max(N, 1e-8) * log(K / max(N, 1e-8))
-    elseif String(baseline.model) == "theta_logistic_growth"
-        theta = max(baseline.shape_value, 1e-8)
-        return baseline.r * N * max(zero(N), 1 - (N / K)^theta)
-    end
-    return baseline.r * N * max(zero(N), 1 - N / K)
+function _linked_intrinsic_growth(population, baseline, t)
+    return _baseline_growth(population, population, baseline, t)
 end
 
 function _linked_problem(monoculture_environments, coculture_environments, start, seed, hypothesis)
@@ -364,7 +383,7 @@ function _linked_problem(monoculture_environments, coculture_environments, start
             treatment = _linked_treatment_values(p, hypothesis, :monoculture, environment.density, base)
             activation = _ramp_activation(t, 0.0, treatment.naive_lambda, treatment.naive_onset)
             kill = activation * _hill_effect(environment.effect_level, treatment.naive_emax, treatment.naive_ec50, treatment.naive_hill)
-            du[index] = _linked_intrinsic_growth(N, environment.baseline) - kill * N
+            du[index] = _linked_intrinsic_growth(N, environment.baseline, t) - kill * N
         end
         for (index, environment) in enumerate(cis_mono)
             sensitive_index = mono_cis_offset + 2index - 1
@@ -376,7 +395,7 @@ function _linked_problem(monoculture_environments, coculture_environments, start
             activation = _timing_activation(t, treatment.cis_lambda, treatment.cis_onset, treatment.cis_activation_mode)
             kill_sensitive = activation * _hill_effect(environment.effect_level, treatment.cis_emax_sensitive, 0.5, 4.0)
             kill_tolerant = activation * _hill_effect(environment.effect_level, treatment.cis_emax_tolerant, 0.5, 4.0)
-            growth = _linked_intrinsic_growth(total, environment.baseline)
+            growth = _linked_intrinsic_growth(total, environment.baseline, t)
             sensitive_share = total > 0 ? sensitive / total : one(total)
             tolerant_share = total > 0 ? tolerant / total : zero(total)
             du[sensitive_index] = growth * sensitive_share - kill_sensitive * sensitive
@@ -401,8 +420,8 @@ function _linked_problem(monoculture_environments, coculture_environments, start
             naive_baseline, cis_baseline = coculture_baselines[index]
             naive_load = naive + alpha_sr * cis_total
             cis_load = cis_total + alpha_rs * naive
-            naive_growth = _anchored_component_growth(naive, naive_load, naive_baseline) - death_naive * naive
-            cis_growth = _anchored_component_growth(cis_total, cis_load, cis_baseline) - death_cis * cis_total
+            naive_growth = _anchored_component_growth(naive, naive_load, naive_baseline, t) - death_naive * naive
+            cis_growth = _anchored_component_growth(cis_total, cis_load, cis_baseline, t) - death_cis * cis_total
             treatment = _linked_treatment_values(p, hypothesis, :coculture, environment.density, base)
             if hypothesis == "competitor_scaled"
                 naive_burden = alpha_sr * cis_total / max(naive_baseline.K, 1e-8)
@@ -530,9 +549,10 @@ end
 function _render_linked_coculture_grid(overlay, winner, out)
     selected = overlay[(String.(overlay.model) .== String(winner.model)) .& (String.(overlay.context) .== "coculture"), :]
     panels = Any[]
+    y_limits = _shared_y_limits(selected)
     for density in ("20k", "30k"), mix in ("25-75", "50-50", "75-25")
         environment = selected[(String.(selected.density) .== density) .& (String.(selected.mix) .== mix), :]
-        panel = plot(title = "$(density), mix $(mix)", titlefontsize = 9, xlabel = "Time (day)", ylabel = mix == "25-75" ? "Measured population" : "", legend = density == "20k" && mix == "75-25" ? :outertopright : false, legendfontsize = 8)
+        panel = plot(title = "$(density), mix $(mix)", titlefontsize = 9, xlabel = "Time (day)", ylabel = mix == "25-75" ? "Measured population" : "", ylims = y_limits, legend = density == "20k" && mix == "75-25" ? :outertopright : false, legendfontsize = 8)
         for (component, color) in (("sensitive", :crimson), ("resistant", :steelblue))
             rows = environment[String.(environment.component) .== component, :]
             sort!(rows, :time)
@@ -637,7 +657,8 @@ function _fit_linked_treatment_joint(
     fit_cache = Dict{String,Any}()
     overlay_parts = DataFrame[]
     resume_path = joinpath(out.csv, "linked_treatment_model_ranking.csv")
-    for hypothesis in LINKED_TREATMENT_HYPOTHESES
+    linked_hypotheses = _tournament_smoke_test() ? ["load_plus_tolerant_context", "fully_free_context_diagnostic"] : LINKED_TREATMENT_HYPOTHESES
+    for hypothesis in linked_hypotheses
         problem = _linked_problem(monoculture_environments, coculture_environments, start, seed, hypothesis)
         resumed = resume_from_existing ?
             _linked_resume_parameters(resume_path, hypothesis, length(problem.p0)) :
@@ -646,18 +667,28 @@ function _fit_linked_treatment_joint(
             problem = merge(problem, (p0 = resumed, u0 = Float64.(problem.u0_builder(resumed))))
         end
         maxiters = hypothesis == "fully_free_context_diagnostic" ? max(400, Int(round(max_time_per_fit * 80))) : max(300, Int(round(max_time_per_fit * 60)))
+        _tournament_smoke_test() && (maxiters = 1)
         println("  Linked treatment fit $(hypothesis)...")
-        fit = GrowthParameterEstimation.run_joint_fit(
-            problem.model, problem.datasets, problem.u0, problem.p0;
+        starts = GrowthParameterEstimation.generate_multistarts(
+            problem.p0,
+            problem.bounds;
+            n_starts = _configured_multistarts(1),
+            seed = _stable_multistart_seed("linked_treatment", hypothesis),
+        )
+        multistart = GrowthParameterEstimation.run_joint_multistart(
+            problem.model, problem.datasets, problem.u0, starts;
+            refine_optimizer = _configured_refine_optimizer(),
             bounds = problem.bounds,
             u0_builder = problem.u0_builder,
             solver = Rodas5(),
             optimizer = :nelder_mead,
             maxiters = maxiters,
+            maxtime = _configured_fit_maxtime(),
             reltol = 1e-7,
             abstol = 1e-7,
             initial_time = 0.0,
         )
+        fit = multistart.fit
         isfinite(fit.bic) && isfinite(fit.raw_sse) && fit.raw_sse < 9.99e11 || continue
         fit_cache[hypothesis] = (fit = fit, problem = problem)
         push!(rows, (
@@ -680,11 +711,17 @@ function _fit_linked_treatment_joint(
             initial_condition_strategy = "fixed day-zero density totals; coculture split by nominal mix and inherited cis tolerant fraction",
             residual_scaling = "trajectory peak across combined 24-trajectory objective",
             boundary_issue = false,
-            params = string((names = problem.names, values = fit.params, package_api = "GrowthParameterEstimation.run_joint_fit")),
+            params = string((names = problem.names, values = fit.params, package_api = "GrowthParameterEstimation.run_joint_multistart", successful_starts = count(==("completed"), String.(multistart.summary.status)))),
         ))
     end
+    strobl = _tournament_smoke_test() ? (rows = NamedTuple[], fits = Dict{String,Any}(), overlays = DataFrame[]) : _fit_strobl_linked_benchmarks(
+        monoculture_environments, coculture_environments, start;
+        max_time_per_fit = max_time_per_fit,
+    )
+    append!(rows, strobl.rows)
     ranking = sort!(DataFrame(rows), :bic)
-    nrow(ranking) == length(LINKED_TREATMENT_HYPOTHESES) || error("Not all linked treatment hypotheses produced finite fits")
+    expected_model_count = length(linked_hypotheses) + (_tournament_smoke_test() ? 0 : length(STROBL_MODEL_VARIANTS))
+    nrow(ranking) == expected_model_count || error("Not all linked treatment and Strobl benchmark hypotheses produced finite fits")
     eligible = ranking[Bool.(ranking.eligible_for_inheritance), :]
     winner = eligible[argmin(eligible.bic), :]
     cached = fit_cache[String(winner.model)]
@@ -727,7 +764,8 @@ function _fit_linked_treatment_joint(
         u0_builder = cached.problem.u0_builder,
         solver = Rodas5(),
         optimizer = :nelder_mead,
-        maxiters = max(400, Int(round(max_time_per_fit * 70))),
+        maxiters = _tournament_smoke_test() ? 1 : max(400, Int(round(max_time_per_fit * 70))),
+        maxtime = _configured_fit_maxtime(),
         reltol = 1e-7,
         abstol = 1e-7,
         initial_time = 0.0,
@@ -747,10 +785,11 @@ function _fit_linked_treatment_joint(
     eligible = ranking[Bool.(ranking.eligible_for_inheritance), :]
     winner = eligible[argmin(eligible.bic), :]
 
-    for hypothesis in LINKED_TREATMENT_HYPOTHESES
+    for hypothesis in linked_hypotheses
         cached_hypothesis = fit_cache[hypothesis]
         push!(overlay_parts, _linked_overlay(cached_hypothesis.fit, cached_hypothesis.problem, hypothesis))
     end
+    append!(overlay_parts, strobl.overlays)
     overlay = vcat(overlay_parts...; cols = :union)
     free_row = first(ranking[String.(ranking.model) .== "fully_free_context_diagnostic", :])
     free_improvement = Float64(winner.bic) - Float64(free_row.bic)
@@ -784,6 +823,69 @@ function _fit_linked_treatment_joint(
         ))
     end
     shared_audit = DataFrame(parameter_rows)
+
+    whole_fit_bootstraps = something(tryparse(Int, get(ENV, "A2780_WHOLE_FIT_BOOTSTRAPS", "0")), 0)
+    if whole_fit_bootstraps > 0
+        println("  Whole-fit residual bootstrap for $(winner.model): $(whole_fit_bootstraps) refits...")
+        bootstrap = GrowthParameterEstimation.bootstrap_joint_fit(
+            winner_cached.problem.model,
+            winner_cached.problem.datasets,
+            winner_cached.problem.u0,
+            winner_cached.fit;
+            bounds = winner_cached.problem.bounds,
+            n_bootstrap = whole_fit_bootstraps,
+            starts_per_bootstrap = 2,
+            seed = 4041,
+            u0_builder = winner_cached.problem.u0_builder,
+            solver = Rodas5(),
+            optimizer = :nelder_mead,
+            maxiters = max(250, Int(round(max_time_per_fit * 35))),
+            maxtime = _configured_fit_maxtime(),
+            reltol = 1e-7,
+            abstol = 1e-7,
+            initial_time = 0.0,
+        )
+        summary = copy(bootstrap.parameter_summary)
+        summary.parameter = [String(winner_cached.problem.names[index]) for index in summary.parameter_index]
+        summary.method = fill(bootstrap.method, nrow(summary))
+        summary.requested_replicates = fill(bootstrap.requested_replicates, nrow(summary))
+        CSV.write(joinpath(out.csv, "linked_treatment_whole_fit_bootstrap_parameters.csv"), summary)
+        CSV.write(joinpath(out.csv, "linked_treatment_whole_fit_bootstrap_predictions.csv"), bootstrap.prediction_summary)
+        CSV.write(joinpath(out.csv, "linked_treatment_whole_fit_bootstrap_failures.csv"), bootstrap.failures)
+    end
+    if lowercase(get(ENV, "A2780_BLOCKED_VALIDATION", "false")) == "true"
+        validation_parts = DataFrame[]
+        metadata = winner_cached.problem.metadata
+        strategies = (
+            density = ["density=" * String(row.density) for row in metadata],
+            dose = ["dose=" * string(row.dose) for row in metadata],
+            mixture = [isempty(String(row.mix)) ? "monoculture=" * String(row.cell_line) : "mixture=" * String(row.mix) for row in metadata],
+            context = ["context=" * String(row.context) for row in metadata],
+        )
+        for (strategy, blocks) in pairs(strategies)
+            validation = GrowthParameterEstimation.blocked_joint_validation(
+                winner_cached.problem.model,
+                winner_cached.problem.datasets,
+                winner_cached.problem.u0,
+                winner_cached.fit.params,
+                blocks;
+                bounds = winner_cached.problem.bounds,
+                starts_per_fold = 2,
+                seed = _stable_multistart_seed("blocked", strategy, winner.model),
+                u0_builder = winner_cached.problem.u0_builder,
+                solver = Rodas5(),
+                optimizer = :nelder_mead,
+                maxiters = max(250, Int(round(max_time_per_fit * 35))),
+                maxtime = _configured_fit_maxtime(),
+                reltol = 1e-7,
+                abstol = 1e-7,
+                initial_time = 0.0,
+            )
+            insertcols!(validation, 1, :holdout_scheme => fill(String(strategy), nrow(validation)))
+            push!(validation_parts, validation)
+        end
+        CSV.write(joinpath(out.csv, "linked_treatment_blocked_validation.csv"), vcat(validation_parts...; cols = :union))
+    end
 
     effective_rows = NamedTuple[]
     for density in ("20k", "30k")

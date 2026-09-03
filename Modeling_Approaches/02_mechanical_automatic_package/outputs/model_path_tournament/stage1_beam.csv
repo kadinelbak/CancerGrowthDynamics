@@ -1,0 +1,5 @@
+naive_model,naive_pooling,naive_bic,cis_model,cis_pooling,cis_bic,stage1_bic,simple_path
+baranyi_theta_logistic_growth,partial_5pct,-177.5588224995718,adaptation_theta_logistic_growth,shared,-186.40564973620323,-363.964472235775,false
+theta_logistic_growth,partial_5pct,-177.49328221263238,adaptation_theta_logistic_growth,shared,-186.40564973620323,-363.89893194883564,false
+baranyi_theta_logistic_growth,partial_5pct,-177.5588224995718,baranyi_theta_logistic_growth,shared,-186.03680107220023,-363.595623571772,false
+theta_logistic_growth,partial_5pct,-177.49328221263238,theta_logistic_growth,shared,-181.56937165339986,-359.06265386603224,true

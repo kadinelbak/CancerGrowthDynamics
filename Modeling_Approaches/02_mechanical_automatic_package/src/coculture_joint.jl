@@ -162,18 +162,8 @@ function _coculture_monoculture_baselines(start, density)
     return sensitive, resistant
 end
 
-function _anchored_component_growth(population, competitive_load, baseline)
-    N = max(population, zero(population))
-    load = max(competitive_load, zero(competitive_load))
-    K = max(baseline.K, 1e-8)
-    model = String(baseline.model)
-    if model == "gompertz_growth"
-        return baseline.r * N * log(K / max(load, 1e-8))
-    elseif model == "theta_logistic_growth"
-        theta = isfinite(baseline.shape_value) ? max(baseline.shape_value, 0.05) : 1.0
-        return baseline.r * N * (1 - (load / K)^theta)
-    end
-    return baseline.r * N * (1 - load / K)
+function _anchored_component_growth(population, competitive_load, baseline, t)
+    return _baseline_growth(population, competitive_load, baseline, t)
 end
 
 function _pooled_local_parameters(base_p0, base_bounds, base_names, pooling_mode, density_indices; contrast_indices = collect(eachindex(base_p0)))
@@ -241,8 +231,8 @@ function _untreated_coculture_specs(environments, baselines, pooling_mode)
                 sensitive_baseline, resistant_baseline = baselines[environment_index]
                 sensitive_load = sensitive + alpha_sr * resistant
                 resistant_load = resistant + alpha_rs * sensitive
-                du[sensitive_index] = _anchored_component_growth(sensitive, sensitive_load, sensitive_baseline) - death_sensitive * sensitive
-                du[resistant_index] = _anchored_component_growth(resistant, resistant_load, resistant_baseline) - death_resistant * resistant
+                du[sensitive_index] = _anchored_component_growth(sensitive, sensitive_load, sensitive_baseline, t) - death_sensitive * sensitive
+                du[resistant_index] = _anchored_component_growth(resistant, resistant_load, resistant_baseline, t) - death_resistant * resistant
             end
         end
         specs[model_name] = merge(pooled, (model = model!,))
@@ -294,18 +284,47 @@ function _fit_untreated_coculture_joint(environments, out; start, max_time_per_f
     profile_parts = DataFrame[]
     identifiability_parts = DataFrame[]
     fit_cache = Dict{Tuple{String,String},Any}()
-    for pooling_mode in ("shared", "partial_5pct", "independent_diagnostic")
+    pooling_modes = _tournament_smoke_test() ? ("shared", "partial_5pct") : ("shared", "partial_5pct", "independent_diagnostic")
+    for pooling_mode in pooling_modes
         specs = _untreated_coculture_specs(environments, baselines, pooling_mode)
-        for model_name in sort(collect(keys(specs)))
+        model_names = sort(collect(keys(specs)))
+        _tournament_smoke_test() && (model_names = filter(name -> name in ("lv_symmetric_competition", "lv_asymmetric_competition", "lv_asymmetric_competition_death"), model_names))
+        for model_name in model_names
             spec = specs[model_name]
             println("  Joint untreated coculture fit $(model_name), $(pooling_mode)...")
+            model_maxiters = max(500, Int(round(max_time_per_fit * 18)))
+            _tournament_smoke_test() && (model_maxiters = 1)
+            multistart = try
+                starts = GrowthParameterEstimation.generate_multistarts(
+                    spec.p0, spec.bounds;
+                    n_starts = _configured_multistarts(1),
+                    seed = _stable_multistart_seed("untreated_coculture", model_name, pooling_mode),
+                )
+                GrowthParameterEstimation.run_joint_multistart(
+                    spec.model, datasets, u0, starts;
+                    refine_optimizer = _configured_refine_optimizer(),
+                    bounds = spec.bounds,
+                    solver = Tsit5(),
+                    maxiters = model_maxiters,
+                    maxtime = _configured_fit_maxtime(),
+                    reltol = 1e-7,
+                    abstol = 1e-7,
+                    optimizer = :nelder_mead,
+                    initial_time = 0.0,
+                )
+            catch error_value
+                @warn "Untreated coculture joint multistart failed" model_name pooling_mode exception = error_value
+                nothing
+            end
+            multistart === nothing && continue
             profiled = try
                 GrowthParameterEstimation.profile_joint_fit_bounds(
-                    spec.model, datasets, u0, spec.p0;
+                    spec.model, datasets, u0, multistart.fit.params;
                     bounds = spec.bounds,
                     parameter_names = spec.names,
                     solver = Tsit5(),
-                    maxiters = max(500, Int(round(max_time_per_fit * 18))),
+                    maxiters = model_maxiters,
+                    maxtime = _configured_fit_maxtime(),
                     reltol = 1e-7,
                     abstol = 1e-7,
                     optimizer = :nelder_mead,
@@ -383,6 +402,13 @@ function _fit_untreated_coculture_joint(environments, out; start, max_time_per_f
             end
         end
     end
+    strobl = _fit_strobl_untreated_benchmarks(
+        environments, baselines, datasets, u0, metadata;
+        max_time_per_fit = max_time_per_fit,
+    )
+    append!(rows, strobl.rows)
+    append!(overlays, strobl.overlays)
+    append!(parameter_rows, strobl.parameter_rows)
     ranking = sort!(DataFrame(rows), :bic)
     isempty(ranking) && error("No finite untreated coculture joint fits were produced")
     eligible = ranking[Bool.(ranking.eligible_for_inheritance), :]
@@ -460,8 +486,8 @@ function _treated_coculture_specs(environments, baselines, untreated_baseline, u
                 if layout == :live
                     sensitive = max(u[offset + 1], zero(u[offset + 1]))
                     resistant = max(u[offset + 2], zero(u[offset + 2]))
-                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline) - death_sensitive * sensitive
-                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline) - death_resistant * resistant
+                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline, t) - death_sensitive * sensitive
+                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline, t) - death_resistant * resistant
                     if model_name == "dual_constant_kill"
                         kill_sensitive, kill_resistant = values
                         exposure = 1.0
@@ -481,8 +507,8 @@ function _treated_coculture_specs(environments, baselines, untreated_baseline, u
                     damaged_resistant = max(u[offset + 4], zero(u[offset + 4]))
                     kill_sensitive, kill_resistant, lambda, onset, clearance = values[1:5]
                     exposure = elapsed <= onset ? 0.0 : 1 - exp(-lambda * (elapsed - onset))
-                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline) - death_sensitive * sensitive
-                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline) - death_resistant * resistant
+                    growth_sensitive = _anchored_component_growth(sensitive, sensitive + alpha_sr * resistant, sensitive_baseline, t) - death_sensitive * sensitive
+                    growth_resistant = _anchored_component_growth(resistant, resistant + alpha_rs * sensitive, resistant_baseline, t) - death_resistant * resistant
                     effect_scale_sensitive = 1.0
                     effect_scale_resistant = 1.0
                     if model_name != "dual_transit_damage"
@@ -510,8 +536,8 @@ function _treated_coculture_specs(environments, baselines, untreated_baseline, u
                     naive_total = sensitive + tolerant
                     kill_sensitive, kill_tolerant, kill_resistant, lambda, onset, transition = values
                     exposure = elapsed <= onset ? 0.0 : 1 - exp(-lambda * (elapsed - onset))
-                    naive_growth = _anchored_component_growth(naive_total, naive_total + alpha_sr * resistant, sensitive_baseline) - death_sensitive * naive_total
-                    resistant_growth = _anchored_component_growth(resistant, resistant + alpha_rs * naive_total, resistant_baseline) - death_resistant * resistant
+                    naive_growth = _anchored_component_growth(naive_total, naive_total + alpha_sr * resistant, sensitive_baseline, t) - death_sensitive * naive_total
+                    resistant_growth = _anchored_component_growth(resistant, resistant + alpha_rs * naive_total, resistant_baseline, t) - death_resistant * resistant
                     sensitive_share = naive_total > 0 ? sensitive / naive_total : 1.0
                     tolerant_share = naive_total > 0 ? tolerant / naive_total : 0.0
                     du[offset + 1] = naive_growth * sensitive_share - exposure * kill_sensitive * sensitive - transition * sensitive
@@ -579,21 +605,57 @@ function _fit_treated_coculture_joint(environments, out; start, max_time_per_fit
     parameter_rows = NamedTuple[]
     profile_parts = DataFrame[]
     identifiability_parts = DataFrame[]
-    for pooling_mode in ("shared", "partial_5pct", "independent_diagnostic")
+    pooling_modes = _tournament_smoke_test() ? ("shared",) : ("shared", "partial_5pct", "independent_diagnostic")
+    for pooling_mode in pooling_modes
         specs = _treated_coculture_specs(environments, baselines, untreated_baseline, untreated_specs, pooling_mode, t0)
-        for model_name in sort(collect(keys(specs)))
+        model_names = sort(collect(keys(specs)))
+        _tournament_smoke_test() && (model_names = filter(==("dual_constant_kill"), model_names))
+        if lowercase(get(ENV, "A2780_CONDITIONAL_TOURNAMENT", "false")) == "true"
+            model_names = filter(
+                name -> name ∉ ("dual_transit_competitor_scaled", "dual_transit_load_scaled"),
+                model_names,
+            )
+        end
+        for model_name in model_names
             spec = specs[model_name]
             datasets, u0, metadata = _treated_coculture_inputs(environments, spec.layout)
             println("  Joint treated coculture fit $(model_name), $(pooling_mode)...")
             explicit_profiles = Dict{Symbol,Vector{Float64}}(name => [5.0, 7.5, 10.0] for name in spec.names if occursin("lambda", String(name)))
+            model_maxiters = max(650, Int(round(max_time_per_fit * 22)))
+            multistart = try
+                requested_starts = _configured_multistarts(1)
+                screening_starts = lowercase(get(ENV, "A2780_CONDITIONAL_TOURNAMENT", "false")) == "true" ?
+                    min(requested_starts, 3) : requested_starts
+                starts = GrowthParameterEstimation.generate_multistarts(
+                    spec.p0, spec.bounds;
+                    n_starts = screening_starts,
+                    seed = _stable_multistart_seed("treated_coculture", model_name, pooling_mode),
+                )
+                GrowthParameterEstimation.run_joint_multistart(
+                    spec.model, datasets, u0, starts;
+                    refine_optimizer = _configured_refine_optimizer(),
+                    bounds = spec.bounds,
+                    solver = Rodas5(),
+                    maxiters = model_maxiters,
+                    maxtime = _configured_fit_maxtime(),
+                    reltol = 1e-7,
+                    abstol = 1e-7,
+                    optimizer = :nelder_mead,
+                    initial_time = 0.0,
+                )
+            catch error_value
+                @warn "Treated coculture joint multistart failed" model_name pooling_mode exception = error_value
+                nothing
+            end
+            multistart === nothing && continue
             profiled = try
                 GrowthParameterEstimation.profile_joint_fit_bounds(
-                    spec.model, datasets, u0, spec.p0;
+                    spec.model, datasets, u0, multistart.fit.params;
                     bounds = spec.bounds,
                     parameter_names = spec.names,
                     explicit_upper_profiles = explicit_profiles,
                     solver = Rodas5(),
-                    maxiters = max(650, Int(round(max_time_per_fit * 22))),
+                    maxiters = model_maxiters,
                     reltol = 1e-7,
                     abstol = 1e-7,
                     optimizer = :nelder_mead,
@@ -730,6 +792,12 @@ function _coculture_treated_nonadditive_comparison(ranking::DataFrame)
             scaling_hypothesis = hypotheses[model_name],
         ))
     end
+    isempty(rows) && return DataFrame(
+        model = String[], pooling_mode = String[], bic = Float64[],
+        scaled_ssr = Float64[], ssr = Float64[], n_parameters = Int[],
+        n_points = Int[], scaling_hypothesis = String[], delta_bic = Float64[],
+        bic_support = String[],
+    )
     comparison = sort!(DataFrame(rows), :bic)
     isempty(comparison) && return comparison
     comparison.delta_bic = comparison.bic .- minimum(comparison.bic)
@@ -805,6 +873,7 @@ function _render_coculture_graph_grid(overlay::DataFrame, winner, out, condition
         :,
     ]
     panels = Any[]
+    y_limits = _shared_y_limits(selected)
     for density in ("20k", "30k"), mix in ("25-75", "50-50", "75-25")
         environment = selected[(String.(selected.density) .== density) .& (String.(selected.mix) .== mix), :]
         isempty(environment) && continue
@@ -813,6 +882,7 @@ function _render_coculture_graph_grid(overlay::DataFrame, winner, out, condition
             titlefontsize = 10,
             xlabel = "Time (day)",
             ylabel = mix == "25-75" ? "Measured population" : "",
+            ylims = y_limits,
             legend = density == "20k" && mix == "75-25" ? :outertopright : false,
             legendfontsize = 8,
         )

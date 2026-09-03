@@ -1,0 +1,27 @@
+@testset "Sample-aware staged report contract" begin
+    package_root = normpath(joinpath(@__DIR__, ".."))
+    report_path = joinpath(package_root, "outputs", "reports", "a2780_sample_aware_staged_model_comparison.html")
+    findings_path = joinpath(package_root, "outputs", "csv", "sample_aware", "sample_trajectory_findings.csv")
+    summaries_path = joinpath(package_root, "outputs", "csv", "sample_aware", "sample_timepoint_summaries.csv")
+
+    @test isfile(report_path)
+    @test isfile(findings_path)
+    @test isfile(summaries_path)
+    report = read(report_path, String)
+    @test occursin("A2780 sample-aware staged model comparison", report)
+    @test occursin("plus or minus one between-well standard deviation", report)
+    @test occursin("What the well-level samples add", report)
+    @test occursin("Direction of the treated-coculture samples", report)
+    @test occursin("Stage 1 notation key", report)
+    @test occursin("Stage 4 expanded treated-coculture equations", report)
+    @test occursin("sample_aware/stage1_untreated_monoculture_samples.png", report)
+    @test occursin("sample_aware/stage2_timing_hypotheses_samples.png", report)
+    @test occursin("sample_aware/stage4_treated_coculture_samples.png", report)
+    @test !occursin("class=\"missing\"", report)
+
+    findings = CSV.read(findings_path, DataFrame)
+    @test Set(String.(findings.stage)) == Set(["Stage 1", "Stage 2", "Stage 3", "Stage 4"])
+    @test all(findings.n_wells .>= 3)
+    @test all((0 .<= findings.fit_within_one_sd) .& (findings.fit_within_one_sd .<= 1))
+    @test all((0 .<= findings.direction_consensus) .& (findings.direction_consensus .<= 1))
+end

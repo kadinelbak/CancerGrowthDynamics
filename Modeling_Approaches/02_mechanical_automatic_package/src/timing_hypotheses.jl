@@ -147,7 +147,7 @@ function _treated_timing_problem(start, seed, hypothesis)
                 treatment.naive_ec50,
                 treatment.naive_hill,
             )
-            du[index] = _linked_intrinsic_growth(N, environment.baseline) - kill * N
+            du[index] = _linked_intrinsic_growth(N, environment.baseline, t) - kill * N
         end
         for (index, environment) in enumerate(cis_environments)
             sensitive_index = n_naive + 2index - 1
@@ -174,7 +174,7 @@ function _treated_timing_problem(start, seed, hypothesis)
                 0.5,
                 4.0,
             )
-            growth = _linked_intrinsic_growth(total, environment.baseline)
+            growth = _linked_intrinsic_growth(total, environment.baseline, t)
             sensitive_share = total > 0 ? sensitive / total : one(total)
             tolerant_share = total > 0 ? tolerant / total : zero(total)
             du[sensitive_index] = growth * sensitive_share - kill_sensitive * sensitive
@@ -268,6 +268,8 @@ function _render_timing_hypothesis_grid(overlay, ranking, out)
     top_models = String.(first(ranking.model, min(3, nrow(ranking))))
     colors = [:royalblue3, :darkorange2, :seagreen4]
     panels = Any[]
+    selected_overlay = overlay[in.(String.(overlay.timing_hypothesis), Ref(top_models)), :]
+    y_limits = _shared_y_limits(selected_overlay)
     for cell_line in ("A2780Naive", "A2780cis"), density in ("20k", "30k"), dose in (0.67, 1.0, 1.47)
         panel_rows = overlay[
             (String.(overlay.cell_line) .== cell_line) .&
@@ -280,6 +282,7 @@ function _render_timing_hypothesis_grid(overlay, ranking, out)
             title = "$(cell_line) $(density), $(label)",
             xlabel = "Time (day)",
             ylabel = "Cell count",
+            ylims = y_limits,
             legend = false,
         )
         observed = panel_rows[String.(panel_rows.timing_hypothesis) .== first(top_models), :]

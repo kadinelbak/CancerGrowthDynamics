@@ -1,4 +1,4 @@
 model,pooling_mode,bic,scaled_ssr,ssr,n_parameters,n_points,scaling_hypothesis,delta_bic,bic_support
-dual_transit_load_scaled,shared,-617.7818828967949,3.4321688110348867,2.5994323121657025e7,7,168,drug damage multiplied by exp(beta * total competitive load),0.0,substantial
-dual_transit_competitor_scaled,partial_5pct,-596.7503261768069,3.773037650297034,2.77469196923892e7,8,168,drug damage multiplied by exp(beta * opposing-lineage competition burden),21.031556719987975,not supported
-dual_transit_damage,partial_5pct,-595.0311915238835,4.051604337334648,2.8503647564569272e7,6,168,additive transit-damage reference; equivalent to beta=0,22.75069137291132,not supported
+dual_transit_load_scaled,partial_5pct,-591.031803944551,3.903678222423163,1.849858598073274e7,8,168,drug damage multiplied by exp(beta * total competitive load),0.0,substantial
+dual_transit_damage,partial_5pct,-554.7811491099641,5.148454235373827,2.3969492970646873e7,6,168,additive transit-damage reference; equivalent to beta=0,36.25065483458695,not supported
+dual_transit_competitor_scaled,partial_5pct,-554.7423730967537,4.844905592351157,2.273428138922136e7,8,168,drug damage multiplied by exp(beta * opposing-lineage competition burden),36.28943084779735,not supported
