@@ -89,6 +89,21 @@ function ratio_label(sheet)
     m === nothing ? "matched coculture" : "sensitive:resistant $(m.captures[1])"
 end
 
+function sheet_context(sheet)
+    run_match = match(r"^(\d+)\s*-", sheet)
+    density_match = match(r"\b(\d+k)\b", sheet)
+    parts = String[]
+    run_match !== nothing && push!(parts, "run $(run_match.captures[1])")
+    density_match !== nothing && push!(parts, density_match.captures[1])
+    push!(parts, ratio_label(sheet))
+    join(parts, ", ")
+end
+
+function ce_ratio_label(file)
+    m = match(r"ce[01]_(\d+)S(\d+)R", lowercase(file))
+    m === nothing ? "sensitive:resistant ratio stated in source sheets" : "sensitive:resistant $(m.captures[1]):$(m.captures[2])"
+end
+
 function counterpart(sheet)
     lower = lowercase(sheet)
     if occursin("a2780cis", lower)
@@ -129,7 +144,7 @@ function read_sources()
                 state = startswith(lowercase(file), "ce0_") ? "untreated (Ce0)" : "treated (Ce1, 1 uM IC50)"
                 notes = "Low-resource co-culture; Ce0 = untreated and Ce1 = 1 uM cisplatin at the IC50."
                 src = [series(file, s, d, s) for (s, d) in sort(collect(parsed); by=first)]
-                push!(records, record("coculture", "Co-culture $(state): $(file) / sensitive + resistant sheets", notes, src))
+                push!(records, record("low_resource", "Low-resource co-culture: $(state), $(ce_ratio_label(file)): $(file)", notes, src))
             else
                 used = Set{String}()
                 for sheet in sheets
@@ -142,8 +157,8 @@ function read_sources()
                         other = counterpart(sheet)
                         paired = other !== nothing && haskey(parsed, other) && !(other in used)
                         src = paired ? [series(file, sheet, df, sheet), series(file, other, parsed[other], other)] : [series(file, sheet, df, sheet)]
-                        label = paired ? "$(ratio_label(sheet)); sensitive/naive + resistant/cis" : "$(ratio_label(sheet))"
-                        push!(records, record("low_resource", "Low-resource co-culture: $(file) / $(label)", "Low-resource co-culture; ratio is sensitive:resistant. The sensitive/naive and resistant/cis sheets are plotted together.", src))
+                        label = paired ? "$(sheet_context(sheet)); paired source sheets" : sheet_context(sheet)
+                        push!(records, record("low_resource", "Low-resource co-culture: $(file) / $(label)", "Low-resource co-culture; ratio is sensitive:resistant. Paired source sheets are plotted together.", src))
                         push!(used, sheet)
                         paired && push!(used, other)
                     end
@@ -151,7 +166,7 @@ function read_sources()
             end
         end
     end
-    order = Dict("untreated" => 1, "treated" => 2, "coculture" => 3, "low_resource" => 4)
+    order = Dict("untreated" => 1, "treated" => 2, "low_resource" => 3)
     sort(records; by=r -> (order[r.section], r.title))
 end
 
@@ -232,8 +247,8 @@ function main()
     files = Set(s.file for r in records for s in r.sources)
     manifest = "{\n  \"generated_by\": \"Julia $(VERSION)\",\n  \"generated_at\": \"$(Dates.now())\",\n  \"file_count\": $(length(files)),\n  \"plot_count\": $(length(records)),\n  \"sheet_count\": $(sum(length(r.sources) for r in records))\n}\n"
     write(joinpath(OUT_DIR, "manifest.json"), manifest)
-    section_titles = Dict("untreated" => "1. Untreated Mono-culture", "treated" => "2. Treated Mono-culture", "coculture" => "3. Co-culture", "low_resource" => "4. Low-Resource Data")
-    section_order = ["untreated", "treated", "coculture", "low_resource"]
+    section_titles = Dict("untreated" => "1. Untreated Mono-culture", "treated" => "2. Treated Mono-culture", "low_resource" => "3. Low-Resource Data")
+    section_order = ["untreated", "treated", "low_resource"]
     body = join(["<section class=\"report-section\"><h2>$(section_titles[s])</h2>$(join(get(cards_by_section, s, String[]), "\\n"))</section>" for s in section_order], "\n")
     html = """<!doctype html><html><head><meta charset=\"utf-8\"><title>New Data Report</title><style>
 body{margin:0;background:#f4f7f8;color:#172b36;font:15px system-ui,sans-serif}main{max-width:1280px;margin:auto;padding:28px}h1{margin-bottom:8px}h2{margin-top:30px}.intro,.workbook{background:white;border:1px solid #d9e2e6;border-radius:14px;padding:20px;box-shadow:0 5px 18px #173b4d0d}.intro{border-left:6px solid #176b87}.card{margin-top:16px;border-top:1px solid #e6ecef;padding-top:16px}.meta{color:#52636b}.back{display:inline-block;margin:0 0 18px;color:#176b87;font-weight:700;text-decoration:none}.preview-toggle{margin:10px 0 0}.preview-toggle>summary{display:inline-flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:9px 13px;border:1px solid #c5d1d8;border-radius:999px;background:#f7fbfc;color:#175e79;font-weight:700}.preview-toggle>summary::-webkit-details-marker{display:none}.preview-toggle>summary::marker{content:\"\"}.preview-toggle[open]>summary{background:#e8f3f6;border-color:#9fc4d0}.preview-shell{margin-top:10px}.preview{border-collapse:collapse;width:100%;font-size:12px}.preview th,.preview td{border:1px solid #d9e2e6;padding:5px;text-align:right}.preview th{background:#eef5f6;text-align:left}.empty{padding:30px;background:#fff7ed;border-radius:8px}svg{width:100%;max-height:300px;background:#fbfdfd;border:1px solid #e4e7ec;border-radius:8px}code{background:#eef5f6;padding:2px 5px;border-radius:4px}</style></head><body><main><a class=\"back\" href=\"../../index.html\">&larr; Back to reports home</a><h1>New Data Report</h1><div class=\"intro\"><p>This report was generated entirely in Julia $(VERSION) from every CSV and XLSX source in <code>New Datasets</code>.</p><p><b>How to read the labels:</b> LR means low resource. Ce0 is untreated co-culture. Ce1 is treated co-culture at the 1 uM IC50. Ratios 1-1, 3-1, and 1-3 are co-culture sensitive:resistant ratios. Mono-culture files are at 30,000 cells/mL, with treatment specified in the filename. Each chart includes its source file and sheet name, and each card includes a three-row preview.</p><p>Plotted values are Mean Cells over Day. Error bars use SEM when available, otherwise SD.</p></div><h2>All source sheets ($(length(records)))</h2>$body</main></body></html>"""
