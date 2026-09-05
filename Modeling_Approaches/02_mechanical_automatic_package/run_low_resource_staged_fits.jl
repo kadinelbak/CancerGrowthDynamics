@@ -44,9 +44,19 @@ function fit_single(x, y)
     specs = candidate_specs(maximum(y))
     rows = NamedTuple[]; fits = Dict{String,Any}()
     for (name, spec) in specs
-        result = GPE.run_single_fit(x, y, spec.p0; model=spec.model, bounds=spec.bounds, show_stats=false, max_time=20.0)
-        fits[name] = result
-        push!(rows, (model=name, bic=result.bic, sse=result.ssr, params=join(round.(result.params; sigdigits=5), ";")))
+        # The package's joint API supports its bounded derivative-free optimiser.
+        # This keeps the lag model in the model zoo even when its discontinuity
+        # makes the default BFGS line search non-finite.
+        try
+            result = GPE.run_joint_fit(spec.model, [(x=x, y=y, state_index=1)], [y[1]], spec.p0;
+                bounds=spec.bounds, maxiters=2_000, optimizer=:nelder_mead, reltol=1e-7, abstol=1e-7)
+            fits[name] = result
+            push!(rows, (model=name, bic=result.bic, sse=result.sse, params=join(round.(result.params; sigdigits=5), ";")))
+        catch err
+            # Preserve failed candidates in the BIC table rather than silently
+            # removing a model from consideration.
+            push!(rows, (model=name, bic=Inf, sse=Inf, params="fit failed: $(typeof(err))"))
+        end
     end
     sort!(rows; by = row -> row.bic)
     return rows, fits
@@ -112,7 +122,7 @@ for g in groups
     name = "$(g.workbook[1]) — $(g.sheet[1])"
     run = startswith(g.sheet[1], "1 -") ? "Run 1" : startswith(g.sheet[1], "2 -") ? "Run 2" : "single run"
     key = replace(name, r"^.*? — [12] - " => "")
-    ranked, fits = fit_single(x, y); best = ranked[1]; pred = [fits[best.model].solution(t)[1] for t in x]
+    ranked, fits = fit_single(x, y); best = ranked[1]; pred = fits[best.model].predictions[1]
     append!(all_rows, [(stage="LR-1 monoculture/lineage", condition=name, fit_scope=run, model=r.model, bic=r.bic, sse=r.sse, params=r.params, inherited="none; direct low-resource fit") for r in ranked])
     push!(get!(run_buckets, key, NamedTuple[]), (name=run, x=x, y=y, best=best.model, fit=fits[best.model]))
     push!(panels, "<section><h3>$(esc(name)) — $(esc(run))</h3>$(svg_panel("Observed points and winning fit: $(best.model)", [(name=run,x=x,y=y)], [pred]))$(bic_svg(ranked))</section>")
