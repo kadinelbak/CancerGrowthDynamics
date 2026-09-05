@@ -205,10 +205,9 @@ end
 
 function preview(df)
     cols = names(df)[1:min(5, ncol(df))]
-    head = first(df, min(3, nrow(df)))
     th = join(["<th>$(html_escape(c))</th>" for c in cols], "")
     row_html(row) = join(["<td>$(html_escape(row[c]))</td>" for c in cols], "")
-    rows = join(["<tr>$(row_html(row))</tr>" for row in eachrow(head)], "")
+    rows = join(["<tr>$(row_html(row))</tr>" for row in eachrow(df)], "")
     "<table class=\"preview\"><thead><tr>$th</tr></thead><tbody>$rows</tbody></table>"
 end
 
