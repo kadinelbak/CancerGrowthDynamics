@@ -131,7 +131,8 @@ means = filter(:series => ==("Mean Cells"), raw)
 mono = filter(row -> !startswith(lowercase(row.workbook), "ce"), means)
 ce = filter(row -> startswith(lowercase(row.workbook), "ce"), means)
 
-all_rows = NamedTuple[]; panels = String[]
+all_rows = NamedTuple[]
+run1_panels = String[]; run2_panels = String[]; joint_panels = String[]; coculture_panels = String[]
 
 # Stage LR-1: every available single-population workbook trajectory; run labels are
 # derived from sheet names.  Shared run fits are produced only where both runs occur.
@@ -146,7 +147,8 @@ for g in groups
     ranked, fits = fit_single(x, y); best = ranked[1]; pred = fits[best.model].predictions[1]
     append!(all_rows, [(stage="LR-1 monoculture/lineage", condition=name, fit_scope=run, model=r.model, bic=r.bic, sse=r.sse, params=r.params, inherited="none; direct low-resource fit") for r in ranked])
     push!(get!(run_buckets, key, NamedTuple[]), (name=run, x=x, y=y, best=best.model, fit=fits[best.model]))
-    push!(panels, "<section><h3>$(esc(name)) — $(esc(run))</h3>$(svg_panel("Observed points and winning fit: $(best.model)", [(name=run,x=x,y=y)], [pred]))$(bic_svg(ranked))</section>")
+    panel = "<section><h3>$(esc(name)) — $(esc(run))</h3>$(svg_panel("Observed points and winning fit: $(best.model)", [(name=run,x=x,y=y)], [pred]))$(bic_svg(ranked))</section>"
+    push!(run == "Run 2" ? run2_panels : run1_panels, panel)
 end
 
 for (key, runs) in run_buckets
@@ -154,7 +156,7 @@ for (key, runs) in run_buckets
     ranked, fits = fit_joint(runs); best = ranked[1]
     pred = [[fits[best.model].predictions[i][j] * runs[i].y[1] for j in eachindex(runs[i].x)] for i in eachindex(runs)]
     append!(all_rows, [(stage="LR-1 monoculture/lineage", condition=key, fit_scope="Run 1 + Run 2 (joint normalized shape)", model=r.model, bic=r.bic, sse=r.sse, params=r.params, inherited="shared r/K/loss across runs; run-specific observed N0") for r in ranked])
-    push!(panels, "<section><h3>$(esc(key)) — joint Run 1 + Run 2</h3>$(svg_panel("Joint fitted shape restored to each run's observed N0", [(name=r.name,x=r.x,y=r.y) for r in runs], pred))$(bic_svg(ranked))</section>")
+    push!(joint_panels, "<section><h3>$(esc(key)) — joint Run 1 + Run 2</h3>$(svg_panel("Joint fitted shape restored to each run's observed N0", [(name=r.name,x=r.x,y=r.y) for r in runs], pred))$(bic_svg(ranked))</section>")
 end
 
 # Stage LR-2/LR-3: Ce0 provides untreated coculture baselines. Ce1 inherits those
@@ -180,7 +182,7 @@ for g in groupby(filter(row -> startswith(lowercase(row.workbook), "ce0"), ce), 
     end
     sort!(rows; by = row -> row.bic); best=rows[1]; ce0[replace(g.workbook[1],"ce0_"=>"")]=(best=best, fit=fits[best.model], model=best.model)
     append!(all_rows,[(stage="LR-2 untreated coculture",condition=g.workbook[1],fit_scope="available ratio",model=r.model,bic=r.bic,sse=r.sse,params=r.params,inherited="lineage starting counts observed") for r in rows])
-    pred=fits[best.model].predictions; push!(panels,"<section><h3>$(esc(g.workbook[1])) — untreated coculture</h3>$(svg_panel("Observed and winning inherited-baseline candidate",[(name="Sensitive",x=x,y=S),(name="Resistant",x=x,y=R)],pred))$(bic_svg(rows))</section>")
+    pred=fits[best.model].predictions; push!(coculture_panels,"<section><h3>$(esc(g.workbook[1])) — untreated coculture</h3>$(svg_panel("Observed and winning inherited-baseline candidate",[(name="Sensitive",x=x,y=S),(name="Resistant",x=x,y=R)],pred))$(bic_svg(rows))</section>")
 end
 
 for g in groupby(filter(row -> startswith(lowercase(row.workbook), "ce1"), ce), :workbook)
@@ -217,11 +219,12 @@ for g in groupby(filter(row -> startswith(lowercase(row.workbook), "ce1"), ce), 
     end
     sort!(rows; by = row -> row.bic); best=rows[1]
     append!(all_rows,[(stage="LR-3 treated coculture",condition=g.workbook[1],fit_scope="available ratio",model=r.model,bic=r.bic,sse=r.sse,params=r.params,inherited="$(ce0[ratio].model) parameters from ce0_$(ratio); C=IC50=1 µM, Hill=1; fitted treatment terms") for r in rows])
-    push!(panels,"<section><h3>$(esc(g.workbook[1])) — treated coculture</h3>$(svg_panel("Observed and winning inherited fit (C = IC50 = 1 µM)",[(name="Sensitive",x=x,y=S),(name="Resistant",x=x,y=R)],fits[best.model].predictions))$(bic_svg(rows))</section>")
+    push!(coculture_panels,"<section><h3>$(esc(g.workbook[1])) — treated coculture</h3>$(svg_panel("Observed and winning inherited fit (C = IC50 = 1 µM)",[(name="Sensitive",x=x,y=S),(name="Resistant",x=x,y=R)],fits[best.model].predictions))$(bic_svg(rows))</section>")
 end
 
 results=DataFrame(all_rows); CSV.write(joinpath(OUT,"bic_model_ranking.csv"),results)
 summary_rows = join(["<tr><td>$(esc(r.stage))</td><td>$(esc(r.condition))</td><td>$(esc(r.fit_scope))</td><td>$(esc(r.model))</td><td>$(round(r.bic;digits=2))</td><td>$(esc(r.inherited))</td></tr>" for r in eachrow(results) if r.bic == minimum(results.bic[(results.stage .== r.stage) .& (results.condition .== r.condition) .& (results.fit_scope .== r.fit_scope)])], "\n")
-html = """<!doctype html><html><head><meta charset='utf-8'><title>Low-resource staged parameter estimation</title><style>body{font:14px system-ui;margin:32px;color:#17212b;max-width:1250px}h1{color:#124b6e}section{border-top:1px solid #ccd6dd;padding:12px 0}svg{max-width:100%;height:auto;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #ccd6dd;padding:6px;text-align:left}th{background:#e9f3f8}.note{background:#fff6d9;padding:12px}.back{color:#176b87;font-weight:700;text-decoration:none}</style></head><body><p><a class='back' href='../../../../index.html'>&larr; Back to reports home</a></p><h1>Low-resource staged parameter estimation</h1><p>Generated $(Dates.now()). Fits use <code>GrowthParameterEstimation</code> on the workbook-derived mean-cell trajectories. Points are observed values; lines are the BIC-selected ODE fit.</p><div class='note'><b>Late-drop and treatment assumptions.</b> The model set retains the original logistic, constant-loss, and delayed-growth candidates and adds abrupt delayed death, smooth delayed death, and a transit-compartment delayed-kill model. For Ce1, drug concentration and IC50 are both fixed at 1 µM, so the Hill effect is 0.5 × Emax with Hill fixed at 1; constant and delayed-kill alternatives are compared. “Joint” Run 1 + Run 2 fits share shape parameters after each run is normalised at its observed day-zero value.</div><h2>Winning model ledger</h2><table><tr><th>Stage</th><th>Condition</th><th>Fit scope</th><th>Winning model</th><th>BIC</th><th>Inherited parameters</th></tr>$summary_rows</table><h2>Fits and BIC model comparisons</h2>$(join(panels,"\n"))</body></html>"""
+tab_panels = """<div class='tabs' role='tablist' aria-label='Fit comparison groups'><button class='tab active' role='tab' aria-selected='true' data-tab='run1'>Run 1</button><button class='tab' role='tab' aria-selected='false' data-tab='run2'>Run 2</button><button class='tab' role='tab' aria-selected='false' data-tab='joint'>Joint</button><button class='tab' role='tab' aria-selected='false' data-tab='coculture'>Coculture</button></div><div class='tab-panel active' id='run1' role='tabpanel'>$(join(run1_panels,"\n"))</div><div class='tab-panel' id='run2' role='tabpanel'>$(join(run2_panels,"\n"))</div><div class='tab-panel' id='joint' role='tabpanel'>$(join(joint_panels,"\n"))</div><div class='tab-panel' id='coculture' role='tabpanel'>$(join(coculture_panels,"\n"))</div>"""
+html = """<!doctype html><html><head><meta charset='utf-8'><title>Low-resource staged parameter estimation</title><style>body{font:14px system-ui;margin:32px;color:#17212b;max-width:1250px}h1{color:#124b6e}section{border-top:1px solid #ccd6dd;padding:12px 0}svg{max-width:100%;height:auto;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #ccd6dd;padding:6px;text-align:left}th{background:#e9f3f8}.note{background:#fff6d9;padding:12px}.back{color:#176b87;font-weight:700;text-decoration:none}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tab{border:1px solid #176b87;background:#f7fbfd;color:#124b6e;border-radius:5px;padding:8px 14px;font-weight:700;cursor:pointer}.tab.active,.tab:hover{background:#176b87;color:#fff}.tab-panel{display:none}.tab-panel.active{display:block}</style></head><body><p><a class='back' href='../../../../index.html'>&larr; Back to reports home</a></p><h1>Low-resource staged parameter estimation</h1><p>Generated $(Dates.now()). Fits use <code>GrowthParameterEstimation</code> on the workbook-derived mean-cell trajectories. Points are observed values; lines are the BIC-selected ODE fit.</p><div class='note'><b>Late-drop and treatment assumptions.</b> The model set retains the original logistic, constant-loss, and delayed-growth candidates and adds abrupt delayed death, smooth delayed death, and a transit-compartment delayed-kill model. For Ce1, drug concentration and IC50 are both fixed at 1 µM, so the Hill effect is 0.5 × Emax with Hill fixed at 1; constant and delayed-kill alternatives are compared. “Joint” Run 1 + Run 2 fits share shape parameters after each run is normalised at its observed day-zero value.</div><h2>Winning model ledger</h2><table><tr><th>Stage</th><th>Condition</th><th>Fit scope</th><th>Winning model</th><th>BIC</th><th>Inherited parameters</th></tr>$summary_rows</table><h2>Fits and BIC model comparisons</h2>$tab_panels<script>for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>{document.querySelectorAll('.tab,.tab-panel').forEach(x=>{x.classList.remove('active');if(x.classList.contains('tab'))x.setAttribute('aria-selected','false')});b.classList.add('active');b.setAttribute('aria-selected','true');document.getElementById(b.dataset.tab).classList.add('active')})</script></body></html>"""
 open(joinpath(OUT,"report.html"),"w") do io; write(io,html); end
 println("Wrote $(joinpath(OUT,"report.html")) and bic_model_ranking.csv")
