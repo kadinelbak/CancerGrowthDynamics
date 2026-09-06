@@ -2,3 +2,9 @@ opencode.json
 .julia_depot/
 .julia-clean/
 Modeling_Approaches/02_mechanical_automatic_package/.julia_depot/
+
+# Large/raw data directories (kept locally, not tracked)
+Datasets/
+Processed_Datasets/
+**/.julia_depot/
+.agent_low_resource_report/
