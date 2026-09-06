@@ -133,6 +133,7 @@ ce = filter(row -> startswith(lowercase(row.workbook), "ce"), means)
 
 all_rows = NamedTuple[]
 run1_panels = String[]; run2_panels = String[]; joint_panels = String[]; coculture_panels = String[]
+ratio_buckets = Dict{String,Vector{NamedTuple}}()
 
 # Stage LR-1: every available single-population workbook trajectory; run labels are
 # derived from sheet names.  Shared run fits are produced only where both runs occur.
@@ -147,8 +148,32 @@ for g in groups
     ranked, fits = fit_single(x, y); best = ranked[1]; pred = fits[best.model].predictions[1]
     append!(all_rows, [(stage="LR-1 monoculture/lineage", condition=name, fit_scope=run, model=r.model, bic=r.bic, sse=r.sse, params=r.params, inherited="none; direct low-resource fit") for r in ranked])
     push!(get!(run_buckets, key, NamedTuple[]), (name=run, x=x, y=y, best=best.model, fit=fits[best.model]))
-    panel = "<section><h3>$(esc(name)) — $(esc(run))</h3>$(svg_panel("Observed points and winning fit: $(best.model)", [(name=run,x=x,y=y)], [pred]))$(bic_svg(ranked))</section>"
-    push!(run == "Run 2" ? run2_panels : run1_panels, panel)
+    ratio_match = match(r" ([13]-[13])$", g.sheet[1])
+    if ratio_match !== nothing
+        ratio = ratio_match.captures[1]
+        density_match = match(r" (\d+k) [13]-[13]$", g.sheet[1])
+        density = density_match === nothing ? "" : density_match.captures[1]
+        lineage = replace(g.sheet[1], r"^[12] - " => "")
+        lineage = replace(lineage, r" \d+k [13]-[13]$" => "")
+        ratio_key = "$(run) | $(g.workbook[1]) | $(density) | $(ratio)"
+        push!(get!(ratio_buckets, ratio_key, NamedTuple[]), (lineage=lineage, density=density, ratio=ratio, run=run, x=x, y=y, pred=pred, ranked=ranked))
+    else
+        panel = "<section><h3>$(esc(name)) — $(esc(run))</h3>$(svg_panel("Observed points and winning fit: $(best.model)", [(name=run,x=x,y=y)], [pred]))$(bic_svg(ranked))</section>"
+        push!(run == "Run 2" ? run2_panels : run1_panels, panel)
+    end
+end
+
+# Sheets sharing a seeding-ratio label (for example 1-1, 1-3, or 3-1) are
+# paired sensitive/resistant measurements.  Keep their independently selected
+# fits, but render observed values and both fitted curves together.
+for entries in values(ratio_buckets)
+    first_entry = entries[1]
+    title = "$(first_entry.run) — $(first_entry.density) total — $(first_entry.ratio) sensitive:resistant ratio"
+    series = [(name=e.lineage, x=e.x, y=e.y) for e in entries]
+    predictions = [e.pred for e in entries]
+    bic_charts = join(["<h4>$(esc(e.lineage)) model comparison</h4>$(bic_svg(e.ranked))" for e in entries], "")
+    panel = "<section><h3>$(esc(title))</h3>$(svg_panel("Observed and fitted growth for both lineages", series, predictions))$(bic_charts)</section>"
+    push!(first_entry.run == "Run 2" ? run2_panels : run1_panels, panel)
 end
 
 for (key, runs) in run_buckets
