@@ -4,7 +4,8 @@ module Models
 export logistic_growth!, logistic_growth_with_death!, gompertz_growth!, 
        gompertz_growth_with_death!, exponential_growth_with_delay!, 
        logistic_growth_with_delay!, exponential_growth!, 
-       exponential_growth_with_death_and_delay!
+       exponential_growth_with_death_and_delay!,
+       logistic_growth_with_delayed_death!, logistic_growth_with_smooth_delayed_death!
 
 # 1) plain logistic: p = (r, K)
 function logistic_growth!(du,u,p,t)
@@ -64,6 +65,23 @@ function exponential_growth_with_death_and_delay!(du,u,p,t)
   r,K,death_rate,tlag = p
   K = max(K, eps(eltype(u)))
   du[1] = (t>=tlag ? r : 0.0)*u[1]*(1 - u[1]/K) - death_rate*u[1]
+end
+
+# 9) logistic with a delayed onset of loss: p = (r, K, death_rate, t_death)
+function logistic_growth_with_delayed_death!(du,u,p,t)
+  r,K,death_rate,tdeath = p
+  K = max(K, eps(eltype(u)))
+  active_death = t >= tdeath ? death_rate : zero(death_rate)
+  du[1] = r*u[1]*(1 - u[1]/K) - active_death*u[1]
+end
+
+# 10) logistic with a smooth onset of loss: p = (r, K, death_rate, t_death, width)
+function logistic_growth_with_smooth_delayed_death!(du,u,p,t)
+  r,K,death_rate,tdeath,width = p
+  K = max(K, eps(eltype(u)))
+  z = clamp((t - tdeath) / max(width, eps(eltype(u))), -30, 30)
+  onset = inv(one(z) + exp(-z))
+  du[1] = r*u[1]*(1 - u[1]/K) - death_rate*onset*u[1]
 end
 
 end # module Models

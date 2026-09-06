@@ -43,7 +43,8 @@ export
     logistic_growth!, logistic_growth_with_death!, gompertz_growth!,
     gompertz_growth_with_death!, exponential_growth_with_delay!,
     logistic_growth_with_delay!, exponential_growth!,
-    exponential_growth_with_death_and_delay!,
+    exponential_growth_with_death_and_delay!, logistic_growth_with_delayed_death!,
+    logistic_growth_with_smooth_delayed_death!,
 
     # Fitting functions
     setUpProblem, calculate_bic, pQuickStat, run_single_fit,

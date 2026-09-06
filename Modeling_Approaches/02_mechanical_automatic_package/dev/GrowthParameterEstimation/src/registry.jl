@@ -168,6 +168,28 @@ function register_builtin_models!()
     ))
 
     register_model(ModelSpec(
+        "logistic_growth_with_delayed_death",
+        _ode_adapter(Models.logistic_growth_with_delayed_death!),
+        [:r, :K, :death_rate, :t_death],
+        [(1e-6, 5.0), (1e-3, 1e7), (0.0, 10.0), (0.0, 100.0)],
+        [:N],
+        (u, p, t) -> u[1],
+        :ode,
+        Dict(:family => :delayed_kill),
+    ))
+
+    register_model(ModelSpec(
+        "logistic_growth_with_smooth_delayed_death",
+        _ode_adapter(Models.logistic_growth_with_smooth_delayed_death!),
+        [:r, :K, :death_rate, :t_death, :width],
+        [(1e-6, 5.0), (1e-3, 1e7), (0.0, 10.0), (0.0, 100.0), (1e-4, 100.0)],
+        [:N],
+        (u, p, t) -> u[1],
+        :ode,
+        Dict(:family => :delayed_kill),
+    ))
+
+    register_model(ModelSpec(
         "gompertz_growth",
         _ode_adapter(Models.gompertz_growth!),
         [:a, :b, :K],
