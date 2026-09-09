@@ -138,14 +138,6 @@
   const excludedSummary=document.createElement('section');excludedSummary.className='excluded-data';
   excludedSummary.innerHTML='<h3>Excluded data</h3><p>Omitted from the displayed fits: Tyknu/Tyknu-cpr conditions and 20k or 40k cell-density conditions.</p><ul>'+[...excluded].sort((a,b)=>a.localeCompare(b)).map(title=>`<li>${title}</li>`).join('')+'</ul>';
   if(heading){heading.after(deck,excludedSummary)}for(const [,id] of source){document.getElementById(id)?.remove()}document.querySelector('.tabs')?.remove();
-  for(const svg of document.querySelectorAll('svg')){
-    if(svg.querySelector('text')?.textContent.trim()!=='BIC (lower is preferred)')continue;
-    const models=[...svg.querySelectorAll('text[data-model-key]')].map(text=>text.dataset.modelKey).filter(key=>modelEquation[key]);
-    if(!models.length)continue;
-    const key=document.createElement('div');key.className='bic-equation-key';
-    key.innerHTML='<h4>Model equations</h4>'+models.map(model=>`<div class="bic-equation-row"><span>${shortName[model]}</span><span class="math">${modelEquation[model]}</span></div>`).join('');
-    svg.after(key);
-  }
   function parseCsvLine(line){const cells=[];let value='',quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++}else quoted=!quoted}else if(ch===','&&!quoted){cells.push(value);value=''}else value+=ch}cells.push(value);return cells}
   function escapeHtml(value){return String(value??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
   function chartCandidates(svg){const texts=[...svg.querySelectorAll('text')];return [...svg.querySelectorAll('text[data-model-key]')].map(label=>{const y=Number(label.getAttribute('y'));const valueText=texts.find(text=>!text.dataset.modelKey&&Math.abs(Number(text.getAttribute('y'))-y)<=3&&/^-?\d+(\.\d+)?$/.test(text.textContent.trim()));return valueText?{model:label.dataset.modelKey,bic:Number(valueText.textContent.trim())}:null}).filter(Boolean)}
