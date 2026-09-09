@@ -105,6 +105,23 @@
 
 <script>
 (()=>{
+  const reportTitle=document.querySelector('h1');
+  const reportIntro=reportTitle?.nextElementSibling;
+  if(reportIntro?.tagName==='P')reportIntro.innerHTML='Fits use <code>GrowthParameterEstimation</code> on the workbook-derived mean-cell trajectories. Points are observed values; lines are the BIC-selected ODE fit.';
+  const assumptionNote=reportIntro?.nextElementSibling;
+  if(assumptionNote?.classList.contains('note')){
+    const assumptions=document.createElement('details');
+    assumptions.className='note assumptions';
+    assumptions.style.cssText='margin:10px 0;padding:8px 12px;background:#fff6d9';
+    const summary=document.createElement('summary');
+    summary.textContent='Late-drop and treatment assumptions';
+    summary.style.cssText='cursor:pointer;font-weight:700';
+    const text=document.createElement('p');
+    text.textContent=assumptionNote.textContent.replace(/^Late-drop and treatment assumptions\.\s*/,'');
+    text.style.margin='8px 0 0';
+    assumptions.append(summary,text);
+    assumptionNote.replaceWith(assumptions);
+  }
   const shortName={logistic:'logistic',logistic_plus_loss:'logistic + loss',logistic_with_lag:'logistic + lag',logistic_with_delayed_death:'logistic + delayed death',logistic_with_smooth_delayed_death:'logistic + smooth delayed death',transit_compartment_delayed_kill:'transit delayed kill',independent_logistic:'independent logistic',competition_logistic:'competition logistic',inherited_independent_logistic_plus_constant_treatment_loss:'independent + constant loss',inherited_independent_logistic_plus_delayed_Hill_kill_IC50_1uM:'independent + delayed Hill kill',inherited_competition_logistic_plus_constant_treatment_loss:'competition + constant loss',inherited_competition_logistic_plus_delayed_Hill_kill_IC50_1uM:'competition + delayed Hill kill'};
   for(const text of document.querySelectorAll('svg text')){const name=text.textContent.trim();if(shortName[name]){text.dataset.modelKey=name;text.textContent=shortName[name]}}
   const modelEquation={
