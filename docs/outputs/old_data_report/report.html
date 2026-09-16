@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Legacy A2780 report hub</title>
+  <style>
+    :root{--ink:#172b36;--accent:#176b87;--soft:#eef5f6;--line:#d9e2e6;--page:#f4f7f8}
+    *{box-sizing:border-box} body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+    main{max-width:1280px;margin:auto;padding:24px} h1{margin:0 0 6px;font-size:clamp(28px,4vw,40px)} .lead{margin:0 0 18px;color:#52636b;max-width:800px}
+    nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px}.home,.tab{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 13px;border:0;border-radius:8px;text-decoration:none;font:650 14px system-ui,sans-serif;cursor:pointer}.home{padding:8px 10px;color:var(--accent);background:var(--soft)}.tab{color:var(--accent);background:var(--soft)}.tab.active{color:#fff;background:var(--accent)}
+    .frame-wrap{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}.frame-label{padding:11px 16px;border-bottom:1px solid var(--line);font-weight:700;color:#52636b;background:#fbfdfd}iframe{display:block;width:100%;height:78vh;min-height:680px;border:0;background:#fff}
+    @media(max-width:640px){main{padding:18px 12px}iframe{height:76vh;min-height:580px}}
+  </style>
+</head>
+<body>
+  <main>
+    <nav aria-label="Report hubs"><a class="home" href="../../index.html" aria-label="Reports home" title="Reports home">⌂</a><a class="tab" href="../new_data_report/report.html">New data</a></nav>
+    <h1>Legacy A2780 analyses</h1>
+    <p class="lead">The pre-existing A2780 analyses are collected here. Select a tab to review a report without leaving this legacy-data hub.</p>
+    <nav id="report-tabs" aria-label="Legacy A2780 reports">
+      <button class="tab active" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_staged_model_comparison.html">Staged comparison</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_sample_aware_staged_model_comparison.html">Sample-aware</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_delay_compartment_comparison.html">Delay vs compartment</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_delay_compartment_combined_comparison.html">Combined delays</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_reduced_stage_comparison.html">Skip stages</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_model_registry.html">Model registry</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_research_foundations.html">Evidence guide</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_future_research.html">Future research</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_adaptive_treatment_simulations.html">Adaptive simulation</button>
+      <button class="tab" data-src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/optimal_control_one.html">Optimal control</button>
+    </nav>
+    <section class="frame-wrap"><div class="frame-label" id="frame-label">Staged comparison</div><iframe id="report-frame" title="Legacy A2780 report" src="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_staged_model_comparison.html"></iframe></section>
+  </main>
+  <script>
+    const frame=document.querySelector('#report-frame'), label=document.querySelector('#frame-label');
+    document.querySelectorAll('#report-tabs .tab').forEach(tab=>tab.addEventListener('click',()=>{document.querySelectorAll('#report-tabs .tab').forEach(x=>x.classList.remove('active'));tab.classList.add('active');frame.src=tab.dataset.src;label.textContent=tab.textContent;}));
+  </script>
+</body>
+</html>
