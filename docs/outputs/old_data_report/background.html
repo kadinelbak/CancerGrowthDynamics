@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Background and previous research</title>
+  <style>
+    :root{--ink:#172b36;--muted:#52636b;--accent:#176b87;--line:#d9e2e6;--soft:#eef5f6}*{box-sizing:border-box}body{margin:0;color:var(--ink);font:16px/1.55 system-ui,sans-serif}main{max-width:1040px;margin:auto;padding:30px}h1{font-size:clamp(28px,4vw,40px);margin:0 0 8px}h2{margin:30px 0 10px}.lead{color:var(--muted);font-size:18px;max-width:850px}.callout{background:#f4fafb;border-left:5px solid var(--accent);padding:15px 18px;margin:22px 0}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}.card{border:1px solid var(--line);border-radius:10px;padding:16px;background:#fff}.card h3{margin:0 0 8px;font-size:18px}.card p{color:var(--muted);margin:0}.note{background:var(--soft);border-radius:8px;padding:14px 16px;margin-top:22px}@media(max-width:760px){main{padding:20px 15px}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Background and previous research</h1>
+    <p class="lead">This section provides the scientific context for the legacy A2780 modeling program and points to the underlying evidence, equations, and future experimental work.</p>
+    <div class="callout"><strong>Scope.</strong> These are research analyses of A2780 and A2780cis population trajectories. They are intended to compare mechanistic hypotheses and guide experiments—not to make clinical treatment recommendations.</div>
+    <h2>How the legacy analysis is organized</h2>
+    <p>The staged workflow first characterizes untreated monoculture growth, then treatment timing in monoculture, then untreated sensitive–resistant coculture interactions, and finally treated coculture dynamics. This separates what can be learned from each experimental setting before carrying supported parameters forward.</p>
+    <h2>Supporting material in this hub</h2>
+    <div class="grid">
+      <section class="card"><h3>Evidence guide</h3><p>Primary research, biological grounding, model-by-model support, bibliography, and stated limits of the available evidence.</p></section>
+      <section class="card"><h3>Model registry</h3><p>The candidate equations, their assumptions, parameterization, and the role each model has in the analysis.</p></section>
+      <section class="card"><h3>Future research</h3><p>Open experimental and modeling questions needed to reduce uncertainty in coculture and adaptive-treatment dynamics.</p></section>
+    </div>
+    <h2>Interpreting the comparisons</h2>
+    <p>BIC ranks candidates only within a shared fitting objective and dataset. A lower BIC is a useful parsimony criterion, but it does not establish biological truth. The staged and reduced-workflow tabs make it possible to see which measurements support each inherited component and what information is lost when a stage is omitted.</p>
+    <p class="note">Use the <strong>Evidence guide</strong>, <strong>Model registry</strong>, and <strong>Future research</strong> tabs above for the detailed source material. They remain separate views so their tables, references, and interactive registry controls stay usable.</p>
+  </main>
+</body>
+</html>
