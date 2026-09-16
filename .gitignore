@@ -1,5 +1,6 @@
 opencode.json
 .julia_depot/
+.tools/
 .julia-clean/
 Modeling_Approaches/02_mechanical_automatic_package/.julia_depot/
 

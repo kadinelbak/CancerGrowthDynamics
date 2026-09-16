@@ -132,7 +132,7 @@ mono = filter(row -> !startswith(lowercase(row.workbook), "ce"), means)
 ce = filter(row -> startswith(lowercase(row.workbook), "ce"), means)
 
 all_rows = NamedTuple[]
-run1_panels = String[]; run2_panels = String[]; joint_panels = String[]; coculture_panels = String[]
+run1_panels = String[]; run2_panels = String[]; joint_panels = String[]; coculture_panels = String[]; joint_context_panels = String[]
 ratio_buckets = Dict{String,Vector{NamedTuple}}()
 
 # Stage LR-1: every available single-population workbook trajectory; run labels are
@@ -193,6 +193,32 @@ end
 function comp2!(du,u,p,t)
     rS,KS,aSR,rR,KR,aRS=p; du[1]=rS*u[1]*(1-(u[1]+aSR*u[2])/max(KS,1e-8)); du[2]=rR*u[2]*(1-(u[2]+aRS*u[1])/max(KR,1e-8))
 end
+# A joint untreated/treated fit carries both experimental contexts as separate
+# state pairs.  Baseline growth and interaction parameters are shared; only
+# treatment terms act on the treated state pair.  This lets the data estimate
+# all candidate parameters together instead of freezing a Ce0 fit before Ce1.
+function joint_independent_constant!(du,u,p,t)
+    rS,KS,rR,KR,dS,dR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-Su/max(KS,1e-8)); du[2]=rR*Ru*(1-Ru/max(KR,1e-8))
+    du[3]=rS*St*(1-St/max(KS,1e-8))-dS*St; du[4]=rR*Rt*(1-Rt/max(KR,1e-8))-dR*Rt
+end
+function joint_competition_constant!(du,u,p,t)
+    rS,KS,aSR,rR,KR,aRS,dS,dR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-(Su+aSR*Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+aRS*Su)/max(KR,1e-8))
+    du[3]=rS*St*(1-(St+aSR*Rt)/max(KS,1e-8))-dS*St; du[4]=rR*Rt*(1-(Rt+aRS*St)/max(KR,1e-8))-dR*Rt
+end
+function joint_independent_delayed!(du,u,p,t)
+    rS,KS,rR,KR,eS,eR,tS,tR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-Su/max(KS,1e-8)); du[2]=rR*Ru*(1-Ru/max(KR,1e-8))
+    du[3]=rS*St*(1-St/max(KS,1e-8))-(t>=tS ? 0.5 * eS : 0.0)*St
+    du[4]=rR*Rt*(1-Rt/max(KR,1e-8))-(t>=tR ? 0.5 * eR : 0.0)*Rt
+end
+function joint_competition_delayed!(du,u,p,t)
+    rS,KS,aSR,rR,KR,aRS,eS,eR,tS,tR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-(Su+aSR*Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+aRS*Su)/max(KR,1e-8))
+    du[3]=rS*St*(1-(St+aSR*Rt)/max(KS,1e-8))-(t>=tS ? 0.5 * eS : 0.0)*St
+    du[4]=rR*Rt*(1-(Rt+aRS*St)/max(KR,1e-8))-(t>=tR ? 0.5 * eR : 0.0)*Rt
+end
 function ce_pair(g)
     ss = filter(row -> occursin("Sensitive", row.sheet), g); rr = filter(row -> occursin("Resistant", row.sheet), g)
     x=Float64.(ss.day); ix=sortperm(x); return x[ix], Float64.(ss.value)[ix], Float64.(rr.value)[ix]
@@ -205,7 +231,7 @@ for g in groupby(filter(row -> startswith(lowercase(row.workbook), "ce0"), ce), 
     for (model,(fun,p0,bounds)) in specs
         f=GPE.run_joint_fit(fun,data,[S[1],R[1]],p0;bounds=bounds,maxiters=3000,optimizer=:nelder_mead,reltol=1e-7,abstol=1e-7); fits[model]=f; push!(rows,(model=model,bic=f.bic,sse=f.sse,params=join(round.(f.params;sigdigits=5),";")))
     end
-    sort!(rows; by = row -> row.bic); best=rows[1]; ce0[replace(g.workbook[1],"ce0_"=>"")]=(best=best, fit=fits[best.model], model=best.model)
+    sort!(rows; by = row -> row.bic); best=rows[1]; ce0[replace(g.workbook[1],"ce0_"=>"")]=(best=best, fit=fits[best.model], model=best.model, x=x, S=S, R=R)
     append!(all_rows,[(stage="LR-2 untreated coculture",condition=g.workbook[1],fit_scope="available ratio",model=r.model,bic=r.bic,sse=r.sse,params=r.params,inherited="lineage starting counts observed") for r in rows])
     pred=fits[best.model].predictions; push!(coculture_panels,"<section><h3>$(esc(g.workbook[1])) — untreated coculture</h3>$(svg_panel("Observed and winning inherited-baseline candidate",[(name="Sensitive",x=x,y=S),(name="Resistant",x=x,y=R)],pred))$(bic_svg(rows))</section>")
 end
@@ -246,6 +272,38 @@ for g in groupby(filter(row -> startswith(lowercase(row.workbook), "ce1"), ce), 
     append!(all_rows,[(stage="LR-3 treated coculture",condition=g.workbook[1],fit_scope="available ratio",model=r.model,bic=r.bic,sse=r.sse,params=r.params,inherited="$(ce0[ratio].model) parameters from ce0_$(ratio); C=IC50=1 µM, Hill=1; fitted treatment terms") for r in rows])
     push!(coculture_panels,"<section><h3>$(esc(g.workbook[1])) — treated coculture</h3>$(svg_panel("Observed and winning inherited fit (C = IC50 = 1 µM)",[(name="Sensitive",x=x,y=S),(name="Resistant",x=x,y=R)],fits[best.model].predictions))$(bic_svg(rows))</section>")
 end
+
+# Stage LR-4: matched Ce0/Ce1 cocultures are fitted at the same time.  The four
+# states represent untreated sensitive/resistant and treated sensitive/resistant
+# populations, respectively.  Baseline and interaction terms are therefore
+# estimated from all observations jointly, while treatment parameters are
+# identified only through the treated trajectories.
+for g in groupby(filter(row -> startswith(lowercase(row.workbook), "ce1"), ce), :workbook)
+    ratio=replace(g.workbook[1],"ce1_"=>""); haskey(ce0,ratio) || continue
+    treated_x,treated_S,treated_R=ce_pair(g); untreated=ce0[ratio]
+    scale=max(maximum(untreated.S),maximum(untreated.R),maximum(treated_S),maximum(treated_R))
+    data=[
+        (x=untreated.x,y=untreated.S,state_index=1), (x=untreated.x,y=untreated.R,state_index=2),
+        (x=treated_x,y=treated_S,state_index=3), (x=treated_x,y=treated_R,state_index=4),
+    ]
+    joint_specs=Dict(
+        "joint_independent_logistic_plus_constant_treatment_loss" => (joint_independent_constant!,[0.4,scale,0.4,scale,0.1,0.1],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,3.0),(0.0,3.0)]),
+        "joint_competition_logistic_plus_constant_treatment_loss" => (joint_competition_constant!,[0.4,scale,1.0,0.4,scale,1.0,0.1,0.1],[(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(0.0,3.0),(0.0,3.0)]),
+        "joint_independent_logistic_plus_delayed_Hill_kill_IC50_1uM" => (joint_independent_delayed!,[0.4,scale,0.4,scale,0.3,0.3,7.0,7.0],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,6.0),(0.0,6.0),(0.0,13.5),(0.0,13.5)]),
+        "joint_competition_logistic_plus_delayed_Hill_kill_IC50_1uM" => (joint_competition_delayed!,[0.4,scale,1.0,0.4,scale,1.0,0.3,0.3,7.0,7.0],[(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(0.0,6.0),(0.0,6.0),(0.0,13.5),(0.0,13.5)]),
+    )
+    rows=NamedTuple[]; fits=Dict{String,Any}()
+    for (model,(fun,p0,bounds)) in joint_specs
+        f=GPE.run_joint_fit(fun,data,[untreated.S[1],untreated.R[1],treated_S[1],treated_R[1]],p0;bounds=bounds,maxiters=4000,optimizer=:nelder_mead,reltol=1e-7,abstol=1e-7)
+        fits[model]=f; push!(rows,(model=model,bic=f.bic,sse=f.sse,params=join(round.(f.params;sigdigits=5),";")))
+    end
+    sort!(rows; by=row->row.bic); best=rows[1]
+    append!(all_rows,[(stage="LR-4 joint untreated + treated coculture",condition="ce0_$(ratio) + ce1_$(ratio)",fit_scope="simultaneous untreated + treated",model=r.model,bic=r.bic,sse=r.sse,params=r.params,inherited="shared growth and interaction parameters; treated-only loss or delayed-kill terms; C=IC50=1 µM, Hill=1") for r in rows])
+    series=[(name="Untreated sensitive",x=untreated.x,y=untreated.S),(name="Untreated resistant",x=untreated.x,y=untreated.R),(name="Treated sensitive",x=treated_x,y=treated_S),(name="Treated resistant",x=treated_x,y=treated_R)]
+    section_intro=isempty(joint_context_panels) ? "<h2>Simultaneous untreated + treated co-culture fits</h2><p>Each candidate is fitted to its matched Ce0 and Ce1 trajectories at once. Growth and interaction terms are shared; treatment terms apply only to Ce1.</p>" : ""
+    push!(joint_context_panels,"<section>$(section_intro)<h3>$(esc(ratio)) — simultaneous untreated + treated coculture fit</h3>$(svg_panel("Observed and jointly fitted untreated and treated cocultures",series,fits[best.model].predictions))$(bic_svg(rows))</section>")
+end
+append!(coculture_panels,joint_context_panels)
 
 results=DataFrame(all_rows); CSV.write(joinpath(OUT,"bic_model_ranking.csv"),results)
 summary_rows = join(["<tr><td>$(esc(r.stage))</td><td>$(esc(r.condition))</td><td>$(esc(r.fit_scope))</td><td>$(esc(r.model))</td><td>$(round(r.bic;digits=2))</td><td>$(esc(r.inherited))</td></tr>" for r in eachrow(results) if r.bic == minimum(results.bic[(results.stage .== r.stage) .& (results.condition .== r.condition) .& (results.fit_scope .== r.fit_scope)])], "\n")
