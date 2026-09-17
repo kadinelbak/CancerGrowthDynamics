@@ -128,7 +128,7 @@ end
 
 raw = CSV.read(INPUT, DataFrame)
 means = filter(:series => ==("Mean Cells"), raw)
-mono = filter(row -> !startswith(lowercase(row.workbook), "ce"), means)
+mono = filter(row -> !startswith(lowercase(row.workbook), "ce") && !occursin("tyknu", lowercase(row.workbook)) && !occursin("tyknu", lowercase(row.sheet)), means)
 ce = filter(row -> startswith(lowercase(row.workbook), "ce"), means)
 
 all_rows = NamedTuple[]
