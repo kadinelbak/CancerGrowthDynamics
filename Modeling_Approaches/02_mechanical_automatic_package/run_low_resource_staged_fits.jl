@@ -98,12 +98,15 @@ function fit_joint(runs)
 end
 
 function svg_panel(title, series, predictions; width=720, height=300)
-    xs = vcat([s.x for s in series]...); ys = vcat([s.y for s in series]...)
-    ymax = max(maximum(ys), 1.0) * 1.10; xmin, xmax = minimum(xs), maximum(xs)
+    # Every population trajectory in the report uses the same axes, so visual
+    # differences between panels reflect the data and fitted curves rather than
+    # panel-specific rescaling.  The limits are calculated once from all of the
+    # low-resource mean-cell observations below.
+    xmin, xmax, ymax = TRAJECTORY_XMIN, TRAJECTORY_XMAX, TRAJECTORY_YMAX
     sx(x) = 55 + (width-75)*(x-xmin)/max(xmax-xmin, 1e-8)
     sy(y) = height-35 - (height-60)*y/ymax
     colors = ["#0b6e99", "#d95f02", "#3b8b4f", "#9b59b6"]
-    parts = ["<svg viewBox='0 0 $width $height' role='img'><rect width='100%' height='100%' fill='white'/><text x='55' y='18' font-size='14' font-weight='bold'>$(esc(title))</text><line x1='55' y1='$(height-35)' x2='$(width-20)' y2='$(height-35)' stroke='#555'/><line x1='55' y1='30' x2='55' y2='$(height-35)' stroke='#555'/><text x='8' y='36' font-size='10'>$(round(ymax; sigdigits=3))</text><text x='24' y='$(height-38)' font-size='10'>0</text>"]
+    parts = ["<svg viewBox='0 0 $width $height' role='img'><rect width='100%' height='100%' fill='white'/><text x='55' y='18' font-size='14' font-weight='bold'>$(esc(title))</text><line x1='55' y1='$(height-35)' x2='$(width-20)' y2='$(height-35)' stroke='#555'/><line x1='55' y1='30' x2='55' y2='$(height-35)' stroke='#555'/><text x='8' y='36' font-size='10'>$(round(ymax; sigdigits=3))</text><text x='24' y='$(height-38)' font-size='10'>0</text><text x='52' y='$(height-20)' font-size='10'>$(round(xmin; digits=1))</text><text x='$(width-35)' y='$(height-20)' font-size='10'>$(round(xmax; digits=1))</text>"]
     for (i, s) in enumerate(series)
         color = colors[mod1(i, length(colors))]
         pred = predictions[i]
@@ -128,6 +131,12 @@ end
 
 raw = CSV.read(INPUT, DataFrame)
 means = filter(:series => ==("Mean Cells"), raw)
+# Keep every trajectory panel on a common domain.  Include a small upper margin
+# so the global maximum does not touch the top border while retaining zero as
+# the shared lower bound for cell counts.
+const TRAJECTORY_XMIN = minimum(Float64.(means.day))
+const TRAJECTORY_XMAX = maximum(Float64.(means.day))
+const TRAJECTORY_YMAX = ceil(maximum(Float64.(means.value)) * 1.10; sigdigits=2)
 mono = filter(row -> !startswith(lowercase(row.workbook), "ce") && !occursin("tyknu", lowercase(row.workbook)) && !occursin("tyknu", lowercase(row.sheet)), means)
 ce = filter(row -> startswith(lowercase(row.workbook), "ce"), means)
 
@@ -207,6 +216,16 @@ function joint_competition_constant!(du,u,p,t)
     du[1]=rS*Su*(1-(Su+aSR*Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+aRS*Su)/max(KR,1e-8))
     du[3]=rS*St*(1-(St+aSR*Rt)/max(KS,1e-8))-dS*St; du[4]=rR*Rt*(1-(Rt+aRS*St)/max(KR,1e-8))-dR*Rt
 end
+function joint_equal_competition_constant!(du,u,p,t)
+    rS,KS,rR,KR,dS,dR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-(Su+Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+Su)/max(KR,1e-8))
+    du[3]=rS*St*(1-(St+Rt)/max(KS,1e-8))-dS*St; du[4]=rR*Rt*(1-(Rt+St)/max(KR,1e-8))-dR*Rt
+end
+function joint_reference_competition_constant!(du,u,p,t)
+    rS,KS,rR,KR,aRS,dS,dR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-(Su+Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+aRS*Su)/max(KR,1e-8))
+    du[3]=rS*St*(1-(St+Rt)/max(KS,1e-8))-dS*St; du[4]=rR*Rt*(1-(Rt+aRS*St)/max(KR,1e-8))-dR*Rt
+end
 function joint_independent_delayed!(du,u,p,t)
     rS,KS,rR,KR,eS,eR,tS,tR=p; Su,Ru,St,Rt=u
     du[1]=rS*Su*(1-Su/max(KS,1e-8)); du[2]=rR*Ru*(1-Ru/max(KR,1e-8))
@@ -217,6 +236,18 @@ function joint_competition_delayed!(du,u,p,t)
     rS,KS,aSR,rR,KR,aRS,eS,eR,tS,tR=p; Su,Ru,St,Rt=u
     du[1]=rS*Su*(1-(Su+aSR*Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+aRS*Su)/max(KR,1e-8))
     du[3]=rS*St*(1-(St+aSR*Rt)/max(KS,1e-8))-(t>=tS ? 0.5 * eS : 0.0)*St
+    du[4]=rR*Rt*(1-(Rt+aRS*St)/max(KR,1e-8))-(t>=tR ? 0.5 * eR : 0.0)*Rt
+end
+function joint_equal_competition_delayed!(du,u,p,t)
+    rS,KS,rR,KR,eS,eR,tS,tR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-(Su+Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+Su)/max(KR,1e-8))
+    du[3]=rS*St*(1-(St+Rt)/max(KS,1e-8))-(t>=tS ? 0.5 * eS : 0.0)*St
+    du[4]=rR*Rt*(1-(Rt+St)/max(KR,1e-8))-(t>=tR ? 0.5 * eR : 0.0)*Rt
+end
+function joint_reference_competition_delayed!(du,u,p,t)
+    rS,KS,rR,KR,aRS,eS,eR,tS,tR=p; Su,Ru,St,Rt=u
+    du[1]=rS*Su*(1-(Su+Ru)/max(KS,1e-8)); du[2]=rR*Ru*(1-(Ru+aRS*Su)/max(KR,1e-8))
+    du[3]=rS*St*(1-(St+Rt)/max(KS,1e-8))-(t>=tS ? 0.5 * eS : 0.0)*St
     du[4]=rR*Rt*(1-(Rt+aRS*St)/max(KR,1e-8))-(t>=tR ? 0.5 * eR : 0.0)*Rt
 end
 function ce_pair(g)
@@ -288,8 +319,12 @@ for g in groupby(filter(row -> startswith(lowercase(row.workbook), "ce1"), ce), 
     ]
     joint_specs=Dict(
         "joint_independent_logistic_plus_constant_treatment_loss" => (joint_independent_constant!,[0.4,scale,0.4,scale,0.1,0.1],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,3.0),(0.0,3.0)]),
+        "joint_equal_competition_alphaSR_alphaRS_1_plus_constant_treatment_loss" => (joint_equal_competition_constant!,[0.4,scale,0.4,scale,0.1,0.1],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,3.0),(0.0,3.0)]),
+        "joint_reference_competition_alphaSR_1_plus_constant_treatment_loss" => (joint_reference_competition_constant!,[0.4,scale,0.4,scale,1.0,0.1,0.1],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(0.0,3.0),(0.0,3.0)]),
         "joint_competition_logistic_plus_constant_treatment_loss" => (joint_competition_constant!,[0.4,scale,1.0,0.4,scale,1.0,0.1,0.1],[(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(0.0,3.0),(0.0,3.0)]),
         "joint_independent_logistic_plus_delayed_Hill_kill_IC50_1uM" => (joint_independent_delayed!,[0.4,scale,0.4,scale,0.3,0.3,7.0,7.0],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,6.0),(0.0,6.0),(0.0,13.5),(0.0,13.5)]),
+        "joint_equal_competition_alphaSR_alphaRS_1_plus_delayed_Hill_kill_IC50_1uM" => (joint_equal_competition_delayed!,[0.4,scale,0.4,scale,0.3,0.3,7.0,7.0],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,6.0),(0.0,6.0),(0.0,13.5),(0.0,13.5)]),
+        "joint_reference_competition_alphaSR_1_plus_delayed_Hill_kill_IC50_1uM" => (joint_reference_competition_delayed!,[0.4,scale,0.4,scale,1.0,0.3,0.3,7.0,7.0],[(1e-6,4.0),(1e-3,scale*20),(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(0.0,6.0),(0.0,6.0),(0.0,13.5),(0.0,13.5)]),
         "joint_competition_logistic_plus_delayed_Hill_kill_IC50_1uM" => (joint_competition_delayed!,[0.4,scale,1.0,0.4,scale,1.0,0.3,0.3,7.0,7.0],[(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(1e-6,4.0),(1e-3,scale*20),(0.0,5.0),(0.0,6.0),(0.0,6.0),(0.0,13.5),(0.0,13.5)]),
     )
     rows=NamedTuple[]; fits=Dict{String,Any}()
@@ -308,6 +343,14 @@ append!(coculture_panels,joint_context_panels)
 results=DataFrame(all_rows); CSV.write(joinpath(OUT,"bic_model_ranking.csv"),results)
 summary_rows = join(["<tr><td>$(esc(r.stage))</td><td>$(esc(r.condition))</td><td>$(esc(r.fit_scope))</td><td>$(esc(r.model))</td><td>$(round(r.bic;digits=2))</td><td>$(esc(r.inherited))</td></tr>" for r in eachrow(results) if r.bic == minimum(results.bic[(results.stage .== r.stage) .& (results.condition .== r.condition) .& (results.fit_scope .== r.fit_scope)])], "\n")
 tab_panels = """<div class='tabs' role='tablist' aria-label='Fit comparison groups'><button class='tab active' role='tab' aria-selected='true' data-tab='run1'>Run 1</button><button class='tab' role='tab' aria-selected='false' data-tab='run2'>Run 2</button><button class='tab' role='tab' aria-selected='false' data-tab='joint'>Joint</button><button class='tab' role='tab' aria-selected='false' data-tab='coculture'>Coculture</button></div><div class='tab-panel active' id='run1' role='tabpanel'>$(join(run1_panels,"\n"))</div><div class='tab-panel' id='run2' role='tabpanel'>$(join(run2_panels,"\n"))</div><div class='tab-panel' id='joint' role='tabpanel'>$(join(joint_panels,"\n"))</div><div class='tab-panel' id='coculture' role='tabpanel'>$(join(coculture_panels,"\n"))</div>"""
-html = """<!doctype html><html><head><meta charset='utf-8'><title>Low-resource staged parameter estimation</title><style>body{font:14px system-ui;margin:32px;color:#17212b;max-width:1250px}h1{color:#124b6e}section{border-top:1px solid #ccd6dd;padding:12px 0}svg{max-width:100%;height:auto;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #ccd6dd;padding:6px;text-align:left}th{background:#e9f3f8}.note{background:#fff6d9;padding:12px}.back{color:#176b87;font-weight:700;text-decoration:none}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tab{border:1px solid #176b87;background:#f7fbfd;color:#124b6e;border-radius:5px;padding:8px 14px;font-weight:700;cursor:pointer}.tab.active,.tab:hover{background:#176b87;color:#fff}.tab-panel{display:none}.tab-panel.active{display:block}</style></head><body><p><a class='back' href='../../../../index.html'>&larr; Back to reports home</a></p><h1>Low-resource staged parameter estimation</h1><p>Generated $(Dates.now()). Fits use <code>GrowthParameterEstimation</code> on the workbook-derived mean-cell trajectories. Points are observed values; lines are the BIC-selected ODE fit.</p><div class='note'><b>Late-drop and treatment assumptions.</b> The model set retains the original logistic, constant-loss, and delayed-growth candidates and adds abrupt delayed death, smooth delayed death, and a transit-compartment delayed-kill model. For Ce1, drug concentration and IC50 are both fixed at 1 µM, so the Hill effect is 0.5 × Emax with Hill fixed at 1; constant and delayed-kill alternatives are compared. “Joint” Run 1 + Run 2 fits share shape parameters after each run is normalised at its observed day-zero value.</div><h2>Winning model ledger</h2><table><tr><th>Stage</th><th>Condition</th><th>Fit scope</th><th>Winning model</th><th>BIC</th><th>Inherited parameters</th></tr>$summary_rows</table><h2>Fits and BIC model comparisons</h2>$tab_panels<script>for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>{document.querySelectorAll('.tab,.tab-panel').forEach(x=>{x.classList.remove('active');if(x.classList.contains('tab'))x.setAttribute('aria-selected','false')});b.classList.add('active');b.setAttribute('aria-selected','true');document.getElementById(b.dataset.tab).classList.add('active')})</script></body></html>"""
+html = """<!doctype html><html><head><meta charset='utf-8'><title>Low-resource staged parameter estimation</title><style>body{font:14px system-ui;margin:32px;color:#17212b;max-width:1250px}h1{color:#124b6e}section{border-top:1px solid #ccd6dd;padding:12px 0}svg{max-width:100%;height:auto;background:#fff}table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #ccd6dd;padding:6px;text-align:left}th{background:#e9f3f8}.note{background:#fff6d9;padding:12px}.back{color:#176b87;font-weight:700;text-decoration:none}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tab{border:1px solid #176b87;background:#f7fbfd;color:#124b6e;border-radius:5px;padding:8px 14px;font-weight:700;cursor:pointer}.tab.active,.tab:hover{background:#176b87;color:#fff}.tab-panel{display:none}.tab-panel.active{display:block}</style></head><body><p><a class='back' href='../../../../index.html'>&larr; Back to reports home</a></p><h1>Low-resource staged parameter estimation</h1><p>Generated $(Dates.now()). Fits use <code>GrowthParameterEstimation</code> on the workbook-derived mean-cell trajectories. Points are observed values; lines are the BIC-selected ODE fit. Every trajectory panel uses the same x-axis ($(TRAJECTORY_XMIN)–$(TRAJECTORY_XMAX) days) and y-axis (0–$(TRAJECTORY_YMAX) mean cells) for direct comparison.</p><div class='note'><b>Late-drop and treatment assumptions.</b> The model set retains the original logistic, constant-loss, and delayed-growth candidates and adds abrupt delayed death, smooth delayed death, and a transit-compartment delayed-kill model. For Ce1, drug concentration and IC50 are both fixed at 1 µM, so the Hill effect is 0.5 × Emax with Hill fixed at 1; constant and delayed-kill alternatives are compared. “Joint” Run 1 + Run 2 fits share shape parameters after each run is normalised at its observed day-zero value.</div><h2>Winning model ledger</h2><table><tr><th>Stage</th><th>Condition</th><th>Fit scope</th><th>Winning model</th><th>BIC</th><th>Inherited parameters</th></tr>$summary_rows</table><h2>Fits and BIC model comparisons</h2>$tab_panels<script>for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>{document.querySelectorAll('.tab,.tab-panel').forEach(x=>{x.classList.remove('active');if(x.classList.contains('tab'))x.setAttribute('aria-selected','false')});b.classList.add('active');b.setAttribute('aria-selected','true');document.getElementById(b.dataset.tab).classList.add('active')})</script></body></html>"""
 open(joinpath(OUT,"report.html"),"w") do io; write(io,html); end
+# The report is initially rendered in broad run tabs for simple static HTML.
+# Rearrange those panes in the browser into dataset cards: no condition is
+# dropped, and each paired dataset has its own Run 1 / Run 2 / Joint control.
+report_path = joinpath(OUT, "report.html")
+dataset_toggle_script = raw"""<script>(()=>{const source=[['Run 1','run1'],['Run 2','run2'],['Joint runs','joint'],['Fit','coculture']],cards=new Map(),deck=document.createElement('div');deck.id='per-dataset-fits';const keyFor=(label,title)=>{if(label==='Run 1'||label==='Run 2'){const ratio=title.match(/^Run [12] — (.+)$/);return ratio?ratio[1]:title.replace(/ — Run [12]$/,'')}return title.replace(/ — joint Run 1 \+ Run 2$/,'').replace(/ — (un)?treated coculture$/,'')};const cardFor=key=>{if(!cards.has(key)){const card=document.createElement('section'),heading=document.createElement('h3');card.className='fit-card';heading.textContent=key;card.append(heading);cards.set(key,{card,panes:[]});deck.append(card)}return cards.get(key)};for(const [label,id] of source){const panel=document.getElementById(id);if(!panel)continue;for(const section of [...panel.children]){if(section.tagName!=='SECTION')continue;const heading=section.querySelector(':scope > h3'),title=heading?heading.textContent.trim():label;heading?.remove();cardFor(keyFor(label,title)).panes.push({label,section})}}for(const {card,panes} of cards.values()){if(panes.length===1){card.append(panes[0].section);continue}const tabs=document.createElement('div'),bodies=document.createElement('div');tabs.className='tabs';tabs.setAttribute('role','tablist');panes.forEach((pane,index)=>{const button=document.createElement('button'),body=document.createElement('div');button.className='tab'+(index?'':' active');button.textContent=pane.label;button.setAttribute('role','tab');button.setAttribute('aria-selected',String(index===0));body.className='tab-panel'+(index?'':' active');body.setAttribute('role','tabpanel');body.append(pane.section);button.addEventListener('click',()=>{tabs.querySelectorAll('.tab').forEach(x=>{x.classList.remove('active');x.setAttribute('aria-selected','false')});bodies.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));button.classList.add('active');button.setAttribute('aria-selected','true');body.classList.add('active')});tabs.append(button);bodies.append(body)});card.append(tabs,bodies)}const heading=[...document.querySelectorAll('h2')].find(x=>x.textContent.includes('Fits and BIC model comparisons'));heading?.after(deck);for(const [,id] of source)document.getElementById(id)?.remove();document.querySelector(".tabs[aria-label='Fit comparison groups']")?.remove()})();</script>"""
+report = read(report_path, String)
+report = replace(report, "</body>" => dataset_toggle_script * "</body>")
+write(report_path, report)
 println("Wrote $(joinpath(OUT,"report.html")) and bic_model_ranking.csv")

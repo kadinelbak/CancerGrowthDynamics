@@ -170,7 +170,21 @@ function read_sources()
     sort(records; by=r -> (order[r.section], r.title))
 end
 
-function svg_plot(sources, title)
+function source_ymax(sources)
+    maxima = Float64[]
+    for src in sources
+        y = src.df[!, Symbol("Mean Cells")]
+        errcol = Symbol("SEM Cells") in propertynames(src.df) ? Symbol("SEM Cells") : Symbol("SD Cells")
+        e = errcol in propertynames(src.df) ? src.df[!, errcol] : zeros(nrow(src.df))
+        for (value, error) in zip(y, e)
+            ismissing(value) && continue
+            push!(maxima, Float64(value) + (ismissing(error) ? 0.0 : Float64(error)))
+        end
+    end
+    isempty(maxima) ? 1.0 : max(maximum(maxima) * 1.12, 1.0)
+end
+
+function svg_plot(sources, title, ymax)
     curves = NamedTuple[]
     for (i, src) in enumerate(sources)
         x = Float64.(collect(skipmissing(src.df.Day)))
@@ -183,7 +197,7 @@ function svg_plot(sources, title)
     end
     isempty(curves) && return "<div class=\"empty\">No numeric trajectory available.</div>"
     xmin = minimum(minimum(c.x) for c in curves); xmax = maximum(maximum(c.x) for c in curves); xmax == xmin && (xmax = xmin + 1)
-    ymin = 0.0; ymax = max(maximum(maximum(c.y .+ c.e) for c in curves) * 1.12, 1.0)
+    ymin = 0.0
     W, H, L, R, T, B = 760, 300, 72, 22, 28, 48
     sx(v) = L + (v - xmin) / (xmax - xmin) * (W - L - R)
     sy(v) = H - B - (v - ymin) / (ymax - ymin) * (H - T - B)
@@ -238,19 +252,26 @@ end
 function main()
     mkpath(OUT_DIR)
     records = read_sources()
+    # One common ceiling makes trajectories directly comparable across the report.
+    shared_ymax = source_ymax([s for r in records for s in r.sources])
     cards_by_section = Dict{String,Vector{String}}()
     for (i, r) in enumerate(records)
         previews = join(["<h4>Sheet preview: $(html_escape(s.label))</h4>$(preview_toggle(s.df, s.label))" for s in r.sources], "")
-        push!(get!(cards_by_section, r.section, String[]), "<article class=\"card section-$(r.section)\"><h3>$(html_escape(r.title))</h3><p class=\"meta\">$(html_escape(r.notes))</p>$(svg_plot(r.sources, r.title))$previews</article>")
+        push!(get!(cards_by_section, r.section, String[]), "<article class=\"card section-$(r.section)\"><h3>$(html_escape(r.title))</h3><p class=\"meta\">$(html_escape(r.notes))</p>$(svg_plot(r.sources, r.title, shared_ymax))$previews</article>")
     end
     files = Set(s.file for r in records for s in r.sources)
     manifest = "{\n  \"generated_by\": \"Julia $(VERSION)\",\n  \"generated_at\": \"$(Dates.now())\",\n  \"file_count\": $(length(files)),\n  \"plot_count\": $(length(records)),\n  \"sheet_count\": $(sum(length(r.sources) for r in records))\n}\n"
     write(joinpath(OUT_DIR, "manifest.json"), manifest)
     section_titles = Dict("untreated" => "1. Untreated Mono-culture", "treated" => "2. Treated Mono-culture", "low_resource" => "3. Low-Resource Data")
     section_order = ["untreated", "treated", "low_resource"]
-    body = join(["<section class=\"report-section\"><h2>$(section_titles[s])</h2>$(join(get(cards_by_section, s, String[]), "\\n"))</section>" for s in section_order], "\n")
+    cards_for(section) = begin
+        cards = join(get(cards_by_section, section, String[]), "\n")
+        section == "treated" ? "<div class=\"treated-grid\">$cards</div>" : cards
+    end
+    body = join(["<section class=\"report-section\"><h2>$(section_titles[s])</h2>$(cards_for(s))</section>" for s in section_order], "\n")
     html = """<!doctype html><html><head><meta charset=\"utf-8\"><title>New Data Report</title><style>
 body{margin:0;background:#f4f7f8;color:#172b36;font:15px system-ui,sans-serif}main{max-width:1280px;margin:auto;padding:28px}h1{margin-bottom:8px}h2{margin-top:30px}.intro,.workbook{background:white;border:1px solid #d9e2e6;border-radius:14px;padding:20px;box-shadow:0 5px 18px #173b4d0d}.intro{border-left:6px solid #176b87}.card{margin-top:16px;border-top:1px solid #e6ecef;padding-top:16px}.meta{color:#52636b}.back{display:inline-block;margin:0 0 18px;color:#176b87;font-weight:700;text-decoration:none}.preview-toggle{margin:10px 0 0}.preview-toggle>summary{display:inline-flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:9px 13px;border:1px solid #c5d1d8;border-radius:999px;background:#f7fbfc;color:#175e79;font-weight:700}.preview-toggle>summary::-webkit-details-marker{display:none}.preview-toggle>summary::marker{content:\"\"}.preview-toggle[open]>summary{background:#e8f3f6;border-color:#9fc4d0}.preview-shell{margin-top:10px}.preview{border-collapse:collapse;width:100%;font-size:12px}.preview th,.preview td{border:1px solid #d9e2e6;padding:5px;text-align:right}.preview th{background:#eef5f6;text-align:left}.empty{padding:30px;background:#fff7ed;border-radius:8px}svg{width:100%;max-height:300px;background:#fbfdfd;border:1px solid #e4e7ec;border-radius:8px}code{background:#eef5f6;padding:2px 5px;border-radius:4px}</style></head><body><main><a class=\"back\" href=\"../../index.html\">&larr; Back to reports home</a><h1>New Data Report</h1><div class=\"intro\"><p>This report was generated entirely in Julia $(VERSION) from every CSV and XLSX source in <code>New Datasets</code>.</p><p><b>How to read the labels:</b> LR means low resource. Ce0 is untreated co-culture. Ce1 is treated co-culture at the 1 uM IC50. Ratios 1-1, 3-1, and 1-3 are co-culture sensitive:resistant ratios. Mono-culture files are at 30,000 cells/mL, with treatment specified in the filename. Each chart includes its source file and sheet name, and each card includes a three-row preview.</p><p>Plotted values are Mean Cells over Day. Error bars use SEM when available, otherwise SD.</p></div><h2>All source sheets ($(length(records)))</h2>$body</main></body></html>"""
+    html = replace(html, "</style>" => ".treated-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.treated-grid .card{margin-top:0;background:#fff;border:1px solid #d9e2e6;border-radius:10px;padding:14px}.treated-grid h3{font-size:16px;margin:0}.treated-grid .meta{font-size:13px;min-height:38px}.treated-grid svg{max-height:210px}@media(max-width:850px){.treated-grid{grid-template-columns:1fr}}</style>")
     write(joinpath(OUT_DIR, "report.html"), html)
     mkpath(DOCS_OUT_DIR)
     cp(joinpath(OUT_DIR, "report.html"), joinpath(DOCS_OUT_DIR, "report.html"); force=true)
