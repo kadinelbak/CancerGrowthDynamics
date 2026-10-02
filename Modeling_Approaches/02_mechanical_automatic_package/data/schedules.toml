@@ -1,0 +1,12 @@
+# Dose schedules D(t): cisplatin in the medium (µM) as piecewise-constant steps.
+# Each schedule is a list of [t_start (days), dose (µM)]; the dose holds until the next step.
+# Sources (sources.toml) refer to a schedule by its name. Add a schedule here for a new experiment.
+
+const_0    = [[0.0, 0.0]]
+const_0_62 = [[0.0, 0.62]]
+const_1    = [[0.0, 1.0]]
+const_1_47 = [[0.0, 1.47]]
+
+# Intermittent experiments (Processed_Datasets/Intermittent Data): 1 µM switched at day 7
+on0_off7 = [[0.0, 1.0], [7.0, 0.0]]
+off0_on7 = [[0.0, 0.0], [7.0, 1.0]]

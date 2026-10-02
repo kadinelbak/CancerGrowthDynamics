@@ -30,7 +30,7 @@ current = Dict("A2780" => cur("s1b-a2780"), "A2780cis" => cur("s1b-a2780cis"))
 for L in LINES
     m = lrmono[L.line]; g = growth[L.line]
     x, y = m.x[.!m.bad], m.y[.!m.bad]; n = length(x)
-    shift = L.line in SHIFT_FROM_DAY1 ? 1.0 : 0.0
+    shift = Float64(get(source(only_source(condition="low_resource", culture="mono", line=L.line)), "time_origin", 0))   # day taken as t = 0 (data/sources.toml)
     changes = [c - shift for c in 2.0:2.0:30.0 if c - shift > 0]          # media changes every 2 days (original frame)
     last_change(t) = (i = searchsortedlast(changes, t); i == 0 ? -shift : changes[i])
     G(X, reff) = reff * X * (1 - (max(X, 0) / g.K)^g.θ)
