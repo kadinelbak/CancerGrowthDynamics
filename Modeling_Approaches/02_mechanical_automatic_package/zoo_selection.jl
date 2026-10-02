@@ -77,9 +77,10 @@ function replay_joint(gN, gC, rN, rC, rule)
     pN, pC
 end
 
-# replay the paired-line rules on the bootstrap results of the Stage 1b and Stage 2 groups
-function apply_joint_replay!(groups, results)
-    for (kind, rule) in (("s1b", "ab"), ("s2", "shared"))
+# replay the paired-line rules on the bootstrap results of the per-line stages that have one
+# (stages.toml `joint_rule`; the default matches it for older checkpoints)
+function apply_joint_replay!(groups, results; rules=(("s1b", "ab"), ("s2", "shared")))
+    for (kind, rule) in rules
         gN = only(g for g in groups if g.id == "$kind-a2780"); gC = only(g for g in groups if g.id == "$kind-a2780cis")
         pN, pC = replay_joint(gN, gC, results[gN.id].res, results[gC.id].res, rule)
         isempty(pN) && continue

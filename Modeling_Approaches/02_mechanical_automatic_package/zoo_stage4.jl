@@ -15,18 +15,10 @@
 freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
 freeze_line(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple(freeze_slot(getfield(L.s, k), p) for k in keys(L.s))),))
 
-const S4_SPECS = [
-    # (name, label, crowding source, resistant kill on, free parameters)
-    ("s4_inherited",         "Everything inherited: Stage 3 drug model and crowding + Stage 3b low-resource mechanisms", :S3,  false, Symbol[]),
-    ("s4_inherited_3bcrowd", "Everything inherited, crowding from Stage 3b (shared K, one-for-one)",                     :S3b, false, Symbol[]),
-    ("s4_reskill",           "Everything inherited + resistant kill at its Stage 2 value",                               :S3,  true,  Symbol[]),
-    ("s4_chi",               "+ drug × low-resource interaction χ (shared by both lines)",                               :S3,  false, [:χ]),
-    ("s4_K",                 "+ shared carrying capacity K refitted",                                                    :S3,  false, [:K]),
-    ("s4_reskill_chi",       "Resistant kill at its Stage 2 value + shared interaction χ",                               :S3,  true,  [:χ]),
-    ("s4_chi_lines",         "+ interaction χ per line",                                                                 :S3,  false, [:χN, :χC]),
-    ("s4_eps",               "+ low-resource strength per line (ε_N, ε_C)",                                              :S3,  false, [:εN, :εC]),
-    ("s4_chi_K",             "+ shared interaction χ and K",                                                             :S3,  false, [:χ, :K]),
-]
+# (name, label, crowding source, resistant kill on, free parameters) from the combination stage of stages.toml
+const S4_SPECS = let st = only(s for s in TOML.parsefile(joinpath(@__DIR__, "stages.toml"))["stage"] if s["kind"] == "combination")
+    [(c["name"], c["label"], c["crowd"] == "s3b" ? :S3b : :S3, get(c, "reskill", false), Symbol[Symbol(x) for x in c["free"]]) for c in st["candidate"]]
+end
 const S4_PNAME = Dict(:K => "K", :χ => "χ", :χN => "χ_N", :χC => "χ_C", :εN => "ε_N^R", :εC => "ε_C^R")
 
 function combo_datasets(obs)
