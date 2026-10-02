@@ -113,7 +113,7 @@ function model_section()
              prow("\\beta_C", hillC.β, "/day", "DATA · $(stage3_betaC().source) (A) / Stage 2 (B: $(fmt(only(filter(m -> m.action == :hill, PB.spec[2].mods)).β)))", "maximum A2780cis kill"),
              prow("h_N,\\ h_C", "$(fmt(hillN.h)), $(fmt(hillC.h))", "—", "DATA · Stage 2", "Hill slopes"),
              prow("k_N,\\ k_C", "$(fmt(hillN.k)), $(fmt(hillC.k))", "/day", "DATA · Stage 2", "drug-effect transit rates"),
-             prow("EC_{50}", EC50, "µM", "DATA (fixed)", "set to the measured IC50"),
+             prow("EC_{50,N},\\ EC_{50,C}", "$(fmt(hillN.ec50)), $(fmt(hillC.ec50))", "µM", "DATA (fixed)", "measured IC50 of each line"),
              prow("c_N", capN.c, "—", "DATA · Stage 1b", "A2780 capacity reduction per unit low resource"),
              prow("d_C^{LR}", lossC.d0, "/day", "DATA · Stage 1b", "immediate A2780cis death in low resource"),
              prow("d_C^{acc}", lossC.β, "/day", "DATA · Stage 1b (flat profile: poorly identified)", "A2780cis death from accumulated stress"),

@@ -6,7 +6,11 @@ ENV["DRYRUN"] = "1"
 include(joinpath(@__DIR__, "..", "run_zoo_fits.jl"))
 using Test
 
-same_line(a, b) = all(isequal(getfield(a, k), getfield(b, k)) for k in keys(b) if k != :s) && isequal(a.s, b.s) && keys(a) == keys(b)
+# slots are compared on the keys the saved line has: lines saved before 2026-10-02 have no EC50 slot
+# (they used EC50 = 1 µM for both lines); the new EC50 slot is checked against stages.toml below
+same_slots(a, b) = all(isequal(getfield(a, k), getfield(b, k)) for k in keys(b))
+same_line(a, b) = all(k in (:s, :extra) || isequal(getfield(a, k), getfield(b, k)) for k in keys(b)) && same_slots(a.s, b.s) && keys(a) == keys(b) &&
+                  (!hasproperty(b, :extra) || all(same_line(x, y) for (x, y) in zip(a.extra, b.extra)))
 function same_cand(c, p)
     ok = c.name == p.name && c.label == p.label && c.family == p.family && c.pnames == p.pnames &&
          isequal(c.bounds, p.bounds) && isequal(c.p0s, p.p0s) && isequal(c.u0, p.u0) &&
@@ -31,4 +35,12 @@ end
     @test all(a.stage == b.stage && a.title == b.title && a.line == b.line && a.kind == b.kind && isequal(a.datasets, b.datasets)
               for (a, b) in zip(groups, DRY_PREV.groups))
     @test JOINT_RULES == [("s1b", "ab"), ("s2", "shared")]
+    # every Hill kill line carries its line's measured IC50 (stages.toml [lines])
+    for g in DRY_PREV.groups, c in DRY_BUILT[g.id]
+        g.kind == :s4 && continue                       # Stage 4 lines are frozen copies of the saved Stage 3a lines
+        lines = g.kind in (:s3, :s3b) ? ["A2780", "A2780cis"] : [g.line]
+        for (L, name) in zip(c.sys.lines, lines)
+            @test L.s.EC50 == Slot(0, LINE_CFG[name]["ec50"])
+        end
+    end
 end

@@ -68,6 +68,7 @@ if !isempty(stale) && !isempty(ck)
     haskey(ck, :validation) && (ck[:validation] = merge(ck[:validation], (rows=[r for r in ck[:validation].rows if !(r.group in stale)],)))
     haskey(ck, :gsa) && (ck[:gsa] = merge(ck[:gsa], (stages=Dict(k => v for (k, v) in ck[:gsa].stages if !(k in stale)),)))
 end
+any(id -> startswith(id, "s1-") || startswith(id, "s2-"), stale) && delete!(ck, :intermittent)   # predicted from Stages 1 and 2b
 ck[:models] = current_models
 println("=== zoo analyses: $(Threads.nthreads()) threads; checkpoint has $(collect(keys(ck))); to (re)compute: $(sort(collect(stale))) ==="); flush(stdout)
 
@@ -327,8 +328,11 @@ function blocked(g, labels, scheme)
 end
 
 # time-block forecast: fit days ≤ 70% of the last day, predict the later days
+# validation.toml: which data are held out and how they are predicted
+const VAL = TOML.parsefile(joinpath(@__DIR__, "validation.toml"))
+
 function forecast(g)
-    c = g.cands[1]; tmax = maximum(maximum(d.x) for d in g.datasets); split = round(0.7 * tmax)
+    c = g.cands[1]; tmax = maximum(maximum(d.x) for d in g.datasets); split = round(VAL["forecast"]["fit_fraction"] * tmax)
     train = [sub_ds(d, d.x .<= split) for d in g.datasets]; test = [sub_ds(d, d.x .> split) for d in g.datasets]
     test = [d for d in test if !isempty(d.x)]
     f = gfit(c.model, train, c.u0, c.params, c.bounds; starts=3)
@@ -338,41 +342,41 @@ function forecast(g)
      rmse_heldout=ho.rmse, rmse_insample=ins.rmse, nrmse_heldout=ho.rmse / m, nrmse_insample=ins.rmse / m)
 end
 
-# The treated cocultures held out. Stage 3's crowding (K, α, sensitive death) is fitted to the
-# untreated (Ce0) cocultures only; cisplatin comes from the Stage 2 monoculture fits of both lines
-# (Stage 3's kill strengths were fitted with Ce1, so they are not used here).
-g3 = gid("s3"); c3 = g3.cands[1]
-βN2 = gid("s2-a2780").cands[1].params[1]; βC2 = gid("s2-a2780cis").cands[1].params[1]
+# A held-out condition (validation.toml [heldout]): the group's crowding is refitted on the training
+# data only (the untreated Ce0 cocultures), the kill strengths come from the monoculture drug fits
+# (Stage 3a's own were fitted with Ce1, so they are not used), and the held-out data are predicted.
+const HO = VAL["heldout"]
+g3 = gid(HO["group"]); c3 = g3.cands[1]
+βof(c) = c.params[findfirst(==(:β), c.slots)]
+βN2 = βof(gid("$(HO["drug_from"])-a2780").cands[1]); βC2 = βof(gid("$(HO["drug_from"])-a2780cis").cands[1])
 function heldout_ce1_model(βN, βC)
     LN, LC = c3.sys.lines
     LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βN),)),)); LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βC),)),))
     sys = build_system([LN2, LC2], c3.sys.envs, c3.sys.alpha)
     make_system_model(sys)
 end
-# held-out Ce1: crowding refitted to Ce0 with the Stage 2 drug response, then Ce1 predicted
+tag_match(s, sel) = all(string(get(s, k, "")) == string(v) for (k, v) in sel)
+const HO_TAGS = dataset_tags(HO["group"])
+const CE0 = [k for (k, s) in enumerate(HO_TAGS) if tag_match(s, HO["train"])]
+const CE1 = [k for (k, s) in enumerate(HO_TAGS) if tag_match(s, HO["predict"])]
+# the refitted parameters must lead the carried model's parameter vector (the kill slots are then fixed)
+const HO_RI = [findfirst(==(n), c3.pnames) for n in HO["refit"]]
+HO_RI == collect(1:length(HO_RI)) || error("validation.toml heldout.refit must be the first parameters of $(c3.name): $(c3.pnames)")
 function heldout_ce1()
     m = heldout_ce1_model(βN2, βC2)
-    f = gfit(m, g3.datasets[CE0], c3.u0, c3.params[1:4], c3.bounds[1:4]; starts=4)
+    f = gfit(m, g3.datasets[CE0], c3.u0, c3.params[HO_RI], c3.bounds[HO_RI]; starts=4)
     ce1 = [(variant="cisplatin from Stage 2 for both lines", params=f.params, fit_ce0=evaluate(m, g3.datasets[CE0], c3.u0, f.params),
             pred=evaluate(m, g3.datasets[CE1], c3.u0, f.params))]
     full = evaluate(c3.model, g3.datasets[CE1], c3.u0, c3.params)
-    # TODO (user, 2026-10-01): at the next rerun, replace this no-change reference with plain logistic
-    # growth (each line's untreated logistic, no drug term), so the table shows what the drug model adds.
-    base_sse = sum(sum(abs2, d.y .- d.y[1]) for d in g3.datasets[CE1])
-    (ce1=ce1, ce1_full=full, ce1_baseline_rmse=sqrt(base_sse / nobs(g3.datasets[CE1])))
+    # reference with no drug model: the same Ce0-fitted growth and crowding, no drug term
+    HO["baseline"] == "logistic" || error("validation.toml heldout.baseline: only \"logistic\" is implemented")
+    base = evaluate(heldout_ce1_model(0.0, 0.0), g3.datasets[CE1], c3.u0, f.params)
+    (ce1=ce1, ce1_full=full, ce1_baseline_rmse=base.rmse, ce1_baseline="logistic")
 end
-const CE0 = [k for k in eachindex(g3.datasets) if COCULTURE_LAYOUT[(k + 1) ÷ 2].cond == "Ce0"]
-const CE1 = [k for k in eachindex(g3.datasets) if COCULTURE_LAYOUT[(k + 1) ÷ 2].cond == "Ce1"]
-@assert c3.pnames[1:4] == ["K", "α_NC", "α_CN", "d_N"] && c3.pnames[5] == "β_N"
 
-# blocked validations: (group, scheme, held-out labels of its datasets)
-const BLOCKED_SPECS = [
-    ("s2-a2780", "leave one dose out", () -> ["$(d) µM" for d in treated["A2780"].doses]),
-    ("s2-a2780cis", "leave one dose out", () -> ["$(d) µM" for d in treated["A2780cis"].doses]),
-    ("s3", "leave one ratio out", () -> [COCULTURE_LAYOUT[(k + 1) ÷ 2].ratio for k in eachindex(g3.datasets)]),
-    ("s3b", "leave one run out", () -> ["run $(lr_cc[(k + 1) ÷ 2].run)" for k in eachindex(gid("s3b").datasets)]),
-    ("s3b", "leave one ratio out", () -> [lr_cc[(k + 1) ÷ 2].label for k in eachindex(gid("s3b").datasets)]),
-]
+# blocked validations (validation.toml [[leave_out]]): (group, scheme, held-out label of each dataset)
+tag_label(s, tag) = tag == "schedule" ? "$(constant_dose(s["schedule"])) µM" : tag == "run" ? "run $(s["run"])" : string(s[tag])
+const BLOCKED_SPECS = [(lo["group"], lo["scheme"], () -> [tag_label(s, lo["tag"]) for s in dataset_tags(lo["group"])]) for lo in VAL["leave_out"]]
 if !haskey(ck, :validation)
     println("\n--- validation ---"); flush(stdout)
     tasks = Any[]
@@ -437,60 +441,70 @@ if haskey(ck, :validation)
     end
 end
 
-# ── intermittent dosing: 1 µM on days 0–7 then off, or off then on (Processed_Datasets) ─────────
-# Predicted from the Stage 1 growth and Stage 2 drug models with no refit. Values are image areas
-# (µm²), so each trajectory has one area-per-cell scale, profiled out. A second question: does the
-# drug effect decay after removal at the build-up rate k (the model's assumption)? A separate
-# washout rate k_off is tested and kept only if the 3-BIC rule supports it.
-const INT_DIR = joinpath(ROOT, "Processed_Datasets", "Intermittent Data", "30k_seeding_density", "Averages")
-const INT_SWITCH = 7.0
-int_dose(sched, t) = sched == :onoff ? (t < INT_SWITCH ? 1.0 : 0.0) : (t < INT_SWITCH ? 0.0 : 1.0)
-function int_line(line)
-    g1 = gid(line == "A2780" ? "s1-a2780" : "s1-a2780cis"); g2 = gid(line == "A2780" ? "s2-a2780" : "s2-a2780cis")
-    v1 = Dict(zip(g1.cands[1].slots, g1.cands[1].params)); L2 = g2.cands[1].sys.lines[1]
-    @assert L2.kernel == :chain3 && L2.action == :hill
-    q2 = g2.cands[1].params
-    (r=v1[:r], K=v1[:K], θ=get(v1, :θ, 1.0), β=sv(L2.s.β, q2, Float64), h=sv(L2.s.h, q2, Float64), k=sv(L2.s.k, q2, Float64))
+# ── intermittent dosing: 1 µM on days 0–7 then off, or off then on ─────────────────────────────
+# Predicted with no refit from each line's carried Stage 2b model (its growth is the carried
+# Stage 1 law), driven by the schedule D(t) of the data (data/schedules.toml) through the model
+# engine itself. Values are image areas normalised to cell size, so each trajectory has one scale,
+# profiled out. A second question: does the drug effect decay after removal at the build-up rate k
+# (the model's assumption)? A separate washout rate k_off of the first effect compartment while
+# D = 0 is tested and kept only if the 3-BIC rule supports it (chain and compartment kernels only).
+const SP = VAL["schedule_prediction"]
+const INT_SCHED = Dict(Symbol(k) => v for (k, v) in SP["schedules"])
+freeze_all(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple((q = getfield(L.s, k); q.i > 0 ? Slot(0, p[q.i]) : q) for k in keys(L.s))),))
+function int_system(line, sc)
+    c = gid("$(SP["model_from"])-$(lowercase(line))").cands[1]
+    L = freeze_all(c.sys.lines[1], c.params)
+    sys = build_system([L], [(D=dose_input(INT_SCHED[sc]), R=0.0, lines=[1])], [[Slot(0, 1.0)]])
+    sys, L
 end
-function int_sim(P, sched, koff, x, x0)
-    f!(du, u, q, t) = begin
-        D = int_dose(sched, t); X = max(u[1], 0.0)
-        du[2] = P.k * D - (D > 0 ? P.k : koff) * u[2]; du[3] = P.k * (u[2] - u[3]); du[4] = P.k * (u[3] - u[4])
-        E = max(u[4], 0.0)
-        du[1] = P.r * X * (1 - (X / P.K)^P.θ) - (E > 0 ? P.β * E^P.h / (EC50^P.h + E^P.h) : 0.0) * X
-    end
-    pre = solve(ODEProblem(f!, [1.0, 0.0, 0.0, 0.0], (0.0, 1.0)), Tsit5(); reltol=1e-9, abstol=1e-9).u[end]
-    sol = solve(ODEProblem(f!, [x0, pre[2], pre[3], pre[4]], (1.0, maximum(x))), Tsit5(); saveat=x, tstops=[INT_SWITCH], reltol=1e-9, abstol=1e-9)
-    [u[1] for u in sol.u]
+# the washout variant: the first effect compartment clears at koff instead of k while the dose is 0
+function int_model(line, sc, koff)
+    sys, L = int_system(line, sc); f! = make_system_model(sys)
+    koff === nothing && return sys, f!
+    (L.kernel in (:comp1, :chain2, :chain3) && ncell(L.action) == 0) || return sys, nothing
+    i1 = sys.hb[1][1] + 1; k = L.s.k.v
+    g!(du, u, p, t) = (f!(du, u, p, t); input_at(sys.envs[1].D, t) == 0 && (du[i1] += (k - koff) * u[i1]); nothing)
+    sys, g!
 end
-function int_fit_scale(P, sched, koff, x, y)
-    f(ls) = (sc = exp(ls); sum(abs2, y .- sc .* int_sim(P, sched, koff, x, y[1] / sc)))
+# counts at days x from day 1 (= x0); days 0–1 run first from one cell so the effect states hold
+# one day of the schedule, as in the experiment
+function int_predict(line, sc, koff, x, x0)
+    sys, m = int_model(line, sc, koff)
+    m === nothing && return fill(NaN, length(x))
+    u = sys_u0(sys, [[1.0]])
+    pre = solve(ODEProblem(m, u, (0.0, 1.0), Float64[]), Tsit5(); reltol=1e-9, abstol=1e-9).u[end]
+    pre[sys.xi[1][1]+1] = x0
+    sol = solve(ODEProblem(m, pre, (1.0, maximum(x)), Float64[]), Tsit5(); saveat=x, tstops=sys_breakpoints(sys), reltol=1e-9, abstol=1e-9)
+    [u[sys.xi[1][1]+1] for u in sol.u]
+end
+function int_fit_scale(line, sc, koff, x, y)
+    f(ls) = (sc_ = exp(ls); sum(abs2, y .- sc_ .* int_predict(line, sc, koff, x, y[1] / sc_)))
     grid = range(log(0.05), log(20.0); length=40); v = [f(g) for g in grid]; i = argmin(v)
     a, b = grid[max(i - 1, 1)], grid[min(i + 1, end)]
     for _ in 1:40
         c = b - (b - a) / 1.618; d = a + (b - a) / 1.618
         f(c) < f(d) ? (b = d) : (a = c)
     end
-    sc = exp((a + b) / 2)
-    (scale=sc, sse=f((a + b) / 2), pred=sc .* int_sim(P, sched, koff, x, y[1] / sc))
+    s = exp((a + b) / 2)
+    (scale=s, sse=f((a + b) / 2), pred=s .* int_predict(line, sc, koff, x, y[1] / s))
 end
 if !haskey(ck, :intermittent)
     println("\n--- intermittent dosing ---"); flush(stdout)
     res = Dict{String,Any}()
-    for (line, file) in (("A2780", "A2780"), ("A2780cis", "A2780cis"))
-        P = int_line(line)
-        data = Dict(:onoff => CSV.read(joinpath(INT_DIR, "$(file)T_dayaverages.csv"), DataFrame),
-                    :offon => CSV.read(joinpath(INT_DIR, "$(file)UT_dayaverages.csv"), DataFrame))
-        xy = Dict(k => (Float64.(d.Day), Float64.(d.Mean_Cells_um2), Float64.(d.Std_Error_Cells)) for (k, d) in data)
+    for line in ("A2780", "A2780cis")
+        xy = Dict(sc => (d = intermittent[line][INT_SCHED[sc]]; (d.x, d.y, Float64.(coalesce.(d.se, NaN)))) for sc in (:onoff, :offon))
         n = sum(length(v[1]) for v in values(xy))
-        tot(koff) = sum(int_fit_scale(P, sc, koff, xy[sc][1], xy[sc][2]).sse for sc in (:onoff, :offon))
-        s_eq = tot(P.k)
-        grid = exp.(range(log(0.01), log(20.0); length=50)); vals = [tot(ko) for ko in grid]; ib = argmin(vals)
+        tot(koff) = sum(int_fit_scale(line, sc, koff, xy[sc][1], xy[sc][2]).sse for sc in (:onoff, :offon))
+        s_eq = tot(nothing)
         bic(sse, k) = n * log(sse / n) + k * log(n)
-        fits = Dict(sc => int_fit_scale(P, sc, P.k, xy[sc][1], xy[sc][2]) for sc in (:onoff, :offon))
-        res[line] = (P=P, xy=xy, n=n, sse_equal=s_eq, bic_equal=bic(s_eq, 2), koff_best=grid[ib], sse_koff=vals[ib], bic_koff=bic(vals[ib], 3),
-                     profile=collect(zip(grid, vals)), fits=fits)
-        @printf("  %-9s equal rates BIC %.2f; best k_off %.3g BIC %.2f (Δ %+.2f)\n", line, bic(s_eq, 2), grid[ib], bic(vals[ib], 3), bic(vals[ib], 3) - bic(s_eq, 2))
+        grid = exp.(range(log(0.01), log(20.0); length=50)); vals = [tot(ko) for ko in grid]
+        ok = SP["washout_test"] && all(isfinite, vals); ib = ok ? argmin(vals) : 1
+        fits = Dict(sc => int_fit_scale(line, sc, nothing, xy[sc][1], xy[sc][2]) for sc in (:onoff, :offon))
+        res[line] = (xy=xy, n=n, sse_equal=s_eq, bic_equal=bic(s_eq, 2), koff_best=ok ? grid[ib] : NaN, sse_koff=ok ? vals[ib] : NaN,
+                     bic_koff=ok ? bic(vals[ib], 3) : NaN, profile=ok ? collect(zip(grid, vals)) : Tuple{Float64,Float64}[], fits=fits,
+                     model=gid("$(SP["model_from"])-$(lowercase(line))").cands[1].name)
+        @printf("  %-9s equal rates BIC %.2f; best k_off %.3g BIC %.2f (Δ %+.2f)\n", line, bic(s_eq, 2), res[line].koff_best, res[line].bic_koff,
+                res[line].bic_koff - bic(s_eq, 2))
     end
     ck[:intermittent] = res; save_ck()
 end
@@ -778,11 +792,12 @@ function intermittent_html()
         m = mean(vcat(R.xy[:onoff][2], R.xy[:offon][2]))
         rm = sqrt(R.sse_equal / R.n)
         d = R.bic_koff - R.bic_equal
-        push!(rows, trow([td(line), tn(fmt(rm)), tn(@sprintf("%.2f", rm / m)), tn(@sprintf("%.2f", R.bic_equal)), tn(fmt(R.koff_best)), tn(@sprintf("%.2f", R.bic_koff)),
-                          td(@sprintf("%+.2f", d) * (d > -3 ? " <span class='ok'>equal rates kept</span>" : " <span class='flag'>separate washout supported</span>"))]))
+        push!(rows, trow([td(line), tn(fmt(rm)), tn(@sprintf("%.2f", rm / m)), tn(@sprintf("%.2f", R.bic_equal)), tn(isfinite(R.koff_best) ? fmt(R.koff_best) : "—"), tn(isfinite(R.bic_koff) ? @sprintf("%.2f", R.bic_koff) : "—"),
+                          td(!isfinite(d) ? "not tested (kernel has no effect compartment)" :
+                             @sprintf("%+.2f", d) * (d > -3 ? " <span class='ok'>equal rates kept</span>" : " <span class='flag'>separate washout supported</span>"))]))
         for (sc, lab) in ((:onoff, "1 µM days 0–7, then off"), (:offon, "off, then 1 µM from day 7"))
             x, y, se = R.xy[sc]; f = R.fits[sc]
-            ts = collect(1.0:0.1:maximum(x)); pred = f.scale .* int_sim(R.P, sc, R.P.k, ts, y[1] / f.scale)
+            ts = collect(1.0:0.1:maximum(x)); pred = f.scale .* int_predict(line, sc, nothing, ts, y[1] / f.scale)
             ymax = ceil(max(maximum(y .+ se), maximum(pred)) * 1.1; sigdigits=2)
             series = [(panel=1, name="observed (area)", color=line == "A2780" ? BLUE : ORANGE, filled=true, dashed=false, state=1, x=x, y=y, xbad=Float64[], ybad=Float64[])]
             svg = zoo_band_svg("$line · $lab: prediction (line) vs data (points)", series, ts, [[v] for v in pred], nothing, 14.0, ymax)
@@ -819,7 +834,8 @@ function write_validation()
     ce1rows = vcat([trow([td(hesc(v.variant)), td(join(["$(pl(n)) = $(fmt(x))" for (n, x) in zip(c3.pnames[1:4], v.params)], ", ")),
                         tn(fmt(v.pred.rmse)), tn(@sprintf("%.2f", v.pred.rmse / m1))]; cls=i == 1 ? "win" : "") for (i, v) in enumerate(V.ce1)],
                    [trow([td("In-sample reference: the Stage 3 optimal model fitted with Ce1"), td("—"), tn(fmt(V.ce1_full.rmse)), tn(@sprintf("%.2f", V.ce1_full.rmse / m1))]),
-                    trow([td("No-change reference: each trajectory stays at its day-0 count"), td("—"), tn(fmt(V.ce1_baseline_rmse)), tn(@sprintf("%.2f", V.ce1_baseline_rmse / m1))])])
+                    trow([td(get(V, :ce1_baseline, "no_change") == "logistic" ? "Untreated-growth reference: the same logistic growth and crowding fitted to Ce0, no drug term" :
+                              "No-change reference: each trajectory stays at its day-0 count"), td("—"), tn(fmt(V.ce1_baseline_rmse)), tn(@sprintf("%.2f", V.ce1_baseline_rmse / m1))])])
     page("validation", "Validation — compartment models", "validation", """
 <div class='intro'><p>Three kinds of validation, each refitting the carried model without the held-out data and then predicting it:</p><ul>
 <li><b>Held-out treated cocultures (Ce1).</b> The same held-out set as the neural-network track. The Stage 3 model's crowding terms (\\(K, \\alpha_{NC}, \\alpha_{CN}, d_N\\)) are fitted to the untreated Ce0 cocultures only; cisplatin comes from the Stage 2 monoculture fits (\\(\\beta_N = $(fmt(βN2))\\), \\(\\beta_C = $(fmt(βC2))\\), with their delays and Hill slopes). The Ce1 cocultures ($(n1) points) are then predicted without refitting.</li>

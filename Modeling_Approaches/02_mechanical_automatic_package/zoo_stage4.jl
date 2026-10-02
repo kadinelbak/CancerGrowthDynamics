@@ -84,10 +84,10 @@ function fit_stage4(cands, ds; maxtime=300.0)
         end
         best = (params=fill(NaN, length(c.pnames)), bic=Inf, sse=Inf)
         for p0 in c.p0s
-            f = bs_fit(c.model, ds, c.u0, p0, c.bounds; maxtime=maxtime)
+            f = bs_fit(c.model, ds, c.u0, p0, c.bounds; maxtime=maxtime, tag=c.name)
             f.bic < best.bic && (best = f)
         end
-        isfinite(best.bic) && (f = bs_fit(c.model, ds, c.u0, best.params, c.bounds; maxtime=maxtime); f.bic < best.bic && (best = f))
+        isfinite(best.bic) && (f = bs_fit(c.model, ds, c.u0, best.params, c.bounds; maxtime=maxtime, tag=c.name); f.bic < best.bic && (best = f))
         se = isfinite(best.bic) ? (try param_se(c.model, ds, c.u0, best.params) catch; fill(NaN, length(c.pnames)) end) : fill(NaN, length(c.pnames))
         rows[i] = merge(c, (params=best.params, bic=best.bic, sse=best.sse, se=se))
     end

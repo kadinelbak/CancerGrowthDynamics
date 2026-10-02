@@ -233,8 +233,8 @@ const TOX_TIP = "Toxicity proxy: the damage the same drug exposure would do to h
 
 function model_section()
     P = scenario_plant(:A); c3 = zgroup("s3").cands[1]
-    eqs = ["\\frac{dN}{dt}=r_N N\\left(1-\\frac{N+\\alpha_{NC}C}{K}\\right)-d_N N-\\beta_N\\frac{E_N^{h_N}}{EC_{50}^{h_N}+E_N^{h_N}}N",
-           "\\frac{dC}{dt}=r_C C\\left[1-\\left(\\frac{C+\\alpha_{CN}N}{K}\\right)^{\\theta_C}\\right]-\\beta_C\\frac{E_C^{h_C}}{EC_{50}^{h_C}+E_C^{h_C}}C",
+    eqs = ["\\frac{dN}{dt}=r_N N\\left(1-\\frac{N+\\alpha_{NC}C}{K}\\right)-d_N N-\\beta_N\\frac{E_N^{h_N}}{EC_{50,N}^{h_N}+E_N^{h_N}}N",
+           "\\frac{dC}{dt}=r_C C\\left[1-\\left(\\frac{C+\\alpha_{CN}N}{K}\\right)^{\\theta_C}\\right]-\\beta_C\\frac{E_C^{h_C}}{EC_{50,C}^{h_C}+E_C^{h_C}}C",
            "\\frac{dA_{X,1}}{dt}=k_X\\,(u-A_{X,1}),\\quad \\frac{dA_{X,j}}{dt}=k_X\\,(A_{X,j-1}-A_{X,j}),\\ j=2,3,\\quad E_X=A_{X,3}\\qquad (X=N,C)",
            "\\frac{dB}{dt}=s_B\\,u-d_B\\,B,\\qquad \\frac{dT}{dt}=a_H\\left(1-e^{-B}\\right)(1-T)-r_H\\,T(1-T)"]
     # low-resource (Stage 4) equations generated from the fitted model itself, as on the zoo pages (D = u)
@@ -252,7 +252,8 @@ function model_section()
              prow("h_N", Ln.s.h.v, "—", "DATA · Stage 2", "Hill slope, sensitive"), prow("k_N", Ln.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, sensitive"),
              prow("\\beta_C", stage3_betaC().value, "/day", "DATA · $(stage3_betaC().source) (A) / Stage 2 (B)", "max resistant kill: $(fmt(stage3_betaC().value)) in A, $(fmt(zgroup("s2-a2780cis").cands[1].params[1])) in B"),
              prow("h_C", Lc.s.h.v, "—", "DATA · Stage 2", "Hill slope, resistant"), prow("k_C", Lc.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, resistant"),
-             prow("EC_{50}", EC50, "µM", "DATA (fixed)", "set to the measured IC50"),
+             prow("EC_{50,N}", ec50_of(Ln.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780"),
+             prow("EC_{50,C}", ec50_of(Lc.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780cis"),
              prow("s_B", t.s_B, "per µM", "ASSUMPTION", "medium µM → systemic burden"), prow("d_B", t.d_B, "/day", "LITERATURE", "drug decay (de Pillis & Radunskaya 2001)"),
              prow("a_H", t.a_H, "—", "LITERATURE", "fractional kill of normal tissue (de Pillis & Radunskaya 2001)"), prow("r_H", t.r_H, "/day", "LITERATURE", "normal-tissue regrowth (de Pillis & Radunskaya 2001)"),
              prow("B_{tox}", CFG["toxicity"]["B_tox"], "—", "LITERATURE", "normal tissue ≥ 75% (de Pillis & Radunskaya 2001)"),

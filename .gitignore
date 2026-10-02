@@ -14,3 +14,4 @@ Processed_Datasets/
 .julia-depot/
 **/*.jls
 Modeling_Approaches/02_mechanical_automatic_package/outputs/*.log
+Modeling_Approaches/02_mechanical_automatic_package/outputs/logs/

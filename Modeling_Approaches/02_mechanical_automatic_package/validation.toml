@@ -1,0 +1,54 @@
+# Validation run by zoo_analyses.jl: which data are held out and how they are predicted.
+# Groups are fitted groups of the zoo (stages.toml ids: s2-a2780, s3, …); tags are those of
+# data/sources.toml. Each check refits the group's carried model without the held-out data and
+# predicts them.
+
+[forecast]
+# every group: refit on the first fit_fraction of its days, predict the rest
+fit_fraction = 0.7
+
+# leave one block out: one value of a tag at a time (GrowthParameterEstimation.blocked_joint_validation)
+[[leave_out]]
+group = "s2-a2780"
+tag = "schedule"            # one dose at a time
+scheme = "leave one dose out"
+
+[[leave_out]]
+group = "s2-a2780cis"
+tag = "schedule"
+scheme = "leave one dose out"
+
+[[leave_out]]
+group = "s3"
+tag = "ratio"
+scheme = "leave one ratio out"
+
+[[leave_out]]
+group = "s3b"
+tag = "run"
+scheme = "leave one run out"
+
+[[leave_out]]
+group = "s3b"
+tag = "ratio"
+scheme = "leave one ratio out"
+
+# a held-out condition: the group's crowding is refitted on `train` only, with the drug response
+# taken from the monoculture fits (drug_from), and `predict` is predicted with no refit
+[heldout]
+group = "s3"
+train = { condition = "Ce0" }
+predict = { condition = "Ce1" }
+refit = ["K", "α_NC", "α_CN", "d_N"]
+drug_from = "s2"
+# reference without any drug model: the same Ce0-fitted growth and crowding (each line's carried
+# untreated logistic law, shared K), with no drug term (user, 2026-10-01: "normal logistic")
+baseline = "logistic"
+
+# a dose schedule the models never saw: the carried drug stage predicts it with no refit
+[schedule_prediction]
+data = { condition = "intermittent" }
+model_from = "s2"
+schedules = { onoff = "on0_off7", offon = "off0_on7" }
+scale = "free"              # one scale per trajectory (image area normalised to cell size)
+washout_test = true         # test a separate clearance rate of the effect compartment after removal

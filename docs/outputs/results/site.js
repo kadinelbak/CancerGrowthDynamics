@@ -281,7 +281,7 @@ function zooSystem(sim, p) {
     let reff = r, Keff = K, loss = 0, out = 0;
     const a = M.action;
     if (a === 'loss') loss += sv(s.d0) * w + sv(s['β']) * E;
-    else if (a === 'hill') { const h = sv(s.h); loss += E > 0 ? sv(s['β']) * Math.pow(E, h) / (Math.pow(EC50, h) + Math.pow(E, h)) : 0; }
+    else if (a === 'hill') { const h = sv(s.h), ec = s.EC50 ? sv(s.EC50) : EC50; loss += E > 0 ? sv(s['β']) * Math.pow(E, h) / (Math.pow(ec, h) + Math.pow(E, h)) : 0; }
     else if (a === 'damage') { const d = sv(s['δ']), Dm = Math.max(u[o + 1], 0); du[o + 1] = sv(s['β']) * E * V - d * Dm; out = d * Dm; }
     else if (a === 'transit') { const tau = sv(s['τ']), D1 = Math.max(u[o + 1], 0), D2 = Math.max(u[o + 2], 0); du[o + 1] = sv(s['β']) * E * V - tau * D1; du[o + 2] = tau * (D1 - D2); out = tau * D2; }
     else if (a === 'capacity') Keff = K / (1 + sv(s.c) * E);

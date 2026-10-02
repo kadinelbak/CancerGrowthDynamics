@@ -34,16 +34,26 @@ function bs_resample(rng, yhat, e)
     vcat(yhat[1] + e[1], max.(yhat[2:end] .+ out[1:m], 0.0))
 end
 
-function bs_fit(model, datasets, u0, p_start, bounds; maxtime=120.0)
+# Reproducibility: every optimiser call stops on its iteration cap; the wall-clock limit is only a
+# safety net (without it the bounded BFGS can run for a very long time on a few candidates). Measured
+# 2026-10-02 on 20 threads: no primary fit came near it, so the fits are deterministic. A call that
+# reaches 95% of its limit may depend on the machine; it is recorded in LIMIT_HITS and run_zoo_fits.jl
+# writes the list to outputs/zoo_fits/time_limit_hits.csv.
+const LIMIT_HITS = NamedTuple[]
+const LIMIT_LOCK = ReentrantLock()
+function bs_fit(model, datasets, u0, p_start, bounds; maxtime=120.0, tag="")
     p0 = [clamp(p, lo + 1e-4*(hi - lo), hi - 1e-4*(hi - lo)) for (p, (lo, hi)) in zip(p_start, bounds)]
     best = (params=fill(NaN, length(p0)), bic=Inf, sse=Inf)
     for opt in (:bfgs, :nelder_mead)
+        t0 = time()
         try
             r = run_joint_fit(model, datasets, u0, isfinite(best.bic) ? best.params : p0; bounds=bounds, optimizer=opt,
                               maxiters = opt == :bfgs ? 1500 : 2500, maxtime=maxtime, reltol=1e-7, abstol=1e-7)
             isfinite(r.bic) && r.bic < best.bic && (best = (params=r.params, bic=r.bic, sse=r.sse))
         catch
         end
+        dt = time() - t0
+        dt >= 0.95 * maxtime && lock(() -> push!(LIMIT_HITS, (fit=tag, optimizer=opt, seconds=dt, limit=maxtime)), LIMIT_LOCK)
     end
     best
 end
@@ -71,7 +81,7 @@ function bootstrap(g; B, seed=20260927)
             if ks[j] == 0
                 bic[b, j] = predict_candidate(c.name, c.label, c.model, ds, cu0(c, g)).bic
             else
-                f = bs_fit(c.model, ds, cu0(c, g), c.params, c.bounds)
+                f = bs_fit(c.model, ds, cu0(c, g), c.params, c.bounds; tag="$(g.id) $(c.name) bootstrap $b")
                 bic[b, j] = f.bic; pars[j][b, :] = f.params
             end
         end

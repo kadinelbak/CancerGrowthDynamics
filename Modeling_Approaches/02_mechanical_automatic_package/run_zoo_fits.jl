@@ -55,11 +55,11 @@ function fit_zoo(cands, datasets; maxtime=300.0)
         c = cands[i]
         best = (params=fill(NaN, length(c.pnames)), bic=Inf, sse=Inf)
         for p0 in c.p0s
-            f = bs_fit(c.model, datasets, c.u0, p0, c.bounds; maxtime=maxtime)
+            f = bs_fit(c.model, datasets, c.u0, p0, c.bounds; maxtime=maxtime, tag=c.name)
             f.bic < best.bic && (best = f)
         end
         if isfinite(best.bic)
-            f = bs_fit(c.model, datasets, c.u0, best.params, c.bounds; maxtime=maxtime)
+            f = bs_fit(c.model, datasets, c.u0, best.params, c.bounds; maxtime=maxtime, tag=c.name)
             f.bic < best.bic && (best = f)
         end
         se = isfinite(best.bic) ? (try param_se(c.model, datasets, c.u0, best.params) catch; fill(NaN, length(c.pnames)) end) : fill(NaN, length(c.pnames))
@@ -82,7 +82,7 @@ end
 function zoo_line_cands(zoo, X, input, g, envs, X0)
     [begin
         free = Dict(k => i for (i, k) in enumerate(slots))
-        L = line_spec(g.growth, kernel, action, input; fixed=Dict(:r => g.r, :K => g.K, :θ => g.θ), free=free)
+        L = line_spec(g.growth, kernel, action, input; fixed=Dict(:r => g.r, :K => g.K, :θ => g.θ, :EC50 => EC50_OF_SYM[X]), free=free)
         bnds = [SLOT_BOUNDS[k] for k in slots]
         make_cand(name, label, fam, [L], envs, NOALPHA, X0, [slot_name(k, X, input; combo=(:d0 in slots)) for k in slots], bnds,
                   [[SLOT_STARTS[k][j] for k in slots] for j in 1:3]; slots=slots)
@@ -92,32 +92,8 @@ end
 # ── stages from stages.toml, data from the tidy table by tag ──────────────────
 
 using Serialization
-const STAGE_CFG = TOML.parsefile(joinpath(@__DIR__, "stages.toml"))
-const STAGES = STAGE_CFG["stage"]
 STAGE_CFG["selection"]["rule_bic"] == RULE_BIC || error("stages.toml rule_bic differs from RULE_BIC in zoo_models.jl")
-stage_cfg(id) = STAGES[findfirst(s -> s["id"] == id, STAGES)]
 const CATALOGUES = Dict("DRUG_ZOO" => DRUG_ZOO, "LR_ZOO" => LR_ZOO)
-ur_of(fbs) = (10 - fbs) / (10 - 0.05)                      # low-resource level u_R from the serum %, as U_R
-
-# sources matching a stage's tag selector (a list value matches any entry), in sources.toml order
-function stage_sources(st; line=nothing)
-    sel = st["data"]
-    ok(s) = all(k -> (v = sel[k]; w = string(get(s, k, "")); v isa AbstractVector ? w in string.(v) : w == string(v)), collect(keys(sel))) &&
-            (line === nothing || s["line"] == line)
-    [s for s in SOURCES if ok(s)]
-end
-env_inputs(s) = (D=constant_dose(s["schedule"]), R=ur_of(Float64(s["fbs"])))
-# coculture environments: distinct (condition, ratio, run), each with its sensitive and resistant source
-function cc_envs(st)
-    srcs = stage_sources(st)
-    ks = unique([(s["condition"], string(s["ratio"]), s["run"]) for s in srcs])
-    [begin
-         pick(L) = only(s for s in srcs if (s["condition"], string(s["ratio"]), s["run"]) == k && s["line"] == L)
-         sN, sC = pick("A2780"), pick("A2780cis")
-         env_inputs(sN) == env_inputs(sC) || error("environment $k: the two lines have different inputs")
-         (key=k, inputs=env_inputs(sN), N=series(sN["id"]), C=series(sC["id"]))
-     end for k in ks]
-end
 keep(s) = (x=s.x[.!s.bad], y=s.y[.!s.bad])
 
 # DRYRUN=1: build every stage's candidates without fitting; fitted rows are taken from the last
@@ -140,7 +116,7 @@ function growth_rows(st, L)
     rel(k, v) = k == :K ? v * K0 : v
     cands = [begin
                  free = Symbol[Symbol(x) for x in c["free"]]
-                 Lsp = line_spec(Symbol(c["growth"]), :none, :loss, :D; free=Dict(k => i for (i, k) in enumerate(free)))
+                 Lsp = line_spec(Symbol(c["growth"]), :none, :loss, :D; fixed=Dict(:EC50 => L.ec50), free=Dict(k => i for (i, k) in enumerate(free)))
                  make_cand(c["name"], c["label"], "Growth", [Lsp], env, NOALPHA, [[s.y[1]]], ["$(k)_$(L.sym)" for k in free],
                            [(rel(k, b[1]), rel(k, b[2])) for (k, b) in zip(free, c["bounds"])],
                            [[rel(k, v) for (k, v) in zip(free, p)] for p in c["starts"]]; slots=free)
@@ -175,9 +151,9 @@ const CC_PNAME = Dict(:K => "K", :αNC => "α_NC", :αCN => "α_CN", :βN => "β
 
 # Rebuild a line from its fitted mechanism row: mechanism values fixed, growth from Stage 1,
 # K replaced by the coculture K; `refit` names mechanism slots that are fitted again here.
-function cc_line(row, g, Kslot, free::Dict{Symbol,Int}, fixed::Dict{Symbol,Float64})
+function cc_line(row, g, Kslot, free::Dict{Symbol,Int}, fixed::Dict{Symbol,Float64}, ec50)
     L0 = row.sys.lines[1]
-    fx = Dict{Symbol,Float64}(:r => g.r, :θ => g.θ, :K => 0.0)
+    fx = Dict{Symbol,Float64}(:r => g.r, :θ => g.θ, :K => 0.0, :EC50 => ec50)
     for (k, v) in zip(row.slots, row.params)
         fx[k] = v
     end
@@ -197,8 +173,8 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
     fN = lf([(:βN, :β), (:dN, :d), (:εN, :ε)]); fC = lf([(:βC, :β), (:dC, :d), (:εC, :ε)])
     xN = noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}()
     xC = noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}()
-    LN = cc_line(rows[1], growth["A2780"], Kslot, fN, xN)
-    LC = cc_line(rows[2], growth["A2780cis"], Kslot, fC, xC)
+    LN = cc_line(rows[1], growth["A2780"], Kslot, fN, xN, LINES[1].ec50)
+    LC = cc_line(rows[2], growth["A2780cis"], Kslot, fC, xC, LINES[2].ec50)
     alpha = [[Slot(0, 1.0), slot(:αNC, 1.0)], [slot(:αCN, 1.0), Slot(0, 1.0)]]
     inh(k, row) = (i = findfirst(==(:β), row.slots); i === nothing ? 0.5 : row.params[i])
     start = Dict(:K => 1.1datasets_max, :αNC => 1.0, :αCN => 1.0, :βN => inh(:β, rows[1]), :βC => inh(:β, rows[2]),
@@ -379,6 +355,11 @@ for attempt in 1:3
         attempt == 3 ? rethrow() : sleep(2)
     end
 end
+
+# fits that reached their time limit (should be none; any listed may differ on another machine)
+CSV.write(joinpath(ZOO_DIR, "time_limit_hits.csv"),
+          isempty(LIMIT_HITS) ? DataFrame(fit=String[], optimizer=String[], seconds=Float64[], limit=Float64[]) : DataFrame(LIMIT_HITS))
+println("Fits that reached their time limit: $(length(LIMIT_HITS))", isempty(LIMIT_HITS) ? " (the run is reproducible)" : " (see time_limit_hits.csv)")
 
 # checkpoint: zoo_rebuild_pages.jl redraws the report and site from this without refitting
 try

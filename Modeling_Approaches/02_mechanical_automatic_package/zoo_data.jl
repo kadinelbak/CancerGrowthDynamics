@@ -12,7 +12,7 @@
 
 const DATA_TABLE = joinpath(@__DIR__, "data", "measurements.csv")
 isfile(DATA_TABLE) || error("data/measurements.csv is missing: run `julia --project=. data/build_tidy.jl` first")
-const MEAS      = CSV.read(DATA_TABLE, DataFrame; stringtype=String, types=Dict(:ratio => String, :exclude_reason => String))
+const MEAS      = CSV.read(DATA_TABLE, DataFrame; ntasks=1, stringtype=String, types=Dict(:ratio => String, :exclude_reason => String))
 const SOURCES   = TOML.parsefile(joinpath(@__DIR__, "data", "sources.toml"))["source"]
 const SCHEDULES = TOML.parsefile(joinpath(@__DIR__, "data", "schedules.toml"))
 
@@ -31,14 +31,19 @@ end
 
 # a schedule as (breakpoint times, doses); a constant schedule is a single step at t = 0
 schedule_steps(name) = (s = SCHEDULES[name]; (Float64[p[1] for p in s], Float64[p[2] for p in s]))
+# the model input of a schedule: a number if constant, otherwise a Schedule (zoo_models.jl)
+dose_input(name) = ((ts, ds) = schedule_steps(name); length(ds) == 1 ? ds[1] : Schedule(ts, ds))
 function constant_dose(name)
     ts, ds = schedule_steps(name)
     length(ds) == 1 || error("schedule $name is not constant")
     ds[1]
 end
 
-const LINE_SYM = Dict("A2780" => "N", "A2780cis" => "C")
-const LINES = [(line=L, sym=LINE_SYM[L]) for L in ("A2780", "A2780cis")]
+# the two lines, their symbols and measured IC50 (stages.toml [lines])
+const LINE_CFG = TOML.parsefile(joinpath(@__DIR__, "stages.toml"))["lines"]
+const LINES = [(line=L, sym=LINE_CFG[L]["sym"], ec50=Float64(LINE_CFG[L]["ec50"])) for L in ("A2780", "A2780cis")]
+const LINE_SYM = Dict(L.line => L.sym for L in LINES)
+const EC50_OF_SYM = Dict(L.sym => L.ec50 for L in LINES)       # EC50 by line symbol (N, C)
 
 untreated = Dict(L.line => (s = series(only_source(condition="untreated", line=L.line)); (x=s.x, y=s.y)) for L in LINES)
 
@@ -82,6 +87,46 @@ end
 intermittent = Dict(L.line => Dict(source(i)["schedule"] => (s = series(i); (x=s.x, y=s.y, se=s.se, schedule=source(i)["schedule"]))
                                    for i in select_sources(condition="intermittent", line=L.line))
                     for L in LINES)
+
+# ── data of a fitting stage (stages.toml) ──────────────────────────────────────
+
+const STAGE_CFG = TOML.parsefile(joinpath(@__DIR__, "stages.toml"))
+const STAGES = STAGE_CFG["stage"]
+stage_cfg(id) = STAGES[findfirst(s -> s["id"] == id, STAGES)]
+ur_of(fbs) = (10 - fbs) / (10 - 0.05)                      # low-resource level u_R from the serum %, as U_R
+
+# sources matching a stage's tag selector (a list value matches any entry), in sources.toml order
+function stage_sources(st; line=nothing)
+    sel = st["data"]
+    ok(s) = all(k -> (v = sel[k]; w = string(get(s, k, "")); v isa AbstractVector ? w in string.(v) : w == string(v)), collect(keys(sel))) &&
+            (line === nothing || s["line"] == line)
+    [s for s in SOURCES if ok(s)]
+end
+env_inputs(s) = (D=dose_input(s["schedule"]), R=ur_of(Float64(s["fbs"])))
+# coculture environments: distinct (condition, ratio, run), each with its sensitive and resistant source
+function cc_envs(st)
+    srcs = stage_sources(st)
+    ks = unique([(s["condition"], string(s["ratio"]), s["run"]) for s in srcs])
+    [begin
+         pick(L) = only(s for s in srcs if (s["condition"], string(s["ratio"]), s["run"]) == k && s["line"] == L)
+         sN, sC = pick("A2780"), pick("A2780cis")
+         env_inputs(sN) == env_inputs(sC) || error("environment $k: the two lines have different inputs")
+         (key=k, inputs=env_inputs(sN), N=series(sN["id"]), C=series(sC["id"]))
+     end for k in ks]
+end
+
+# the tags of each dataset of a fitted group, in the group's dataset order (one per line per environment)
+function dataset_tags(gid)
+    st = stage_cfg(split(gid, "-")[1])
+    if st["kind"] in ("growth", "mechanism")
+        line = only(L.line for L in LINES if endswith(gid, "-" * lowercase(L.line)))
+        return stage_sources(st; line=line)
+    end
+    st["kind"] == "coculture" || error("dataset_tags: no per-dataset tags for $gid")
+    srcs = stage_sources(st)
+    reduce(vcat, [[only(s for s in srcs if (s["condition"], string(s["ratio"]), s["run"]) == e.key && s["line"] == L) for L in ("A2780", "A2780cis")]
+                  for e in cc_envs(st)])
+end
 
 # SHA-256 of every raw file and of the tidy table, for the run manifest
 function data_checksums()

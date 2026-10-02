@@ -70,7 +70,11 @@ function zoo_inherited(g, c)
         end
     end
     g.kind in (:s1b, :s3b) && push!(rows, (sym="u_R", value=U_R, note="0.5% FBS"))
-    g.kind in (:s2, :s3) && any(L -> L.action == :hill, c.sys.lines) && push!(rows, (sym="EC_{50}", value=EC50, note="fixed, µM"))
+    if g.kind in (:s2, :s3)
+        for (L, X) in zip(c.sys.lines, line_syms(g))
+            L.action == :hill && push!(rows, (sym="EC_{50,$X}", value=ec50_of(L.s, Float64[], Float64), note="measured IC50, µM"))
+        end
+    end
     g.kind == :s3 && push!(rows, (sym="D", value=COCULTURE_DOSE, note="µM in Ce1 (0 in Ce0)"))
     rows
 end
@@ -78,7 +82,7 @@ end
 function zoo_sim(c)
     S = c.sys
     modict(M) = Dict{String,Any}("growth" => string(M.growth), "kernel" => string(M.kernel), "action" => string(M.action),
-                                 "input" => string(M.input), "s" => Dict(string(k) => [getfield(M.s, k).i, getfield(M.s, k).v] for k in SLOT_KEYS))
+                                 "input" => string(M.input), "s" => Dict(string(k) => [getfield(M.s, k).i, getfield(M.s, k).v] for k in SLOT_KEYS if hasproperty(M.s, k)))
     lines = [begin
                  d = modict(L)
                  hasproperty(L, :extra) && (d["extra"] = [modict(M) for M in L.extra])     # extra mechanism modules (Stage 4)
@@ -187,7 +191,8 @@ function s4_inherited(c)
     for (a, nm) in ((c.sys.alpha[1][2], "\\alpha_{NC}"), (c.sys.alpha[2][1], "\\alpha_{CN}"))
         a.i == 0 && push!(rows, (sym=nm, value=a.v, note=a.v == 1 ? "one-for-one" : c.crowd == :S3 ? "Stage 3" : "Stage 3b"))
     end
-    push!(rows, (sym="u_R", value=U_R, note="0.5% FBS"), (sym="D", value=COMBO_DOSE, note="µM cisplatin"), (sym="EC_{50}", value=EC50, note="fixed, µM"))
+    push!(rows, (sym="u_R", value=U_R, note="0.5% FBS"), (sym="D", value=COMBO_DOSE, note="µM cisplatin"),
+          [(sym="EC_{50,$X}", value=ec50_of(L.s, Float64[], Float64), note="measured IC50, µM") for (L, X) in zip(c.sys.lines, ("N", "C"))]...)
     rows
 end
 
@@ -207,7 +212,7 @@ function zoo_builder(g)
         "kernels" => kern, "actions" => [Dict("id" => string(a), "label" => alab[a], "slots" => string.(aslots(a))) for a in acts],
         "slots" => Dict(string(k) => Dict("name" => slot_name(k, X, L.input), "tex" => ptex(slot_name(k, X, L.input)),
                                           "lo" => SLOT_BOUNDS[k][1], "hi" => SLOT_BOUNDS[k][2], "start" => SLOT_STARTS[k][1]) for k in slots),
-        "uR" => U_R, "EC50" => EC50)
+        "uR" => U_R, "EC50" => ec50_of(L.s, Float64[], Float64))      # this line's EC50 (the builder makes one line)
 end
 
 function selection_note(g)

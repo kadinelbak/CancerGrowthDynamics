@@ -15,6 +15,14 @@
 # joint_rule   paired-line rule for per-line stages (zoo_selection.jl): "shared" = one structure for both
 #              lines chosen on the joint BIC; "ab" = a shared structure is tested and kept only if it wins.
 
+[lines.A2780]
+sym = "N"
+ec50 = 1.0              # µM, measured cisplatin IC50 of A2780 (the Hill kill's EC50)
+
+[lines.A2780cis]
+sym = "C"
+ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-10-02; was 1 µM for both lines before)
+
 [selection]
 rule_bic = 3.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC)
 

@@ -1,7 +1,8 @@
 # Autonomous model zoo: no model uses time t directly.
 #
 # Every right-hand side depends only on the state and on two inputs: the cisplatin dose D (µM)
-# and the low-resource level w_R (u_R = 0.955 at 0.5% FBS, 0 at 10% FBS). Delay and
+# and the low-resource level w_R (u_R = 0.955 at 0.5% FBS, 0 at 10% FBS). Each input of an
+# environment is a constant or a piecewise-constant Schedule D(t) (data/schedules.toml). Delay and
 # accumulation live in extra states driven by those inputs, so the same equations can be driven
 # by any dose schedule D(t) — what optimal control needs. For a constant input switched on at
 # t = 0 some of these reproduce the archived time-based forms exactly (an effect compartment
@@ -20,7 +21,7 @@
 #   :auc     dA/dt = w,                    E = A           cumulative exposure, never cleared
 # action   what the effect does to the cells
 #   :loss      death (d0·w + β·E) per viable cell
-#   :hill      death β E^h/(EC50^h + E^h)
+#   :hill      death β E^h/(EC50^h + E^h), EC50 per line (the measured IC50, stages.toml [lines])
 #   :damage    viable → damaged at β·E; damaged cells die at δ (still counted, do not divide)
 #   :transit   as :damage, but damaged cells pass two compartments at rate τ before dying
 #   :capacity  K_eff = K/(1 + c·E)
@@ -30,15 +31,30 @@
 #   :resource  R consumed at c·E·R·X/1000 (R(0) = 1); growth × R, death β(1 − R)
 #   :toxin     W made at E·X/1000, cleared at κ; death γ·W
 
-const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d)
+const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d, :EC50)
+# EC50 has no default: every line sets its own (a Hill line without one is an error, see build_system)
 const SLOT_DEFAULT = (r=NaN, K=NaN, θ=1.0, k=1.0, ω=1.0, ζ=1.0, β=0.0, h=1.0, δ=1.0, d0=0.0, c=0.0, ρr=1.0, ρK=1.0,
-                      rLR=NaN, γ=0.0, κ=0.0, τ=1.0, ε=1.0, d=0.0)
+                      rLR=NaN, γ=0.0, κ=0.0, τ=1.0, ε=1.0, d=0.0, EC50=NaN)
 
 struct Slot
     i::Int        # index into the parameter vector, 0 = fixed
     v::Float64    # fixed value
 end
 @inline sv(s::Slot, p, ::Type{T}) where {T} = s.i > 0 ? T(p[s.i]) : T(s.v)
+# EC50 of a module; lines saved before EC50 became a per-line slot (2026-10-02) used EC50 = 1 µM
+@inline ec50_of(s, p, ::Type{T}) where {T} = hasproperty(s, :EC50) ? sv(s.EC50, p, T) : T(EC50)
+
+# A piecewise-constant input: value v[i] from t[i] until t[i+1] (t[1] = 0). Constant inputs stay numbers.
+struct Schedule
+    t::Vector{Float64}
+    v::Vector{Float64}
+end
+@inline input_at(x::Real, t) = x
+@inline input_at(s::Schedule, t) = s.v[max(searchsortedlast(s.t, t), 1)]
+breakpoints(x::Real) = Float64[]
+breakpoints(s::Schedule) = s.t[2:end]
+# times where an input of the system jumps (tstops for the ODE solver)
+sys_breakpoints(sys) = sort(unique(reduce(vcat, [vcat(breakpoints(e.D), breakpoints(e.R)) for e in sys.envs]; init=Float64[])))
 
 ncell(a::Symbol) = a == :damage ? 1 : a == :transit ? 2 : 0
 chainlen(k::Symbol) = k == :chain2 ? 2 : k == :chain3 ? 3 : k == :chain8 ? 8 : 0
@@ -66,6 +82,10 @@ end
 # observes the same state indices; each line's hidden states follow in a block of their own:
 #   xi[e][j] + 1 = observed count, hb[e][j] + 1 … = hidden states [damaged…, effect…, auxiliary…]
 function build_system(lines, envs, alpha)
+    for L in lines, M in modules(L)
+        M.action == :hill && hasproperty(M.s, :EC50) && M.s.EC50.i == 0 && isnan(M.s.EC50.v) &&
+            error("a Hill kill line has no EC50: set it from stages.toml [lines]")
+    end
     xi = Vector{Vector{Int}}(); hb = Vector{Vector{Int}}()
     nobs = sum(length(e.lines) for e in envs); o = 0; h = nobs
     for e in envs
@@ -145,7 +165,8 @@ function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}) where {T}
         loss += sv(s.d0, p, T)*w + sv(s.β, p, T)*E
     elseif a == :hill
         h = sv(s.h, p, T)
-        loss += E > 0 ? sv(s.β, p, T) * E^h / (T(EC50)^h + E^h) : z
+        ec = ec50_of(s, p, T)
+        loss += E > 0 ? sv(s.β, p, T) * E^h / (ec^h + E^h) : z
     elseif a == :damage
         δ = sv(s.δ, p, T); Dm = max(u[o+1], z)
         du[o+1] = sv(s.β, p, T)*E*V - δ*Dm; out = δ*Dm
@@ -216,7 +237,8 @@ end
 function make_system_model(sys)
     function f!(du, u, p, t)
         T = promote_type(eltype(u), eltype(p))
-        for (e, env) in enumerate(sys.envs)
+        for (e, envs) in enumerate(sys.envs)
+            env = (D=input_at(envs.D, t), R=input_at(envs.R, t), lines=envs.lines)      # inputs at time t
             for (j, l) in enumerate(env.lines)
                 xi = sys.xi[e][j]; L = sys.lines[l]
                 crowd = max(u[xi+1], zero(T))
@@ -297,7 +319,7 @@ function module_tex(M, X, V)
     if a == :loss
         push!(losses, M.s.d0.i > 0 || M.s.d0.v != 0 ? "-\\left($(nm(:d0))$w+$(nm(:β))$E\\right)$V" : "-$(nm(:β))\\,$E\\,$V")
     elseif a == :hill
-        push!(losses, "-$(nm(:β))\\frac{$E^{$(nm(:h))}}{EC_{50}^{$(nm(:h))}+$E^{$(nm(:h))}}\\,$V")
+        push!(losses, "-$(nm(:β))\\frac{$E^{$(nm(:h))}}{EC_{50,$X}^{$(nm(:h))}+$E^{$(nm(:h))}}\\,$V")
     elseif a == :damage
         push!(losses, "-$(nm(:δ))\\,$(X)_D")
         push!(lines, "\\frac{d$(X)_D}{dt}=$(nm(:β))\\,$E\\,$V-$(nm(:δ))\\,$(X)_D,\\quad $V=$X-$(X)_D")

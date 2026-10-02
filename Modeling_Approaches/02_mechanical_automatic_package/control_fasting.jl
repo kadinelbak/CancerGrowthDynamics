@@ -29,7 +29,7 @@ default_host() = (k_W=Float64(HCFG["k_W"]), r_W=Float64(HCFG["r_W"]), k_P=Float6
 # are supported; anything else stops with an error rather than silently differing.
 struct ModSpec
     input_D::Bool; kernel_chain::Int; k::Float64; o::Int     # chain length (0 = immediate), rate, first hidden index − 1
-    action::Symbol; β::Float64; h::Float64; c::Float64; d0::Float64
+    action::Symbol; β::Float64; h::Float64; c::Float64; d0::Float64; ec50::Float64
     ε::Float64; εj::Int                                       # fixed strength, or index into FPlant.ε (0 = fixed)
 end
 struct LineSpec
@@ -50,7 +50,8 @@ function line_specs(base::Plant, iε)
             nk = nker(M.kernel); gs(k) = hasproperty(M.s, k) ? sv(getfield(M.s, k), p, Float64) : 0.0
             εs = M.s.ε; εj = εs.i > 0 ? findfirst(==(εs.i), iε) : 0
             εs.i > 0 && εj === nothing && error("unexpected free slot")
-            push!(mods, ModSpec(M.input == :D, nk, nk > 0 ? gs(:k) : 0.0, off, M.action, gs(:β), gs(:h), gs(:c), gs(:d0), εs.i > 0 ? NaN : εs.v, εj))
+            push!(mods, ModSpec(M.input == :D, nk, nk > 0 ? gs(:k) : 0.0, off, M.action, gs(:β), gs(:h), gs(:c), gs(:d0), ec50_of(M.s, p, Float64),
+                                εs.i > 0 ? NaN : εs.v, εj))
             off += mwidth(M)
         end
         m = 3 - j
@@ -143,7 +144,7 @@ function fast_rhs!(du, x, w, FP::FPlant)
                 E = max(x[o+3], z)
             end
             if M.action == :hill
-                loss += E > 0 ? M.β * E^M.h / (T(EC50)^M.h + E^M.h) : z
+                loss += E > 0 ? M.β * E^M.h / (T(M.ec50)^M.h + E^M.h) : z
             elseif M.action == :capacity
                 Keff /= 1 + M.c * E
             else                                     # :loss
