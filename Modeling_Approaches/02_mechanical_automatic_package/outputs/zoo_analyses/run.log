@@ -1,0 +1,44 @@
+=== zoo analyses: 12 threads; checkpoint has Symbol[] ===
+
+--- package bootstrap_joint_fit (within-trajectory residuals), optimal model of every group ---
+  s1b-a2780    package bootstrap done in 6s
+  s1-a2780     package bootstrap done in 8s
+  s3b          package bootstrap done in 8s
+  s1b-a2780cis package bootstrap done in 10s
+  s2-a2780     package bootstrap done in 12s
+  s2-a2780cis  package bootstrap done in 15s
+  s1-a2780cis  package bootstrap done in 21s
+  s3           package bootstrap done in 38s
+
+--- profile likelihood: 189 refits ---
+    20 / 189 profile points
+    40 / 189 profile points
+    60 / 189 profile points
+    80 / 189 profile points
+    100 / 189 profile points
+    120 / 189 profile points
+    140 / 189 profile points
+    160 / 189 profile points
+    180 / 189 profile points
+
+--- validation ---
+    validation task 3 done
+    validation task 4 done
+    validation task 8 done
+    validation task 5 done
+    validation task 1 done
+    validation task 6 done
+    validation task 12 done
+    validation task 13 done
+    validation task 9 done
+    validation task 2 done
+    validation task 7 done
+    validation task 10 done
+    validation task 11 done
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+Wrote C:\Research\CancerGrowthDynamics\docs\Modeling_Approaches\02_mechanical_automatic_package\outputs\zoo_analyses\bootstrap\report.html
+Wrote C:\Research\CancerGrowthDynamics\docs\Modeling_Approaches\02_mechanical_automatic_package\outputs\zoo_analyses\sensitivity\report.html
+Wrote C:\Research\CancerGrowthDynamics\docs\Modeling_Approaches\02_mechanical_automatic_package\outputs\zoo_analyses\validation\report.html
+
+Done.
+EXIT 0

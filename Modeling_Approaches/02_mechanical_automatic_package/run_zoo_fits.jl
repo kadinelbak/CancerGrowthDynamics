@@ -1,0 +1,366 @@
+# Staged fits with the autonomous model zoo (zoo_models.jl): no model uses time t directly,
+# so every fitted model can be driven by a dose schedule D(t) for optimal control.
+#
+#   Stage 1   untreated monocultures          logistic / theta-logistic / Gompertz
+#   Stage 1b  low-resource monocultures       Stage 1 growth + 16 low-resource mechanisms
+#   Stage 2   treated monocultures (3 doses)  Stage 1 growth + 11 cisplatin mechanisms
+#   Stage 3   Ce0 + Ce1 cocultures, shared K  Stage 1 growth + each line's Stage 2 mechanism
+#             (the resistant line keeps a cisplatin kill: inherited from Stage 2, or refitted no lower
+#             than BETA_C_FLOOR × its Stage 2 value; user decision 2026-10-01)
+#   Stage 3b  low-resource cocultures         Stage 1 growth + each line's Stage 1b mechanism
+#
+# At every stage the optimal model is the candidate with the fewest free parameters within 3 BIC of the
+# lowest BIC (lower BIC breaks ties); it is carried into later stages. At most 3 compartments per line.
+# Every candidate is then refitted to B residual block-bootstrap replicates (bootstrap_tools.jl)
+# for 95% parameter intervals, prediction bands and how often the optimal model stays lowest.
+# Writes outputs/zoo_fits/ (CSVs + report, copied into docs/) and docs/outputs/results/bundle.js.
+#
+# Run:  julia -t auto run_zoo_fits.jl        (BOOT_B = replicates, default 200)
+#   ZOO_RESUME=1      reuse the Stage 1 / 1b / 2 fits from zoo_mono_stages.jls
+#   ZOO_REUSE_BOOT=1  reuse the bootstrap of every group whose candidates and fits are unchanged
+#                     since the last zoo_state.jls (same names, BICs and parameters)
+
+include(joinpath(@__DIR__, "zoo_common.jl"))
+include(joinpath(@__DIR__, "zoo_models.jl"))
+include(joinpath(@__DIR__, "bootstrap_tools.jl"))
+
+const BOOT_B   = parse(Int, get(ENV, "BOOT_B", "200"))
+const ZOO_DIR  = joinpath(@__DIR__, "outputs", "zoo_fits")
+const ZOO_DOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "zoo_fits")
+const BLUE, ORANGE, GREEN, PURPLE = "#0b6e99", "#d95f02", "#3b8b4f", "#8b5cf6"
+mkpath(ZOO_DIR)
+println("=== Autonomous model zoo: $(Threads.nthreads()) threads, B = $BOOT_B ==="); flush(stdout)
+
+include(joinpath(@__DIR__, "zoo_selection.jl"))
+
+# ── candidate construction ─────────────────────────────────────────────────────
+
+mono_env(D, R) = (D=D, R=R, lines=[1])
+const NOALPHA = [[Slot(0, 1.0)]]
+inner(bounds, v) = [clamp(x, lo + 1e-3*(hi - lo), hi - 1e-3*(hi - lo)) for (x, (lo, hi)) in zip(v, bounds)]
+
+function make_cand(name, label, family, lines, envs, alpha, X0, pnames, bounds, p0s; extra...)
+    sys = build_system(lines, envs, alpha)
+    (name=name, label=label, family=family, sys=sys, model=make_system_model(sys), u0=sys_u0(sys, X0),
+     pnames=pnames, bounds=bounds, p0s=[inner(bounds, p) for p in p0s], extra...)
+end
+
+function fit_zoo(cands, datasets; maxtime=300.0)
+    rows = Vector{Any}(undef, length(cands))
+    Threads.@threads :dynamic for i in eachindex(cands)
+        c = cands[i]
+        best = (params=fill(NaN, length(c.pnames)), bic=Inf, sse=Inf)
+        for p0 in c.p0s
+            f = bs_fit(c.model, datasets, c.u0, p0, c.bounds; maxtime=maxtime)
+            f.bic < best.bic && (best = f)
+        end
+        if isfinite(best.bic)
+            f = bs_fit(c.model, datasets, c.u0, best.params, c.bounds; maxtime=maxtime)
+            f.bic < best.bic && (best = f)
+        end
+        se = isfinite(best.bic) ? (try param_se(c.model, datasets, c.u0, best.params) catch; fill(NaN, length(c.pnames)) end) : fill(NaN, length(c.pnames))
+        rows[i] = merge(c, (params=best.params, bic=best.bic, sse=best.sse, se=se))
+    end
+    failed = [r.name for r in rows if !isfinite(r.bic)]
+    isempty(failed) || @warn "no fit" failed
+    sort!([r for r in rows if isfinite(r.bic)]; by=r -> r.bic)
+end
+
+function show_rows(tag, rows)
+    for r in rows
+        @printf("  %-9s %-20s k=%d BIC=%8.2f  %s\n", tag, r.name, length(r.params), r.bic,
+                join(["$n = $(fmt(v))" for (n, v) in zip(r.pnames, r.params)], ", "))
+    end
+    flush(stdout)
+end
+
+# a single-line mechanism from a catalogue entry, on top of the carried-forward growth law
+function zoo_line_cands(zoo, X, input, g, envs, X0)
+    [begin
+        free = Dict(k => i for (i, k) in enumerate(slots))
+        L = line_spec(g.growth, kernel, action, input; fixed=Dict(:r => g.r, :K => g.K, :θ => g.θ), free=free)
+        bnds = [SLOT_BOUNDS[k] for k in slots]
+        make_cand(name, label, fam, [L], envs, NOALPHA, X0, [slot_name(k, X, input; combo=(:d0 in slots)) for k in slots], bnds,
+                  [[SLOT_STARTS[k][j] for k in slots] for j in 1:3]; slots=slots)
+     end for (name, label, fam, kernel, action, slots) in zoo]
+end
+
+# ── Stage 1: untreated monocultures ────────────────────────────────────────────
+
+using Serialization
+const MONO_CKPT = joinpath(ZOO_DIR, "zoo_mono_stages.jls")
+if get(ENV, "ZOO_RESUME", "0") == "1" && isfile(MONO_CKPT)
+    # reuse the monoculture fits of an interrupted run (same catalogue); only the cocultures and bootstrap rerun
+    stage1, stage1b, stage2 = deserialize(MONO_CKPT)
+    println("Resumed Stages 1, 1b and 2 from ", MONO_CKPT)
+else
+    println("\n=== Stage 1: untreated monocultures ===")
+    stage1 = Dict{String,Any}()
+    for Lm in LINES
+        d = untreated[Lm.line]; X = Lm.sym; K0 = maximum(d.y); kb = (0.5K0, 20K0)
+        ds = [(x=d.x, y=d.y, state_index=1)]; env = [mono_env(0.0, 0.0)]
+        grow(g, n) = line_spec(g, :none, :loss, :D; free=Dict(:r => 1, :K => 2, (n == 3 ? (:θ => 3,) : ())...))
+        cands = [
+            make_cand("logistic", "Logistic", "Growth", [grow(:logistic, 2)], env, NOALPHA, [[d.y[1]]], ["r_$X", "K_$X"],
+                      [(1e-4, 5.0), kb], [[0.6, 1.05K0], [0.3, 1.3K0], [1.0, K0]]; slots=[:r, :K]),
+            make_cand("theta_logistic", "Theta logistic", "Growth", [grow(:theta, 3)], env, NOALPHA, [[d.y[1]]], ["r_$X", "K_$X", "θ_$X"],
+                      [(1e-4, 10.0), kb, (0.05, 10.0)], [[0.6, 1.05K0, 1.0], [0.4, 1.1K0, 3.0], [1.0, K0, 0.5]]; slots=[:r, :K, :θ]),
+            make_cand("gompertz", "Gompertz", "Growth", [grow(:gompertz, 2)], env, NOALPHA, [[d.y[1]]], ["r_$X", "K_$X"],
+                      [(1e-4, 5.0), kb], [[0.3, 1.05K0], [0.15, 1.3K0], [0.6, K0]]; slots=[:r, :K]),
+        ]
+        rows = order_rule(fit_zoo(cands, ds))
+        b = rows[1]; v = Dict(zip(b.slots, b.params))
+        stage1[Lm.line] = (rows=rows, ds=ds, growth=b.sys.lines[1].growth, r=v[:r], K=v[:K], θ=get(v, :θ, 1.0), X=X)
+        show_rows(Lm.line, rows)
+    end
+
+    # ── Stage 1b: low-resource monocultures ───────────────────────────────────────
+
+    println("\n=== Stage 1b: low-resource monocultures ===")
+    stage1b = Dict{String,Any}()
+    for Lm in LINES
+        m = lrmono[Lm.line]; g = stage1[Lm.line]
+        ds = [(x=m.x[.!m.bad], y=m.y[.!m.bad], state_index=1)]
+        rows = order_rule(fit_zoo(zoo_line_cands(LR_ZOO, Lm.sym, :R, g, [mono_env(0.0, U_R)], [[m.y[1]]]), ds))
+        rows = [begin
+                    sol = solve(ODEProblem(r.model, r.u0, (0.0, 200.0), r.params), Tsit5(); reltol=1e-8, abstol=1e-8)
+                    merge(r, (x30=sol(30.0)[1], x200=sol(200.0)[1], extinct=sol(200.0)[1] < 1.0))
+                end for r in rows]
+        stage1b[Lm.line] = (rows=rows, ds=ds, best=rows[1])
+        show_rows(Lm.line, rows)
+    end
+
+    # ── Stage 2: treated monocultures, three doses jointly ────────────────────────
+
+    println("\n=== Stage 2: treated monocultures ===")
+    stage2 = Dict{String,Any}()
+    for Lm in LINES
+        t = treated[Lm.line]; g = stage1[Lm.line]
+        envs = [mono_env(dose, 0.0) for dose in t.doses]
+        ds = [(x=x, y=y, state_index=0) for (x, y) in t.data]
+        cands = zoo_line_cands(DRUG_ZOO, Lm.sym, :D, g, envs, [[y[1]] for (_, y) in t.data])
+        obs = sys_obs(cands[1].sys)
+        ds = [(x=d.x, y=d.y, state_index=obs[i]) for (i, d) in enumerate(ds)]
+        rows = order_rule(fit_zoo(cands, ds))
+        stage2[Lm.line] = (rows=rows, ds=ds, best=rows[1])
+        show_rows(Lm.line, rows)
+    end
+    serialize(MONO_CKPT, (stage1, stage1b, stage2))
+end
+
+# paired-line rules (zoo_selection.jl): one shared cisplatin structure; a tested shared low-resource structure
+sel2 = select_shared(stage2["A2780"].rows, stage2["A2780cis"].rows)
+sel1b = select_ab(stage1b["A2780"].rows, stage1b["A2780cis"].rows)
+for (L, n2, n1b) in zip(("A2780", "A2780cis"), (sel2.name, sel2.name), sel1b.names)
+    r2 = order_by_name(stage2[L].rows, n2); stage2[L] = merge(stage2[L], (rows=r2, best=r2[1]))
+    r1 = order_by_name(stage1b[L].rows, n1b); stage1b[L] = merge(stage1b[L], (rows=r1, best=r1[1]))
+end
+JOINT_INFO = Dict("s2" => sel2.info, "s1b" => sel1b.info)
+@printf("Stage 2 shared structure: %s (joint BIC %.2f, k=%d)\n", sel2.name, sel2.info.pick.bic, sel2.info.pick.k)
+@printf("Stage 1b: %s (A per line %.2f, k=%d; B shared %s %.2f, k=%d; ΔBIC %+.2f)\n", sel1b.info.useB ? "shared (B)" : "per line (A)",
+        sel1b.info.A.bic, sel1b.info.A.k, sel1b.info.B.name, sel1b.info.B.bic, sel1b.info.B.k, sel1b.info.dbic)
+
+# ── cocultures: two lines per environment, one shared K ───────────────────────
+
+# Cisplatin kills A2780cis in monoculture (Stage 2), so a coculture model may weaken that kill but not
+# switch it off: a refitted β_C is bounded below by BETA_C_FLOOR × its Stage 2 value (user, 2026-10-01).
+const BETA_C_FLOOR = 0.5
+const CC_BOUNDS = Dict(:αNC => (0.0, 5.0), :αCN => (0.0, 5.0), :βN => (0.0, 10.0), :βC => (0.0, 10.0),
+                       :dN => (0.0, 3.0), :dC => (0.0, 3.0), :εN => (0.0, 5.0), :εC => (0.0, 5.0))
+const CC_PNAME = Dict(:K => "K", :αNC => "α_NC", :αCN => "α_CN", :βN => "β_N", :βC => "β_C",
+                      :dN => "d_N", :dC => "d_C", :εN => "ε_N", :εC => "ε_C")
+
+# Rebuild a line from its fitted mechanism row: mechanism values fixed, growth from Stage 1,
+# K replaced by the coculture K; `refit` names mechanism slots that are fitted again here.
+function cc_line(row, g, Kslot, free::Dict{Symbol,Int}, fixed::Dict{Symbol,Float64})
+    L0 = row.sys.lines[1]
+    fx = Dict{Symbol,Float64}(:r => g.r, :θ => g.θ, :K => 0.0)
+    for (k, v) in zip(row.slots, row.params)
+        fx[k] = v
+    end
+    merge!(fx, fixed)
+    L = line_spec(L0.growth, L0.kernel, L0.action, L0.input; fixed=fx, free=free)
+    merge(L, (s=merge(L.s, (K=Kslot,)),))
+end
+
+# fixed: values used for K / α when not fitted; noLR: switch the low-resource input off
+function make_cc(name, label, free, rows, envs, X0, datasets_max; fixed=Dict{Symbol,Float64}(), noinput=false, family="Coculture")
+    idx = Dict(k => i for (i, k) in enumerate(free))
+    slot(k, v) = haskey(idx, k) ? Slot(idx[k], 0.0) : Slot(0, get(fixed, k, v))
+    Kslot = slot(:K, NaN)
+    lf(ks) = Dict(s => idx[k] for (k, s) in ks if haskey(idx, k))
+    fN = lf([(:βN, :β), (:dN, :d), (:εN, :ε)]); fC = lf([(:βC, :β), (:dC, :d), (:εC, :ε)])
+    xN = noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}()
+    xC = noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}()
+    LN = cc_line(rows[1], stage1["A2780"], Kslot, fN, xN)
+    LC = cc_line(rows[2], stage1["A2780cis"], Kslot, fC, xC)
+    alpha = [[Slot(0, 1.0), slot(:αNC, 1.0)], [slot(:αCN, 1.0), Slot(0, 1.0)]]
+    inh(k, row) = (i = findfirst(==(:β), row.slots); i === nothing ? 0.5 : row.params[i])
+    start = Dict(:K => 1.1datasets_max, :αNC => 1.0, :αCN => 1.0, :βN => inh(:β, rows[1]), :βC => inh(:β, rows[2]),
+                 :dN => 0.05, :dC => 0.05, :εN => 1.0, :εC => 1.0)
+    alt = Dict(:K => 1.6datasets_max, :αNC => 0.5, :αCN => 1.5, :βN => 0.5start[:βN], :βC => 0.75start[:βC],
+               :dN => 0.2, :dC => 0.01, :εN => 0.5, :εC => 2.0)
+    alt2 = Dict(:K => 0.8datasets_max, :αNC => 1.5, :αCN => 0.5, :βN => 2start[:βN] + 0.05, :βC => 2start[:βC] + 0.05,
+                :dN => 0.01, :dC => 0.2, :εN => 2.0, :εC => 0.5)
+    bounds = [k == :K ? (0.5datasets_max, 20datasets_max) : k == :βC ? (BETA_C_FLOOR * start[:βC], CC_BOUNDS[:βC][2]) : CC_BOUNDS[k] for k in free]
+    make_cand(name, label, family, [LN, LC], envs, alpha, X0, [CC_PNAME[k] for k in free], bounds,
+              [[s[k] for k in free] for s in (start, alt, alt2)]; slots=free, fixedcc=fixed, noinput=noinput, mech=rows)
+end
+ccval(r, k, default) = (i = findfirst(==(k), r.slots); i === nothing ? get(r.fixedcc, k, default) : r.params[i])
+
+# ── Stage 3: Ce0 + Ce1 cocultures jointly, shared K ────────────────────────────
+
+println("\n=== Stage 3: Ce0 + Ce1 cocultures (shared K) ===")
+envs3 = [(D=e.dose, R=0.0, lines=[1, 2]) for e in COCULTURE_LAYOUT]
+X0_3 = [[d.S[2][1], d.R[2][1]] for d in co_data]
+mech3 = [stage2["A2780"].best, stage2["A2780cis"].best]
+max3 = maximum(maximum(vcat(d.S[2], d.R[2])) for d in co_data)
+S3_SPECS = [
+    ("cc_K",                    "Shared K, one-for-one crowding, drug mechanisms from Stage 2",         [:K]),
+    ("cc_K_alpha",              "Shared K + asymmetric crowding, drug mechanisms from Stage 2",         [:K, :αNC, :αCN]),
+    ("cc_K_alpha_betaN",        "Shared K + crowding, sensitive kill strength refitted",                [:K, :αNC, :αCN, :βN]),
+    ("cc_K_alpha_beta",         "Shared K + crowding, both kill strengths refitted (resistant ≥ 50% of Stage 2)", [:K, :αNC, :αCN, :βN, :βC]),
+    ("cc_K_alpha_death",        "Shared K + crowding + coculture death",                                [:K, :αNC, :αCN, :dN, :dC]),
+    ("cc_K_alpha_deathN_betaN", "Shared K + crowding + sensitive death, sensitive kill refitted",       [:K, :αNC, :αCN, :dN, :βN]),
+    ("cc_K_alpha_deathN_beta",  "Shared K + crowding + sensitive death, both kill strengths refitted (resistant ≥ 50% of Stage 2)", [:K, :αNC, :αCN, :dN, :βN, :βC]),
+    ("cc_full",                 "Shared K + crowding + death, both kill strengths refitted (resistant ≥ 50% of Stage 2)", [:K, :αNC, :αCN, :dN, :dC, :βN, :βC]),
+]
+cands3 = [make_cc(n, l, f, mech3, envs3, X0_3, max3) for (n, l, f) in S3_SPECS]
+obs3 = sys_obs(cands3[1].sys)
+ds3 = reduce(vcat, [[(x=d.S[1], y=d.S[2], state_index=obs3[2i-1]), (x=d.R[1], y=d.R[2], state_index=obs3[2i])] for (i, d) in enumerate(co_data)])
+rows3 = order_rule(fit_zoo(cands3, ds3))
+show_rows("coculture", rows3)
+b3 = rows3[1]
+K3, aNC3, aCN3 = ccval(b3, :K, NaN), ccval(b3, :αNC, 1.0), ccval(b3, :αCN, 1.0)
+
+# ── Stage 3b: low-resource cocultures, shared K ───────────────────────────────
+
+println("\n=== Stage 3b: low-resource cocultures (shared K) ===")
+envs3b = [(D=0.0, R=U_R, lines=[1, 2]) for _ in lr_cc]
+X0_3b = [[c.yN[1], c.yC[1]] for c in lr_cc]
+mech3b = [stage1b["A2780"].best, stage1b["A2780cis"].best]
+max3b = maximum(maximum(vcat(c.yN, c.yC)) for c in lr_cc)
+S3B_SPECS = [
+    ("lrcc_K",              "Shared K, one-for-one crowding, low-resource mechanisms from Stage 1b",  [:K], Dict{Symbol,Float64}(), false),
+    ("lrcc_K_alpha",        "Shared K + asymmetric crowding, low-resource mechanisms from Stage 1b",  [:K, :αNC, :αCN], Dict{Symbol,Float64}(), false),
+    ("lrcc_K_alphaCN",      "Shared K, resistant crowded by sensitive only (α_NC = 0)",               [:K, :αCN], Dict(:αNC => 0.0), false),
+    ("lrcc_K_alpha_eps",    "Shared K + crowding, low-resource strength refitted per line",           [:K, :αNC, :αCN, :εN, :εC], Dict{Symbol,Float64}(), false),
+    ("lrcc_eps",            "K and α from Stage 3, low-resource strength refitted per line",          [:εN, :εC], Dict(:K => K3, :αNC => aNC3, :αCN => aCN3), false),
+    ("lrcc_K_alpha_noLR",   "Shared K + asymmetric crowding, no low-resource effect",                 [:K, :αNC, :αCN], Dict{Symbol,Float64}(), true),
+    ("lrcc_K_alphaCN_noLR", "Shared K, α_NC = 0, no low-resource effect",                             [:K, :αCN], Dict(:αNC => 0.0), true),
+]
+cands3b = [make_cc(n, l, f, mech3b, envs3b, X0_3b, max3b; fixed=fx, noinput=no) for (n, l, f, fx, no) in S3B_SPECS]
+obs3b = sys_obs(cands3b[1].sys)
+ds3b = reduce(vcat, [[(x=c.xN[.!c.bN], y=c.yN[.!c.bN], state_index=obs3b[2i-1]), (x=c.xC[.!c.bC], y=c.yC[.!c.bC], state_index=obs3b[2i])]
+                     for (i, c) in enumerate(lr_cc)])
+rows3b = order_rule(fit_zoo(cands3b, ds3b))
+show_rows("LR cocult", rows3b)
+
+# ── bootstrap ─────────────────────────────────────────────────────────────────
+
+groups = NamedTuple[]
+for Lm in LINES
+    push!(groups, (id="s1-$(lowercase(Lm.line))", stage="1 Untreated monoculture", title="Stage 1 · $(Lm.line) untreated",
+                   datasets=stage1[Lm.line].ds, u0=stage1[Lm.line].rows[1].u0, cands=stage1[Lm.line].rows, line=Lm.line, kind=:s1))
+end
+for Lm in LINES
+    push!(groups, (id="s1b-$(lowercase(Lm.line))", stage="1b Low-resource monoculture", title="Stage 1b · $(Lm.line) low resource",
+                   datasets=stage1b[Lm.line].ds, u0=stage1b[Lm.line].rows[1].u0, cands=stage1b[Lm.line].rows, line=Lm.line, kind=:s1b))
+end
+for Lm in LINES
+    push!(groups, (id="s2-$(lowercase(Lm.line))", stage="2 Treated monoculture", title="Stage 2 · $(Lm.line) treated (3 doses jointly)",
+                   datasets=stage2[Lm.line].ds, u0=stage2[Lm.line].rows[1].u0, cands=stage2[Lm.line].rows, line=Lm.line, kind=:s2))
+end
+push!(groups, (id="s3", stage="3 Ce0 + Ce1 coculture", title="Stage 3 · Ce0 + Ce1 coculture (shared K)",
+               datasets=ds3, u0=rows3[1].u0, cands=rows3, line="coculture", kind=:s3))
+push!(groups, (id="s3b", stage="3b Low-resource coculture", title="Stage 3b · low-resource coculture",
+               datasets=ds3b, u0=rows3b[1].u0, cands=rows3b, line="LR coculture", kind=:s3b))
+
+# ── Stage 4: low resource + cisplatin coculture (both mechanisms per line; zoo_stage4.jl) ─────
+println("\n=== Stage 4: low resource + cisplatin coculture ==="); flush(stdout)
+include(joinpath(@__DIR__, "zoo_stage4.jl"))
+g4 = stage4_group(rows3[1], rows3b[1], stage2["A2780cis"].rows[1].params[1])
+show_rows("combination", g4.cands)
+push!(groups, g4)
+
+tmax_of(g) = g.kind == :s1b ? 20.0 : XMAX
+using Serialization
+const PREV = get(ENV, "ZOO_REUSE_BOOT", "0") == "1" && isfile(joinpath(ZOO_DIR, "zoo_state.jls")) ? deserialize(joinpath(ZOO_DIR, "zoo_state.jls")) : nothing
+# the previous bootstrap of a group, if its candidates and fits are exactly the same as now
+function previous_boot(g)
+    (PREV === nothing || PREV.B != BOOT_B) && return nothing
+    i = findfirst(h -> h.id == g.id, PREV.groups); i === nothing && return nothing
+    h = PREV.groups[i]
+    same = length(h.cands) == length(g.cands) && all(a.name == b.name && a.bic == b.bic && a.params == b.params for (a, b) in zip(h.cands, g.cands))
+    same ? PREV.results[g.id] : nothing
+end
+results = Dict{String,Any}()
+for g in groups
+    t0 = time()
+    prev = previous_boot(g)
+    if prev !== nothing
+        res = prev.res
+        println("  $(g.id): candidates and fits unchanged, bootstrap reused from the previous run")
+    elseif BOOT_B > 0
+        res = bootstrap(g; B=BOOT_B)
+    else
+        nc = length(g.cands); ks = [length(c.params) for c in g.cands]
+        res = (cands=g.cands, ks=ks, ref=g.cands[1], bic=fill(NaN, 0, nc), pars=[fill(NaN, 0, k) for k in ks],
+               winner=Int[], pick=Int[], selected=1, orig_pick=1)
+    end
+    # candidate 1 is the one the rule picks on the data; replay the rule on every replicate
+    ks = [length(c.params) for c in g.cands]
+    picks = size(res.bic, 1) > 0 ? [rule_pick(res.bic[b, :], ks) for b in 1:size(res.bic, 1)] : Int[]
+    res = merge(res, (selected=1, pick=picks))
+    band = prev !== nothing ? prev.band : BOOT_B > 0 ? bands(g, res; tmax=tmax_of(g), j=1) : nothing
+    results[g.id] = (res=res, band=band)
+    @printf("  %-12s optimal %-24s k=%d  chosen in %5.1f%% of replicates (lowest BIC in %5.1f%%)  [%.0fs]\n", g.id, g.cands[1].name,
+            length(g.cands[1].params), BOOT_B > 0 ? pct(res.pick, 1) : NaN, BOOT_B > 0 ? pct(res.winner, 1) : NaN, time() - t0)
+    flush(stdout)
+end
+
+apply_joint_replay!(groups, results)
+
+# ── CSVs ──────────────────────────────────────────────────────────────────────
+
+sel_rows = NamedTuple[]; par_rows = NamedTuple[]
+for g in groups
+    r = results[g.id].res
+    for (j, c) in enumerate(g.cands)
+        push!(sel_rows, (group=g.id, stage=g.stage, candidate=c.name, label=c.label, family=c.family, k=length(c.params),
+                         bic=c.bic, delta_bic=c.bic - g.cands[1].bic, pct_lowest_bic=BOOT_B > 0 ? pct(r.winner, j) : NaN, pct_chosen=BOOT_B > 0 ? pct(r.pick, j) : NaN,
+                         optimal=(j == 1), params=join(["$n=$(v)" for (n, v) in zip(c.pnames, c.params)], "; ")))
+    end
+    c = g.cands[1]
+    for (i, n) in enumerate(c.pnames)
+        l, m, h = BOOT_B > 0 ? qs(r.pars[1][:, i]) : (NaN, NaN, NaN)
+        push!(par_rows, (group=g.id, candidate=c.name, param=n, estimate=c.params[i], se=c.se[i], boot_median=m, boot_lo=l, boot_hi=h))
+    end
+end
+for attempt in 1:3
+    try
+        CSV.write(joinpath(ZOO_DIR, "zoo_model_selection.csv"), DataFrame(sel_rows))
+        CSV.write(joinpath(ZOO_DIR, "zoo_parameters.csv"), DataFrame(par_rows))
+        break
+    catch err
+        attempt == 3 ? rethrow() : sleep(2)
+    end
+end
+
+# checkpoint: zoo_rebuild_pages.jl redraws the report and site from this without refitting
+try
+    serialize(joinpath(ZOO_DIR, "zoo_state.jls"), (groups=groups, results=results, B=BOOT_B, joint=JOINT_INFO))
+catch err
+    @warn "checkpoint not written" err
+end
+
+include(joinpath(@__DIR__, "export_zoo_bundle.jl"))
+include(joinpath(@__DIR__, "zoo_report.jl"))
+write_zoo_report(groups, results)
+export_zoo_bundle(groups, results)
+try
+    run(`$(Base.julia_cmd()) --startup-file=no $(joinpath(ROOT, "build_final_report.jl"))`)
+catch err
+    @warn "Final report rebuild failed" err
+end
+println("\nDone.")

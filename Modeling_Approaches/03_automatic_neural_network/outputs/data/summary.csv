@@ -1,0 +1,19 @@
+split,role,source,plate,line,resource,culture,trajectories,points
+train,competition,ce0,co-culture untreated,R,normal,co,6,78
+train,competition,ce0,co-culture untreated,S,normal,co,6,78
+train,competition,lr,LR run 1,R,low,co,6,68
+train,competition,lr,LR run 1,S,low,co,6,65
+train,competition,lr,LR run 2,R,low,co,3,32
+train,competition,lr,LR run 2,S,low,co,3,33
+train,drug,intermittent,intermittent,R,normal,mono,4,54
+train,drug,intermittent,intermittent,S,normal,mono,4,56
+train,drug,lr,LR run 1,R,low,mono,2,18
+train,drug,lr,LR run 1,S,low,mono,2,24
+train,drug,mono,mono 1 + 0.62uM,R,normal,mono,4,56
+train,drug,mono,mono 1 + 0.62uM,S,normal,mono,4,56
+train,drug,mono,mono 1.47uM (A2780),S,normal,mono,2,28
+train,drug,mono,mono 1.47uM (A2780cis),R,normal,mono,2,28
+train,drug,mono,mono untreated,R,normal,mono,2,32
+train,drug,mono,mono untreated,S,normal,mono,2,28
+validation_treated_co,validation,ce1,co-culture treated,R,normal,co,6,82
+validation_treated_co,validation,ce1,co-culture treated,S,normal,co,6,81

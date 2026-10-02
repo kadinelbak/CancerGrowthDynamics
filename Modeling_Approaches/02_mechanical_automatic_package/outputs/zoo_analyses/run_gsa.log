@@ -1,0 +1,10 @@
+=== zoo analyses: 12 threads; checkpoint has [:pkgboot, :profile, :validation, :gsa] ===
+
+--- global sensitivity (Sobol, N = 16384) ---
+  done in 29s
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+Wrote C:\Research\CancerGrowthDynamics\docs\Modeling_Approaches\02_mechanical_automatic_package\outputs\zoo_analyses\bootstrap\report.html
+Wrote C:\Research\CancerGrowthDynamics\docs\Modeling_Approaches\02_mechanical_automatic_package\outputs\zoo_analyses\sensitivity\report.html
+Wrote C:\Research\CancerGrowthDynamics\docs\Modeling_Approaches\02_mechanical_automatic_package\outputs\zoo_analyses\validation\report.html
+
+Done.

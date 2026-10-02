@@ -1,0 +1,55 @@
+[ Info: fitting no-drug and Hill ensembles
+[ Info: fitting NN (UDE) ensemble
+[ Info: fitting pure neural ODE
+┌ Info: competition
+│   Dict((k => (v[1]).a for (k, v) = models)) =
+│    Dict{String, Vector{Float64}} with 4 entries:
+│      "UDE (NN kill)"      => [1.00303, 1.25177, 0.0353296, 0.00251762]
+│      "pure neural ODE"    => [1.0, 1.0, 1.0, 1.0]
+│      "no drug"            => [0.213419, 1.64686, 0.0183134, 0.00258102]
+└      "Hill (mechanistic)" => [0.942671, 1.2498, 0.0353692, 0.00206868]
+16×5 DataFrame
+ Row │ model               set                                forward_rmse  nextday_rmse  n
+     │ String              String                             Float64       Float64       Int64
+─────┼──────────────────────────────────────────────────────────────────────────────────────────
+   1 │ UDE (NN kill)       train: drug units                      0.229744      0.202172    254
+   2 │ UDE (NN kill)       train: untreated co-culture            0.802457      0.572778    290
+   3 │ UDE (NN kill)       VALIDATION: LR + cisplatin co-cu…      1.2201        0.821872     26
+   4 │ UDE (NN kill)       VALIDATION: ce1 treated co-cultu…      0.354281      0.279822     78
+   5 │ pure neural ODE     train: drug units                      0.192671      0.191183    254
+   6 │ pure neural ODE     train: untreated co-culture            0.961673      0.598026    290
+   7 │ pure neural ODE     VALIDATION: LR + cisplatin co-cu…      1.62025       0.846903     26
+   8 │ pure neural ODE     VALIDATION: ce1 treated co-cultu…      0.34202       0.268265     78
+   9 │ no drug             train: drug units                      0.479365      0.298264    254
+  10 │ no drug             train: untreated co-culture            0.815342      0.572545    290
+  11 │ no drug             VALIDATION: LR + cisplatin co-cu…      1.34447       0.869168     26
+  12 │ no drug             VALIDATION: ce1 treated co-cultu…      0.906266      0.315        78
+  13 │ Hill (mechanistic)  train: drug units                      0.223974      0.202627    254
+  14 │ Hill (mechanistic)  train: untreated co-culture            0.872985      0.574346    290
+  15 │ Hill (mechanistic)  VALIDATION: LR + cisplatin co-cu…      1.08932       0.814116     26
+  16 │ Hill (mechanistic)  VALIDATION: ce1 treated co-cultu…      0.431267      0.302206     78
+12×4 DataFrame
+ Row │ fold                          model               rmse      n
+     │ String                        String              Float64   Int64
+─────┼───────────────────────────────────────────────────────────────────
+   1 │ hold out on→off intermittent  no drug             0.321504     52
+   2 │ hold out on→off intermittent  Hill (mechanistic)  0.156233     52
+   3 │ hold out on→off intermittent  UDE (NN kill)       0.187699     52
+   4 │ hold out on→off intermittent  pure neural ODE     0.202798     52
+   5 │ hold out off→on intermittent  no drug             0.413322     52
+   6 │ hold out off→on intermittent  Hill (mechanistic)  0.264709     52
+   7 │ hold out off→on intermittent  UDE (NN kill)       0.204785     52
+   8 │ hold out off→on intermittent  pure neural ODE     0.232547     52
+   9 │ hold out 1 uM monoculture     no drug             0.134163     26
+  10 │ hold out 1 uM monoculture     Hill (mechanistic)  0.177611     26
+  11 │ hold out 1 uM monoculture     UDE (NN kill)       0.242293     26
+  12 │ hold out 1 uM monoculture     pure neural ODE     0.13386      26
+4×4 DataFrame
+ Row │ model               kill_params  weighted_sse  bic
+     │ String              Int64        Float64       Float64
+─────┼─────────────────────────────────────────────────────────
+   1 │ no drug                       0      1748.04   1808.95
+   2 │ Hill (mechanistic)            5       242.701   331.298
+   3 │ UDE (NN kill)               113       215.821   902.451
+   4 │ pure neural ODE             129       192.683   967.91
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\ude\report.html

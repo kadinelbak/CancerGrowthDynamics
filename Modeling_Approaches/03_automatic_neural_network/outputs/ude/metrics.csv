@@ -1,0 +1,13 @@
+model,set,forward_rmse,nextday_rmse,n
+UDE (NN kill),train: drug units,0.2044447266025262,0.16397235023530826,352
+UDE (NN kill),train: untreated co-culture,0.5624550208238115,0.285549106800714,324
+UDE (NN kill),VALIDATION: ce1 treated co-culture,0.3312434883991468,0.2435700031852922,151
+pure neural ODE,train: drug units,0.15993303912672077,0.14114550814867818,352
+pure neural ODE,train: untreated co-culture,0.6018207731390022,0.2967626954073051,324
+pure neural ODE,VALIDATION: ce1 treated co-culture,0.36808640404603404,0.23857560852834872,151
+no drug,train: drug units,0.5855745564128416,0.31672114361078163,352
+no drug,train: untreated co-culture,0.6175794423807314,0.3510983039226936,324
+no drug,VALIDATION: ce1 treated co-culture,0.8293620878069977,0.27696760636817047,151
+Hill (mechanistic),train: drug units,0.22376657189623508,0.16892648919033212,352
+Hill (mechanistic),train: untreated co-culture,0.7336002048002901,0.2947841940574314,324
+Hill (mechanistic),VALIDATION: ce1 treated co-culture,0.3528103259492844,0.24321559665232265,151

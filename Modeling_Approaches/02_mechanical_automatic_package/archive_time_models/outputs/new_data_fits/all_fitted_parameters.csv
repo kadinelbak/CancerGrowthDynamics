@@ -1,0 +1,219 @@
+stage,line,model,label,bic,k,param,value,se
+1,A2780,theta_logistic,Theta logistic,156.89832138763649,3,r_N,1.0545543555744394,0.2357064491202744
+1,A2780,theta_logistic,Theta logistic,156.89832138763649,3,K_N,4036.125617077091,85.79985890410791
+1,A2780,theta_logistic,Theta logistic,156.89832138763649,3,θ_N,0.5769224493787863,0.22317577725693222
+1,A2780,logistic,Logistic ★,156.9397295741757,2,r_N,0.8186882169477476,0.022321421157134796
+1,A2780,logistic,Logistic ★,156.9397295741757,2,K_N,3950.107747668974,66.64239773576548
+1,A2780,gompertz,Gompertz,161.84449531421953,2,r_N,0.3693851942921455,0.017972209398270298
+1,A2780,gompertz,Gompertz,161.84449531421953,2,K_N,4266.381408031101,115.41425789561701
+1,A2780cis,theta_logistic,Theta logistic,164.49854483226594,3,r_C,0.4662069281850514,0.017903908423122457
+1,A2780cis,theta_logistic,Theta logistic,164.49854483226594,3,K_C,3840.618626300423,97.2784915321629
+1,A2780cis,theta_logistic,Theta logistic,164.49854483226594,3,θ_C,3.319571126984407,1.4760017879778755
+1,A2780cis,logistic,Logistic ★,172.0825663492592,2,r_C,0.580714509669471,0.024099513073450558
+1,A2780cis,logistic,Logistic ★,172.0825663492592,2,K_C,4080.7248538965523,155.98425255027578
+1,A2780cis,gompertz,Gompertz,185.19852670004246,2,r_C,0.23838161364531607,0.029593051843264818
+1,A2780cis,gompertz,Gompertz,185.19852670004246,2,K_C,4891.829062776724,552.2084920875286
+1b,A2780,lr_rho_modifiers,Growth-rate and carrying-capacity modifiers,154.77653900541654,2,ρ_r,1.1345990858759267,0.10414827810953835
+1b,A2780,lr_rho_modifiers,Growth-rate and carrying-capacity modifiers,154.77653900541654,2,ρ_K,0.7019842323513419,0.03563120815582409
+1b,A2780,lr_accumulated_loss4,"Accumulated low-resource damage, 4 steps",156.31108975848124,2,d_N^LR,0.2665691973716139,0.053334755929023696
+1b,A2780,lr_accumulated_loss4,"Accumulated low-resource damage, 4 steps",156.31108975848124,2,λ_N^LR,0.7602217156317026,0.24656305402358467
+1b,A2780,lr_loss_plus_accum8,"Immediate loss + accumulated damage, 8 steps",157.8278596573648,3,d_N^LR,3.1263256312906185e-18,0.08754809181555598
+1b,A2780,lr_loss_plus_accum8,"Immediate loss + accumulated damage, 8 steps",157.8278596573648,3,d_N^acc,0.26203094018154255,0.08350946734578633
+1b,A2780,lr_loss_plus_accum8,"Immediate loss + accumulated damage, 8 steps",157.8278596573648,3,λ_N^LR,1.5530350394610815,0.7048908930794763
+1b,A2780,lr_loss_plus_accum4,"Immediate loss + accumulated damage, 4 steps",158.8760391159443,3,d_N^LR,1.5779764354263508e-15,0.11111075544933274
+1b,A2780,lr_loss_plus_accum4,"Immediate loss + accumulated damage, 4 steps",158.8760391159443,3,d_N^acc,0.2665691952166779,0.09057461027349692
+1b,A2780,lr_loss_plus_accum4,"Immediate loss + accumulated damage, 4 steps",158.8760391159443,3,λ_N^LR,0.7602217464779384,0.5436751152427093
+1b,A2780,lr_subtractive_loss,Lineage-specific subtractive loss ★,165.46562818238684,1,d_N^LR,0.15682632107954966,0.03542399729158307
+1b,A2780,lr_separate_r,Separately fitted growth rate,176.67610303592136,1,r_N^LR,0.6967066409418675,0.08644595249457845
+1b,A2780cis,lr_loss_plus_accum8,"Immediate loss + accumulated damage, 8 steps",74.87497979072923,3,d_C^LR,0.5396840818147918,0.018133760949175896
+1b,A2780cis,lr_loss_plus_accum8,"Immediate loss + accumulated damage, 8 steps",74.87497979072923,3,d_C^acc,1.2429659674259335,0.5143926696195007
+1b,A2780cis,lr_loss_plus_accum8,"Immediate loss + accumulated damage, 8 steps",74.87497979072923,3,λ_C^LR,1.4367288262859315,0.24694713080689257
+1b,A2780cis,lr_loss_plus_accum4,"Immediate loss + accumulated damage, 4 steps",76.40089087306585,3,d_C^LR,0.5287193124645558,0.022655908178020615
+1b,A2780cis,lr_loss_plus_accum4,"Immediate loss + accumulated damage, 4 steps",76.40089087306585,3,d_C^acc,3.8817849402356197,5.448638946780106
+1b,A2780cis,lr_loss_plus_accum4,"Immediate loss + accumulated damage, 4 steps",76.40089087306585,3,λ_C^LR,0.3878964950166694,0.21670630511028682
+1b,A2780cis,lr_accumulated_loss4,"Accumulated low-resource damage, 4 steps",102.41874965077474,2,d_C^LR,0.8195010717731908,0.06053312338262545
+1b,A2780cis,lr_accumulated_loss4,"Accumulated low-resource damage, 4 steps",102.41874965077474,2,λ_C^LR,6.2142434818407155,2.1340726979246476
+1b,A2780cis,lr_subtractive_loss,Lineage-specific subtractive loss ★,105.87146624389186,1,d_C^LR,0.728839573986893,0.04124289279260277
+1b,A2780cis,lr_rho_modifiers,Growth-rate and carrying-capacity modifiers,111.12255355020069,2,ρ_r,0.0032415032707911956,0.49909893042930475
+1b,A2780cis,lr_rho_modifiers,Growth-rate and carrying-capacity modifiers,111.12255355020069,2,ρ_K,0.0010000000000000002,0.1519392518805652
+1b,A2780cis,lr_separate_r,Separately fitted growth rate,129.21411311118712,1,r_C^LR,0.0001000000004678718,0.037977771753053134
+2,A2780,delayed_hill_kill,Time-delayed Hill kill ★,531.6352998219604,3,β_N,1.2087874184094634,0.23864858923457666
+2,A2780,delayed_hill_kill,Time-delayed Hill kill ★,531.6352998219604,3,λ_N,0.15816492931069015,0.05860310537342937
+2,A2780,delayed_hill_kill,Time-delayed Hill kill ★,531.6352998219604,3,h_N,4.076963885249623,0.4287150547035088
+2,A2780,delayed_linear_kill,"Time-delayed kill, no Hill saturation",563.767844636739,2,β_N,0.5268996721889435,0.10482205716733377
+2,A2780,delayed_linear_kill,"Time-delayed kill, no Hill saturation",563.767844636739,2,λ_N,0.1938114571405621,0.08434914609433077
+2,A2780cis,delayed_linear_kill,"Time-delayed kill, no Hill saturation",538.4182988116913,2,β_C,0.10610902974887548,0.049058273756501354
+2,A2780cis,delayed_linear_kill,"Time-delayed kill, no Hill saturation",538.4182988116913,2,λ_C,0.18124390354637382,0.18321244569357287
+2,A2780cis,delayed_hill_kill,Time-delayed Hill kill ★,540.1426723518574,3,β_C,0.18939334645789688,0.07086640876841283
+2,A2780cis,delayed_hill_kill,Time-delayed Hill kill ★,540.1426723518574,3,λ_C,0.2266990058785988,0.21558421051080318
+2,A2780cis,delayed_hill_kill,Time-delayed Hill kill ★,540.1426723518574,3,h_C,4.138553498549368,1.6282738377851171
+3,coculture,crowding_deathN_killN,Crowding + sensitive death + sensitive kill (no resistant terms),2113.0214084013637,5,K,4845.565489112514,152.9308275864065
+3,coculture,crowding_deathN_killN,Crowding + sensitive death + sensitive kill (no resistant terms),2113.0214084013637,5,α_NC,0.5340896608327099,0.05912807142677116
+3,coculture,crowding_deathN_killN,Crowding + sensitive death + sensitive kill (no resistant terms),2113.0214084013637,5,α_CN,1.4896847751552993,0.10195952422290241
+3,coculture,crowding_deathN_killN,Crowding + sensitive death + sensitive kill (no resistant terms),2113.0214084013637,5,d_N,0.19674841565651152,0.015651633479162517
+3,coculture,crowding_deathN_killN,Crowding + sensitive death + sensitive kill (no resistant terms),2113.0214084013637,5,β_N,0.44502837971423004,0.03190247748138822
+3,coculture,crowding_death_delayed_hill,Asymmetric crowding + death + time-delayed Hill kill on Ce1,2123.4073221031517,7,K,4845.565522575368,225.99086261855146
+3,coculture,crowding_death_delayed_hill,Asymmetric crowding + death + time-delayed Hill kill on Ce1,2123.4073221031517,7,α_NC,0.5340896561071901,0.06011322642609694
+3,coculture,crowding_death_delayed_hill,Asymmetric crowding + death + time-delayed Hill kill on Ce1,2123.4073221031517,7,α_CN,1.4896847827031656,0.11159729174595841
+3,coculture,crowding_death_delayed_hill,Asymmetric crowding + death + time-delayed Hill kill on Ce1,2123.4073221031517,7,d_N,0.19674840976666122,0.01906532407522444
+3,coculture,crowding_death_delayed_hill,Asymmetric crowding + death + time-delayed Hill kill on Ce1,2123.4073221031517,7,d_C,1.3786935524318276e-21,0.018924767534194756
+3,coculture,crowding_death_delayed_hill,Asymmetric crowding + death + time-delayed Hill kill on Ce1,2123.4073221031517,7,β_N,0.44502840616950046,0.048876274403927646
+3,coculture,crowding_death_delayed_hill,Asymmetric crowding + death + time-delayed Hill kill on Ce1,2123.4073221031517,7,β_C,2.2061527795769022e-21,0.022633823657356437
+3,coculture,sharedK_deathN_killN,One-for-one crowding + sensitive death + sensitive kill,2165.208217763467,3,K,4086.726437758542,99.81860905858287
+3,coculture,sharedK_deathN_killN,One-for-one crowding + sensitive death + sensitive kill,2165.208217763467,3,d_N,0.05387806041389115,0.007747742886430153
+3,coculture,sharedK_deathN_killN,One-for-one crowding + sensitive death + sensitive kill,2165.208217763467,3,β_N,0.49741739736888424,0.04337420100669971
+3,coculture,crowding_killN,"Crowding + sensitive kill (no death, no resistant kill)",2197.2561490910916,4,K,3767.171924374431,101.24027952193019
+3,coculture,crowding_killN,"Crowding + sensitive kill (no death, no resistant kill)",2197.2561490910916,4,α_NC,1.0070568224268017,0.07060118630696852
+3,coculture,crowding_killN,"Crowding + sensitive kill (no death, no resistant kill)",2197.2561490910916,4,α_CN,0.8827794826559243,0.04707539583791571
+3,coculture,crowding_killN,"Crowding + sensitive kill (no death, no resistant kill)",2197.2561490910916,4,β_N,0.6090827844792421,0.04947303142669089
+3,coculture,sharedK_killN,One-for-one crowding + sensitive kill (no death),2199.3219543389614,2,K,3744.1479732399093,92.70892385270479
+3,coculture,sharedK_killN,One-for-one crowding + sensitive kill (no death),2199.3219543389614,2,β_N,0.6955389297336511,0.04126918552070868
+3,coculture,crowding_delayed_hill,Asymmetric crowding + time-delayed Hill kill on Ce1 ★,2202.449105941984,5,K,3767.1719566319703,128.13944805504352
+3,coculture,crowding_delayed_hill,Asymmetric crowding + time-delayed Hill kill on Ce1 ★,2202.449105941984,5,α_NC,1.0070568481175532,0.07151433243222242
+3,coculture,crowding_delayed_hill,Asymmetric crowding + time-delayed Hill kill on Ce1 ★,2202.449105941984,5,α_CN,0.8827795150031673,0.048000383096894174
+3,coculture,crowding_delayed_hill,Asymmetric crowding + time-delayed Hill kill on Ce1 ★,2202.449105941984,5,β_N,0.6090828033945889,0.08281178553748296
+3,coculture,crowding_delayed_hill,Asymmetric crowding + time-delayed Hill kill on Ce1 ★,2202.449105941984,5,β_C,9.564223352941738e-25,0.026600189891092463
+3,coculture,shared_K_only,"Shared K only, treatment inherited from Stage 2",2272.2100109925136,1,K,3876.341505559593,123.46575708784833
+3,coculture,crowding_inherited_kill,"Shared K + asymmetric crowding, treatment inherited",2276.868473198494,3,K,3877.8667246504447,141.62146329050043
+3,coculture,crowding_inherited_kill,"Shared K + asymmetric crowding, treatment inherited",2276.868473198494,3,α_NC,0.9418957932909943,0.09987497422311183
+3,coculture,crowding_inherited_kill,"Shared K + asymmetric crowding, treatment inherited",2276.868473198494,3,α_CN,0.8699221916811435,0.06769258743965027
+3b,coculture,lr_cc_refit_all,"LR coculture ★, K, α and d^LR all refitted",2058.7899557322685,5,K,3394.5250340044695,367.08472474068617
+3b,coculture,lr_cc_refit_all,"LR coculture ★, K, α and d^LR all refitted",2058.7899557322685,5,α_NC,1.869543055567744e-21,1.1026069659822952
+3b,coculture,lr_cc_refit_all,"LR coculture ★, K, α and d^LR all refitted",2058.7899557322685,5,α_CN,3.4461203891978687,3.4588873479367344
+3b,coculture,lr_cc_refit_all,"LR coculture ★, K, α and d^LR all refitted",2058.7899557322685,5,d_N^LR,6.036212711962573e-22,0.07769216431547349
+3b,coculture,lr_cc_refit_all,"LR coculture ★, K, α and d^LR all refitted",2058.7899557322685,5,d_C^LR,6.299270999767112e-19,0.27553541061040854
+3b,coculture,lr_cc_K_only,"LR coculture: K refitted, α from Stage 3, d^LR from Stage 1b",2091.5392101538905,1,K,4469.758429915433,202.22391763466655
+3b,coculture,lr_cc_sharedK,"LR coculture: shared K only (one-for-one crowding, d^LR from Stage 1b)",2092.363326464657,1,K,4485.398963039961,203.13195695222439
+3b,coculture,lr_cc_refit_d,"LR coculture ★, K and α inherited, d^LR refitted",2092.5305822469654,2,d_N^LR,0.11859419469590184,0.01666359015807899
+3b,coculture,lr_cc_refit_d,"LR coculture ★, K and α inherited, d^LR refitted",2092.5305822469654,2,d_C^LR,0.19073304815959669,0.06022963603539078
+1b,A2780,hd_lr_density_death,"Healthy → damaged → death, damage rises with crowding",155.89921798015334,2,σ_N,0.36232278007432495,0.08110218565809514
+1b,A2780,hd_lr_density_death,"Healthy → damaged → death, damage rises with crowding",155.89921798015334,2,δ_N^LR,0.8903024057232158,1.9159211754526755
+1b,A2780,hd_lr_density_arrest,"Healthy ⇄ arrested, entry rises with crowding, no death (Gyllenberg–Webb)",159.08210582908248,2,σ_N,1.0541027550325128,0.4030224029344799
+1b,A2780,hd_lr_density_arrest,"Healthy ⇄ arrested, entry rises with crowding, no death (Gyllenberg–Webb)",159.08210582908248,2,ρ_N^LR,2.0102982512230593e-15,0.09358868416786746
+1b,A2780,hd_lr_transit4,"Healthy → damaged, 4 steps → death (longer delayed death)",165.83160423939663,2,σ_N,0.18765755462775893,0.1084626182274167
+1b,A2780,hd_lr_transit4,"Healthy → damaged, 4 steps → death (longer delayed death)",165.83160423939663,2,δ_N^LR,1.728639727156212,7.158370210274191
+1b,A2780,hd_lr_transit,"Healthy → damaged, 2 steps → death (delayed death)",166.20025080414976,2,σ_N,0.18402827472953606,0.13316474362864306
+1b,A2780,hd_lr_transit,"Healthy → damaged, 2 steps → death (delayed death)",166.20025080414976,2,δ_N^LR,0.9830312020560263,5.770227305504727
+1b,A2780,hd_lr_irreversible,Healthy → damaged → death (irreversible starvation damage),166.65104527646497,2,σ_N,0.1788573867540626,0.17130039139819228
+1b,A2780,hd_lr_irreversible,Healthy → damaged → death (irreversible starvation damage),166.65104527646497,2,δ_N^LR,0.6051816270779246,5.7860886313871465
+1b,A2780,hd_lr_repair,Healthy ⇄ damaged → death (damage can be repaired),169.21599463394037,3,σ_N,0.17885735762897745,0.390797214156157
+1b,A2780,hd_lr_repair,Healthy ⇄ damaged → death (damage can be repaired),169.21599463394037,3,δ_N^LR,0.605183021169888,8.120412898678785
+1b,A2780,hd_lr_repair,Healthy ⇄ damaged → death (damage can be repaired),169.21599463394037,3,ρ_N^LR,8.174581422885204e-34,0.9590206654859492
+1b,A2780,hd_lr_arrest,"Healthy ⇄ arrested, no death (quiescence)",172.5173850925775,2,σ_N,0.326058875806998,0.16522836264720417
+1b,A2780,hd_lr_arrest,"Healthy ⇄ arrested, no death (quiescence)",172.5173850925775,2,ρ_N^LR,8.564258869529986e-26,0.19041022338638966
+1b,A2780cis,hd_lr_transit4,"Healthy → damaged, 4 steps → death (longer delayed death)",87.22072377198329,2,σ_C,7.224337582284788,4.862344502298346
+1b,A2780cis,hd_lr_transit4,"Healthy → damaged, 4 steps → death (longer delayed death)",87.22072377198329,2,δ_C^LR,0.7966136464997585,0.062305609049165156
+1b,A2780cis,hd_lr_transit,"Healthy → damaged, 2 steps → death (delayed death)",94.61739923362383,2,σ_C,2.6350169621253228,0.9681956317501618
+1b,A2780cis,hd_lr_transit,"Healthy → damaged, 2 steps → death (delayed death)",94.61739923362383,2,δ_C^LR,0.46915205038725605,0.07392395861601947
+1b,A2780cis,hd_lr_irreversible,Healthy → damaged → death (irreversible starvation damage),95.14500322521488,2,σ_C,1.129940628445898,1.9949023034467261
+1b,A2780cis,hd_lr_irreversible,Healthy → damaged → death (irreversible starvation damage),95.14500322521488,2,δ_C^LR,0.4624850213651001,1.469568129169957
+1b,A2780cis,hd_lr_repair,Healthy ⇄ damaged → death (damage can be repaired),97.54289849806658,3,σ_C,1.1299413431935224,7.490048224744363
+1b,A2780cis,hd_lr_repair,Healthy ⇄ damaged → death (damage can be repaired),97.54289849806658,3,δ_C^LR,0.462484446966303,5.956217799615847
+1b,A2780cis,hd_lr_repair,Healthy ⇄ damaged → death (damage can be repaired),97.54289849806658,3,ρ_C^LR,3.741622478406188e-25,0.2995663442594912
+1b,A2780cis,hd_lr_density_death,"Healthy → damaged → death, damage rises with crowding",103.71458316402332,2,σ_C,9.999999999992154,2.0199699034357947
+1b,A2780cis,hd_lr_density_death,"Healthy → damaged → death, damage rises with crowding",103.71458316402332,2,δ_C^LR,0.3233808527229595,0.11411320200717667
+1b,A2780cis,hd_lr_arrest,"Healthy ⇄ arrested, no death (quiescence)",133.07847717921405,2,σ_C,9.999999999999066,98.92331847631897
+1b,A2780cis,hd_lr_arrest,"Healthy ⇄ arrested, no death (quiescence)",133.07847717921405,2,ρ_C^LR,9.357622968839298e-13,2.5684546075535986
+1b,A2780cis,hd_lr_density_arrest,"Healthy ⇄ arrested, entry rises with crowding, no death (Gyllenberg–Webb)",142.53430102082368,2,σ_C,9.999999999999066,16.14283980125223
+1b,A2780cis,hd_lr_density_arrest,"Healthy ⇄ arrested, entry rises with crowding, no death (Gyllenberg–Webb)",142.53430102082368,2,ρ_C^LR,9.357622968839298e-13,0.3093590647891963
+2,A2780,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",531.550264480022,4,κ_N,1.0472617279625454,0.29907018983193134
+2,A2780,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",531.550264480022,4,δ_N,1.3662295911954094,8.02940295493499
+2,A2780,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",531.550264480022,4,h_N,4.0003238320389505,0.752877760732635
+2,A2780,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",531.550264480022,4,λ_N,0.2948330169574539,0.7368581545124968
+2,A2780,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",532.7449728436683,4,κ_N,1.0764461507172651,0.4153103268767875
+2,A2780,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",532.7449728436683,4,δ_N,0.9383955214371023,9.322157174845355
+2,A2780,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",532.7449728436683,4,h_N,4.032038293022672,0.7108166752661569
+2,A2780,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",532.7449728436683,4,λ_N,0.25431928069152054,0.7939972608484824
+2,A2780,hd_drug_transit,"Healthy → damaged, 2 steps → death, Hill dose response",551.4851176841886,3,κ_N,0.8772595278622467,0.17500197028149955
+2,A2780,hd_drug_transit,"Healthy → damaged, 2 steps → death, Hill dose response",551.4851176841886,3,δ_N,0.4025407539911166,0.6133913583039359
+2,A2780,hd_drug_transit,"Healthy → damaged, 2 steps → death, Hill dose response",551.4851176841886,3,h_N,3.7502421504386034,0.6724110350084859
+2,A2780,hd_drug_irreversible,"Healthy → damaged → death, Hill dose response",553.8437362664954,3,κ_N,0.8768774921502102,0.18671679325013443
+2,A2780,hd_drug_irreversible,"Healthy → damaged → death, Hill dose response",553.8437362664954,3,δ_N,0.1814054318611332,0.36031285848168
+2,A2780,hd_drug_irreversible,"Healthy → damaged → death, Hill dose response",553.8437362664954,3,h_N,3.7817552393081613,0.6714277640126387
+2,A2780,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",557.6503987562786,4,κ_N,0.8768775417645288,0.21748641589084863
+2,A2780,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",557.6503987562786,4,δ_N,0.18140540388661994,0.38617329652888555
+2,A2780,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",557.6503987562786,4,h_N,3.7817554231487907,0.7642667220211016
+2,A2780,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",557.6503987562786,4,ρ_N,1.5706621895313705e-21,0.0851849606598668
+2,A2780,hd_drug_repair_linear,"Healthy ⇄ damaged → death (repair), damage ∝ dose",572.1320561007993,3,κ_N,0.4823653094000063,0.08039402668600978
+2,A2780,hd_drug_repair_linear,"Healthy ⇄ damaged → death (repair), damage ∝ dose",572.1320561007993,3,δ_N,0.038993759395392215,0.08766672114398011
+2,A2780,hd_drug_repair_linear,"Healthy ⇄ damaged → death (repair), damage ∝ dose",572.1320561007993,3,ρ_N,6.21535012916535e-28,0.054338858503812065
+2,A2780cis,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",542.3937578222245,4,κ_C,0.6606596972057158,2.9530795562940084
+2,A2780cis,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",542.3937578222245,4,δ_C,9.357622968839298e-13,0.12545622310423174
+2,A2780cis,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",542.3937578222245,4,h_C,4.498299736864979,2.344868264491335
+2,A2780cis,hd_drug_onset,"Healthy → damaged → death, damage builds up over time (Hill)",542.3937578222245,4,λ_C,0.09938646210092973,0.5303327183594144
+2,A2780cis,hd_drug_transit,"Healthy → damaged, 2 steps → death, Hill dose response",542.9714792819002,3,κ_C,0.15276670127382086,0.19036050653033113
+2,A2780cis,hd_drug_transit,"Healthy → damaged, 2 steps → death, Hill dose response",542.9714792819002,3,δ_C,0.7904171431581848,6.803943574977993
+2,A2780cis,hd_drug_transit,"Healthy → damaged, 2 steps → death, Hill dose response",542.9714792819002,3,h_C,4.762200612049587,2.6078561102880995
+2,A2780cis,hd_drug_irreversible,"Healthy → damaged → death, Hill dose response",543.2276830268858,3,κ_C,0.14981935445573172,0.1631471167662039
+2,A2780cis,hd_drug_irreversible,"Healthy → damaged → death, Hill dose response",543.2276830268858,3,δ_C,0.42575618987084163,3.847686717458714
+2,A2780cis,hd_drug_irreversible,"Healthy → damaged → death, Hill dose response",543.2276830268858,3,h_C,4.821781661855425,2.5152797041985324
+2,A2780cis,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",543.7269778188179,4,κ_C,0.18649596222562262,0.05631117166720457
+2,A2780cis,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",543.7269778188179,4,δ_C,2.083187778272923,59.61112555601778
+2,A2780cis,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",543.7269778188179,4,h_C,4.111733097622629,1.8875066068428912
+2,A2780cis,hd_drug_transit_onset,"Healthy → damaged, 2 steps → death, damage builds up over time (Hill)",543.7269778188179,4,λ_C,0.30687114526828635,2.4320628453291504
+2,A2780cis,hd_drug_repair_linear,"Healthy ⇄ damaged → death (repair), damage ∝ dose",546.2447115025938,3,κ_C,0.07785238218084024,0.08289386463670313
+2,A2780cis,hd_drug_repair_linear,"Healthy ⇄ damaged → death (repair), damage ∝ dose",546.2447115025938,3,δ_C,0.4547005649301561,4.706357526353117
+2,A2780cis,hd_drug_repair_linear,"Healthy ⇄ damaged → death (repair), damage ∝ dose",546.2447115025938,3,ρ_C,5.805135269539955e-35,0.5980182823517506
+2,A2780cis,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",547.0343455167099,4,κ_C,0.14981927888831867,0.16526668461063787
+2,A2780cis,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",547.0343455167099,4,δ_C,0.425757874573044,4.6240529620399435
+2,A2780cis,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",547.0343455167099,4,h_C,4.82178316728756,2.6734975006511967
+2,A2780cis,hd_drug_repair,"Healthy ⇄ damaged → death (repair), Hill dose response",547.0343455167099,4,ρ_C,4.17123028809386e-26,0.5856740760735747
+3,coculture,hd_cc_kappa_baseN,"Healthy/damaged: + both damage rates, and coculture damage of sensitive cells",2112.985190545115,6,K,5021.403828357875,190.787050533776
+3,coculture,hd_cc_kappa_baseN,"Healthy/damaged: + both damage rates, and coculture damage of sensitive cells",2112.985190545115,6,α_NC,0.4814786140930781,0.06238661879045271
+3,coculture,hd_cc_kappa_baseN,"Healthy/damaged: + both damage rates, and coculture damage of sensitive cells",2112.985190545115,6,α_CN,1.5743206091204986,0.112331074832845
+3,coculture,hd_cc_kappa_baseN,"Healthy/damaged: + both damage rates, and coculture damage of sensitive cells",2112.985190545115,6,κ_N,0.37624175507840946,0.03677998711284444
+3,coculture,hd_cc_kappa_baseN,"Healthy/damaged: + both damage rates, and coculture damage of sensitive cells",2112.985190545115,6,κ_C,4.25674176582737e-27,0.2714860796882339
+3,coculture,hd_cc_kappa_baseN,"Healthy/damaged: + both damage rates, and coculture damage of sensitive cells",2112.985190545115,6,b_N,0.23672202908532963,0.017842728582764693
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,K,5044.797060059222,235.2121540892984
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,α_NC,0.4723197898663822,0.08564342948593894
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,α_CN,1.5851974359491345,0.12744685308205986
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,κ_N,0.3843003985519924,0.07785689237815013
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,κ_C,2.2901229642447052e-23,0.05810341161882685
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,b_N,0.24469136321799928,0.06086090437437852
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,δ_N,1.078362833362655,1.9195746217659473
+3,coculture,hd_cc_kappa_baseN_delta,"Healthy/damaged: + damage, coculture damage of sensitive cells, and death rates",2123.2795324427834,8,δ_C,4.9175246915334405,0.0
+3,coculture,hd_cc_kappa_delta,Healthy/damaged: + damage and death rates refitted,2185.970759958748,7,K,3800.7224812712066,122.04535551805809
+3,coculture,hd_cc_kappa_delta,Healthy/damaged: + damage and death rates refitted,2185.970759958748,7,α_NC,1.0593334902298108,0.07526661704270535
+3,coculture,hd_cc_kappa_delta,Healthy/damaged: + damage and death rates refitted,2185.970759958748,7,α_CN,0.9095270029525006,0.050362961744682716
+3,coculture,hd_cc_kappa_delta,Healthy/damaged: + damage and death rates refitted,2185.970759958748,7,κ_N,1.1830004680317239,0.14782427721631983
+3,coculture,hd_cc_kappa_delta,Healthy/damaged: + damage and death rates refitted,2185.970759958748,7,κ_C,1.8715245937678596e-12,0.07005812126826959
+3,coculture,hd_cc_kappa_delta,Healthy/damaged: + damage and death rates refitted,2185.970759958748,7,δ_N,2.8786599754345314e-7,11403.440736438102
+3,coculture,hd_cc_kappa_delta,Healthy/damaged: + damage and death rates refitted,2185.970759958748,7,δ_C,9.999999999999066,0.0
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,K,3769.398905216566,121.78596571234698
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,α_NC,1.0466007089423197,0.07292725779381656
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,α_CN,0.9070239358688035,0.04904392940896183
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,κ_N,2.4312287561699355,4.813355831030007
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,κ_C,8.102282061848575e-29,0.16697683045270584
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,δ_N,0.005333720470408747,0.7797344820528523
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,δ_C,6.446610465292506,0.0
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,ρ_N,0.5629391768785587,2.9782977978708
+3,coculture,hd_cc_full,"Healthy/damaged: + damage, repair and death rates refitted",2194.2958570638375,9,ρ_C,8.926726793871328,0.0
+3,coculture,hd_cc_kappa,Healthy/damaged: + both damage rates refitted,2201.7298596968994,5,K,3772.9752155183774,122.35745239424786
+3,coculture,hd_cc_kappa,Healthy/damaged: + both damage rates refitted,2201.7298596968994,5,α_NC,1.0093630102466016,0.07135721905987742
+3,coculture,hd_cc_kappa,Healthy/damaged: + both damage rates refitted,2201.7298596968994,5,α_CN,0.8840233287955159,0.049665326861064854
+3,coculture,hd_cc_kappa,Healthy/damaged: + both damage rates refitted,2201.7298596968994,5,κ_N,0.5469227851513905,0.074560820270357
+3,coculture,hd_cc_kappa,Healthy/damaged: + both damage rates refitted,2201.7298596968994,5,κ_C,2.2317011741981945e-21,0.34703794555451445
+3,coculture,hd_cc_kappaN,Healthy/damaged: + sensitive damage rate refitted,2261.2117788910773,4,K,3948.893755980405,140.08911394196505
+3,coculture,hd_cc_kappaN,Healthy/damaged: + sensitive damage rate refitted,2261.2117788910773,4,α_NC,1.0131072506831083,0.09218559654505186
+3,coculture,hd_cc_kappaN,Healthy/damaged: + sensitive damage rate refitted,2261.2117788910773,4,α_CN,0.8444138375504153,0.0588337570426481
+3,coculture,hd_cc_kappaN,Healthy/damaged: + sensitive damage rate refitted,2261.2117788910773,4,κ_N,0.7527010480926393,0.055054591816366155
+3,coculture,hd_cc_inherited_damage,"Healthy/damaged: shared K + asymmetric crowding, damage kinetics from Stage 2",2276.24292870935,3,K,3891.478904076317,148.87276660845777
+3,coculture,hd_cc_inherited_damage,"Healthy/damaged: shared K + asymmetric crowding, damage kinetics from Stage 2",2276.24292870935,3,α_NC,0.9378448411123346,0.10233859709955512
+3,coculture,hd_cc_inherited_damage,"Healthy/damaged: shared K + asymmetric crowding, damage kinetics from Stage 2",2276.24292870935,3,α_CN,0.8530152403012321,0.0672220383662359
+3b,coculture,hd_lrcc_sigma,"Healthy/damaged: starvation damage rates refitted, K and α from Stage 3",2041.3525792245457,2,σ_N,0.4285615159641735,0.048362112824619996
+3b,coculture,hd_lrcc_sigma,"Healthy/damaged: starvation damage rates refitted, K and α from Stage 3",2041.3525792245457,2,σ_C,0.3696373249017326,0.1322745307332908
+3b,coculture,hd_lrcc_K_alpha_sigma,"Healthy/damaged: K, α and starvation damage rates refitted",2043.259886888147,5,K,41522.252764996156,182031.77308119368
+3b,coculture,hd_lrcc_K_alpha_sigma,"Healthy/damaged: K, α and starvation damage rates refitted",2043.259886888147,5,α_NC,2.613912800913181,1.0648958686218069
+3b,coculture,hd_lrcc_K_alpha_sigma,"Healthy/damaged: K, α and starvation damage rates refitted",2043.259886888147,5,α_CN,4.999999999999533,23.963174888228668
+3b,coculture,hd_lrcc_K_alpha_sigma,"Healthy/damaged: K, α and starvation damage rates refitted",2043.259886888147,5,σ_N,8.45373180069627,41.026012589066255
+3b,coculture,hd_lrcc_K_alpha_sigma,"Healthy/damaged: K, α and starvation damage rates refitted",2043.259886888147,5,σ_C,0.4603289424283525,0.12915866453834338
+3b,coculture,hd_lrcc_K_alpha,"Healthy/damaged: K and α refitted, starvation damage from Stage 1b",2050.675569240002,3,K,4665.785749546113,177.29239292557796
+3b,coculture,hd_lrcc_K_alpha,"Healthy/damaged: K and α refitted, starvation damage from Stage 1b",2050.675569240002,3,α_NC,1.996997043521172e-13,2.543962041347327
+3b,coculture,hd_lrcc_K_alpha,"Healthy/damaged: K and α refitted, starvation damage from Stage 1b",2050.675569240002,3,α_CN,2.6273610788947204e-10,2868.504036676104
+3b,coculture,hd_lrcc_full,"Healthy/damaged: K, α, starvation damage and death rates refitted",2053.2753787843226,7,K,38788.879049534014,232912.43583578782
+3b,coculture,hd_lrcc_full,"Healthy/damaged: K, α, starvation damage and death rates refitted",2053.2753787843226,7,α_NC,2.678851125168394,1.1686738077481016
+3b,coculture,hd_lrcc_full,"Healthy/damaged: K, α, starvation damage and death rates refitted",2053.2753787843226,7,α_CN,4.999999999999999,28.43322793264714
+3b,coculture,hd_lrcc_full,"Healthy/damaged: K, α, starvation damage and death rates refitted",2053.2753787843226,7,σ_N,7.870109319558463,52.20945080470149
+3b,coculture,hd_lrcc_full,"Healthy/damaged: K, α, starvation damage and death rates refitted",2053.2753787843226,7,σ_C,0.4723668806172166,0.3996623273226757
+3b,coculture,hd_lrcc_full,"Healthy/damaged: K, α, starvation damage and death rates refitted",2053.2753787843226,7,δ_N^LR,0.7964354350996592,0.7668374109571539
+3b,coculture,hd_lrcc_full,"Healthy/damaged: K, α, starvation damage and death rates refitted",2053.2753787843226,7,δ_C^LR,0.6678629223599075,3.618366818577026

@@ -1,0 +1,41 @@
+┌ Info: ablation
+│   name = "full"
+└   sse = 221.81754026142747
+┌ Info: ablation
+│   name = "without density ρ"
+└   sse = 237.2019336223193
+┌ Info: ablation
+│   name = "without line"
+└   sse = 259.35648527611784
+13×6 DataFrame
+ Row │ feature       trees_train  trees_validation  mlp_train  mlp_validation  trees_mean_abs_shap
+     │ String        Float64      Float64           Float64    Float64         Float64
+─────┼─────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ dprev         0.0733165         0.0101489    0.0910812     0.0406929            0.106952
+   2 │ log_well      0.0829135         0.0353082    0.183225     -0.000984983          0.0983516
+   3 │ low_resource  0.0182867         0.0202297    0.287758      0.115702             0.059194
+   4 │ logN          0.0478066         0.00734833   0.229705      0.0201907            0.0513839
+   5 │ since_switch  0.0190305        -0.00185668   0.0843081    -0.00324944           0.0312795
+   6 │ day           0.0181299        -0.00869125   0.108867      0.0171033            0.0292426
+   7 │ line_R        0.00713076        0.0020981    0.322281      0.0258186            0.023819
+   8 │ exposure      0.00128681        0.000412729  0.0283815     0.00547892           0.00443461
+   9 │ coculture     0.00117653        0.0          0.0433632     0.0                  0.00390183
+  10 │ dose          0.00100966        0.0          0.0139445     0.0                  0.00300745
+  11 │ s_frac        0.000129557      -4.24659e-5   0.115158     -0.00261263           0.00171951
+  12 │ seeding       5.9145e-5         0.0          0.0091125     0.0                  0.000158532
+  13 │ cumdose       0.0               0.0          0.0248185     0.0247832            0.0
+3×3 DataFrame
+ Row │ input          mean       sd
+     │ String         Float64    Float64
+─────┼─────────────────────────────────────
+   1 │ exposure v     0.12885    0.0696647
+   2 │ density ρ      0.0874653  0.025885
+   3 │ line (S vs R)  0.226829   0.0530341
+3×5 DataFrame
+ Row │ variant            weighted_sse  val_lr_cis_rmse  val_treated_co_rmse  delta_sse
+     │ String             Float64       Float64          Float64              Float64
+─────┼──────────────────────────────────────────────────────────────────────────────────
+   1 │ full                    221.818          1.32899             0.367344     0.0
+   2 │ without density ρ       237.202          1.10573             0.419741    15.3844
+   3 │ without line            259.356          1.42949             0.524965    37.5389
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\importance\report.html

@@ -1,0 +1,483 @@
+env,group,line,day,value
+A2780 untreated,1 untreated monoculture,N,0.0,99.8
+A2780 untreated,1 untreated monoculture,N,1.0,246.8503087
+A2780 untreated,1 untreated monoculture,N,2.0,386.6241513
+A2780 untreated,1 untreated monoculture,N,3.0,921.0547067
+A2780 untreated,1 untreated monoculture,N,4.0,1594.845139
+A2780 untreated,1 untreated monoculture,N,5.0,2628.855208
+A2780 untreated,1 untreated monoculture,N,6.0,3034.912076
+A2780 untreated,1 untreated monoculture,N,7.0,3462.906944
+A2780 untreated,1 untreated monoculture,N,8.0,3405.064313
+A2780 untreated,1 untreated monoculture,N,9.0,3755.234414
+A2780 untreated,1 untreated monoculture,N,10.0,3652.791281
+A2780 untreated,1 untreated monoculture,N,11.0,4085.137269
+A2780 untreated,1 untreated monoculture,N,12.0,4010.548148
+A2780 untreated,1 untreated monoculture,N,13.0,4137.956713
+A2780 untreated,1 untreated monoculture,N,14.0,4169.734799
+A2780 low resource,1b low-resource monoculture,N,0.0,99.8
+A2780 low resource,1b low-resource monoculture,N,1.0,725.6057384941267
+A2780 low resource,1b low-resource monoculture,N,2.0,731.2704024648565
+A2780 low resource,1b low-resource monoculture,N,3.0,1024.6360870402464
+A2780 low resource,1b low-resource monoculture,N,4.0,1486.1234618029764
+A2780 low resource,1b low-resource monoculture,N,5.0,2130.3312150972465
+A2780 low resource,1b low-resource monoculture,N,6.0,2794.9158097438863
+A2780 low resource,1b low-resource monoculture,N,7.0,2814.22491815906
+A2780 low resource,1b low-resource monoculture,N,10.0,2192.8662430194495
+A2780 low resource,1b low-resource monoculture,N,11.0,2247.1252840362026
+A2780 low resource,1b low-resource monoculture,N,12.0,2921.288072405161
+A2780 low resource,1b low-resource monoculture,N,13.0,3215.3749470440976
+A2780 low resource,1b low-resource monoculture,N,14.0,3017.9614481032154
+A2780 1.47 µM,2 treated monoculture,N,0.0,99.8
+A2780 1.47 µM,2 treated monoculture,N,1.0,683.0949667
+A2780 1.47 µM,2 treated monoculture,N,2.0,962.5994
+A2780 1.47 µM,2 treated monoculture,N,3.0,1293.415333
+A2780 1.47 µM,2 treated monoculture,N,4.0,1242.376
+A2780 1.47 µM,2 treated monoculture,N,5.0,1196.672333
+A2780 1.47 µM,2 treated monoculture,N,6.0,1151.698
+A2780 1.47 µM,2 treated monoculture,N,7.0,908.6365333
+A2780 1.47 µM,2 treated monoculture,N,8.0,684.2957667
+A2780 1.47 µM,2 treated monoculture,N,9.0,451.4713333
+A2780 1.47 µM,2 treated monoculture,N,10.0,351.6421667
+A2780 1.47 µM,2 treated monoculture,N,11.0,239.0488667
+A2780 1.47 µM,2 treated monoculture,N,12.0,153.4825667
+A2780 1.47 µM,2 treated monoculture,N,13.0,115.1273633
+A2780 1.47 µM,2 treated monoculture,N,14.0,60.39660667
+A2780 1.0 µM,2 treated monoculture,N,0.0,100.0
+A2780 1.0 µM,2 treated monoculture,N,1.0,277.1990353
+A2780 1.0 µM,2 treated monoculture,N,2.0,512.5472607
+A2780 1.0 µM,2 treated monoculture,N,3.0,810.4685957
+A2780 1.0 µM,2 treated monoculture,N,4.0,1072.597222
+A2780 1.0 µM,2 treated monoculture,N,5.0,1220.337539
+A2780 1.0 µM,2 treated monoculture,N,6.0,1524.237886
+A2780 1.0 µM,2 treated monoculture,N,7.0,1784.317361
+A2780 1.0 µM,2 treated monoculture,N,8.0,1754.768094
+A2780 1.0 µM,2 treated monoculture,N,9.0,1630.943518
+A2780 1.0 µM,2 treated monoculture,N,10.0,1765.695949
+A2780 1.0 µM,2 treated monoculture,N,11.0,1797.057716
+A2780 1.0 µM,2 treated monoculture,N,12.0,1664.883989
+A2780 1.0 µM,2 treated monoculture,N,13.0,1869.518326
+A2780 1.0 µM,2 treated monoculture,N,14.0,2521.753626
+A2780 0.62 µM,2 treated monoculture,N,0.0,99.8
+A2780 0.62 µM,2 treated monoculture,N,1.0,507.5015817
+A2780 0.62 µM,2 treated monoculture,N,2.0,801.887693
+A2780 0.62 µM,2 treated monoculture,N,3.0,1336.278318
+A2780 0.62 µM,2 treated monoculture,N,4.0,1623.104938
+A2780 0.62 µM,2 treated monoculture,N,5.0,2076.849113
+A2780 0.62 µM,2 treated monoculture,N,6.0,2482.367593
+A2780 0.62 µM,2 treated monoculture,N,7.0,2895.899846
+A2780 0.62 µM,2 treated monoculture,N,8.0,2949.133025
+A2780 0.62 µM,2 treated monoculture,N,9.0,3220.295872
+A2780 0.62 µM,2 treated monoculture,N,10.0,2758.770833
+A2780 0.62 µM,2 treated monoculture,N,11.0,3434.9652
+A2780 0.62 µM,2 treated monoculture,N,12.0,3115.501775
+A2780 0.62 µM,2 treated monoculture,N,13.0,3633.648958
+A2780 0.62 µM,2 treated monoculture,N,14.0,3423.783179
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,0.0,24.95
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,1.0,13.087617666666668
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,2.0,39.298923333333335
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,3.0,123.18034333333333
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,4.0,301.89056666666664
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,5.0,791.3014666666667
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,6.0,726.0503666666667
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,7.0,1318.3615
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,8.0,1513.7346666666665
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,9.0,1434.7740000000001
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,10.0,1640.7846666666665
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,11.0,2289.899
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,12.0,1768.0916666666665
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,13.0,2427.369
+Ce0 25:75,3 Ce0 + Ce1 coculture,N,14.0,1996.911
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,0.0,49.9
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,1.0,28.14232253
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,2.0,81.63553239333334
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,3.0,213.78726853333333
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,4.0,572.6799768666666
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,5.0,1364.0345290000002
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,6.0,953.8250386333334
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,7.0,1761.812153
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,8.0,2030.139352
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,9.0,2096.135146666667
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,10.0,2398.7996143333335
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,11.0,2851.6789353333334
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,12.0,2548.58696
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,13.0,2881.326543333333
+Ce0 50:50,3 Ce0 + Ce1 coculture,N,14.0,2774.949845666666
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,0.0,74.85
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,1.0,30.907330246666664
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,2.0,96.66439045
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,3.0,246.1283565
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,4.0,733.1077160666667
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,5.0,1347.571952
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,6.0,1164.9052083
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,7.0,1861.0936726666666
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,8.0,2326.417863
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,9.0,2216.042014
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,10.0,2734.5024690000005
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,11.0,2770.232909
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,12.0,3008.747222
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,13.0,3096.448919666667
+Ce0 75:25,3 Ce0 + Ce1 coculture,N,14.0,3013.985455666667
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,0.0,24.95
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,1.0,119.54895833333335
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,2.0,194.13510800000003
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,3.0,325.6793209666667
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,4.0,380.8195602
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,5.0,557.2538966000001
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,6.0,505.4315200666667
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,7.0,799.1715663666665
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,8.0,450.8604166666667
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,9.0,453.6402392333334
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,10.0,447.41022376666666
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,11.0,785.971798
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,12.0,791.0160493666666
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,13.0,1477.6887729999999
+Ce1 25:75,3 Ce0 + Ce1 coculture,N,14.0,672.1098764333333
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,0.0,49.9
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,1.0,158.64576666666667
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,2.0,295.09436666666664
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,3.0,432.1829333333333
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,4.0,589.4063666666667
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,5.0,891.1995666666667
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,6.0,949.3226333333333
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,7.0,1504.2146666666667
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,8.0,1023.7512333333334
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,9.0,1332.1843333333334
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,10.0,1367.6196666666667
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,11.0,1493.777
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,12.0,1365.7013333333332
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,13.0,1733.785
+Ce1 50:50,3 Ce0 + Ce1 coculture,N,14.0,1221.3053333333332
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,0.0,74.85
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,1.0,267.54996666666665
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,2.0,483.00399999999996
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,3.0,714.9101666666667
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,4.0,956.6022666666667
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,5.0,1333.2123333333332
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,6.0,1534.089
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,7.0,2150.395
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,8.0,1654.271
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,9.0,2112.240333333333
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,10.0,2544.047
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,11.0,2294.391
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,12.0,1895.954
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,13.0,2208.899
+Ce1 75:25,3 Ce0 + Ce1 coculture,N,14.0,1844.3769999999997
+LR run 1 1-3,3b low-resource coculture,N,0.0,24.95
+LR run 1 1-3,3b low-resource coculture,N,1.0,304.2665511
+LR run 1 1-3,3b low-resource coculture,N,2.0,461.53645293333335
+LR run 1 1-3,3b low-resource coculture,N,3.0,869.8122856
+LR run 1 1-3,3b low-resource coculture,N,4.0,1207.0729445666668
+LR run 1 1-3,3b low-resource coculture,N,5.0,3280.515116666667
+LR run 1 1-3,3b low-resource coculture,N,6.0,1749.207549
+LR run 1 1-3,3b low-resource coculture,N,7.0,2042.3465816666667
+LR run 1 1-3,3b low-resource coculture,N,10.0,3520.6346666666664
+LR run 1 1-3,3b low-resource coculture,N,11.0,3932.3089999999997
+LR run 1 1-3,3b low-resource coculture,N,14.0,3171.0646331600233
+LR run 1 1-1,3b low-resource coculture,N,0.0,49.9
+LR run 1 1-1,3b low-resource coculture,N,1.0,466.89863276666665
+LR run 1 1-1,3b low-resource coculture,N,2.0,644.1471596333333
+LR run 1 1-1,3b low-resource coculture,N,3.0,939.3024841666667
+LR run 1 1-1,3b low-resource coculture,N,4.0,1445.288893
+LR run 1 1-1,3b low-resource coculture,N,5.0,1517.70052
+LR run 1 1-1,3b low-resource coculture,N,6.0,1976.4381053333334
+LR run 1 1-1,3b low-resource coculture,N,7.0,2276.2046983333335
+LR run 1 1-1,3b low-resource coculture,N,9.0,1373.9274795666668
+LR run 1 1-1,3b low-resource coculture,N,10.0,2977.122333333333
+LR run 1 1-1,3b low-resource coculture,N,11.0,3312.5266666666666
+LR run 1 1-1,3b low-resource coculture,N,12.0,3410.697666666667
+LR run 1 1-1,3b low-resource coculture,N,13.0,3302.9012901277783
+LR run 1 1-1,3b low-resource coculture,N,14.0,3257.5079144777774
+LR run 1 3-1,3b low-resource coculture,N,0.0,74.85
+LR run 1 3-1,3b low-resource coculture,N,1.0,704.5427306
+LR run 1 3-1,3b low-resource coculture,N,2.0,1080.4734064333334
+LR run 1 3-1,3b low-resource coculture,N,3.0,1910.6240323333332
+LR run 1 3-1,3b low-resource coculture,N,4.0,2020.192374333333
+LR run 1 3-1,3b low-resource coculture,N,5.0,2887.4453303333335
+LR run 1 3-1,3b low-resource coculture,N,6.0,3106.099017666667
+LR run 1 3-1,3b low-resource coculture,N,7.0,3480.636241
+LR run 1 3-1,3b low-resource coculture,N,9.0,2181.4256116666666
+LR run 1 3-1,3b low-resource coculture,N,10.0,3948.0570000000002
+LR run 1 3-1,3b low-resource coculture,N,11.0,4002.1486666666665
+LR run 1 3-1,3b low-resource coculture,N,13.0,3531.6643333333336
+LR run 1 3-1,3b low-resource coculture,N,14.0,3465.5913333333333
+LR run 2 1-3,3b low-resource coculture,N,0.0,25.0
+LR run 2 1-3,3b low-resource coculture,N,1.0,159.32399999999998
+LR run 2 1-3,3b low-resource coculture,N,2.0,302.7059
+LR run 2 1-3,3b low-resource coculture,N,3.0,478.82043333333337
+LR run 2 1-3,3b low-resource coculture,N,4.0,1020.9616333333333
+LR run 2 1-3,3b low-resource coculture,N,5.0,1080.4394333333332
+LR run 2 1-3,3b low-resource coculture,N,6.0,2362.1806666666666
+LR run 2 1-3,3b low-resource coculture,N,7.0,2465.702333333333
+LR run 2 1-3,3b low-resource coculture,N,8.0,1564.7923333333335
+LR run 2 1-3,3b low-resource coculture,N,9.0,1836.1366666666665
+LR run 2 1-3,3b low-resource coculture,N,10.0,2668.372
+LR run 2 1-3,3b low-resource coculture,N,11.0,1444.3149999999998
+LR run 2 1-3,3b low-resource coculture,N,12.0,336.02641
+LR run 2 1-1,3b low-resource coculture,N,0.0,50.0
+LR run 2 1-1,3b low-resource coculture,N,1.0,245.29376666666667
+LR run 2 1-1,3b low-resource coculture,N,2.0,345.35373333333337
+LR run 2 1-1,3b low-resource coculture,N,4.0,1682.798
+LR run 2 1-1,3b low-resource coculture,N,5.0,2399.4186666666665
+LR run 2 1-1,3b low-resource coculture,N,6.0,2797.727666666667
+LR run 2 1-1,3b low-resource coculture,N,7.0,3369.9743333333336
+LR run 2 1-1,3b low-resource coculture,N,8.0,2840.8153333333335
+LR run 2 1-1,3b low-resource coculture,N,9.0,3253.807666666666
+LR run 2 1-1,3b low-resource coculture,N,10.0,3831.6583333333333
+LR run 2 1-1,3b low-resource coculture,N,11.0,3351.762
+LR run 2 1-1,3b low-resource coculture,N,12.0,2838.935
+LR run 2 3-1,3b low-resource coculture,N,0.0,75.0
+LR run 2 3-1,3b low-resource coculture,N,1.0,1222.2842333333333
+LR run 2 3-1,3b low-resource coculture,N,2.0,1726.6703333333335
+LR run 2 3-1,3b low-resource coculture,N,3.0,3290.4953333333337
+LR run 2 3-1,3b low-resource coculture,N,4.0,3497.1479999999997
+LR run 2 3-1,3b low-resource coculture,N,5.0,4007.253666666667
+LR run 2 3-1,3b low-resource coculture,N,6.0,4283.907
+LR run 2 3-1,3b low-resource coculture,N,7.0,4354.624
+LR run 2 3-1,3b low-resource coculture,N,8.0,4259.878
+LR run 2 3-1,3b low-resource coculture,N,9.0,4115.240333333333
+LR run 2 3-1,3b low-resource coculture,N,10.0,4308.782333333334
+LR run 2 3-1,3b low-resource coculture,N,11.0,4300.637333333333
+LR run 2 3-1,3b low-resource coculture,N,12.0,3875.492333333333
+A2780cis untreated,1 untreated monoculture,C,0.0,99.8
+A2780cis untreated,1 untreated monoculture,C,1.0,80.43985333
+A2780cis untreated,1 untreated monoculture,C,2.0,140.1945603
+A2780cis untreated,1 untreated monoculture,C,3.0,246.1790123
+A2780cis untreated,1 untreated monoculture,C,4.0,504.2686343
+A2780cis untreated,1 untreated monoculture,C,5.0,917.9230323
+A2780cis untreated,1 untreated monoculture,C,6.0,1707.485031
+A2780cis untreated,1 untreated monoculture,C,7.0,2472.925849
+A2780cis untreated,1 untreated monoculture,C,8.0,3185.559259
+A2780cis untreated,1 untreated monoculture,C,9.0,3761.654668
+A2780cis untreated,1 untreated monoculture,C,10.0,3510.291435
+A2780cis untreated,1 untreated monoculture,C,11.0,4178.483796
+A2780cis untreated,1 untreated monoculture,C,12.0,3520.712192
+A2780cis untreated,1 untreated monoculture,C,13.0,4140.540625
+A2780cis untreated,1 untreated monoculture,C,14.0,3732.035031
+A2780cis low resource,1b low-resource monoculture,C,0.0,99.8
+A2780cis low resource,1b low-resource monoculture,C,1.0,512.7865742345465
+A2780cis low resource,1b low-resource monoculture,C,2.0,470.36187175043324
+A2780cis low resource,1b low-resource monoculture,C,3.0,539.6246485653766
+A2780cis low resource,1b low-resource monoculture,C,4.0,450.96896591565564
+A2780cis low resource,1b low-resource monoculture,C,5.0,432.48033891777396
+A2780cis low resource,1b low-resource monoculture,C,6.0,284.0470633545157
+A2780cis low resource,1b low-resource monoculture,C,7.0,142.0210745233969
+A2780cis low resource,1b low-resource monoculture,C,8.0,60.80460234931638
+A2780cis low resource,1b low-resource monoculture,C,9.0,47.64366537371736
+A2780cis low resource,1b low-resource monoculture,C,10.0,21.49229732331985
+A2780cis low resource,1b low-resource monoculture,C,11.0,11.651857115347582
+A2780cis 1.47 µM,2 treated monoculture,C,0.0,99.8
+A2780cis 1.47 µM,2 treated monoculture,C,1.0,73.88472
+A2780cis 1.47 µM,2 treated monoculture,C,2.0,143.6446333
+A2780cis 1.47 µM,2 treated monoculture,C,3.0,301.8758333
+A2780cis 1.47 µM,2 treated monoculture,C,4.0,670.1066667
+A2780cis 1.47 µM,2 treated monoculture,C,5.0,1170.911
+A2780cis 1.47 µM,2 treated monoculture,C,6.0,1348.338
+A2780cis 1.47 µM,2 treated monoculture,C,7.0,1881.76
+A2780cis 1.47 µM,2 treated monoculture,C,8.0,1606.188667
+A2780cis 1.47 µM,2 treated monoculture,C,9.0,2421.258333
+A2780cis 1.47 µM,2 treated monoculture,C,10.0,1957.238333
+A2780cis 1.47 µM,2 treated monoculture,C,11.0,2537.103333
+A2780cis 1.47 µM,2 treated monoculture,C,12.0,2244.322667
+A2780cis 1.47 µM,2 treated monoculture,C,13.0,2827.442667
+A2780cis 1.47 µM,2 treated monoculture,C,14.0,3433.938333
+A2780cis 1.0 µM,2 treated monoculture,C,0.0,99.8
+A2780cis 1.0 µM,2 treated monoculture,C,1.0,117.6211807
+A2780cis 1.0 µM,2 treated monoculture,C,2.0,206.5297067
+A2780cis 1.0 µM,2 treated monoculture,C,3.0,392.7975307
+A2780cis 1.0 µM,2 treated monoculture,C,4.0,793.1631947
+A2780cis 1.0 µM,2 treated monoculture,C,5.0,1328.350116
+A2780cis 1.0 µM,2 treated monoculture,C,6.0,1947.658218
+A2780cis 1.0 µM,2 treated monoculture,C,7.0,2594.510609
+A2780cis 1.0 µM,2 treated monoculture,C,8.0,2352.010648
+A2780cis 1.0 µM,2 treated monoculture,C,9.0,3220.085031
+A2780cis 1.0 µM,2 treated monoculture,C,10.0,2953.806752
+A2780cis 1.0 µM,2 treated monoculture,C,11.0,3595.11142
+A2780cis 1.0 µM,2 treated monoculture,C,12.0,2534.660455
+A2780cis 1.0 µM,2 treated monoculture,C,13.0,3853.449229
+A2780cis 1.0 µM,2 treated monoculture,C,14.0,4116.669907
+A2780cis 0.62 µM,2 treated monoculture,C,0.0,99.8
+A2780cis 0.62 µM,2 treated monoculture,C,1.0,119.1229163
+A2780cis 0.62 µM,2 treated monoculture,C,2.0,208.1099537
+A2780cis 0.62 µM,2 treated monoculture,C,3.0,381.1926697
+A2780cis 0.62 µM,2 treated monoculture,C,4.0,731.6507717
+A2780cis 0.62 µM,2 treated monoculture,C,5.0,1291.676042
+A2780cis 0.62 µM,2 treated monoculture,C,6.0,1980.231559
+A2780cis 0.62 µM,2 treated monoculture,C,7.0,2670.847839
+A2780cis 0.62 µM,2 treated monoculture,C,8.0,2545.009915
+A2780cis 0.62 µM,2 treated monoculture,C,9.0,3548.798727
+A2780cis 0.62 µM,2 treated monoculture,C,10.0,2897.710455
+A2780cis 0.62 µM,2 treated monoculture,C,11.0,3797.833449
+A2780cis 0.62 µM,2 treated monoculture,C,12.0,2884.930286
+A2780cis 0.62 µM,2 treated monoculture,C,13.0,4146.366088
+A2780cis 0.62 µM,2 treated monoculture,C,14.0,3326.884761
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,0.0,74.85
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,1.0,61.047336666666666
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,2.0,103.61651
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,3.0,178.24300000000002
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,4.0,362.32986666666665
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,5.0,757.4355999999999
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,6.0,1086.1088666666667
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,7.0,1566.3503333333335
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,8.0,1943.8999999999999
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,9.0,2446.549
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,10.0,1824.6076666666668
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,11.0,3249.732
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,12.0,1631.7306666666666
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,13.0,2673.605666666667
+Ce0 25:75,3 Ce0 + Ce1 coculture,C,14.0,1684.9116666666669
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,0.0,49.9
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,1.0,34.930323333333334
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,2.0,59.401543333333336
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,3.0,105.14539333333335
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,4.0,218.274
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,5.0,401.8941333333333
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,6.0,348.39776666666666
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,7.0,538.1780666666667
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,8.0,748.2513333333333
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,9.0,815.8371333333333
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,10.0,605.9174333333333
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,11.0,905.2924666666667
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,12.0,496.2327
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,13.0,678.3244333333333
+Ce0 50:50,3 Ce0 + Ce1 coculture,C,14.0,422.3096666666667
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,0.0,24.95
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,1.0,23.11705247
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,2.0,39.51724537
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,3.0,59.61574074
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,4.0,109.35096449333332
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,5.0,186.27098766666666
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,6.0,147.97361113333332
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,7.0,231.45547840000003
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,8.0,339.9123456666666
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,9.0,329.4054012
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,10.0,263.0547068
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,11.0,325.77314813333334
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,12.0,224.2261188
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,13.0,250.1449845666667
+Ce0 75:25,3 Ce0 + Ce1 coculture,C,14.0,166.3991898
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,0.0,74.85
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,1.0,104.86543210666667
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,2.0,181.57245373333333
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,3.0,315.5830246666667
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,4.0,593.7847222
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,5.0,1105.2674383333335
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,6.0,1631.9437499999997
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,7.0,2963.252585
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,8.0,2256.084645
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,9.0,3581.353588
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,10.0,3386.3753859999997
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,11.0,3983.662268666667
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,12.0,2746.3045136666665
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,13.0,4196.278549333333
+Ce1 25:75,3 Ce0 + Ce1 coculture,C,14.0,2883.502932
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,0.0,49.9
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,1.0,52.865739999999995
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,2.0,91.55857333333331
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,3.0,144.52216666666666
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,4.0,289.9549
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,5.0,514.2376
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,6.0,740.3906999999999
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,7.0,1461.5346666666667
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,8.0,1238.5919666666666
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,9.0,2303.223
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,10.0,2384.797666666667
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,11.0,3137.178
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,12.0,2007.1413333333333
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,13.0,3328.9130000000005
+Ce1 50:50,3 Ce0 + Ce1 coculture,C,14.0,2088.491666666667
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,0.0,24.95
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,1.0,32.1549
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,2.0,54.31049333333334
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,3.0,87.34973333333335
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,4.0,159.1566
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,5.0,237.83360000000002
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,6.0,322.6598333333333
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,7.0,582.2943666666666
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,8.0,622.3529
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,9.0,1074.9711
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,10.0,1331.1799999999998
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,11.0,1796.7789999999998
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,12.0,1185.143
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,13.0,2190.3763333333336
+Ce1 75:25,3 Ce0 + Ce1 coculture,C,14.0,1532.8336666666667
+LR run 1 1-3,3b low-resource coculture,C,0.0,74.85
+LR run 1 1-3,3b low-resource coculture,C,1.0,461.44020797227034
+LR run 1 1-3,3b low-resource coculture,C,2.0,601.6166570383208
+LR run 1 1-3,3b low-resource coculture,C,3.0,760.5372616984401
+LR run 1 1-3,3b low-resource coculture,C,4.0,394.38254573464275
+LR run 1 1-3,3b low-resource coculture,C,5.0,199.12416714808396
+LR run 1 1-3,3b low-resource coculture,C,6.0,86.62356248796455
+LR run 1 1-3,3b low-resource coculture,C,7.0,79.60237242441748
+LR run 1 1-3,3b low-resource coculture,C,8.0,109.12184093972654
+LR run 1 1-3,3b low-resource coculture,C,9.0,48.202888503755055
+LR run 1 1-3,3b low-resource coculture,C,10.0,38.00288850375505
+LR run 1 1-3,3b low-resource coculture,C,11.0,34.25225958020412
+LR run 1 1-3,3b low-resource coculture,C,13.0,13.358395108800309
+LR run 1 1-3,3b low-resource coculture,C,14.0,13.518851530906991
+LR run 1 1-1,3b low-resource coculture,C,0.0,49.9
+LR run 1 1-1,3b low-resource coculture,C,1.0,183.46964375120353
+LR run 1 1-1,3b low-resource coculture,C,2.0,231.61578890814556
+LR run 1 1-1,3b low-resource coculture,C,3.0,235.3606893895629
+LR run 1 1-1,3b low-resource coculture,C,4.0,139.90853071442325
+LR run 1 1-1,3b low-resource coculture,C,5.0,67.93168110918543
+LR run 1 1-1,3b low-resource coculture,C,6.0,51.42313498940882
+LR run 1 1-1,3b low-resource coculture,C,7.0,46.84709801656075
+LR run 1 1-1,3b low-resource coculture,C,8.0,27.746065857885615
+LR run 1 1-1,3b low-resource coculture,C,9.0,24.96716811091854
+LR run 1 1-1,3b low-resource coculture,C,10.0,18.376767571731175
+LR run 1 1-1,3b low-resource coculture,C,11.0,21.96007317542846
+LR run 1 1-1,3b low-resource coculture,C,12.0,12.367027113421912
+LR run 1 1-1,3b low-resource coculture,C,13.0,15.383145657616021
+LR run 1 1-1,3b low-resource coculture,C,14.0,12.042997034469478
+LR run 1 3-1,3b low-resource coculture,C,0.0,24.95
+LR run 1 3-1,3b low-resource coculture,C,1.0,206.78517235
+LR run 1 3-1,3b low-resource coculture,C,2.0,223.84436741555555
+LR run 1 3-1,3b low-resource coculture,C,3.0,205.6144425205555
+LR run 1 3-1,3b low-resource coculture,C,4.0,100.29027537944444
+LR run 1 3-1,3b low-resource coculture,C,5.0,55.01582900333333
+LR run 1 3-1,3b low-resource coculture,C,6.0,46.778047371666666
+LR run 1 3-1,3b low-resource coculture,C,7.0,64.08295782722222
+LR run 1 3-1,3b low-resource coculture,C,8.0,19.35689967261111
+LR run 1 3-1,3b low-resource coculture,C,9.0,14.673040631555557
+LR run 1 3-1,3b low-resource coculture,C,10.0,20.602441749277776
+LR run 1 3-1,3b low-resource coculture,C,11.0,11.721979587944446
+LR run 1 3-1,3b low-resource coculture,C,12.0,12.373445715500003
+LR run 1 3-1,3b low-resource coculture,C,13.0,11.765658308999997
+LR run 2 1-3,3b low-resource coculture,C,0.0,75.0
+LR run 2 1-3,3b low-resource coculture,C,1.0,339.50326666666666
+LR run 2 1-3,3b low-resource coculture,C,2.0,453.1713333333333
+LR run 2 1-3,3b low-resource coculture,C,3.0,873.4261
+LR run 2 1-3,3b low-resource coculture,C,4.0,669.6772666666667
+LR run 2 1-3,3b low-resource coculture,C,5.0,539.02
+LR run 2 1-3,3b low-resource coculture,C,6.0,216.1353
+LR run 2 1-3,3b low-resource coculture,C,7.0,190.2848333333333
+LR run 2 1-3,3b low-resource coculture,C,8.0,75.98884
+LR run 2 1-3,3b low-resource coculture,C,9.0,61.67606333333333
+LR run 2 1-3,3b low-resource coculture,C,10.0,31.275949999999998
+LR run 2 1-3,3b low-resource coculture,C,11.0,15.114258
+LR run 2 1-3,3b low-resource coculture,C,12.0,99.01080999999999
+LR run 2 1-1,3b low-resource coculture,C,0.0,50.0
+LR run 2 1-1,3b low-resource coculture,C,1.0,175.43313333333333
+LR run 2 1-1,3b low-resource coculture,C,2.0,240.72316666666666
+LR run 2 1-1,3b low-resource coculture,C,4.0,442.7222
+LR run 2 1-1,3b low-resource coculture,C,5.0,371.97223333333335
+LR run 2 1-1,3b low-resource coculture,C,6.0,200.91053333333335
+LR run 2 1-1,3b low-resource coculture,C,7.0,182.07213333333334
+LR run 2 1-1,3b low-resource coculture,C,8.0,81.05969666666665
+LR run 2 1-1,3b low-resource coculture,C,9.0,76.70168666666666
+LR run 2 1-1,3b low-resource coculture,C,10.0,50.20772333333333
+LR run 2 1-1,3b low-resource coculture,C,11.0,43.4523
+LR run 2 1-1,3b low-resource coculture,C,12.0,28.455650000000002
+LR run 2 3-1,3b low-resource coculture,C,0.0,25.0
+LR run 2 3-1,3b low-resource coculture,C,1.0,160.48364333333333
+LR run 2 3-1,3b low-resource coculture,C,2.0,176.10136666666665
+LR run 2 3-1,3b low-resource coculture,C,3.0,259.10996666666665
+LR run 2 3-1,3b low-resource coculture,C,4.0,197.31803333333332
+LR run 2 3-1,3b low-resource coculture,C,5.0,123.9901
+LR run 2 3-1,3b low-resource coculture,C,6.0,73.97585333333335
+LR run 2 3-1,3b low-resource coculture,C,7.0,59.372040000000005
+LR run 2 3-1,3b low-resource coculture,C,8.0,33.26265
+LR run 2 3-1,3b low-resource coculture,C,9.0,26.387753333333333
+LR run 2 3-1,3b low-resource coculture,C,10.0,16.269606666666665
+LR run 2 3-1,3b low-resource coculture,C,11.0,15.085693333333333
+LR run 2 3-1,3b low-resource coculture,C,12.0,6.139588

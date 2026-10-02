@@ -1,0 +1,66 @@
+┌ Info: optimising
+│   sc.name = "A2780 monoculture"
+└   sname = "bounds [0.62, 1.47] (as OptimalControlOne)"
+┌ Info: optimising
+│   sc.name = "A2780 monoculture"
+└   sname = "bounds [0, 1.47] (drug holidays allowed)"
+┌ Info: optimising
+│   sc.name = "50:50 co-culture"
+└   sname = "bounds [0.62, 1.47] (as OptimalControlOne)"
+┌ Info: optimising
+│   sc.name = "50:50 co-culture"
+└   sname = "bounds [0, 1.47] (drug holidays allowed)"
+┌ Info: optimising
+│   sc.name = "25S:75R co-culture"
+└   sname = "bounds [0.62, 1.47] (as OptimalControlOne)"
+┌ Info: optimising
+│   sc.name = "25S:75R co-culture"
+└   sname = "bounds [0, 1.47] (drug holidays allowed)"
+6×5 DataFrame
+ Row │ scenario            setting                            gradient_obj  bbo_obj  max_dose_diff
+     │ String              String                             Float64       Float64  Float64
+─────┼─────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…       7.09542  7.21337       0.347642
+   2 │ A2780 monoculture   bounds [0, 1.47] (drug holidays …       6.63851  6.85872       1.47
+   3 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…       8.00083  8.03191       0.736265
+   4 │ 50:50 co-culture    bounds [0, 1.47] (drug holidays …       7.93854  7.96336       0.566799
+   5 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…       8.09543  8.10146       0.525931
+   6 │ 25S:75R co-culture  bounds [0, 1.47] (drug holidays …       8.0671   8.07866       0.611867
+33×11 DataFrame
+ Row │ scenario            setting                            schedule                           mean_dose  total_closed  total_closed_sd  R_frac_closed  total_ude  total_hill  support                            rel_to_constant
+     │ String              String                             String                             Float64    Float64       Float64          Float64        Float64    Float64     String                             Float64
+─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  OPTIMAL (closed form)               1.0          1150.21          122.097      1.97444e-7   1641.59      931.554   2 dose changes (training has ≤ 1)        0.605419
+   2 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  optimal under UDE                   1.0          1410.47          100.238      8.53372e-7   1310.87     1765.77    2 dose changes (training has ≤ 1)        0.742408
+   3 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  constant 1 uM                       1.0          1899.86           85.7719     1.64766e-7   2033.69     1828.54    within training support                  1.0
+   4 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  front-loaded (max first)            1.0          1776.13          157.428      7.16081e-7   1668.41     2208.56    within training support                  0.934872
+   5 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  back-loaded (max last)              1.0          1715.46          166.39       6.26244e-8   2113.07     1320.86    within training support                  0.902941
+   6 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  1 uM on d0-6, off after (as data)   0.538462     3398.75          154.613      2.8624e-8    3430.12     3569.83    within training support                  1.78894
+   7 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  off d0-6, 1 uM after (as data)      0.461538     3130.11           73.0886     2.95136e-9   3255.16     2818.16    within training support                  1.64754
+   8 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  constant 1.47 uM                    1.47           47.1099          7.35122    0.000156096    48.5504     76.1387  within training support                  0.0247965
+   9 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  no drug                             0.0          3515.72          200.635      2.16512e-9   3670.47     3700.61    within training support                  1.85051
+  10 │ A2780 monoculture   bounds [0, 1.47] (drug holidays …  OPTIMAL (closed form)               1.0           734.156          64.2224     8.74682e-7   1286.96      683.576   3 dose changes (training has ≤ 1)        0.386426
+  11 │ A2780 monoculture   bounds [0, 1.47] (drug holidays …  optimal under UDE                   1.0           744.972         111.614      6.95631e-6    711.156    1302.06    2 dose changes (training has ≤ 1)        0.392119
+  12 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  OPTIMAL (closed form)               1.0          2910.26          149.0        0.793912     2737.0      2449.5     within training support                  0.908624
+  13 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  optimal under UDE                   1.0          2910.26          149.0        0.793912     2737.0      2449.5     within training support                  0.908624
+  14 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  constant 1 uM                       1.0          3202.93          206.699      0.868327     3062.66     3008.62    within training support                  1.0
+  15 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  front-loaded (max first)            1.0          3284.52          227.954      0.930724     3213.32     3289.82    within training support                  1.02547
+  16 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  back-loaded (max last)              1.0          3027.95          166.363      0.801993     2859.25     2665.26    within training support                  0.945371
+  17 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  1 uM on d0-6, off after (as data)   0.538462     3288.7           160.247      0.750778     3490.61     3525.89    within training support                  1.02678
+  18 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  off d0-6, 1 uM after (as data)      0.461538     3094.63           97.0073     0.29331      3157.66     2987.69    within training support                  0.966188
+  19 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  constant 1.47 uM                    1.47         3311.85          249.438      0.990925     2635.08     2656.3     within training support                  1.03401
+  20 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  no drug                             0.0          3399.48          115.17       0.224364     3562.54     3555.67    within training support                  1.06137
+  21 │ 50:50 co-culture    bounds [0, 1.47] (drug holidays …  OPTIMAL (closed form)               1.0          2735.75          139.296      0.805171     2222.94     2494.24    2 dose changes (training has ≤ 1)        0.85414
+  22 │ 50:50 co-culture    bounds [0, 1.47] (drug holidays …  optimal under UDE                   1.0          2735.75          139.296      0.805171     2222.94     2494.24    2 dose changes (training has ≤ 1)        0.85414
+  23 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  OPTIMAL (closed form)               1.0          3177.42          210.254      0.908708     3074.72     2807.77    within training support                  0.966351
+  24 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  optimal under UDE                   1.0          3186.32          211.296      0.907211     3080.69     2845.21    4 dose changes (training has ≤ 1)        0.969058
+  25 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  constant 1 uM                       1.0          3288.06          234.13       0.944495     3224.41     3194.73    within training support                  1.0
+  26 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  front-loaded (max first)            1.0          3321.24          245.942      0.97032      3292.94     3387.16    within training support                  1.01009
+  27 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  back-loaded (max last)              1.0          3221.52          217.876      0.912667     3129.29     2959.64    within training support                  0.979763
+  28 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  1 uM on d0-6, off after (as data)   0.538462     3317.19          215.066      0.898656     3590.04     3613.36    within training support                  1.00886
+  29 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  off d0-6, 1 uM after (as data)      0.461538     3159.07          147.187      0.598838     3188.35     3221.96    within training support                  0.960768
+  30 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  constant 1.47 uM                    1.47         3332.12          255.728      0.995182     2961.75     2699.32    within training support                  1.0134
+  31 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  no drug                             0.0          3324.48          102.114      0.512987     3558.69     3573.64    within training support                  1.01107
+  32 │ 25S:75R co-culture  bounds [0, 1.47] (drug holidays …  OPTIMAL (closed form)               1.0          3097.52          186.094      0.900705     2764.29     2760.71    2 dose changes (training has ≤ 1)        0.942051
+  33 │ 25S:75R co-culture  bounds [0, 1.47] (drug holidays …  optimal under UDE                   1.0          3097.52          186.094      0.900705     2764.29     2760.71    2 dose changes (training has ≤ 1)        0.942051
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\control\report.html

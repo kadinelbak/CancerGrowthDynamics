@@ -9,3 +9,8 @@ Datasets/
 Processed_Datasets/
 **/.julia_depot/
 .agent_low_resource_report/
+
+# Reproducible-pipeline branch (2026-10-02): local Julia depot, binary checkpoints and run logs
+.julia-depot/
+**/*.jls
+Modeling_Approaches/02_mechanical_automatic_package/outputs/*.log

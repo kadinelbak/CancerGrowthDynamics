@@ -1,0 +1,33 @@
+┌ Info: dropping terms whose interval includes 0
+└   form = "simple"
+┌ Info: dropping terms whose interval includes 0
+└   form = "best"
+6×3 DataFrame
+ Row │ model                 kill_params  bic_drug
+     │ String                Int64        Float64
+─────┼─────────────────────────────────────────────
+   1 │ closed form (simple)            3   338.886
+   2 │ closed form (best)              3   338.888
+   3 │ no drug                         0  1808.95
+   4 │ Hill (mechanistic)              5   331.298
+   5 │ UDE (NN kill)                 113   902.451
+   6 │ pure neural ODE               129   967.91
+4×5 DataFrame
+ Row │ model                 train: drug units  train: untreated co-culture  VALIDATION: LR + cisplatin co-culture  VALIDATION: ce1 treated co-culture
+     │ String                Float64?           Float64?                     Float64?                               Float64?
+─────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ closed form (simple)           0.218407                     0.799465                                1.22227                            0.342738
+   2 │ closed form (best)             0.218398                     0.799432                                1.22118                            0.342671
+   3 │ UDE (NN kill)                  0.229744                     0.802457                                1.2201                             0.354281
+   4 │ Hill (mechanistic)             0.223974                     0.872985                                1.08932                            0.431267
+6×7 DataFrame
+ Row │ form    line    term    estimate   lo         hi         includes_zero
+     │ String  String  String  Float64    Float64    Float64    Bool
+─────┼────────────────────────────────────────────────────────────────────────
+   1 │ simple  S       v        0.640551   0.409851   0.812305          false
+   2 │ simple  S       v³       0.146769   0.106011   0.222899          false
+   3 │ simple  S       v·ρ     -0.632754  -0.846272  -0.371746          false
+   4 │ best    S       v        0.640466   0.410176   0.812324          false
+   5 │ best    S       v³       0.14679    0.105951   0.222802          false
+   6 │ best    S       v·ρ     -0.63268   -0.846261  -0.372077          false
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\symbolic\report.html

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>[Archived] Presentation — A2780 staged fitting (live)</title>
+<link rel="stylesheet" href="site.css">
+<style>
+html,body{height:100%;margin:0;background:#0f1d27;overflow:hidden}
+#bar{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:6px 12px;background:#0f1d27;color:#c9d6de;font:13px system-ui}
+#bar a,#bar button{color:#c9d6de;background:#1c3040;border:0;border-radius:6px;padding:5px 10px;text-decoration:none;font:600 12px system-ui;cursor:pointer}
+#bar .count{margin-left:auto}
+#viewport{position:fixed;top:38px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center}
+#deck{position:relative;width:1600px;height:900px;transform-origin:center center}
+.slide.title{justify-content:center}
+.slide{position:absolute;inset:0;background:#f6f4ee;color:#16283a;padding:56px 72px;display:flex;flex-direction:column;gap:18px;visibility:hidden;opacity:0;transition:opacity .25s;overflow:hidden;border-radius:6px}
+.slide.on{visibility:visible;opacity:1}
+.slide.dark{background:#16283a;color:#f6f4ee}
+.slide h1{font:600 64px/1.1 Georgia,serif;color:inherit;margin:0}
+.slide h2{font:600 42px/1.15 Georgia,serif;color:#16283a;margin:0}
+.slide .sub{font-size:20px;color:#4a5866;margin:0}
+.slide.dark .sub{color:#b9c9d3}
+.eyebrow{font:700 16px system-ui;letter-spacing:.08em;text-transform:uppercase;color:#0b6e99}
+.slide.dark .eyebrow{color:#8ccbe6}
+.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;flex:1;min-height:0}
+.mcard{background:#fff;border:1px solid #d6dee3;border-radius:12px;padding:10px 16px;margin-bottom:12px}
+.mcard.opt{border:3px solid #0b6e99}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}.pair .mcard{margin:0}
+.mcard .tag{font-size:13px}
+.mcard h3{font:650 22px/1.2 system-ui;margin:4px 0}
+.mcard .stats{font-size:15px}
+.mcard .eq{font-size:15px;border:0;background:#f7fafb;margin:4px 0}
+.plist{font-size:15px;margin:4px 0 0;padding-left:18px;columns:2;column-gap:22px}
+.plist li{margin:2px 0}
+.big table{font-size:18px}.big th,.big td{padding:8px 10px}
+.bul{font-size:26px;line-height:1.45;margin:0;padding-left:28px}.bul li{margin:8px 0}
+.foot{position:absolute;left:72px;right:72px;bottom:22px;font-size:14px;color:#6b7782;display:flex;justify-content:space-between}
+.slide.dark .foot{color:#9fb2bf}
+svg.plot{border:1px solid #d6dee3}
+</style>
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script>');</script>
+</head><body>
+<div id="bar"><span style="background:#8a5a00;color:#fff;border-radius:6px;padding:3px 8px;font-weight:700">ARCHIVED · time-based</span><a href="index.html">Archive index</a><a href="../../index.html">⌂ Home</a><a href="summary.html">Summary</a><a href="explorer.html">Explorer</a><a href="../final_report/report.html">Final report</a>
+  <button id="fs">Full screen (F)</button><span class="muted" style="color:#9fb2bf">← → to move</span><span class="count" id="count"></span></div>
+<div id="viewport"><div id="deck"></div></div>
+<script>
+const deck = document.getElementById('deck');
+const slides = [];
+const foot = n => `<div class="foot"><span>A2780 / A2780cis staged fitting · live results</span><span>${RES ? 'run ' + esc(RES.generated) : ''}</span></div>`;
+function add(html, cls = '') { slides.push(`<section class="slide ${cls}">${html}</section>`); }
+function plist(m) {
+  if (!m.params.length) return '<p class="muted" style="font-size:16px">No free parameters (all carried over).</p>';
+  return '<ul class="plist">' + m.params.map(p => `<li>${texInline(p.tex)} = <b>${fmt(p.value)}</b> <span class="muted">(${fmt(p.lo)} – ${fmt(p.hi)})</span>${p.atbound ? ' <span class="flag">at bound</span>' : ''}</li>`).join('') + '</ul>';
+}
+function mcard(g, m) {
+  return `<div class="mcard opt"><span class="tag">Optimal · bootstrap pick</span><h3>${esc(m.label)}</h3>
+    <div class="stats"><span><b>${m.k}</b> parameter${m.k === 1 ? '' : 's'}</span><span>BIC <b>${fmt(m.bic)}</b></span><span>picked in <b>${pctf(m.pick)}</b></span></div>
+    ${m.tex.map(texBlock).join('')}${plist(m)}</div>`;
+}
+function build() {
+  if (!RES) { add('<h2>No results yet</h2><p class="sub">Run run_bootstrap_fits.jl once; this deck draws from its output.</p>'); return; }
+  add(`<div><div class="eyebrow">A2780 / A2780cis · new data · live</div>
+       <h1>Staged growth-model fitting</h1><p class="sub" style="margin-top:18px">The optimal model at every stage, redrawn from the latest full run</p>
+       <p class="sub" style="margin-top:10px">Run ${esc(RES.generated)} · ${RES.replicates} bootstrap replicates per fit</p></div>${foot()}`, 'dark title');
+  const stages = [...new Map(RES.groups.map(g => [g.stage, g])).keys()];
+  add(`<div class="eyebrow">How models were chosen</div><h2>Five stages, each building on the last</h2>
+       <ul class="bul"><li>Stages: ${stages.map(esc).join(' → ')}.</li>
+       <li><b>Optimal</b>: the model the bootstrap picks most often; a simpler model wins unless it costs more than ${RES.perParamBIC} BIC per removed parameter.</li>
+       <li>Intervals are 95% bootstrap percentiles; values carried over from earlier stages are held fixed.</li></ul>${foot()}`);
+  const rows = RES.groups.map(g => `<tr><td>${esc(g.title)}</td><td><b>${esc(g.optimal.label)}</b> (${g.optimal.k})</td><td class="num">${pctf(g.optimal.pick)}</td></tr>`).join('');
+  add(`<div class="eyebrow">At a glance</div><h2>Optimal model, every fit</h2><div class="big tscroll"><table><tr><th>Fit</th><th>Optimal (parameters)</th><th>Picked in</th></tr>${rows}</table></div>${foot()}`);
+  for (const g of RES.groups) {
+    const ptitle = g.panels.length > 1 ? g.panels[g.mainPanel - 1] : '';
+    const cards = mcard(g, g.optimal);
+    const multiEq = g.optimal.tex.length > 1;
+    const body = multiEq
+      // several equations: full-width card, wide plot below
+      ? `${cards}${groupPlot(g, g.mainPanel, { w: 1456, h: 300, title: ptitle })}`
+      : `<div class="cols"><div>${groupPlot(g, g.mainPanel, { w: 900, h: 560, title: ptitle })}</div><div>${cards}</div></div>`;
+    add(`<div class="eyebrow">${esc(g.stage)}</div><h2>${esc(g.title)}</h2><p class="sub">${esc(g.text)}</p>${body}${foot()}`);
+  }
+  const bullets = RES.groups.map(g => {
+    const o = g.optimal;
+    return `<li><b>${esc(g.title)}:</b> ${esc(o.label)} (${o.k} parameter${o.k === 1 ? '' : 's'}, ${pctf(o.pick)} of replicates)${o.reachesZero ? '; reaches zero' : ''}.</li>`;
+  }).join('');
+  add(`<div class="eyebrow">Key findings</div><h2>What the latest run says</h2><ul class="bul" style="font-size:19px">${bullets}</ul>${foot()}`);
+  add(`<div><div class="eyebrow">Explore further</div><h1>Change a parameter, watch the fit</h1>
+       <p class="sub" style="margin-top:18px">Explorer: live sliders for every optimal model · Summary: full tables · Final report: every detailed analysis</p></div>${foot()}`, 'dark title');
+}
+build();
+deck.innerHTML = slides.join('');
+const els = [...deck.querySelectorAll('.slide')];
+let cur = Math.min(Math.max(parseInt(location.hash.slice(1)) - 1 || 0, 0), els.length - 1);
+function show(i) {
+  cur = Math.max(0, Math.min(els.length - 1, i));
+  els.forEach((e, k) => e.classList.toggle('on', k === cur));
+  document.getElementById('count').textContent = `${cur + 1} / ${els.length}`;
+  history.replaceState(null, '', '#' + (cur + 1));
+}
+function fit() {
+  const vp = document.getElementById('viewport');
+  const s = Math.min(vp.clientWidth / 1600, vp.clientHeight / 900) * 0.98;
+  deck.style.transform = `scale(${s})`;
+}
+document.addEventListener('keydown', e => {
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(cur + 1); }
+  else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); show(cur - 1); }
+  else if (e.key === 'Home') show(0); else if (e.key === 'End') show(els.length - 1);
+  else if (e.key === 'f' || e.key === 'F') toggleFs();
+});
+deck.addEventListener('click', e => { if (e.target.closest('a,button')) return; const r = deck.getBoundingClientRect(); show(e.clientX > r.left + r.width / 2 ? cur + 1 : cur - 1); });
+function toggleFs() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }
+document.getElementById('fs').onclick = toggleFs;
+window.addEventListener('resize', fit);
+fit(); show(cur);
+</script></body></html>

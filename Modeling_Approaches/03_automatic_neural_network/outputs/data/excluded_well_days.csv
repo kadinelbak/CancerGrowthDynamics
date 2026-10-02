@@ -1,0 +1,4 @@
+traj_id,day,well,value,rule
+ce0_75S25R_20k_S,7.0,B1,1687.0457175925924,well spike (>2x vs own neighbours)
+ce0_75S25R_30k_R,12.0,C4,774.9173611111111,well spike (>2x vs own neighbours)
+ce1_25S75R_30k_S,13.0,C6,2395.2395833333335,well spike (>2x vs own neighbours)

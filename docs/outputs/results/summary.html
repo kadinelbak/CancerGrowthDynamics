@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Summary — A2780 staged fitting</title>
+<link rel="stylesheet" href="site.css">
+<style>.glance-eq{font-size:.86em;overflow-x:auto;max-width:640px;margin-top:4px}.glance-eq mjx-container[display]{margin:.15em 0 !important;text-align:left !important}</style>
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script><script src="control.js?' + __v + '"><\/script><script src="control30.js?' + __v + '"><\/script>');</script>
+</head><body><main id="app"></main>
+<script>
+const app = document.getElementById('app');
+function modelCard(g, m) {
+  const zero = m.reachesZero !== undefined ? ` · reaches zero: <b>${m.reachesZero ? 'yes' : 'no'}</b>` : '';
+  return `<div class="model optimal"><span class="tag">Optimal · fewest terms within 3 BIC</span>
+    <h3>${esc(m.label)}</h3>
+    <div class="stats"><span><b>${m.k}</b> free parameter${m.k === 1 ? '' : 's'}</span><span>BIC <b>${fmt(m.bic)}</b></span><span>${esc(m.family || "")}</span><span>chosen in <b>${pctf(m.pick)}</b> of bootstrap replicates${zero}</span>${tipK('stats')}</div>
+    <div class="muted" style="font-size:12px">Equations${tipK('eq')}</div>${m.tex.map(texBlock).join('')}${paramTable(m)}</div>`;
+}
+// the optimal model's equations, one display line each (for the at-a-glance table)
+// every candidate's equations (from the Explorer's model list), for the 'All candidates' tables
+const candEq = (g, r) => { const m = (g.models || []).find(x => x.name === r.name); return m ? glanceEq(m) : ''; };
+// optimal-control summary (control.js, written by control_report.jl); absent until run_control.jl has run
+function controlTable(C) {
+  const T = {
+    run: 'Environment (normal medium = Stage 3a model; low resource = Stage 4 model) and drug-response scenario: A = coculture fit as selected (Stage 3a; resistant cells keep a cisplatin kill), B = monoculture drug response for both lines. All start from the 50:50 seeding.',
+    sched: 'Dose chosen by MPC for each 2-day interval between media changes, restricted to the measured doses 0, 0.62, 1 and 1.47 µM (data-supported mode).',
+    tot: 'Total cells N + C on day 14 (model simulation) under MPC, constant 1 µM and the maximum measured dose. Lower is less cancer burden.',
+    rf: 'Resistant fraction C/(N + C) on day 14 under MPC and constant 1 µM.',
+    dose: 'Cumulative dose (µM·days) under MPC and constant 1 µM.',
+    tox: 'Highest toxicity burden T under MPC (literature proxy; the bound is ' + C.Btox + ').'
+  };
+  const rows = C.rows.map(r => `<tr><td>${esc(r.run)}</td><td>${r.schedule.map(u => u.toFixed(2).replace(/\.?0+$/, '')).join(', ')}</td><td class="num">${Math.round(r.mpc.total)} · ${Math.round(r.const1.total)} · ${Math.round(r.mtd.total)}</td><td class="num">${r.mpc.rf.toFixed(2)} · ${r.const1.rf.toFixed(2)}</td><td class="num">${r.mpc.cum.toFixed(1)} · ${r.const1.cum.toFixed(1)}</td><td class="num">${r.mpc.maxTox.toFixed(3)}</td></tr>`).join('');
+  return `<div class="tscroll"><table><tr><th>Run${infoTip(T.run, 'none')}</th><th>MPC schedule (µM)${infoTip(T.sched, 'none')}</th><th>N + C day 14: MPC · 1 µM · 1.47 µM${infoTip(T.tot, 'lower')}</th><th>Resistant fraction: MPC · 1 µM${infoTip(T.rf, 'lower')}</th><th>Dose µM·d: MPC · 1 µM${infoTip(T.dose, 'lower')}</th><th>Max toxicity${infoTip(T.tox, 'lower')}</th></tr>${rows}</table></div>`;
+}
+// 30-day dose + fasting control summary (control30.js, written by control_fasting_report.jl)
+function control30Table(C) {
+  const T = {
+    run: 'Drug-response scenario (A: coculture fit as selected; B: monoculture drug response). 50:50 start, 30 days (days after ' + C.dataDays + ' are beyond the data).',
+    sched: 'Dose (µM) chosen by MPC for each 2-day interval; F marks an interval run in low resource ("fasting", 0.5% FBS). Measured levels only; fasts up to 48 h with at least 2 days of refeeding.',
+    tot: 'Total cells N + C on day ' + C.days + ': MPC with fasting · MPC without fasting · constant 1 µM.',
+    C: 'Resistant A2780cis cells on day ' + C.days + ': MPC with fasting · MPC without fasting · constant 1 µM.',
+    dose: 'Cumulative cisplatin (µM·days) and days spent fasting under MPC with fasting.',
+    host: 'Lowest body weight (fraction of baseline; limit ' + C.Wmin + ', the cachexia threshold) and highest healthy-tissue loss T (limit 0.25) under MPC with fasting.'
+  };
+  const rows = C.rows.map(r => `<tr><td>${esc(r.run)}</td><td>${r.dose.map((u, k) => (r.fast[k] > 0 ? '<b>F</b>' : '') + u.toFixed(2).replace(/\.?0+$/, '')).join(' ')}</td><td class="num">${Math.round(r.mpc2.total)} · ${Math.round(r.mpc1.total)} · ${Math.round(r.const1.total)}</td><td class="num">${Math.round(r.mpc2.C)} · ${Math.round(r.mpc1.C)} · ${Math.round(r.const1.C)}</td><td class="num">${r.mpc2.cum.toFixed(1)} µM·d · ${Math.round(r.mpc2.fast)} d</td><td class="num">${r.mpc2.minW.toFixed(3)} · ${r.mpc2.maxTox.toFixed(3)}</td></tr>`).join('');
+  return `<div class="tscroll"><table><tr><th>Run${infoTip(T.run, 'none')}</th><th>MPC schedule (µM; F = fasting)${infoTip(T.sched, 'none')}</th><th>N + C day ${C.days}: fasting MPC · MPC · 1 µM${infoTip(T.tot, 'lower')}</th><th>Resistant C day ${C.days}${infoTip(T.C, 'lower')}</th><th>Dose · fasting days${infoTip(T.dose, 'lower')}</th><th>Min weight · max toxicity${infoTip(T.host, 'Higher weight and lower toxicity are better.')}</th></tr>${rows}</table></div>`;
+}
+const glanceEq = m => `<div class="glance-eq">${m.tex.map(t => `\\[${t}\\]`).join('')}</div>`;
+// why the rule kept this model: the other candidates within 3 BIC of the lowest, and what beat them
+function whyModel(g) {
+  const rk = g.ranking || [];
+  if (rk.length < 2) return '';
+  const o = rk[0], low = Math.min(...rk.map(r => r.bic)), band = rk.filter(r => r.bic <= low + 3);
+  const others = band.filter(r => r !== o);
+  const out = [];
+  if (!others.length) out.push(`it has the lowest BIC and no other candidate comes within 3 BIC (the next is ${esc(rk[1].label)}, ΔBIC ${dsign(rk[1].dbic)}).`);
+  else {
+    out.push(`${band.length} candidates are within 3 BIC of the lowest; the rule takes the fewest free parameters, then the lower BIC.`);
+    for (const r of others.slice(0, 4)) {
+      out.push(r.k > o.k
+        ? `${esc(r.label)} fits ${r.dbic < 0 ? 'slightly better' : 'slightly worse'} (ΔBIC ${dsign(r.dbic)}) but needs ${r.k} parameters instead of ${o.k}.`
+        : `${esc(r.label)} has the same ${r.k} parameters but a higher BIC (ΔBIC ${dsign(r.dbic)}), so the tie goes to this model.`);
+    }
+  }
+  const alt = rk.slice(1).reduce((a, r) => (!a || r.pick > a.pick ? r : a), null);
+  if (isFinite(o.pick) && o.pick < 50 && alt)
+    out.push(`With resampled data the choice is not robust: the rule picks this model in ${pctf(o.pick)} of bootstrap replicates, and ${esc(alt.label)} in ${pctf(alt.pick)}.`);
+  const joint = g.kind === 's2' ? ' (the structure is shared by both lines and was chosen on their joint BIC, see the note above; for this line alone:)' : '';
+  return `<p class="note"><b>Why this model${joint}:</b>${tipK('why')} ${out.join(' ')}</p>`;
+}
+function render() {
+  if (!RES) { app.innerHTML = navHTML('summary'); missingBundle(app); return; }
+  const rows = RES.groups.map(g => {
+    const o = g.optimal;
+    const next = (g.ranking || [])[1];
+    const note = next ? `next: ${esc(next.label)} (ΔBIC ${dsign(next.dbic)}, k=${next.k})` : '';
+    return `<tr><td><a href="#${g.id}">${esc(g.title)}</a></td><td><b>${esc(o.label)}</b> <span class="muted">(k=${o.k})</span>${glanceEq(o)}</td><td class="num">${pctf(o.pick)}</td><td class="num">${fmt(o.bic)}</td><td class="muted">${note}</td></tr>`;
+  }).join('');
+  const sections = RES.groups.map(g => `
+    <section class="card" id="${g.id}"><h2>${esc(g.title)}</h2><p class="muted">${esc(g.text)} ${g.candidates} candidate models compared.</p>
+      ${g.selectionNote ? `<p class="note">${esc(g.selectionNote)}${tipK('note')}</p>` : ''}
+      ${modelCard(g, g.optimal)}
+      ${whyModel(g)}
+      ${groupPlot(g, g.mainPanel)}
+      ${(g.ranking || []).length > 1 ? `<details><summary>All ${g.ranking.length} candidates of this stage</summary><div class="tscroll"><table><tr><th>Model and its equations${tipK('eq')}</th><th>Family${tipK('family')}</th><th>k${tipK('k')}</th><th>ΔBIC vs optimal${tipK('dbic')}</th><th>Chosen in bootstrap${tipK('chosen')}</th></tr>${g.ranking.map((r, i) => `<tr${i === 0 ? ' class="win"' : ''}><td><b>${esc(r.label)}</b>${candEq(g, r)}</td><td class="muted">${esc(r.family)}</td><td class="num">${r.k}</td><td class="num">${i === 0 ? '0' : dsign(r.dbic)}</td><td class="num">${pctf(r.pick)}</td></tr>`).join('')}</table></div><p class="muted">Try any of them, or build your own, in the <a href="explorer.html#${g.id}">Explorer</a>.</p></details>` : ''}
+      ${g.panels.length > 1 ? `<p class="muted">Shown: ${esc(g.panels[g.mainPanel - 1])}. All ${g.panels.length} panels are in the Explorer.</p>` : ''}
+      <div class="links"><a class="btn" href="explorer.html#${g.id}">Open in Explorer</a>
+        <a class="btn" href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_fits/report.html#${g.id}">All candidates</a></div>
+    </section>`).join('');
+  app.innerHTML = `${navHTML('summary')}
+    <h1>Summary — the optimal model at every stage</h1>${runInfo()}
+    <div class="card lead"><p><b>How to read this.</b> Every model here is <b>autonomous</b>: no term uses time directly. Delays and accumulation come from drug-effect, stress or damaged-cell states driven by the dose D and the low-resource level u<sub>R</sub>, so each model can be driven by a dose schedule for optimal control. For each fit the <b>optimal</b> model is the one with the fewest free parameters among the candidates within 3 BIC of the lowest (lower BIC breaks ties), and it is carried into later stages. Every model has at most 3 compartments per cell line. Intervals are 95% bootstrap percentiles; "chosen in bootstrap" is how often the same rule picks it when the data are resampled. <a href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_fits/report.html">All candidates and equations</a> · <a href="../archive_time/index.html">archived time-based models</a>.</p>
+    <p class="muted">This page redraws from the latest full run each time it is opened. Lines: optimal fit (95% band shaded); points are data, grey × are excluded points.</p></div>
+    <div class="card"><h2>At a glance</h2><div class="tscroll"><table><tr><th>Fit${tipK('fit')}</th><th>Optimal model (fewest terms within 3 BIC) and its equations${tipK('model')}</th><th>Chosen in bootstrap${tipK('chosen')}</th><th>BIC${tipK('bic')}</th><th>Runner-up${tipK('runner')}</th></tr>${rows}</table></div></div>
+    ${sections}
+    ${window.CONTROL ? `<section class="card" id="control"><h2>Optimal control of the cisplatin schedule</h2>
+      <p class="muted">Sequential model-predictive control (MPC) chooses the dose at each media change on the carried models, trading cancer burden against a literature toxicity proxy (de Pillis &amp; Radunskaya 2001). Model simulations only; no schedule here has been tested in the lab.</p>
+      ${controlTable(window.CONTROL)}
+      <p class="note">${esc(window.CONTROL.finding)}</p>
+      <div class="links"><a class="btn" href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/control/report.html">Full optimal-control report</a></div></section>` : ''}
+    ${window.CONTROL30 ? `<section class="card" id="control30"><h2>Optimal control over ${window.CONTROL30.days} days: cisplatin and fasting</h2>
+      <p class="muted">MPC chooses both the dose and whether to fast (low resource, 0.5% FBS) at each media change, with a weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days after ${window.CONTROL30.dataDays} are beyond the data, and the fasting effect is the in-vitro effect at full strength (no in-vivo attenuation yet), so it is an upper bound.</p>
+      ${control30Table(window.CONTROL30)}
+      ${window.CONTROL30.caveat ? `<p class="note">${esc(window.CONTROL30.caveat)}</p>` : ''}
+      <div class="links"><a class="btn" href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/control_30d/report.html">Full 30-day report</a></div></section>` : ''}`;
+  typeset(app);
+  // re-typeset a candidates table when it is opened, in case it was laid out while collapsed
+  app.querySelectorAll('details').forEach(d => d.addEventListener('toggle', () => d.open && typeset(d)));
+  if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+}
+render();
+</script></body></html>

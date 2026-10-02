@@ -1,0 +1,10 @@
+test,why_it_matters,best_neural,neural,best_mechanistic,mechanistic,winner,margin
+"Next-day prediction, held-out treated co-culture",short-term forecasting,pure neural ODE,0.23857560852834872,Hill (mechanistic),0.24321559665232265,tie,+0.005
+Forward prediction — held out: ce1 treated co-culture,the headline out-of-sample test,UDE (NN kill),0.3312434883991468,closed form (optimal),0.3523681472206385,neural,+0.021
+Forward prediction — train: untreated co-culture,"competition dynamics (fit, not held out)",UDE (NN kill),0.5624550208238115,closed form (optimal),0.5975892387163294,neural,+0.035
+Forward prediction — train: drug units,"in-sample fit (flexibility, not generalisation)",pure neural ODE,0.15993303912672077,closed form (optimal),0.20839446331962688,neural,+0.048
+Hold-out: hold out on→off intermittent,"unseen schedule: drug first, then removed",UDE (NN kill),0.1754315101488398,Hill (mechanistic),0.15749034896788705,mechanistic,-0.018
+Hold-out: hold out off→on intermittent,unseen schedule: drug added late (delayed-onset dynamics),pure neural ODE,0.19106422385332097,Hill (mechanistic),0.29219474875397483,neural,+0.101
+Hold-out: hold out 1 uM monoculture,unseen dose (interpolation) — control explores doses,UDE (NN kill),0.2810057273064403,Hill (mechanistic),0.17084477774111245,mechanistic,-0.110
+Hold-out: hold out all 20k wells,unseen seeding density,pure neural ODE,0.2451236194017061,Hill (mechanistic),0.23519193462226742,tie,-0.010
+BIC on training drug units (lower = better fit per parameter),evidence per parameter; 12–28 wells,UDE (NN kill),930.4091543895573,closed form (optimal),299.2916834072126,mechanistic,-631.117

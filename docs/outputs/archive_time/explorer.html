@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>[Archived] Explorer — A2780 staged fitting</title>
+<link rel="stylesheet" href="site.css">
+<style>
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.ctrl .lbl{font-weight:650;color:var(--muted);font-size:13px;min-width:70px}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media(max-width:1000px){.layout{grid-template-columns:1fr}}
+.slider{display:grid;grid-template-columns:90px minmax(0,1fr) 92px;gap:10px;align-items:center;margin:8px 0}
+.slider input[type=range]{width:100%}
+.slider input[type=number]{width:92px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font:13px system-ui}
+.fit{font-size:14px;margin:6px 0}.fit b{font-size:16px}
+.better{color:#1f7a3d}.worse{color:#a33b1d}
+select{padding:5px 8px;border-radius:8px;border:1px solid var(--line);font:14px system-ui}
+</style>
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script>');</script>
+</head><body><div style="background:#fff3d6;border-bottom:1px solid #efd18b;padding:9px 16px;font:600 14px system-ui,sans-serif;color:#5a3d00">ARCHIVED (time-based models, not usable for optimal control). <a href="index.html" style="color:#176b87">Archive index</a> · <a href="../results/summary.html" style="color:#176b87">current results</a></div><main id="app"></main>
+<script>
+const app = document.getElementById('app');
+const state = { gi: 0, role: 'optimal', panel: 1, params: null, showFitted: true };
+
+function group() { return RES.groups[state.gi]; }
+function model() { return group()[state.role]; }
+
+function sliderRange(p, bnd) {
+  const lo = Math.max(bnd[0], 0);
+  let hi = Math.max(3 * Math.abs(p.value), p.hi && isFinite(p.hi) ? 1.5 * p.hi : 0, lo + 1e-3);
+  if (p.value < 1e-6) hi = Math.min(bnd[1], 1);
+  return [lo, Math.min(bnd[1], hi)];
+}
+
+function sse(g, simres) {
+  let s = 0;
+  for (const ser of g.series) ser.x.forEach((x, i) => { const d = at(simres, ser.state, x) - ser.y[i]; s += d * d; });
+  return s;
+}
+
+function renderPlot() {
+  const g = group(), m = model();
+  const simres = simulate(m.sim, state.params, g.xmax);
+  const out = document.getElementById('plot'), fitEl = document.getElementById('fit');
+  if (!simres) { out.innerHTML = '<p class="note">This model has no in-browser simulator yet.</p>'; fitEl.innerHTML = ''; return; }
+  const fitted = simulate(m.sim, m.params.map(p => p.value), g.xmax);
+  const ser = g.series.filter(s => s.panel === state.panel);
+  const points = [], excluded = [], lines = [];
+  for (const s of ser) {
+    s.x.forEach((x, i) => points.push({ x, y: s.y[i], color: s.color, filled: s.filled }));
+    (s.xbad || []).forEach((x, i) => excluded.push({ x, y: s.ybad[i] }));
+    if (state.showFitted) lines.push({ t: fitted.t, y: fitted.u.map(u => u[s.state - 1]), color: '#9aa7b0', dash: '4,3', width: 1.6 });
+    lines.push({ t: simres.t, y: simres.u.map(u => u[s.state - 1]), color: s.color, dash: s.dashed ? '8,4' : '', width: 2.6 });
+  }
+  const legend = [];
+  const seen = new Set();
+  for (const s of ser) if (!seen.has(s.name)) { seen.add(s.name); legend.push({ label: s.name, color: s.color, kind: s.filled ? 'dot' : 'open' }); }
+  legend.push({ label: 'your parameters', color: '#374151', kind: 'line' });
+  if (state.showFitted) legend.push({ label: 'fitted', color: '#9aa7b0', dash: '4,3', kind: 'line' });
+  out.innerHTML = plotSVG({ xmax: g.xmax, ymax: g.ymax, title: g.panels[state.panel - 1] || g.title, points, excluded, lines, legend, h: 360 });
+  const now = sse(g, simres), base = sse(g, fitted);
+  const rel = now / Math.max(base, 1e-12);
+  fitEl.innerHTML = `Fit to all ${g.series.reduce((a, s) => a + s.x.length, 0)} data points: SSE <b class="${rel <= 1.0001 ? 'better' : 'worse'}">${fmt(now)}</b> (fitted: ${fmt(base)}, ×${fmt(rel)})`;
+}
+
+function renderControls() {
+  const g = group(), m = model();
+  const sl = m.params.map((p, i) => {
+    const [lo, hi] = sliderRange(p, m.bounds[i]);
+    const v = state.params[i];
+    return `<div class="slider"><span>${texInline(p.tex)}</span><input type="range" min="${lo}" max="${hi}" step="${(hi - lo) / 400}" value="${v}" data-i="${i}">
+      <input type="number" value="${+v.toPrecision(4)}" step="any" data-i="${i}"></div>`;
+  }).join('');
+  document.getElementById('sliders').innerHTML = m.params.length ? sl : '<p class="muted">This model has no free parameters — every value is carried over from earlier stages.</p>';
+  document.getElementById('eqs').innerHTML = m.tex.map(texBlock).join('');
+  document.getElementById('inh').innerHTML = m.inherited.length ?
+    `<table><tr><th colspan="3">Carried over / fixed</th></tr>${m.inherited.map(p => `<tr><td>${texInline(p.sym)}</td><td class="num">${fmt(p.value)}</td><td class="muted">${esc(p.note)}</td></tr>`).join('')}</table>` : '';
+  document.querySelectorAll('#sliders input').forEach(el => el.addEventListener('input', e => {
+    const i = +e.target.dataset.i, v = parseFloat(e.target.value);
+    if (!isFinite(v)) return;
+    state.params[i] = v;
+    document.querySelectorAll(`#sliders input[data-i="${i}"]`).forEach(o => { if (o !== e.target) o.value = o.type === 'number' ? +v.toPrecision(4) : v; });
+    renderPlot();
+  }));
+  typeset(document.getElementById('side'));
+}
+
+function selectGroup(gi, role) {
+  state.gi = gi; state.role = role || 'optimal'; state.panel = group().mainPanel;
+  state.params = model().params.map(p => p.value);
+  render();
+}
+
+function render() {
+  const g = group(), m = model();
+  const gbtn = RES.groups.map((x, i) => `<button class="btn ${i === state.gi ? 'on' : ''}" data-g="${i}">${esc(x.title.replace('Stage ', 'S'))}</button>`).join('');
+  const rbtn = `<span>Optimal (bootstrap pick): <b>${esc(g.optimal.label)}</b> (k=${g.optimal.k})</span>`;
+  const pan = g.panels.length > 1 ? `<div class="ctrl"><span class="lbl">Panel</span><select id="panel">${g.panels.map((p, i) => `<option value="${i + 1}" ${i + 1 === state.panel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></div>` : '';
+  app.innerHTML = `${navHTML('explorer')}<h1>Explorer — change the parameters, watch the fit</h1>${runInfo()}
+    <div class="card"><div class="ctrl"><span class="lbl">Fit</span>${gbtn}</div><div class="ctrl"><span class="lbl">Model</span>${rbtn}</div>${pan}
+      <p class="muted">${esc(g.text)} Sliders start at the fitted values; the simulation re-runs in your browser as you move them.</p></div>
+    <div class="layout"><div class="card"><div id="plot"></div><div class="fit" id="fit"></div>
+        <div class="links"><button class="btn" id="reset">Reset to fitted values</button><button class="btn ${state.showFitted ? 'on' : ''}" id="showfit">Show fitted curve</button>
+        <a class="btn" href="summary.html#${g.id}">Back to summary</a></div></div>
+      <div class="card" id="side"><h3>${esc(m.label)}</h3><div id="eqs"></div><div id="sliders"></div><div id="inh" class="tscroll"></div></div></div>`;
+  app.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { history.replaceState(null, '', '#' + RES.groups[+b.dataset.g].id); selectGroup(+b.dataset.g); });
+  document.getElementById('panel')?.addEventListener('change', e => { state.panel = +e.target.value; renderPlot(); });
+  document.getElementById('reset').onclick = () => { state.params = m.params.map(p => p.value); renderControls(); renderPlot(); };
+  document.getElementById('showfit').onclick = e => { state.showFitted = !state.showFitted; e.target.classList.toggle('on', state.showFitted); renderPlot(); };
+  renderControls(); renderPlot();
+}
+
+if (!RES) { app.innerHTML = navHTML('explorer'); missingBundle(app); }
+else {
+  const gi = Math.max(0, RES.groups.findIndex(g => '#' + g.id === location.hash));
+  selectGroup(gi);
+}
+</script></body></html>

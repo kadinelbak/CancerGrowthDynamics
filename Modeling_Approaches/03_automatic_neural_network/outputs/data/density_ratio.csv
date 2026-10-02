@@ -1,0 +1,95 @@
+source,line,schedule,s_frac,resource,day,ratio_30k_over_20k
+mono,S,const 0.0 uM,1.0,normal,1.0,0.8794832151591392
+mono,S,const 0.0 uM,1.0,normal,7.0,0.9509377069151983
+mono,S,const 0.0 uM,1.0,normal,14.0,0.9937997035359636
+mono,S,const 1.47 uM,1.0,normal,1.0,1.4522152328296132
+mono,S,const 1.47 uM,1.0,normal,7.0,1.3324818570488433
+mono,S,const 1.47 uM,1.0,normal,14.0,1.6497318031888542
+mono,S,const 1.0 uM,1.0,normal,1.0,1.6816546547903055
+mono,S,const 1.0 uM,1.0,normal,7.0,1.1412048720518015
+mono,S,const 1.0 uM,1.0,normal,14.0,1.0312205381524209
+mono,S,const 0.62 uM,1.0,normal,1.0,1.6629057653009953
+mono,S,const 0.62 uM,1.0,normal,7.0,1.4361559079994326
+mono,S,const 0.62 uM,1.0,normal,14.0,0.9899959875607245
+intermittent,S,"d0+: 1.0 uM, d7+: 0.0 uM",1.0,normal,1.0,1.7546246486611587
+intermittent,S,"d0+: 1.0 uM, d7+: 0.0 uM",1.0,normal,7.0,1.4259697453083444
+intermittent,S,"d0+: 1.0 uM, d7+: 0.0 uM",1.0,normal,14.0,0.989793520241948
+intermittent,S,"d0+: 0.0 uM, d7+: 1.0 uM",1.0,normal,1.0,1.253869519776821
+intermittent,S,"d0+: 0.0 uM, d7+: 1.0 uM",1.0,normal,7.0,1.0047770681138337
+intermittent,S,"d0+: 0.0 uM, d7+: 1.0 uM",1.0,normal,14.0,0.9794974052961621
+mono,R,const 0.0 uM,0.0,normal,1.0,1.1878337398172503
+mono,R,const 0.0 uM,0.0,normal,7.0,1.1796380483885005
+mono,R,const 0.0 uM,0.0,normal,14.0,1.1142237019203503
+mono,R,const 1.47 uM,0.0,normal,1.0,1.1181889362417694
+mono,R,const 1.47 uM,0.0,normal,7.0,0.9962765055883361
+mono,R,const 1.47 uM,0.0,normal,14.0,1.0826517706317766
+mono,R,const 1.0 uM,0.0,normal,1.0,1.424420348561769
+mono,R,const 1.0 uM,0.0,normal,7.0,1.1056889557350802
+mono,R,const 1.0 uM,0.0,normal,14.0,1.0260953663268353
+mono,R,const 0.62 uM,0.0,normal,1.0,1.4921566315366233
+mono,R,const 0.62 uM,0.0,normal,7.0,1.1368943380956085
+mono,R,const 0.62 uM,0.0,normal,14.0,1.1135003322829187
+intermittent,R,"d0+: 1.0 uM, d7+: 0.0 uM",0.0,normal,1.0,1.2700091733120198
+intermittent,R,"d0+: 1.0 uM, d7+: 0.0 uM",0.0,normal,7.0,1.109483095454687
+intermittent,R,"d0+: 1.0 uM, d7+: 0.0 uM",0.0,normal,14.0,1.1173497745245173
+intermittent,R,"d0+: 0.0 uM, d7+: 1.0 uM",0.0,normal,1.0,1.564052156328059
+intermittent,R,"d0+: 0.0 uM, d7+: 1.0 uM",0.0,normal,7.0,1.220738226120126
+intermittent,R,"d0+: 0.0 uM, d7+: 1.0 uM",0.0,normal,14.0,0.9457975502800111
+ce0,S,const 0.0 uM,0.25,normal,1.0,1.0219263232160254
+ce0,S,const 0.0 uM,0.25,normal,7.0,0.8487784241520547
+ce0,S,const 0.0 uM,0.25,normal,14.0,0.7436822876985031
+ce0,R,const 0.0 uM,0.25,normal,1.0,1.9515646957225705
+ce0,R,const 0.0 uM,0.25,normal,7.0,1.8540235747079647
+ce0,R,const 0.0 uM,0.25,normal,14.0,1.5519558135397844
+ce0,S,const 0.0 uM,0.5,normal,1.0,1.448877894603094
+ce0,S,const 0.0 uM,0.5,normal,7.0,1.0385383996171662
+ce0,S,const 0.0 uM,0.5,normal,14.0,0.9442986181252981
+ce0,R,const 0.0 uM,0.5,normal,1.0,1.2400992743439923
+ce0,R,const 0.0 uM,0.5,normal,7.0,1.0061258699556848
+ce0,R,const 0.0 uM,0.5,normal,14.0,0.8134826896503241
+ce0,S,const 0.0 uM,0.75,normal,1.0,1.4945615887024282
+ce0,S,const 0.0 uM,0.75,normal,7.0,1.0166764833223587
+ce0,S,const 0.0 uM,0.75,normal,14.0,1.0795183368440036
+ce0,R,const 0.0 uM,0.75,normal,1.0,2.286774064587024
+ce0,R,const 0.0 uM,0.75,normal,7.0,1.1926868456998378
+ce0,R,const 0.0 uM,0.75,normal,14.0,1.0902643085174712
+ce1,S,const 1.0 uM,0.25,normal,1.0,1.652120527086071
+ce1,S,const 1.0 uM,0.25,normal,7.0,1.5072926543000118
+ce1,S,const 1.0 uM,0.25,normal,14.0,1.0273179935597907
+ce1,R,const 1.0 uM,0.25,normal,1.0,1.4741566793684058
+ce1,R,const 1.0 uM,0.25,normal,7.0,1.390246344226683
+ce1,R,const 1.0 uM,0.25,normal,14.0,1.1501322060271346
+ce1,S,const 1.0 uM,0.5,normal,1.0,0.9848091067764365
+ce1,S,const 1.0 uM,0.5,normal,7.0,1.1565418607696112
+ce1,S,const 1.0 uM,0.5,normal,14.0,1.0536926512648828
+ce1,R,const 1.0 uM,0.5,normal,1.0,1.0210463959583767
+ce1,R,const 1.0 uM,0.5,normal,7.0,1.3275839713096231
+ce1,R,const 1.0 uM,0.5,normal,14.0,0.9713712564799553
+ce1,S,const 1.0 uM,0.75,normal,1.0,1.5974589077131596
+ce1,S,const 1.0 uM,0.75,normal,7.0,1.7269806067370286
+ce1,S,const 1.0 uM,0.75,normal,14.0,1.4670276597089027
+ce1,R,const 1.0 uM,0.75,normal,1.0,1.3843295729357676
+ce1,R,const 1.0 uM,0.75,normal,7.0,1.342083526772499
+ce1,R,const 1.0 uM,0.75,normal,14.0,0.8944007080819957
+lr,S,const 0.0 uM,0.25,low,1.0,0.8564740412883011
+lr,S,const 0.0 uM,0.25,low,7.0,1.9667011140900599
+lr,S,const 0.0 uM,0.25,low,14.0,1.3658934874821136
+lr,R,const 0.0 uM,0.25,low,1.0,1.1895560129478806
+lr,R,const 0.0 uM,0.25,low,7.0,1.2386680521726021
+lr,R,const 0.0 uM,0.25,low,14.0,0.9190079532991862
+lr,S,const 0.0 uM,0.5,low,1.0,0.8550710562029221
+lr,S,const 0.0 uM,0.5,low,7.0,0.9503830175597171
+lr,S,const 0.0 uM,0.5,low,14.0,0.9517831199150955
+lr,R,const 0.0 uM,0.5,low,1.0,0.8451544816990414
+lr,R,const 0.0 uM,0.5,low,7.0,0.9809618933025374
+lr,R,const 0.0 uM,0.5,low,14.0,0.7756770750534014
+lr,S,const 0.0 uM,0.75,low,1.0,2.468479241331153
+lr,S,const 0.0 uM,0.75,low,7.0,1.5851222367329862
+lr,S,const 0.0 uM,0.75,low,14.0,1.2306337280040298
+lr,R,const 0.0 uM,0.75,low,1.0,1.9259845817979013
+lr,R,const 0.0 uM,0.75,low,7.0,2.727289713990546
+lr,S,const 0.0 uM,1.0,low,1.0,1.7610110668685623
+lr,S,const 0.0 uM,1.0,low,7.0,1.1522945194608258
+lr,S,const 0.0 uM,1.0,low,14.0,1.0983414022639084
+lr,R,const 0.0 uM,0.0,low,1.0,2.147249181700633
+lr,R,const 0.0 uM,0.0,low,7.0,1.5915834942327618

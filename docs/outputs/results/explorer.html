@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Explorer — A2780 staged fitting</title>
+<link rel="stylesheet" href="site.css">
+<style>
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.ctrl .lbl{font-weight:650;color:var(--muted);font-size:13px;min-width:70px}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media(max-width:1000px){.layout{grid-template-columns:1fr}}
+.slider{display:grid;grid-template-columns:90px minmax(0,1fr) 92px;gap:10px;align-items:center;margin:8px 0}
+.slider input[type=range]{width:100%}
+.slider input[type=number]{width:92px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font:13px system-ui}
+.fit{font-size:14px;margin:6px 0}.fit b{font-size:16px}
+.better{color:#1f7a3d}.worse{color:#a33b1d}
+select{padding:5px 8px;border-radius:8px;border:1px solid var(--line);font:14px system-ui;max-width:100%}
+.builder{background:#f4f8fa;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:8px 0}
+.busy{opacity:.55;pointer-events:none}
+</style>
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script>');</script>
+</head><body><main id="app"></main>
+<script>
+const app = document.getElementById('app');
+// mi: index into g.models, or -1 for a model built here
+const state = { gi: 0, mi: 0, panel: 1, params: null, showOpt: true, custom: { kernel: 'chain2', action: 'loss', immediate: false } };
+
+function group() { return RES.groups[state.gi]; }
+function builder() { const g = group(); return g.builder ? Object.assign({ X: g.id.includes('a2780cis') ? 'C' : 'N' }, g.builder) : null; }
+
+// the model currently shown: {label, tex, params:[{tex, value, bound}], sim, inherited, k}
+function current() {
+  const g = group();
+  if (state.mi >= 0) {
+    const m = (g.models || [g.optimal])[state.mi];
+    return { label: m.label, family: m.family, tex: m.tex, sim: m.sim, inherited: m.inherited, k: m.k,
+             params: m.params.map((p, i) => ({ tex: p.tex, value: p.value, lo: p.lo, hi: p.hi, bound: m.bounds[i] })) };
+  }
+  const b = builder(), c = state.custom, free = builderSlots(b, c.kernel, c.action, c.immediate);
+  const kl = b.kernels.find(k => k.id === c.kernel).label, al = b.actions.find(a => a.id === c.action).label;
+  return { label: `${kl} → ${al}${free.includes('d0') ? ' (+ immediate)' : ''}`, family: 'built here', custom: true,
+           tex: zooTex(b, c.kernel, c.action, free), sim: zooBuild(b, c.kernel, c.action, free), k: free.length,
+           params: free.map(k => ({ tex: b.slots[k].tex, value: b.slots[k].start, bound: [b.slots[k].lo, b.slots[k].hi] })),
+           inherited: [{ sym: `r_{${b.X}}`, value: b.r, note: 'Stage 1' }, { sym: `K_{${b.X}}`, value: b.K, note: 'Stage 1' },
+                       ...(b.growth === 'theta' ? [{ sym: `\\theta_{${b.X}}`, value: b['θ'], note: 'Stage 1' }] : []),
+                       b.input === 'D' ? { sym: 'EC_{50}', value: b.EC50, note: 'fixed, µM' } : { sym: 'u_R', value: b.uR, note: '0.5% FBS' }] };
+}
+
+function sliderRange(p) {
+  const bnd = p.bound, lo = Math.max(bnd[0], 0);
+  let hi = Math.max(3 * Math.abs(p.value), p.hi && isFinite(p.hi) ? 1.5 * p.hi : 0, lo + 1e-3);
+  if (p.value < 1e-6) hi = Math.min(bnd[1], 1);
+  return [lo, Math.min(bnd[1], hi)];
+}
+
+function renderPlot() {
+  const g = group(), m = current();
+  const simres = simulate(m.sim, state.params, g.xmax);
+  const out = document.getElementById('plot'), fitEl = document.getElementById('fit');
+  if (!simres) { out.innerHTML = '<p class="note">This model has no in-browser simulator.</p>'; fitEl.innerHTML = ''; return; }
+  const ser = g.series.filter(s => s.panel === state.panel);
+  const points = [], excluded = [], lines = [];
+  for (const s of ser) {
+    s.x.forEach((x, i) => points.push({ x, y: s.y[i], color: s.color, filled: s.filled }));
+    (s.xbad || []).forEach((x, i) => excluded.push({ x, y: s.ybad[i] }));
+    const oc = g.optimal.curve;
+    if (state.showOpt && oc && oc.y[String(s.state)]) lines.push({ t: oc.t, y: oc.y[String(s.state)], color: '#9aa7b0', dash: '4,3', width: 1.6 });
+    lines.push({ t: simres.t, y: simres.u.map(u => u[s.state - 1]), color: s.color, dash: s.dashed ? '8,4' : '', width: 2.6 });
+  }
+  const legend = [], seen = new Set();
+  for (const s of ser) if (!seen.has(s.name)) { seen.add(s.name); legend.push({ label: s.name, color: s.color, kind: s.filled ? 'dot' : 'open' }); }
+  legend.push({ label: 'this model', color: '#374151', kind: 'line' });
+  if (state.showOpt) legend.push({ label: 'stage optimum', color: '#9aa7b0', dash: '4,3', kind: 'line' });
+  out.innerHTML = `<div class="tipwrap">${infoTip('Points: measured mean cells (grey × = excluded outlier). Coloured lines: the selected model with the current parameter values. Grey dashed lines: the stage optimum, for comparison.', 'Better: the coloured lines run through the points.')}` + plotSVG({ xmax: g.xmax, ymax: g.ymax, title: g.panels[state.panel - 1] || g.title, points, excluded, lines, legend, h: 360 }) + '</div>';
+  const sse = sseOf(g, m.sim, state.params), bic = bicOf(g, sse, m.k), d = bic - g.optimal.bic;
+  fitEl.innerHTML = `All ${nPoints(g)} data points: BIC <b class="${d <= 0.01 ? 'better' : 'worse'}">${fmt(bic)}</b> with these values ` +
+    `(stage optimum ${fmt(g.optimal.bic)}, Δ ${dsign(d)}) · SSE ${fmt(sse)} · ${m.k} free parameter${m.k === 1 ? '' : 's'}` + infoTip('BIC and SSE of the curves shown, recomputed live from the current values on every data point of this fit. Δ compares with the stage optimum: negative = these values fit better after the parameter penalty. SSE = sum of squared errors in cells².', 'Lower is better for both BIC and SSE; a negative Δ means these values beat the stage optimum.');
+}
+
+function renderControls() {
+  const m = current();
+  const sl = m.params.map((p, i) => {
+    const [lo, hi] = sliderRange(Object.assign({}, p, { value: state.params[i] }));
+    const v = state.params[i];
+    return `<div class="slider"><span>${texInline(p.tex)}</span><input type="range" min="${lo}" max="${hi}" step="${(hi - lo) / 400}" value="${v}" data-i="${i}">
+      <input type="number" value="${+v.toPrecision(4)}" step="any" data-i="${i}"></div>`;
+  }).join('');
+  document.getElementById('sliders').innerHTML = m.params.length ? sl : '<p class="muted">No free parameters — every value is carried over.</p>';
+  document.getElementById('eqs').innerHTML = m.tex.map(texBlock).join('');
+  document.getElementById('mtitle').textContent = m.label;
+  document.getElementById('inh').innerHTML = m.inherited.length ?
+    `<table><tr><th colspan="3">Carried over / fixed</th></tr>${m.inherited.map(p => `<tr><td>${texInline(p.sym)}</td><td class="num">${fmt(p.value)}</td><td class="muted">${esc(p.note)}</td></tr>`).join('')}</table>` : '';
+  document.querySelectorAll('#sliders input').forEach(el => el.addEventListener('input', e => {
+    const i = +e.target.dataset.i, v = parseFloat(e.target.value);
+    if (!isFinite(v)) return;
+    state.params[i] = v;
+    document.querySelectorAll(`#sliders input[data-i="${i}"]`).forEach(o => { if (o !== e.target) o.value = o.type === 'number' ? +v.toPrecision(4) : v; });
+    renderPlot();
+  }));
+  typeset(document.getElementById('side'));
+}
+
+function resetParams() { state.params = current().params.map(p => p.value); }
+function selectGroup(gi) { state.gi = gi; state.mi = 0; state.panel = group().mainPanel; resetParams(); render(); }
+
+function modelOptions(g) {
+  const ms = g.models || [g.optimal];
+  const opts = ms.map((m, i) => `<option value="${i}" ${i === state.mi ? 'selected' : ''}>${i === 0 ? '★ ' : ''}${esc(m.label)} — k=${m.k}, ΔBIC ${i === 0 ? '0' : dsign(m.dbic)}</option>`).join('');
+  return opts + (g.builder ? `<option value="-1" ${state.mi === -1 ? 'selected' : ''}>✎ Build your own (any delay × any effect)</option>` : '');
+}
+
+function builderHTML() {
+  const b = builder(), c = state.custom;
+  if (state.mi !== -1 || !b) return '';
+  const sel = (id, list, v) => `<select id="${id}">${list.map(o => `<option value="${o.id}" ${o.id === v ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+  return `<div class="builder"><div class="ctrl"><span class="lbl">Delay</span>${sel('bk', b.kernels, c.kernel)}
+    <span class="lbl">Effect</span>${sel('ba', b.actions, c.action)}
+    <label><input type="checkbox" id="bi" ${c.immediate ? 'checked' : ''} ${c.action !== 'loss' || c.kernel === 'none' ? 'disabled' : ''}> add an immediate term</label></div>
+    ${(ZOO_NKER[c.kernel] || 0) + (ZOO_NCELL[c.action] || 0) + (ZOO_NAUX[c.action] || 0) > 3 ? '<p class="note" style="margin:4px 0">This combination has more than 3 compartments, so it is outside the fitted zoo.</p>' : ''}
+    <p class="muted" style="margin:4px 0">No term uses time directly: every delay is a state driven by ${b.input === 'D' ? 'the dose D' : 'the low-resource level u<sub>R</sub>'}. Press <b>Fit to data</b> to fit this combination in your browser.</p></div>`;
+}
+
+function render() {
+  const g = group();
+  const gbtn = RES.groups.map((x, i) => `<button class="btn ${i === state.gi ? 'on' : ''}" data-g="${i}">${esc(x.title.replace('Stage ', 'S'))}</button>`).join('');
+  const pan = g.panels.length > 1 ? `<div class="ctrl"><span class="lbl">Panel</span><select id="panel">${g.panels.map((p, i) => `<option value="${i + 1}" ${i + 1 === state.panel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></div>` : '';
+  app.innerHTML = `${navHTML('explorer')}<h1>Explorer — try any model, watch the fit</h1>${runInfo()}
+    <div class="card"><div class="ctrl"><span class="lbl">Fit</span>${gbtn}</div>
+      <div class="ctrl"><span class="lbl">Model${infoTip('★ = the optimal model. The other entries are every fitted candidate of this stage, ordered by BIC, with their parameter count k and ΔBIC to the optimum. The last entry lets you build your own model from any delay and any effect.', 'Neither: a menu. Models higher in the list (lower ΔBIC) fit better.')}</span><select id="model">${modelOptions(g)}</select></div>${builderHTML()}${pan}
+      <p class="muted">${esc(g.text)} ★ = the optimal model (fewest free parameters within 3 BIC of the lowest); every other fitted candidate of this stage follows, ordered by BIC (a negative ΔBIC fits slightly better but needs more terms). Sliders start at each model's fitted values.</p></div>
+    <div class="layout"><div class="card"><div id="plot"></div><div class="fit" id="fit"></div>
+        <div class="links"><button class="btn" id="fitbtn">Fit to data</button><button class="btn" id="reset">Reset values</button>
+        <button class="btn ${state.showOpt ? 'on' : ''}" id="showopt">Show stage optimum</button>
+        <a class="btn" href="summary.html#${g.id}">Back to summary</a></div></div>
+      <div class="card" id="side"><h3 id="mtitle"></h3><div id="eqs"></div><div class="muted" style="font-size:12px">Parameters${infoTip('Drag a slider or type a value to change a parameter; the curves and BIC update immediately. Sliders start at the fitted values; Fit to data re-optimises them in the browser; Reset values restores them.', 'none')}</div><div id="sliders"></div><div id="inh" class="tscroll"></div></div></div>`;
+  app.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { history.replaceState(null, '', '#' + RES.groups[+b.dataset.g].id); selectGroup(+b.dataset.g); });
+  document.getElementById('model').onchange = e => { state.mi = +e.target.value; resetParams(); render(); };
+  const bk = document.getElementById('bk'), ba = document.getElementById('ba'), bi = document.getElementById('bi');
+  if (bk) {
+    const upd = () => { state.custom = { kernel: bk.value, action: ba.value, immediate: bi.checked && ba.value === 'loss' && bk.value !== 'none' }; resetParams(); render(); };
+    bk.onchange = upd; ba.onchange = upd; bi.onchange = upd;
+  }
+  document.getElementById('panel')?.addEventListener('change', e => { state.panel = +e.target.value; renderPlot(); });
+  document.getElementById('reset').onclick = () => { resetParams(); renderControls(); renderPlot(); };
+  document.getElementById('showopt').onclick = e => { state.showOpt = !state.showOpt; e.target.classList.toggle('on', state.showOpt); renderPlot(); };
+  document.getElementById('fitbtn').onclick = e => {
+    const btn = e.target, m = current();
+    btn.textContent = 'Fitting…'; btn.classList.add('busy');
+    setTimeout(() => {
+      let p = state.params.slice();
+      for (let round = 0; round < 3; round++) p = fitNM(group(), m.sim, p, m.params.map(q => q.bound), 250);
+      state.params = p; btn.textContent = 'Fit to data'; btn.classList.remove('busy');
+      renderControls(); renderPlot();
+    }, 30);
+  };
+  renderControls(); renderPlot();
+}
+
+if (!RES) { app.innerHTML = navHTML('explorer'); missingBundle(app); }
+else {
+  const gi = Math.max(0, RES.groups.findIndex(g => '#' + g.id === location.hash));
+  selectGroup(gi);
+}
+</script></body></html>

@@ -1,0 +1,33 @@
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+Test Summary:                                                                  | Pass  Total     Time
+control plant and MPC                                                          |   77     77  3m51.3s
+  scenario A: plant reproduces the fitted zoo model at 1 µM                    |    1      1     4.2s
+  scenario A: RK4 transition vs adaptive Tsit5                                 |    5      5     1.7s
+  scenario A: AD Jacobians vs central finite differences                       |    5      5     3.4s
+  scenario A: linearisation error is second order                              |    1      1     0.6s
+  scenario A: adjoint gradient vs finite differences                           |    1      1     1.8s
+  scenario A: discrete search equals brute force                               |    1      1     0.6s
+  scenario A: SQP respects bounds and does not increase the cost               |    3      3     9.1s
+  scenario B: plant reproduces the fitted zoo model at 1 µM                    |           0     0.0s
+  scenario B: RK4 transition vs adaptive Tsit5                                 |    5      5     0.1s
+  scenario B: AD Jacobians vs central finite differences                       |    5      5     0.3s
+  scenario B: linearisation error is second order                              |    1      1     0.0s
+  scenario B: adjoint gradient vs finite differences                           |    1      1     0.1s
+  scenario B: discrete search equals brute force                               |    1      1     0.4s
+  scenario B: SQP respects bounds and does not increase the cost               |    3      3     0.4s
+  scenario A, low resource: plant reproduces the fitted zoo model at 1 µM      |    1      1     2.4s
+  scenario A, low resource: RK4 transition vs adaptive Tsit5                   |    5      5     0.3s
+  scenario A, low resource: AD Jacobians vs central finite differences         |    5      5     2.8s
+  scenario A, low resource: linearisation error is second order                |    1      1     0.1s
+  scenario A, low resource: adjoint gradient vs finite differences             |    1      1     1.1s
+  scenario A, low resource: discrete search equals brute force                 |    1      1     0.6s
+  scenario A, low resource: SQP respects bounds and does not increase the cost |    3      3     3.0s
+  scenario B, low resource: plant reproduces the fitted zoo model at 1 µM      |           0     0.0s
+  scenario B, low resource: RK4 transition vs adaptive Tsit5                   |    5      5     0.2s
+  scenario B, low resource: AD Jacobians vs central finite differences         |    5      5     0.4s
+  scenario B, low resource: linearisation error is second order                |    1      1     0.0s
+  scenario B, low resource: adjoint gradient vs finite differences             |    1      1     0.1s
+  scenario B, low resource: discrete search equals brute force                 |    1      1     0.5s
+  scenario B, low resource: SQP respects bounds and does not increase the cost |    3      3     0.2s
+  long runs: 30 days, 14-day look-ahead re-planned every 2 days                |    6      6  3m15.7s
+  relaxed barrier                                                              |    5      5     0.0s

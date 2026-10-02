@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>[Archived] Summary — A2780 staged fitting</title>
+<link rel="stylesheet" href="site.css">
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script>');</script>
+</head><body><div style="background:#fff3d6;border-bottom:1px solid #efd18b;padding:9px 16px;font:600 14px system-ui,sans-serif;color:#5a3d00">ARCHIVED (time-based models, not usable for optimal control). <a href="index.html" style="color:#176b87">Archive index</a> · <a href="../results/summary.html" style="color:#176b87">current results</a></div><main id="app"></main>
+<script>
+const app = document.getElementById('app');
+function modelCard(g, m) {
+  const zero = m.reachesZero !== undefined ? ` · reaches zero: <b>${m.reachesZero ? 'yes' : 'no'}</b>` : '';
+  return `<div class="model optimal"><span class="tag">Optimal · bootstrap pick</span>
+    <h3>${esc(m.label)}</h3>
+    <div class="stats"><span><b>${m.k}</b> free parameter${m.k === 1 ? '' : 's'}</span><span>BIC <b>${fmt(m.bic)}</b></span><span>picked in <b>${pctf(m.pick)}</b> of replicates${zero}</span></div>
+    ${m.tex.map(texBlock).join('')}${paramTable(m)}</div>`;
+}
+function render() {
+  if (!RES) { app.innerHTML = navHTML('summary'); missingBundle(app); return; }
+  const rows = RES.groups.map(g => {
+    const o = g.optimal;
+    const note = g.bicBest.isOptimal ? '' : `lowest BIC: ${esc(g.bicBest.label)} (k=${g.bicBest.k})`;
+    return `<tr><td><a href="#${g.id}">${esc(g.title)}</a></td><td><b>${esc(o.label)}</b> <span class="muted">(k=${o.k})</span></td><td class="num">${pctf(o.pick)}</td><td class="num">${fmt(o.bic)}</td><td class="muted">${note}</td></tr>`;
+  }).join('');
+  const sections = RES.groups.map(g => `
+    <section class="card" id="${g.id}"><h2>${esc(g.title)}</h2><p class="muted">${esc(g.text)} ${g.candidates} candidate models compared.</p>
+      ${modelCard(g, g.optimal)}
+      ${groupPlot(g, g.mainPanel)}
+      ${g.panels.length > 1 ? `<p class="muted">Shown: ${esc(g.panels[g.mainPanel - 1])}. All ${g.panels.length} panels are in the Explorer.</p>` : ''}
+      <div class="links"><a class="btn" href="explorer.html#${g.id}">Open in Explorer</a>
+        <a class="btn" href="reports/bootstrap_fits/report.html#${g.id}">Bootstrap details</a></div>
+    </section>`).join('');
+  app.innerHTML = `${navHTML('summary')}
+    <h1>Summary — the optimal model at every stage</h1>${runInfo()}
+    <div class="card lead"><p><b>How to read this.</b> For each fit, the <b>optimal</b> model is the one the bootstrap picks most often when a simpler model is preferred unless it costs more than ${RES.perParamBIC} BIC per removed parameter. Intervals are 95% bootstrap percentiles.</p>
+    <p class="muted">This page redraws from the latest full run each time it is opened. Lines: optimal fit (95% band shaded); points are data, grey × are excluded points.</p></div>
+    <div class="card"><h2>At a glance</h2><div class="tscroll"><table><tr><th>Fit</th><th>Optimal (bootstrap)</th><th>Picked in</th><th>BIC</th><th>Note</th></tr>${rows}</table></div></div>
+    ${sections}`;
+  typeset(app);
+  if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+}
+render();
+</script></body></html>

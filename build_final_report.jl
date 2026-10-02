@@ -1,0 +1,207 @@
+# Builds docs/outputs/final_report/report.html: every new-data analysis step as one page.
+# Each chapter is the published report embedded as a self-contained, auto-height frame, so the
+# chapters keep their own styles, scripts and equations and none of the source pages is modified.
+# Rerun after any chapter's report is regenerated:   julia build_final_report.jl
+
+using Dates
+
+const DOCS = joinpath(@__DIR__, "docs")
+const OUT  = joinpath(DOCS, "outputs", "final_report")
+const PKG  = "Modeling_Approaches/02_mechanical_automatic_package/outputs"
+
+# (id, title, what the step does, path under docs/)
+chapters = [
+    ("data", "1 · Data", "Every CSV and XLSX sheet in <code>New Datasets</code>, plotted as mean cells per day on shared axes.",
+     "outputs/new_data_report/report.html"),
+    ("models", "2 · Compartment models (the models used)", "Stage 1 untreated → 2a low resource → 2b treated → 3a Ce0 + Ce1 with a shared carrying capacity → 3b low-resource coculture → 4 low resource + cisplatin coculture (both inputs at once). Every model is autonomous: delays and accumulation come from drug-effect, stress or damaged-cell compartments driven by the dose, never from time, with at most 3 compartments per mechanism. The model carried forward at each stage has the fewest free parameters within 3 BIC of the lowest, and both lines share one cisplatin mechanism.",
+     "$PKG/zoo_fits/report.html"),
+    ("bootstrap", "3 · Bootstrapping", "200-replicate moving-block residual bootstrap with every candidate refitted and the selection rule replayed, compared with the package's within-trajectory bootstrap: how often each model is chosen, 95% parameter intervals and bands.",
+     "$PKG/zoo_analyses/bootstrap/report.html"),
+    ("sensitivity", "4 · Sensitivity analysis", "Local sensitivity index of every fitted parameter, profile-likelihood identifiability and the bound check.",
+     "$PKG/zoo_analyses/sensitivity/report.html"),
+    ("validation", "5 · Validation", "Held-out treated cocultures predicted from the untreated cocultures and the monoculture drug fits, blocked leave-one-dose / ratio / run-out validation, and forecasts of the last 30% of days.",
+     "$PKG/zoo_analyses/validation/report.html"),
+    ("control", "6 · Optimal control", "Sequential (successive-linearisation) model-predictive control of the cisplatin dose at each media change, on the carried Stage 3 (normal medium) and Stage 4 (low resource) models, with a literature toxicity proxy, barriers on cancer burden and toxicity, baseline schedules, bootstrap robustness, identifiability warnings and suggested experiments.",
+     "$PKG/control/report.html"),
+    ("control30", "7 · Optimal control over 30 days: cisplatin and fasting", "Model-predictive control choosing both the cisplatin dose and fasting (low resource) at every media change for 30 days, with a body-weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days 14–30 are beyond the data, and the fasting effect is the in-vitro effect at full strength.",
+     "$PKG/control_30d/report.html"),
+]
+
+# Turns each chapter into dropdowns so nothing has to be scrolled past: every top-level (h2)
+# section and every card-style section (a section/card whose first element is an h3) becomes a
+# closed <details>, and any table longer than 8 rows is folded behind "Show table". The content is
+# unchanged; only its visibility is.
+const COLLAPSE_JS = raw"""<style>
+details.fr-sec>summary,details.fr-tab>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+details.fr-sec>summary::-webkit-details-marker,details.fr-tab>summary::-webkit-details-marker{display:none}
+details.fr-sec>summary::before,details.fr-tab>summary::before{content:'▸';color:#176b87;font-size:15px;transition:transform .15s;flex:none}
+details.fr-sec[open]>summary::before,details.fr-tab[open]>summary::before{transform:rotate(90deg)}
+details.fr-sec>summary>h2,details.fr-sec>summary>h3{display:inline;margin:0}
+details.fr-h2{margin:14px 0;border-bottom:1px solid #d9e2e6;padding-bottom:6px}details.fr-h2>summary{padding:6px 0}
+details.fr-box>summary{padding:2px 0}
+details.fr-tab{margin:6px 0}details.fr-tab>summary{font:600 13px system-ui,sans-serif;color:#176b87;padding:4px 0}
+.fr-tools{display:flex;gap:8px;margin:0 0 10px}.fr-tools button{border:1px solid #c5d1d8;background:#f7fbfc;color:#176b87;border-radius:999px;padding:4px 12px;font:600 13px system-ui,sans-serif;cursor:pointer}
+</style><script>
+document.addEventListener('DOMContentLoaded', function () {
+  var mk = function (cls, head) {
+    var d = document.createElement('details'), s = document.createElement('summary');
+    d.className = 'fr-sec ' + cls; s.appendChild(head); d.appendChild(s); return d;
+  };
+  // 1. card-style sections: the h3 becomes the summary of a details inside the card
+  document.querySelectorAll('section, .panel, .card, .workbook').forEach(function (box) {
+    var h = box.firstElementChild;
+    if (!h || h.tagName !== 'H3' || box.closest('summary')) return;
+    var d = mk('fr-box', h);
+    while (box.firstChild) d.appendChild(box.firstChild);
+    box.appendChild(d);
+  });
+  // 2. long tables fold behind "Show table"
+  document.querySelectorAll('table').forEach(function (t) {
+    var n = t.querySelectorAll('tr').length;
+    if (n <= 9 || t.closest('summary') || t.closest('details.fr-tab')) return;
+    var host = t.parentElement && t.parentElement.classList.contains('tscroll') ? t.parentElement : t;
+    var d = document.createElement('details'), s = document.createElement('summary');
+    d.className = 'fr-tab'; s.textContent = 'Show table (' + (n - 1) + ' rows)'; d.appendChild(s);
+    host.parentNode.insertBefore(d, host); d.appendChild(host);
+  });
+  // 3. each h2 and everything up to the next h2 becomes one dropdown
+  var parents = [];
+  document.querySelectorAll('h2').forEach(function (h) { if (!h.closest('summary') && parents.indexOf(h.parentElement) < 0) parents.push(h.parentElement); });
+  parents.forEach(function (par) {
+    var cur = null;
+    Array.prototype.slice.call(par.children).forEach(function (el) {
+      if (el.tagName === 'H2') { var d = mk('fr-h2', el.cloneNode(true)); par.replaceChild(d, el); cur = d; return; }
+      if (cur && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') cur.appendChild(el);
+    });
+  });
+  // open the dropdowns around any in-page link target
+  var reveal = function (id) { var t = id && document.getElementById(id); for (var e = t; e; e = e.parentElement) if (e.tagName === 'DETAILS') e.open = true; };
+  reveal(location.hash.slice(1));
+  document.addEventListener('click', function (ev) { var a = ev.target.closest && ev.target.closest('a[href^="#"]'); if (a) reveal(a.getAttribute('href').slice(1)); });
+  // expand / collapse everything in this chapter
+  var first = document.querySelector('details.fr-h2, details.fr-box');
+  if (first) {
+    var bar = document.createElement('div'); bar.className = 'fr-tools';
+    bar.innerHTML = '<button type="button" data-v="1">Expand all</button><button type="button" data-v="0">Collapse all</button>';
+    bar.addEventListener('click', function (ev) { var v = ev.target.dataset && ev.target.dataset.v; if (v === undefined) return;
+      document.querySelectorAll('details.fr-sec, details.fr-tab').forEach(function (d) { d.open = v === '1'; }); });
+    first.parentNode.insertBefore(bar, first);
+  }
+  if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise();
+});
+</script>"""
+
+# hide each chapter's own tab bar; links resolve (and open) relative to the original page
+const CHAPTER_HEAD = "<style>nav.topnav, nav.tab-nav, nav[aria-label='Low-resource report navigation'], a.back, a.back-home{display:none !important}</style>" * COLLAPSE_JS
+
+function json_str(s::AbstractString)
+    io = IOBuffer(); print(io, '"')
+    for c in s
+        c == '"'  ? print(io, "\\\"") :
+        c == '\\' ? print(io, "\\\\") :
+        c == '\n' ? print(io, "\\n") :
+        c == '\r' ? print(io, "\\r") :
+        c == '\t' ? print(io, "\\t") :
+        c == ' ' ? print(io, "\\u2028") :
+        c == ' ' ? print(io, "\\u2029") :
+        c < ' '   ? print(io, "\\u", string(UInt16(c); base=16, pad=4)) : print(io, c)
+    end
+    print(io, '"')
+    replace(String(take!(io)), "</" => "<\\/")      # never close the host <script> early
+end
+
+parts = String[]
+toc = String[]
+missing_parts = String[]
+for (id, title, blurb, rel) in chapters
+    path = joinpath(DOCS, rel)
+    if !isfile(path)
+        push!(missing_parts, rel); continue
+    end
+    html = read(path, String)
+    base = "../../" * rel                                          # relative to docs/outputs/final_report/
+    inject = "<base href=\"$base\" target=\"_top\">$CHAPTER_HEAD"
+    html = occursin(r"<head[^>]*>"i, html) ? replace(html, r"<head[^>]*>"i => s -> s * inject; count=1) : inject * html
+    stamp = Dates.format(unix2datetime(mtime(path)), "yyyy-mm-dd HH:MM")
+    push!(parts, "{id:$(json_str(id)),title:$(json_str(title)),blurb:$(json_str(blurb)),src:$(json_str(base)),stamp:$(json_str(stamp)),html:$(json_str(html))}")
+    push!(toc, "<a href='#$id'>$title</a>")
+end
+
+page = """<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Final report — A2780 new data</title>
+<style>
+:root{--ink:#17212b;--muted:#52636b;--accent:#176b87;--line:#d9e2e6;--page:#f4f7f8}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+header{max-width:1400px;margin:auto;padding:24px 24px 8px}h1{color:#124b6e;margin:8px 0 6px;font-size:32px}
+.lead{color:var(--muted);max-width:980px;margin:0 0 12px}
+.home{display:inline-flex;align-items:center;padding:6px 9px;border-radius:8px;background:#eef5f6;color:var(--accent);text-decoration:none;font-weight:650}
+nav.toc{position:sticky;top:0;z-index:5;background:var(--page);border-bottom:1px solid var(--line)}
+nav.toc div{max-width:1400px;margin:auto;padding:10px 24px;display:flex;gap:8px;flex-wrap:wrap}
+nav.toc a{padding:6px 11px;border-radius:8px;background:#eef5f6;color:var(--accent);text-decoration:none;font:650 14px system-ui,sans-serif;white-space:nowrap}
+nav.toc a.on{background:var(--accent);color:#fff}
+section.chapter{max-width:1440px;margin:14px auto 0;padding:0 12px}
+section.chapter>details{background:#fff;border:1px solid var(--line);border-radius:12px}
+section.chapter>details>summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+section.chapter>details>summary::-webkit-details-marker{display:none}
+section.chapter>details>summary::before{content:'▸';color:var(--accent);font-size:20px;line-height:1.2;transition:transform .15s}
+section.chapter>details[open]>summary::before{transform:rotate(90deg)}
+section.chapter>details[open]>summary{border-bottom:1px solid var(--line)}
+.chead h2{margin:0;color:#124b6e;font-size:22px}.chead p{margin:4px 0 0;color:var(--muted)}.chead small{color:#7b8a91}
+.tools{display:flex;gap:8px;margin:0 0 6px}.tools button{border:1px solid var(--line);background:#eef5f6;color:var(--accent);border-radius:999px;padding:5px 12px;font:650 13px system-ui,sans-serif;cursor:pointer}
+iframe{display:block;width:100%;border:0;min-height:400px;background:var(--page)}
+.warn{background:#fff6d9;border-radius:8px;padding:10px 14px}
+</style></head><body>
+<header>
+<a class='home' href='../../index.html' aria-label='Reports home'>⌂ Reports home</a>
+<h1>Final report — A2780 / A2780cis new data</h1>
+<p class='lead'>The analysis on one page: the data, the compartment models used at every stage, their bootstrapping, sensitivity analysis and validation, and optimal control of the cisplatin schedule built on them, over 14 days and, with fasting as a second control, over 30 days. Earlier time-based models are kept only in the <a href='../archive_time/index.html'>time-based archive</a>. Each chapter is the full report for that step (assembled $(Dates.format(now(), "yyyy-mm-dd HH:MM"))); the date under each heading is when that report was last generated. Rebuild with <code>julia build_final_report.jl</code>.</p>
+$(isempty(missing_parts) ? "" : "<p class='warn'>Not found, so left out: " * join(missing_parts, ", ") * "</p>")
+</header>
+<nav class='toc' aria-label='Final report chapters'><div>$(join(toc))</div></nav>
+<div style='max-width:1400px;margin:10px auto 0;padding:0 24px' class='tools'><button type='button' id='openall'>Open all chapters</button><button type='button' id='closeall'>Close all</button><span style='color:var(--muted);font-size:13px;align-self:center'>Every chapter and section is a dropdown: click a heading to show it.</span></div>
+<main id='chapters'></main>
+<script>
+const PARTS = [$(join(parts, ",\n"))];
+const main = document.getElementById('chapters');
+for (const p of PARTS) {
+  const sec = document.createElement('section'); sec.className = 'chapter'; sec.id = p.id;
+  sec.innerHTML = '<details><summary><div class="chead"><h2></h2><p></p><small></small></div></summary></details>';
+  sec.querySelector('h2').textContent = p.title;
+  sec.querySelector('p').innerHTML = p.blurb;
+  sec.querySelector('small').innerHTML = 'Report generated ' + p.stamp + ' · <a href="' + p.src + '">open on its own</a>';
+  const det = sec.querySelector('details');
+  // the chapter loads the first time it is opened, so the page itself stays light
+  det.addEventListener('toggle', () => {
+    if (!det.open || det.querySelector('iframe')) return;
+    const fr = document.createElement('iframe'); fr.title = p.title; fr.srcdoc = p.html;
+    fr.addEventListener('load', () => {
+      const doc = fr.contentDocument; if (!doc) return;
+      const fit = () => { fr.style.height = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0) + 'px'; };
+      fit(); new ResizeObserver(fit).observe(doc.documentElement);
+      if (doc.body) new ResizeObserver(fit).observe(doc.body);
+      doc.addEventListener('toggle', () => setTimeout(fit, 30), true);
+      setTimeout(fit, 1500); setTimeout(fit, 5000);
+    });
+    det.appendChild(fr);
+  });
+  main.appendChild(sec);
+}
+const openChapter = id => { const d = document.querySelector('#' + id + ' > details'); if (d) d.open = true; };
+document.querySelectorAll('nav.toc a').forEach(a => a.addEventListener('click', () => openChapter(a.getAttribute('href').slice(1))));
+if (location.hash) openChapter(location.hash.slice(1));
+document.getElementById('openall').onclick = () => document.querySelectorAll('section.chapter > details').forEach(d => d.open = true);
+document.getElementById('closeall').onclick = () => document.querySelectorAll('section.chapter > details').forEach(d => d.open = false);
+// highlight the chapter in view
+const links = [...document.querySelectorAll('nav.toc a')];
+const obs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); }), {rootMargin: '-40% 0px -55% 0px'});
+document.querySelectorAll('section.chapter').forEach(s => obs.observe(s));
+</script>
+</body></html>
+"""
+
+mkpath(OUT)
+include(joinpath(@__DIR__, "Modeling_Approaches", "02_mechanical_automatic_package", "stage_names.jl"))   # thesis stage names (1, 2a, 2b, 3a, 3b, 4)
+write(joinpath(OUT, "report.html"), stage_names(page))
+println("Wrote $(joinpath(OUT, "report.html")) ($(round(filesize(joinpath(OUT, "report.html")) / 1e6; digits=2)) MB, $(length(parts)) chapters)")
+isempty(missing_parts) || println("Missing: ", join(missing_parts, ", "))

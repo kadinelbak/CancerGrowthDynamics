@@ -1,0 +1,71 @@
+model,split,horizon,rmse,n
+zero (no change),train (LOWO CV),1,0.421385097815748,525
+zero (no change),train (LOWO CV),2,0.7042545962616935,471
+zero (no change),train (LOWO CV),3,0.965684988863293,427
+zero (no change),train (LOWO CV),4,1.1446785437287212,379
+zero (no change),train (LOWO CV),5,1.4091938184274595,344
+zero (no change),train (LOWO CV),6,1.5773033631092785,301
+zero (no change),train (LOWO CV),7,1.7366788433061962,275
+zero (no change),validation_treated_co,1,0.3778358928904709,127
+zero (no change),validation_treated_co,2,0.6141464215121077,115
+zero (no change),validation_treated_co,3,0.8979584209710377,103
+zero (no change),validation_treated_co,4,1.1253530861454164,91
+zero (no change),validation_treated_co,5,1.3595161629752688,79
+zero (no change),validation_treated_co,6,1.459986053189816,73
+zero (no change),validation_treated_co,7,1.6691360447488888,72
+persistence,train (LOWO CV),1,0.37458960023721366,525
+persistence,train (LOWO CV),2,0.5558163617883429,471
+persistence,train (LOWO CV),3,0.8893046676506685,427
+persistence,train (LOWO CV),4,1.2533558629771049,379
+persistence,train (LOWO CV),5,1.680487915829567,344
+persistence,train (LOWO CV),6,2.2031804256345326,301
+persistence,train (LOWO CV),7,2.8132342682904463,275
+persistence,validation_treated_co,1,0.39140097935307866,127
+persistence,validation_treated_co,2,0.46906050940575333,115
+persistence,validation_treated_co,3,0.735431704041516,103
+persistence,validation_treated_co,4,0.9342446690232163,91
+persistence,validation_treated_co,5,1.3660036196673402,79
+persistence,validation_treated_co,6,1.6140087825670257,73
+persistence,validation_treated_co,7,2.083605831734505,72
+ridge,train (LOWO CV),1,0.2982640278839957,525
+ridge,train (LOWO CV),2,0.42968920968191493,471
+ridge,train (LOWO CV),3,0.6113493169893913,427
+ridge,train (LOWO CV),4,0.7602781833926169,379
+ridge,train (LOWO CV),5,0.8656797122882242,344
+ridge,train (LOWO CV),6,0.9822893281859243,301
+ridge,train (LOWO CV),7,1.1090111462463725,275
+ridge,validation_treated_co,1,0.3534009332915482,127
+ridge,validation_treated_co,2,0.6166544754518226,115
+ridge,validation_treated_co,3,0.9202410072676042,103
+ridge,validation_treated_co,4,1.2233450861318391,91
+ridge,validation_treated_co,5,1.5114072861914596,79
+ridge,validation_treated_co,6,1.785751877121874,73
+ridge,validation_treated_co,7,2.0099922898935616,72
+boosted trees,train (LOWO CV),1,0.22180768448413585,525
+boosted trees,train (LOWO CV),2,0.29313835469038924,471
+boosted trees,train (LOWO CV),3,0.39681451094235215,427
+boosted trees,train (LOWO CV),4,0.49395284792130006,379
+boosted trees,train (LOWO CV),5,0.5608975764030036,344
+boosted trees,train (LOWO CV),6,0.640225162699919,301
+boosted trees,train (LOWO CV),7,0.7193785725100671,275
+boosted trees,validation_treated_co,1,0.24553984069187137,127
+boosted trees,validation_treated_co,2,0.39164788513659293,115
+boosted trees,validation_treated_co,3,0.6022515571863946,103
+boosted trees,validation_treated_co,4,0.8166698127826961,91
+boosted trees,validation_treated_co,5,0.9960073180558857,79
+boosted trees,validation_treated_co,6,1.209163289844477,73
+boosted trees,validation_treated_co,7,1.3824835151160517,72
+MLP ensemble,train (LOWO CV),1,0.18945144030247404,525
+MLP ensemble,train (LOWO CV),2,0.21659279822829583,471
+MLP ensemble,train (LOWO CV),3,0.29072710309369415,427
+MLP ensemble,train (LOWO CV),4,0.35723455085512534,379
+MLP ensemble,train (LOWO CV),5,0.426373846563856,344
+MLP ensemble,train (LOWO CV),6,0.48124001829155105,301
+MLP ensemble,train (LOWO CV),7,0.5680077141303378,275
+MLP ensemble,validation_treated_co,1,0.29013255150680123,127
+MLP ensemble,validation_treated_co,2,0.41410841103629575,115
+MLP ensemble,validation_treated_co,3,0.5752499434790411,103
+MLP ensemble,validation_treated_co,4,0.7023380979197816,91
+MLP ensemble,validation_treated_co,5,0.8322200796006923,79
+MLP ensemble,validation_treated_co,6,0.9412168678501919,73
+MLP ensemble,validation_treated_co,7,1.0175785882034214,72

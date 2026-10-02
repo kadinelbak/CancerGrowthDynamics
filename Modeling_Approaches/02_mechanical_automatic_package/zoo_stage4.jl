@@ -1,0 +1,120 @@
+# Stage 4: the combination culture — low resource (0.5% FBS) + 1 µM cisplatin, A2780 : A2780cis 1:1,
+# 30k (New Datasets/Validation; loaded as `combo` in zoo_common.jl). Fitted as a stage at the user's
+# request (2026-09-29); it is not held-out validation.
+#
+# Every line carries two mechanism modules (zoo_models.jl: modules / line_rhs_multi!):
+#   drug module          the Stage 3 carried model of that line (delay chain + Hill kill, crowding, d_N)
+#   low-resource module  the Stage 3b carried mechanism of that line (from Stage 1b)
+# All inherited values are fixed; candidates add at most a few new parameters:
+#   K (shared capacity), χ (drug × low-resource interaction: kill × (1 + χ·u_R/0.955)),
+#   ε_N, ε_C (low-resource strength per line), or reset the resistant kill to its Stage 2 value
+#   (only offered when the carried Stage 3 model refitted β_C; otherwise it equals the inherited model).
+# The model carried forward is chosen by the same rule as every stage (fewest free parameters within
+# 3 BIC of the lowest). Include after zoo_common.jl, zoo_models.jl, bootstrap_tools.jl, zoo_selection.jl.
+
+freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
+freeze_line(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple(freeze_slot(getfield(L.s, k), p) for k in keys(L.s))),))
+
+const S4_SPECS = [
+    # (name, label, crowding source, resistant kill on, free parameters)
+    ("s4_inherited",         "Everything inherited: Stage 3 drug model and crowding + Stage 3b low-resource mechanisms", :S3,  false, Symbol[]),
+    ("s4_inherited_3bcrowd", "Everything inherited, crowding from Stage 3b (shared K, one-for-one)",                     :S3b, false, Symbol[]),
+    ("s4_reskill",           "Everything inherited + resistant kill at its Stage 2 value",                               :S3,  true,  Symbol[]),
+    ("s4_chi",               "+ drug × low-resource interaction χ (shared by both lines)",                               :S3,  false, [:χ]),
+    ("s4_K",                 "+ shared carrying capacity K refitted",                                                    :S3,  false, [:K]),
+    ("s4_reskill_chi",       "Resistant kill at its Stage 2 value + shared interaction χ",                               :S3,  true,  [:χ]),
+    ("s4_chi_lines",         "+ interaction χ per line",                                                                 :S3,  false, [:χN, :χC]),
+    ("s4_eps",               "+ low-resource strength per line (ε_N, ε_C)",                                              :S3,  false, [:εN, :εC]),
+    ("s4_chi_K",             "+ shared interaction χ and K",                                                             :S3,  false, [:χ, :K]),
+]
+const S4_PNAME = Dict(:K => "K", :χ => "χ", :χN => "χ_N", :χC => "χ_C", :εN => "ε_N^R", :εC => "ε_C^R")
+
+function combo_datasets(obs)
+    [(x=combo.xN[.!combo.bN], y=combo.yN[.!combo.bN], state_index=obs[1]),
+     (x=combo.xC[.!combo.bC], y=combo.yC[.!combo.bC], state_index=obs[2])]
+end
+
+# hidden drug and stress states after one day of exposure (the data start at day 1), counts reset
+function preexposed_u0(sys, model, p, X0)
+    u0 = sys_u0(sys, [X0])
+    u1 = solve(ODEProblem(model, u0, (0.0, 1.0), p), Tsit5(); reltol=1e-10, abstol=1e-10).u[end]
+    for (i, o) in enumerate(sys_obs(sys))
+        u1[o] = X0[i]
+    end
+    u1
+end
+
+function stage4_cands(c3, c3b, βC2)
+    LN3, LC3 = freeze_line(c3.sys.lines[1], c3.params), freeze_line(c3.sys.lines[2], c3.params)
+    MN, MC = freeze_line(c3b.sys.lines[1], c3b.params), freeze_line(c3b.sys.lines[2], c3b.params)
+    a3 = [[freeze_slot(a, c3.params) for a in row] for row in c3.sys.alpha]
+    a3b = [[freeze_slot(a, c3b.params) for a in row] for row in c3b.sys.alpha]
+    K3, K3b = LN3.s.K.v, freeze_slot(c3b.sys.lines[1].s.K, c3b.params).v
+    X0 = [combo.yN[1], combo.yC[1]]
+    ymax = maximum(vcat(combo.yN, combo.yC))
+    cands = NamedTuple[]
+    βC3 = LC3.s.β.v
+    for (name, label, crowd, reskill, free) in S4_SPECS
+        reskill && βC3 == βC2 && continue           # identical to the inherited candidate
+        idx = Dict(k => i for (i, k) in enumerate(free))
+        sl(k, v) = haskey(idx, k) ? Slot(idx[k], 0.0) : Slot(0, v)
+        Kv = crowd == :S3 ? K3 : K3b
+        LN = merge(LN3, (s=merge(LN3.s, (K=sl(:K, Kv),)),))
+        LC = merge(LC3, (s=merge(LC3.s, reskill ? (K=sl(:K, Kv), β=Slot(0, βC2)) : (K=sl(:K, Kv),)),))
+        mN = merge(MN, (s=merge(MN.s, (ε=sl(:εN, MN.s.ε.v),)),))
+        mC = merge(MC, (s=merge(MC.s, (ε=sl(:εC, MC.s.ε.v),)),))
+        χN = haskey(idx, :χ) ? Slot(idx[:χ], 0.0) : sl(:χN, 0.0)
+        χC = haskey(idx, :χ) ? Slot(idx[:χ], 0.0) : sl(:χC, 0.0)
+        lines = [merge(LN, (extra=Any[mN], chi=χN)), merge(LC, (extra=Any[mC], chi=χC))]
+        alpha = crowd == :S3 ? a3 : a3b
+        sys = build_system(lines, [(D=COMBO_DOSE, R=U_R, lines=[1, 2])], alpha)
+        model = make_system_model(sys)
+        bounds = [k == :K ? (0.5ymax, 20ymax) : k in (:χ, :χN, :χC) ? (-0.95, 10.0) : (0.0, 20.0) for k in free]
+        start(k) = k == :K ? Kv : k in (:εN, :εC) ? 1.0 : 0.0
+        p0s = [[start(k) for k in free], [k == :K ? 1.5Kv : k in (:εN, :εC) ? 0.5 : 1.0 for k in free],
+               [k == :K ? 0.7Kv : k in (:εN, :εC) ? 2.0 : -0.5 for k in free]]
+        p0s = [[clamp(x, lo + 1e-3 * (hi - lo), hi - 1e-3 * (hi - lo)) for (x, (lo, hi)) in zip(p, bounds)] for p in p0s]
+        u0 = preexposed_u0(sys, model, isempty(free) ? Float64[] : p0s[1], X0)
+        push!(cands, (name=name, label=label, family=isempty(free) ? "Combination, inherited" : "Combination, refitted", sys=sys, model=model,
+                      u0=u0, pnames=[S4_PNAME[k] for k in free], bounds=bounds, p0s=p0s, slots=free, crowd=crowd, reskill=reskill, βC2=βC2))
+    end
+    cands
+end
+
+function fit_stage4(cands, ds; maxtime=300.0)
+    rows = Vector{Any}(undef, length(cands))
+    Threads.@threads :dynamic for i in eachindex(cands)
+        c = cands[i]
+        if isempty(c.pnames)
+            f = predict_candidate(c.name, c.label, c.model, ds, c.u0)
+            rows[i] = merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[]))
+            continue
+        end
+        best = (params=fill(NaN, length(c.pnames)), bic=Inf, sse=Inf)
+        for p0 in c.p0s
+            f = bs_fit(c.model, ds, c.u0, p0, c.bounds; maxtime=maxtime)
+            f.bic < best.bic && (best = f)
+        end
+        isfinite(best.bic) && (f = bs_fit(c.model, ds, c.u0, best.params, c.bounds; maxtime=maxtime); f.bic < best.bic && (best = f))
+        se = isfinite(best.bic) ? (try param_se(c.model, ds, c.u0, best.params) catch; fill(NaN, length(c.pnames)) end) : fill(NaN, length(c.pnames))
+        rows[i] = merge(c, (params=best.params, bic=best.bic, sse=best.sse, se=se))
+    end
+    order_rule(sort!([r for r in rows if isfinite(r.bic)]; by=r -> r.bic))
+end
+
+function stage4_group(c3, c3b, βC2)
+    cands = stage4_cands(c3, c3b, βC2)
+    ds = combo_datasets(sys_obs(cands[1].sys))
+    rows = fit_stage4(cands, ds)
+    (id="s4", stage="4 Low resource + cisplatin coculture", title="Stage 4 · low resource + cisplatin coculture (1:1)",
+     datasets=ds, u0=rows[1].u0, cands=rows, line="combination", kind=:s4)
+end
+
+# bootstrap with the rule replayed on every replicate (as in run_zoo_fits.jl)
+function stage4_results(g; B)
+    res = bootstrap(g; B=B)
+    ks = [length(c.params) for c in g.cands]
+    picks = size(res.bic, 1) > 0 ? [rule_pick(res.bic[b, :], ks) for b in 1:size(res.bic, 1)] : Int[]
+    res = merge(res, (selected=1, pick=picks))
+    (res=res, band=bands(g, res; tmax=XMAX, j=1))
+end

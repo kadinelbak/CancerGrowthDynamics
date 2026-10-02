@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NN / UDE track</title>
+<style>:root{--bg:#fbfbfa;--fg:#1f2328;--mut:#5b6470;--acc:#2f6f9f}@media (prefers-color-scheme: dark){:root{--bg:#16181c;--fg:#e6e8eb;--mut:#9aa3ad;--acc:#7fb4dc}}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,sans-serif;max-width:800px;margin:0 auto;padding:24px 16px}a{color:var(--acc)}li{margin:6px 0}.m{color:var(--mut)}</style></head><body>
+<h1>03 — neural network / UDE track</h1><p class="m">Independent of GrowthParameterEstimation.jl. Held out: ce1 treated co-culture.</p><ol start="0">
+<li><a href="data/report.html">Harmonised data</a> — splits and every trajectory</li>
+<li><a href="nextday/report.html">Next-day prediction</a> — persistence, ridge, boosted trees, MLP</li>
+<li><a href="ude/report.html">Universal differential equation</a> — NN kill vs Hill vs pure neural ODE, hold-out folds, validation</li>
+<li><a href="symbolic/report.html">Analytical form</a> — sparse regression on the learned kill term, refit as an ODE</li>
+<li><a href="importance/report.html">Feature importance</a> — permutation, TreeSHAP, UDE sensitivity and ablation</li>
+<li><a href="control/report.html">Optimal control</a> — daily dose schedules on the closed form, cross-checked on UDE and Hill</li></ol><p><b><a href="verdict/report.html">Neural vs mechanistic — where each should be used</a></b>: a scorecard over every test, with guidance on when to use the neural model.</p></body></html>

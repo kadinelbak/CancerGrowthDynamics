@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Archive: time-based models</title>
+<style>
+:root{--ink:#17212b;--muted:#5b6b73;--line:#d9e2e6;--accent:#8a5a00;--bg:#f6f4ef;--card:#fff}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif}
+main{max-width:980px;margin:auto;padding:28px 16px}
+h1{margin:6px 0 4px;color:#5a3d00}a{color:#176b87}
+.warn{background:#fff3d6;border:1px solid #efd18b;border-radius:12px;padding:14px 18px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h3{margin:0 0 6px;font-size:16px}.card p{margin:0;color:var(--muted);font-size:14px}
+.home{display:inline-block;margin-bottom:10px;text-decoration:none;font-weight:650}
+code{background:#eef2f3;padding:1px 5px;border-radius:4px;font-size:13px}
+</style></head><body><main>
+<a class="home" href="../../index.html">⌂ Reports home</a>
+<h1>Archive: time-based model zoo</h1>
+<p>Frozen copies of the pages and code as they stood on 2026-09-29, before the switch to the autonomous model zoo.</p>
+<div class="warn"><b>Not for optimal control.</b> Many of these models use time directly: a delay \(1-e^{-\lambda t}\), a switch-on day \(\tau\), a capacity that decays as \(e^{-\delta t}\), or an Erlang onset \(E_n(\lambda t)\). Such a term assumes the drug or the stress started at day 0 and never changes, so the model cannot follow a changing dose schedule. The current pages use the <a href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_fits/report.html">autonomous model zoo</a> instead.</div>
+<div class="grid">
+  <a class="card" href="summary.html"><h3>Summary (archived)</h3><p>Bootstrap-optimal model per stage from the last time-based run (2026-09-28).</p></a>
+  <a class="card" href="presentation.html"><h3>Presentation (archived)</h3><p>The slide deck from that run.</p></a>
+  <a class="card" href="explorer.html"><h3>Explorer (archived)</h3><p>Sliders for the time-based models.</p></a>
+  <a class="card" href="reports/bootstrap_fits/report.html"><h3>Bootstrapping (archived)</h3><p>Bootstrap model selection with the parsimony rule.</p></a>
+  <a class="card" href="reports/lr_mechanisms/report.html"><h3>Low-resource mechanisms (archived)</h3><p>The 13 + 3 low-resource mechanisms, including the delayed-loss, decaying-K and Erlang-onset forms.</p></a>
+  <a class="card" href="reports/new_data_fits/report.html"><h3>New data fitting (snapshot)</h3><p>The staged fits report with the time-delayed Hill kill, as it stood on 2026-09-29.</p></a>
+  <a class="card" href="reports/candidate_models/report.html"><h3>Candidate models (snapshot)</h3><p>The original candidate-model plan.</p></a>
+  <a class="card" href="reports/healthy_damaged_fits/report.html"><h3>Healthy / damaged two-population fits</h3><p>The last staged fits (2026-09-29): one-population models ranked against healthy/damaged models with damage build-up, repair and transit compartments.</p></a>
+  <a class="card" href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/low_resource_staged_fits/report.html"><h3>Earlier low-resource fitting</h3><p>The first stand-alone fits of every low-resource workbook sheet (formerly an appendix of the Final Report).</p></a>
+  <a class="card" href="reports/validation/report.html"><h3>Validation (time-based)</h3><p>The held-out low-resource + cisplatin coculture predicted from the time-based fits without refitting, plus the joint model searches.</p></a>
+</div>
+<p style="margin-top:20px">Code: <code>Modeling_Approaches/02_mechanical_automatic_package/archive_time_models/</code> (the scripts, plus their CSV and HTML outputs).</p>
+</main>
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']]}};</script><script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</body></html>

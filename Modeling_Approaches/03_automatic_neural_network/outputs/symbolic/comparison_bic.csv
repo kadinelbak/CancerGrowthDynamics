@@ -1,0 +1,6 @@
+model,kill_params,bic_drug
+closed form (optimal),4,299.2916834072126
+Hill (mechanistic),5,330.3207355603298
+UDE (NN kill),113,930.4091543895573
+pure neural ODE,129,1007.5608063311558
+no drug,0,3773.145300086916

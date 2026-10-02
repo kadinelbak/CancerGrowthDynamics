@@ -1,0 +1,98 @@
+# Optimal-control configuration (control_model.jl, control_mpc.jl, run_control.jl).
+#
+# Every value is labelled:
+#   DATA        from the fitted models or the experimental design
+#   LITERATURE  taken from a cited model of the same kind
+#   ASSUMPTION  exploratory; not measured in these experiments. Swept in the report, never trusted alone.
+# Replace ASSUMPTION values with measurements when they exist.
+
+[schedule]
+decision_interval_days = 2.0     # DATA: media are changed about every 2 days, so a new dose can start at each change
+horizon_days = 14.0              # DATA: the experiments run 14 days
+closed_loop_days = 14.0          # DATA: closed-loop simulations cover the experimental window
+extrapolation_days = 28.0        # ASSUMPTION: longer runs extrapolate beyond the data (flagged in the report)
+long_days = 30.0                 # ASSUMPTION: the long report (CONTROL_DAYS=30) runs this long; days after 14 are beyond the data
+data_days = 14.0                 # DATA: the last measured day; marked on the long report's time plots
+rk4_step_days = 0.05             # numerical: fixed RK4 step for F(x, u); checked against Tsit5 in test/test_control.jl
+
+[dose]
+units = "µM cisplatin in the medium"
+u_max_data = 1.47                # DATA: highest dose with measurements (Stage 2 monoculture, IC25 file)
+levels_data = [0.0, 0.62, 1.0, 1.47]   # DATA: every dose that was measured
+u_max_demo = 3.0                 # ASSUMPTION: demonstration mode only; above 1.47 µM the Hill curve is extrapolated
+cumulative_max_uM_days = 0.0     # optional budget on ∫u dt; 0 = no budget
+min_gap_days = 0.0               # optional minimum time between dosing intervals (discrete mode); 0 = none
+
+[toxicity]
+# Host-tissue toxicity, following the normal-cell compartment of de Pillis & Radunskaya (2001,
+# Comput Math Methods Med 3:79–100) with the parameter values tabulated in DTR-Bench (Luo et al.
+# 2024, arXiv:2405.18610, Table IX):
+#   dB/dt = s_B·u − d_B·B                         systemic drug burden (their dB/dt = −d2·B + u)
+#   dH/dt = r_H·H(1 − H) − a_H(1 − e^(−B))·H      healthy tissue, 1 = full capacity
+# With T = 1 − H (toxicity burden, 0 = none):
+#   dT/dt = a_H(1 − e^(−B))(1 − T) − r_H·T(1 − T)
+# In-vitro cancer data carry no host, so this state is a proxy for the host cost of the same exposure.
+r_H = 1.0                        # LITERATURE: normal-cell regrowth r2 = 1.0 /day (de Pillis & Radunskaya 2001)
+a_H = 0.1                        # LITERATURE: fractional normal-cell kill a3 = 0.1 (de Pillis & Radunskaya 2001)
+d_B = 1.0                        # LITERATURE: drug decay d2 = 1.0 /day (de Pillis & Radunskaya 2001)
+s_B = 1.0                        # ASSUMPTION: 1 µM in the medium = 1 dose unit of the literature model (1 µM = the IC50 here)
+B_tox = 0.25                     # LITERATURE: normal cells kept ≥ 75% of capacity (de Pillis & Radunskaya 2001); 0.30 (70%) in later RL work
+# sweeps reported in the robustness section
+r_H_sweep = [1.0, 0.5, 0.2]      # ASSUMPTION: 0.2 /day ~ a 5-day recovery, the order of the maturation time in Friberg et al. 2002 (J Clin Oncol 20:4713)
+s_B_sweep = [1.0, 2.0, 4.0]      # ASSUMPTION: stronger mappings of medium µM to systemic burden
+B_tox_sweep = [0.15, 0.25, 0.30]
+
+[cancer]
+B_cancer_fraction_of_K = 0.8     # ASSUMPTION: total N + C must stay below 80% of the fitted shared capacity K
+
+[weights]
+# Stage cost ℓ = qN·(N/K)² + qC·(C/K)² + qT·(T/B_tox)² + ru·(u/u_max)² + barriers; terminal ×terminal_factor
+qN = 1.0
+qC = 1.0
+qT = 1.0
+ru = 0.1
+terminal_factor = 5.0
+mu_cancer = 0.05                 # barrier weights μ (relaxed log barriers)
+mu_tox = 0.05
+barrier_delta = 0.02             # relaxed-barrier switch point (Feller & Ebenbauer 2017): quadratic below z = δ
+# weight sets for the sensitivity sweep: [qN, qC, qT, ru]
+sweep = [[1.0, 1.0, 1.0, 0.1], [1.0, 3.0, 1.0, 0.1], [3.0, 1.0, 1.0, 0.1], [1.0, 1.0, 3.0, 0.1], [1.0, 1.0, 1.0, 1.0], [0.3, 3.0, 1.0, 0.3]]
+
+[sqp]
+max_iter = 40
+tol = 1e-7
+
+[fasting]
+# Low resource as a second control input v (1 = the interval is run at 0.5% FBS / "fasting", 0 = fed, 10% FBS).
+# The cancer-cell effect of v is the fitted in-vitro low-resource effect at full strength: u_R = 0.955·v.
+# NO in-vivo attenuation is applied yet (planned as a future piece): serum starvation in vitro is far
+# stronger than any fast a patient can do, so the tumour-side benefit of fasting here is an upper bound.
+levels = [0.0, 1.0]              # DATA: the two measured media (10% and 0.5% FBS)
+max_consecutive_intervals = 1    # LITERATURE-informed: one 2-day interval = a 48-h fast; fasts of 24–72 h around platinum chemotherapy were feasible (Dorff et al. 2016, BMC Cancer 16:360)
+min_gap_intervals = 1            # ASSUMPTION: at least one fed interval (2 days of refeeding) between fasts
+rv = 0.05                        # ASSUMPTION: cost weight of a fasting interval (burden of fasting itself), stage cost rv·v²
+# Drug × low-resource interaction. Two conditions were measured: low resource alone (Stages 1b/3b,
+# strength ε = 1) and low resource + 1 µM cisplatin (Stage 4, ε_N ≈ 7.6, ε_C ≈ 0.36 since the 2026-10-01 refit). The plant
+# reproduces both exactly and interpolates linearly in the dose between them, capped at the Stage 4
+# value above 1 µM:  ε_X(u) = 1 + (ε_X^S4 − 1)·min(u / u_ref, 1).
+eps_u_ref = 1.0                  # DATA: the Stage 4 dose (µM)
+eps_mode = "interp"              # "interp" (above) or "stage4" (ε = ε^S4 whatever the dose; swept in the report)
+
+[host]
+# Host cost of fasting: body weight W (fraction of baseline, 1 = baseline).
+#   dW/dt = −k_W·v + r_W·(1 − W)·(1 − v)
+k_W = 0.012                      # LITERATURE-informed: ≈1.2% of body weight lost per fasting day (a patient in the Safdie et al. 2009 case series, Aging 1:988, lost ≈3 kg over a multi-day fast); swept
+r_W = 0.15                       # LITERATURE-informed: weight partly regained within days and fully within ≈3 weeks after refeeding (Safdie et al. 2009); 1/r_W ≈ 7 days; swept
+W_min = 0.95                     # LITERATURE: > 5% weight loss is the cancer-cachexia criterion (Fearon et al. 2011, Lancet Oncol 12:489); barrier keeps W ≥ W_min
+qW = 1.0                         # cost weight of weight loss, qW·((1 − W)/(1 − W_min))²
+mu_host = 0.05                   # barrier weight on W ≥ W_min
+# Protection of healthy tissue by fasting (differential stress resistance: Raffaghello et al. 2008,
+# PNAS 105:8215; Lee et al. 2012, Sci Transl Med 4:124ra27; less chemotherapy-induced DNA damage in
+# T cells with a fasting-mimicking diet, de Groot et al. 2020, Nat Commun 11:3083).
+#   dP/dt = k_P·(v − P)                     protection builds while fasting and fades after
+#   toxicity kill a_H(1 − e^(−B)) is multiplied by (1 − p_H·P)
+k_P = 1.0                        # ASSUMPTION: protection builds over ≈1 day (the trials fast 24–48 h before the drug)
+p_H = 0.5                        # ASSUMPTION: at most 50% less healthy-tissue damage while fully protected; swept 0 / 0.5 / 0.8 (0 = no protection, since DIRECT saw no difference in toxicity grades)
+p_H_sweep = [0.0, 0.5, 0.8]
+k_W_sweep = [0.006, 0.012, 0.024]
+W_min_sweep = [0.90, 0.95, 0.98]

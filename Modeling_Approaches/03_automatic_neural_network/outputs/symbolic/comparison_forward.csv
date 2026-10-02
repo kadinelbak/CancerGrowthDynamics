@@ -1,0 +1,10 @@
+model,set,forward_rmse
+closed form (optimal),train: drug units,0.20839446331962688
+closed form (optimal),train: untreated co-culture,0.5975892387163294
+closed form (optimal),VALIDATION: ce1 treated co-culture,0.3523681472206385
+UDE (NN kill),train: drug units,0.2044447266025262
+UDE (NN kill),train: untreated co-culture,0.5624550208238115
+UDE (NN kill),VALIDATION: ce1 treated co-culture,0.3312434883991468
+Hill (mechanistic),train: drug units,0.22376657189623508
+Hill (mechanistic),train: untreated co-culture,0.7336002048002901
+Hill (mechanistic),VALIDATION: ce1 treated co-culture,0.3528103259492844

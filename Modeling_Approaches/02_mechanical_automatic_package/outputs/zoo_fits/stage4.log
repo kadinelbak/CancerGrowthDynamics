@@ -1,0 +1,22 @@
+=== Stage 4 add-on: 12 threads, B = 200 ===
+  s4_eps                 k=2 BIC=  267.10  ε_N^R = 7.728, ε_C^R = 0.3798
+  s4_K                   k=1 BIC=  285.86  K = 1427.0
+  s4_chi_K               k=2 BIC=  287.98  χ = 1.148, K = 1798.2
+  s4_chi                 k=1 BIC=  301.69  χ = 3.74
+  s4_reskill_chi         k=1 BIC=  302.18  χ = 3.971
+  s4_chi_lines           k=2 BIC=  304.91  χ_N = 3.74, χ_C = 4.555
+  s4_inherited           k=0 BIC=  337.27  
+  s4_reskill             k=0 BIC=  337.31  
+  s4_inherited_3bcrowd   k=0 BIC=  337.54  
+    s4: 25 / 200 replicates
+    s4: 50 / 200 replicates
+    s4: 75 / 200 replicates
+    s4: 100 / 200 replicates
+    s4: 125 / 200 replicates
+    s4: 150 / 200 replicates
+    s4: 175 / 200 replicates
+    s4: 200 / 200 replicates
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+  s4 optimal s4_eps, chosen in 100.0% of replicates (lowest BIC in 100.0%)  [1138s]
+Saved Stage 4 into zoo_state.jls. Next: julia --project=. zoo_rebuild_pages.jl
+EXIT 0

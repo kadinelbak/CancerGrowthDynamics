@@ -78,6 +78,15 @@
       padding: 1px 4px;
       border-radius: 4px;
     }
+    .older {
+      margin-top: 22px;
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+    }
+    .older a { color: var(--muted); }
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
       h1 { font-size: 28px; }
@@ -93,26 +102,48 @@
     <section class="grid">
       <article class="card">
         <div>
-          <span class="tag">New Experimental Data</span>
-          <h2>New Data Report</h2>
-          <p>One hub for the new-data sheets, candidate models, and low-resource fitted comparisons, with low-resource, treatment, sensitive:resistant ratio, file/sheet labels, and previews.</p>
+          <span class="tag">Start here · New data</span>
+          <h2>Summary</h2>
+          <p>The current answer for every fitting stage on one page: the optimal model (fewest terms within 3 BIC of the best) from the model zoo with no time-based terms and at most 3 compartments, with symbolic equations, fitted values and 95% bootstrap intervals, and one plot per stage. Redrawn from the latest full run.</p>
         </div>
-        <a class="button" href="outputs/new_data_report/report.html">Open Report</a>
+        <a class="button" href="outputs/results/summary.html">Open Summary</a>
       </article>
       <article class="card">
         <div>
-          <span class="tag">Legacy A2780 Data</span>
-          <h2>Legacy A2780 Report Hub</h2>
-          <p>One tabbed hub for the prior A2780 analyses: staged and sample-aware comparisons, reduced workflows, model registry, evidence, future research, and optimal control.</p>
+          <span class="tag">Present · New data · Live</span>
+          <h2>Live Presentation</h2>
+          <p>A slide deck for lab meetings that rebuilds itself from the latest full run: how models were chosen, an at-a-glance table, one slide per stage with the optimal fit, and the key findings. Arrow keys to move, F for full screen.</p>
         </div>
-        <a class="button" href="outputs/old_data_report/report.html">Open Legacy Report Hub</a>
+        <a class="button" href="outputs/results/presentation.html">Open Presentation</a>
+      </article>
+      <article class="card">
+        <div>
+          <span class="tag">Explore · New data</span>
+          <h2>Interactive Explorer</h2>
+          <p>Pick any stage, then any of its fitted candidate models, or build your own from any delay (immediate, compartments, second order, accumulation) and any effect. Drag the parameters or press Fit to fit it in the browser, and compare its BIC with the stage optimum.</p>
+        </div>
+        <a class="button" href="outputs/results/explorer.html">Open Explorer</a>
+      </article>
+      <article class="card">
+        <div>
+          <span class="tag">All details · New data</span>
+          <h2>Final Report</h2>
+          <p>The full analysis as chapters of one page: the data, the compartment models used at every stage (with every candidate, including the low resource + cisplatin Stage 4), bootstrapping, sensitivity analysis, validation, optimal control of the cisplatin schedule (sequential MPC with a toxicity proxy), and a 30-day version in which fasting is a second control, with a weight limit and protection of healthy tissue.</p>
+        </div>
+        <a class="button" href="outputs/final_report/report.html">Open Final Report</a>
       </article>
     </section>
     <section class="details">
       <h2>How To Use</h2>
-      <p>For a lab meeting, start with the staged model comparison, use the delay-vs-compartment report to explain the competing mechanisms, and consult the research guide for evidence and citations. Use the simulator last to explore hypothetical schedules and initial tumor compositions.</p>
-      <p class="note">The simulator is intentionally lightweight and runs entirely in the browser. It should be connected to fitted parameter exports before treating any schedule ranking as a scientific conclusion.</p>
+      <p>Start with the <b>Summary</b> for the current answer at each stage, use the <b>Presentation</b> in lab meetings, and the <b>Explorer</b> to see what each parameter does. The <b>Final Report</b> holds every detailed analysis, including every candidate of the model zoo. Every current model is autonomous (no term uses time), so it can be driven by any dose schedule; the <a href="Modeling_Approaches/02_mechanical_automatic_package/outputs/control/report.html">optimal-control report</a> does exactly that. Summary, Presentation and Explorer refresh automatically whenever <code>run_zoo_fits.jl</code> finishes a full run.</p>
+      <p class="note">These pages are research artifacts, not clinical decision tools.</p>
     </section>
+    <footer class="older">
+      <span>Older reports:</span>
+      <a href="outputs/archive_time/index.html">Time-based models (archive)</a>
+      <a href="outputs/old_data_report/report.html">Legacy A2780 report hub</a>
+      <a href="outputs/nn_track/index.html">Neural network / UDE track</a>
+    </footer>
   </main>
 </body>
 </html>

@@ -1,0 +1,17 @@
+fold,model,rmse,n
+hold out on→off intermittent,no drug,0.2988295385307548,50
+hold out on→off intermittent,Hill (mechanistic),0.15749034896788705,50
+hold out on→off intermittent,UDE (NN kill),0.1754315101488398,50
+hold out on→off intermittent,pure neural ODE,0.192761415017414,50
+hold out off→on intermittent,no drug,0.4786557601542064,52
+hold out off→on intermittent,Hill (mechanistic),0.29219474875397483,52
+hold out off→on intermittent,UDE (NN kill),0.22597493071538297,52
+hold out off→on intermittent,pure neural ODE,0.19106422385332097,52
+hold out 1 uM monoculture,no drug,0.7496799813729423,52
+hold out 1 uM monoculture,Hill (mechanistic),0.17084477774111245,52
+hold out 1 uM monoculture,UDE (NN kill),0.2810057273064403,52
+hold out 1 uM monoculture,pure neural ODE,0.687474905759759,52
+hold out all 20k wells,no drug,0.6273050961100849,176
+hold out all 20k wells,Hill (mechanistic),0.23519193462226742,176
+hold out all 20k wells,UDE (NN kill),0.2629510306392863,176
+hold out all 20k wells,pure neural ODE,0.2451236194017061,176
