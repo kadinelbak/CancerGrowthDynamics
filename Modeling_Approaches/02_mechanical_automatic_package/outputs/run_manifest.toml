@@ -1,23 +1,95 @@
-finished = "2026-10-02T16:37:12.393"
-julia = "1.12.7"
+steps_requested = ["analyses", "control14", "report14", "control30", "report30", "tests", "final"]
+continued_from = "2026-10-02T20:49:41.508"
 threads = 20
-steps_requested = ["data"]
-started = "2026-10-02T16:36:12.632"
+finished = "2026-10-03T12:53:35.299"
+started = "2026-10-02T22:16:53.074"
 resume = false
+time_limit_hits = 203
+julia = "1.12.7"
+
+[steps.checks]
+log = "outputs/logs/checks.log"
+ok = true
+seconds = 63.5
+finished = "2026-10-02T17:42:39.287"
+
+    [steps.checks.env]
+
+[steps.analyses]
+log = "outputs/logs/analyses.log"
+ok = true
+seconds = 892.9
+finished = "2026-10-02T22:31:51.634"
+
+    [steps.analyses.env]
+
+[steps.report30]
+log = "outputs/logs/report30.log"
+ok = true
+seconds = 109.9
+finished = "2026-10-03T12:38:22.701"
+
+    [steps.report30.env]
+
+[steps.control30]
+log = "outputs/logs/control30.log"
+ok = true
+seconds = 47810.1
+finished = "2026-10-03T12:36:32.801"
+
+    [steps.control30.env]
+    REDO = "1"
 
 [steps.data]
 log = "outputs/logs/data.log"
 ok = true
-seconds = 50.0
-finished = "2026-10-02T16:37:08.856"
+seconds = 38.8
+finished = "2026-10-02T17:41:32.480"
 
     [steps.data.env]
 
-[GrowthParameterEstimation]
-repo-rev = "5eaadd4"
-git-tree-sha1 = "39fecf001e0dc16d4b8c498c059b4fab66ec50c7"
-repo-url = "https://github.com/kadinelbak/GrowthParameterEstimation.jl.git"
-version = "0.4.1"
+[steps.fits]
+log = "outputs/logs/fits.log"
+ok = true
+seconds = 5224.1
+finished = "2026-10-02T22:16:48.425"
+
+    [steps.fits.env]
+    ZOO_RESUME = "1"
+    ZOO_REUSE_BOOT = "1"
+
+[steps.report14]
+log = "outputs/logs/report14.log"
+ok = true
+seconds = 94.4
+finished = "2026-10-02T23:19:42.683"
+
+    [steps.report14.env]
+
+[steps.final]
+log = "outputs/logs/final.log"
+ok = true
+seconds = 5.0
+finished = "2026-10-03T12:53:35.283"
+
+    [steps.final.env]
+
+[steps.control14]
+log = "outputs/logs/control14.log"
+ok = true
+seconds = 2093.5
+finished = "2026-10-02T23:18:08.263"
+
+    [steps.control14.env]
+    REDO = "1"
+
+[steps.tests]
+log = "outputs/logs/tests.log"
+ok = true
+seconds = 907.6
+finished = "2026-10-03T12:53:30.275"
+
+    [steps.tests.env]
 
 [data_sha256]
 "New Datasets/ce0_75S25R.xlsx" = "ea3ecdce265776753a6b933c8a030cf7b4596761dd9881523db8d18fc6f436bd"
@@ -43,7 +115,13 @@ version = "0.4.1"
 "New Datasets/A2780_IC25_1.47um_30k.csv" = "12a91694746712efaa971374d6da16ff73b9cff7b1d01bca0926d55f7f4b604d"
 "New Datasets/Validation/ALL A2780 LR + cis(A2780 30k 1-1).csv" = "508c85b3ddca8de02825b7135935e83846a386e8792eca95a066af4298df522a"
 
+[GrowthParameterEstimation]
+repo-rev = "5eaadd4"
+git-tree-sha1 = "39fecf001e0dc16d4b8c498c059b4fab66ec50c7"
+repo-url = "https://github.com/kadinelbak/GrowthParameterEstimation.jl.git"
+version = "0.4.1"
+
 [git]
 branch = "reproducible-pipeline"
-commit = "7eae1642ac02baccd5376958c5a34788ecad40b5"
+commit = "5c0817889c6fa7f34b692aa1d94018802f5d7cfe"
 uncommitted_changes = true
