@@ -26,8 +26,9 @@ import LinearAlgebra
 const LA = LinearAlgebra
 
 const CFG = TOML.parsefile(joinpath(@__DIR__, "control_config.toml"))
-const ZOO_STATE = deserialize(joinpath(@__DIR__, "outputs", "zoo_fits", "zoo_state.jls"))
-const AN_STATE = deserialize(joinpath(@__DIR__, "outputs", "zoo_analyses", "analyses_state.jls"))
+# ZOO_STATE / AN_STATE override the fitted states (e.g. a backed-up earlier fit, to compare control runs)
+const ZOO_STATE = deserialize(get(ENV, "ZOO_STATE", joinpath(@__DIR__, "outputs", "zoo_fits", "zoo_state.jls")))
+const AN_STATE = deserialize(get(ENV, "AN_STATE", joinpath(@__DIR__, "outputs", "zoo_analyses", "analyses_state.jls")))
 zgroup(id) = ZOO_STATE.groups[findfirst(g -> g.id == id, ZOO_STATE.groups)]
 
 # resistant kill β_C of the carried Stage 3 model, and where it comes from
@@ -48,6 +49,7 @@ struct Plant
     K::Float64                # shared carrying capacity (for normalisation and the cancer bound)
     tox::NamedTuple           # r_H, a_H, d_B, s_B
     uR::Float64               # low-resource level of the environment (0 in normal medium)
+    fp::Any                   # low-resource environment: the two-input plant of control_fasting.jl held at v = 1, else nothing
 end
 
 # replace fixed slot values of a line (e.g. a bootstrap draw of carried parameters)
@@ -67,7 +69,7 @@ function make_plant(name, lines, alpha, p; uR=0.0, tox=default_tox())
     n = sys.n
     Kslot = lines[1].s.K
     K = Kslot.i > 0 ? p[Kslot.i] : Kslot.v
-    Plant(name, sys, p, n + 2, sys.xi[1][1] + 1, sys.xi[1][2] + 1, n + 1, n + 2, K, tox, uR)
+    Plant(name, sys, p, n + 2, sys.xi[1][1] + 1, sys.xi[1][2] + 1, n + 1, n + 2, K, tox, uR, nothing)
 end
 
 # The Stage 3 coculture lines and parameters for a scenario (point estimates or a bootstrap draw b)
@@ -96,25 +98,13 @@ function scenario_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default
     make_plant(name, [set_slots(LN, fixed_N), set_slots(LC, fixed_C)], c3.sys.alpha, p; tox=tox)
 end
 
-# Low-resource environment: the Stage 4 carried model (both mechanisms per line, fitted to the
-# low resource + cisplatin coculture). Scenario :A keeps its resistant kill (inherited from Stage 3);
-# :B sets the resistant kill to its Stage 2 monoculture value. Bootstrap draw b uses Stage 4's own replicate.
-function lr_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox())
-    any(g -> g.id == "s4", ZOO_STATE.groups) || error("Stage 4 is missing from zoo_state.jls (run run_zoo_stage4.jl)")
-    c4 = zgroup("s4").cands[1]
-    p = b === nothing ? copy(c4.params) : (isempty(c4.params) ? Float64[] : ZOO_STATE.results["s4"].res.pars[1][b, :])
-    any(isnan, p) && return nothing
-    LN, LC = c4.sys.lines
-    if scen == :B
-        LC = merge(LC, (s=merge(LC.s, (β=Slot(0, zgroup("s2-a2780cis").cands[1].params[1]),)),))
-    end
-    name = scen == :A ? "A (low resource): Stage 4 model as selected" : "B (low resource): Stage 4 model with the Stage 2 resistant kill"
-    make_plant(name, [LN, LC], c4.sys.alpha, p; uR=U_R, tox=tox)
-end
+# Low-resource environment: lr_plant(scen) is defined in control_fasting.jl (the two-input plant held at
+# v = 1), so the 14-day and 30-day controllers use the same dose-dependent drug × low-resource model.
 
 # continuous-time right-hand side for a given dose u (µM)
 function plant_rhs!(du, x, u, P::Plant)
     T = promote_type(eltype(x), typeof(u))
+    P.fp === nothing || return fast_rhs!(du, x, (T(u), one(T)), P.fp)      # low resource: fasting plant at v = 1
     S = P.sys; env = S.envs[1]
     for (j, l) in enumerate(env.lines)
         xi = S.xi[1][j]; L = S.lines[l]
@@ -178,6 +168,7 @@ end
 # initial state: observed counts, drug and toxicity states at 0
 function x0_for(P::Plant, N0, C0)
     x = zeros(P.nx); x[P.iN] = N0; x[P.iC] = C0
+    P.fp === nothing || (x[P.fp.iW] = 1.0)
     L = P.sys.lines
     L[2].action == :resource && error("resource states need initialisation")
     x

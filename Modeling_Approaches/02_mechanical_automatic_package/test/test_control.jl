@@ -1,6 +1,5 @@
 # Tests for the optimal-control layer:  julia --project=. test/test_control.jl
-include(joinpath(@__DIR__, "..", "control_model.jl"))
-include(joinpath(@__DIR__, "..", "control_mpc.jl"))
+include(joinpath(@__DIR__, "..", "control_fasting.jl"))     # includes control_model.jl and control_mpc.jl; lr_plant lives there
 using Test
 using Random: Xoshiro
 
@@ -38,7 +37,7 @@ end
                 # Stage 4 fit (low resource + 1 µM, from the pre-exposed state): zoo model vs control plant
                 c4 = zgroup("s4").cands[1]
                 solz = solve(ODEProblem(c4.model, c4.u0, (0.0, 12.0), c4.params), Tsit5(); reltol=1e-10, abstol=1e-10)
-                x0 = vcat(c4.u0, 0.0, 0.0)
+                x0 = vcat(c4.u0, zeros(3), 1.0)            # + B, T, protection P, weight W of the fasting plant held at v = 1
                 ts, xs = trajectory(x0, fill(1.0, 6), P, 2.0; dt=0.5)
                 maxrel = maximum(max(abs(xs[i][P.iN] - solz(t)[P.iN]) / max(solz(t)[P.iN], 50),
                                      abs(xs[i][P.iC] - solz(t)[P.iC]) / max(solz(t)[P.iC], 50)) for (i, t) in enumerate(ts))
@@ -80,7 +79,7 @@ end
         end
 
         @testset "scenario $scen: adjoint gradient vs finite differences" begin
-            x0 = x0_for(P, 300.0, 300.0); U = [0.2, 1.0, 0.5, 1.2]
+            x0 = x0_for(P, 300.0, 300.0); U = [0.2, 0.9, 0.5, 1.2]      # off u = 1 µM, the kink of the low-resource ε(u)
             xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Vector{Float64}[]
             for k in eachindex(U)
                 xn, A, B = linearize(xs[k], U[k], P, Δ); push!(xs, xn); push!(As, A); push!(Bs, B)
@@ -89,6 +88,13 @@ end
             gfd = [(Up = copy(U); Um = copy(U); Up[k] += 1e-6; Um[k] -= 1e-6;
                     (total_cost(x0, Up, P, Δ, W) - total_cost(x0, Um, P, Δ, W)) / 2e-6) for k in eachindex(U)]
             @test maximum(abs.(g .- gfd) ./ max.(abs.(gfd), 1e-6)) < 1e-4
+        end
+
+        @testset "scenario $scen: cost is linear in the burden, with the resistance premium" begin
+            x = x0_for(P, 1000.0, 500.0); x2 = x0_for(P, 2000.0, 1000.0)
+            c(x) = stage_cost(x, 0.0, P, default_weights(P; w=[1.0, 1.0, 0.0, 0.0])) - relaxed_barrier(1 - (x[P.iN] + x[P.iC]) / W.Bc, W.μC, W.δ) - relaxed_barrier(1.0, W.μT, W.δ)
+            @test isapprox(c(x2), 2c(x); rtol=1e-12)                                   # doubling every count doubles the burden cost
+            @test isapprox(c(x), (1000 + 2 * 500) / P.K; rtol=1e-12)                    # qR = 1: a resistant cell counts twice
         end
 
         @testset "scenario $scen: discrete search equals brute force" begin

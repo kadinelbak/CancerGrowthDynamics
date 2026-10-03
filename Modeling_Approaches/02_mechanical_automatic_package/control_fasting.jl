@@ -98,6 +98,19 @@ function fast_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox
            n + 4, base.iN, base.iC, n + 1, n + 2, n + 3, n + 4, base.K, tox, host, line_specs(base, [np + 1, np + 2]), Float64(koff))
 end
 
+# The 14-day controller's low-resource environment (control_model.jl Plant interface): the same plant
+# held at v = 1 for the whole run, with no fasting protection of healthy tissue (p_H = 0), because low
+# resource is the culture's environment there, not a fast the host chooses. ε(u) follows eps_mode as above,
+# so u = 0 gives the low-resource-only model and u = 1 µM the Stage 4 model.
+function lr_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox())
+    FP = fast_plant(scen; b=b, tox=tox, host=merge(default_host(), (p_H=0.0,)))
+    FP === nothing && return nothing
+    B = FP.base
+    name = (scen == :A ? "A (low resource): Stage 3 coculture model" : "B (low resource): monoculture drug response") *
+           " + fitted low-resource modules, dose-dependent strength ε(u)"
+    Plant(name, B.sys, B.p, FP.nx, FP.iN, FP.iC, FP.iB, FP.iT, FP.K, tox, U_R, FP)
+end
+
 εfactor(FP::FPlant, u) = FP.eps_mode == :stage4 ? one(u) : min(u / FP.u_ref, one(u))
 
 function fast_rhs_ref!(du, x, w, FP::FPlant)       # reference: the zoo right-hand side
@@ -194,25 +207,25 @@ end
 
 # ── cost ─────────────────────────────────────────────────────────────────────
 struct Weights2
-    qN::Float64; qC::Float64; qT::Float64; qW::Float64; ru::Float64; rv::Float64; tf::Float64
+    qB::Float64; qR::Float64; qT::Float64; qW::Float64; ru::Float64; rv::Float64; tf::Float64
     μC::Float64; μT::Float64; μW::Float64; δ::Float64
     Bc::Float64; Btox::Float64; Wmin::Float64; umax::Float64; K::Float64
 end
 function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Float64(HCFG["W_min"]), w=nothing, rv=Float64(FCFG["rv"]))
     c = CFG["weights"]
-    qN, qC, qT, ru = w === nothing ? (c["qN"], c["qC"], c["qT"], c["ru"]) : Tuple(w)
-    Weights2(qN, qC, qT, HCFG["qW"], ru, rv, c["terminal_factor"], c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
+    qB, qR, qT, ru = w === nothing ? (c["qB"], c["qR"], c["qT"], c["ru"]) : Tuple(w)
+    Weights2(qB, qR, qT, HCFG["qW"], ru, rv, c["terminal_factor"], c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
              CFG["cancer"]["B_cancer_fraction_of_K"] * FP.K, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
 function stage_cost2(x, w, FP::FPlant, W::Weights2)
     N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
-    W.qN * (N / W.K)^2 + W.qC * (C / W.K)^2 + W.qT * (T / W.Btox)^2 + W.qW * wloss(x, FP, W)^2 +
+    burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.qW * wloss(x, FP, W)^2 +
         W.ru * (w[1] / W.umax)^2 + W.rv * w[2]^2 +
         relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ) +
         relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ)
 end
-terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (W.qN * (x[FP.iN] / W.K)^2 + W.qC * (x[FP.iC] / W.K)^2 + W.qT * (x[FP.iT] / W.Btox)^2 + W.qW * wloss(x, FP, W)^2)
+terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (burden_cost(x[FP.iN], x[FP.iC], W) + W.qT * (x[FP.iT] / W.Btox)^2 + W.qW * wloss(x, FP, W)^2)
 
 function total_cost2(x0, U, FP, Δ, W)
     x = copy(x0); J = 0.0

@@ -18,7 +18,7 @@ const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const NRUN = round(Int, DAYS / Δ0)                                   # 15 decisions over 30 days
 const NDEC = round(Int, CFG["schedule"]["horizon_days"] / Δ0)       # 7-interval (14-day) look-ahead
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
-const FOUT = joinpath(@__DIR__, "outputs", "control_30d"); mkpath(FOUT)
+const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), "control_30d"); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
 const FCK = joinpath(FOUT, "fasting_state.jls")
 fck = (isfile(FCK) && get(ENV, "REDO", "0") != "1") ? deserialize(FCK) : Dict{Symbol,Any}()
 savef() = serialize(FCK, fck)
@@ -118,7 +118,7 @@ if !haskey(fck, :sweeps)
             push!(tasks, (kind="look-ahead", scen=scen, label="$(Hh) decisions ($(round(Int, Hh * Δ0)) days)", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP); H=Hh))))
         end
         for w in ([1.0, 3.0, 1.0, 0.1], [3.0, 1.0, 1.0, 0.1], [1.0, 1.0, 3.0, 0.1])
-            push!(tasks, (kind="weights", scen=scen, label="qN=$(w[1]) qC=$(w[2]) qT=$(w[3]) ru=$(w[4])", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; w=w)))))
+            push!(tasks, (kind="weights", scen=scen, label="qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; w=w)))))
         end
     end
     out = Vector{Any}(undef, length(tasks))

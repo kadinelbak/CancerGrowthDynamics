@@ -4,8 +4,10 @@
 # Finite-horizon problem at every decision time (decision interval Δ, H intervals):
 #   minimise  J(U) = Σ_{k=1..H} ℓ(x_{k+1}, u_k) + φ(x_{H+1}),   x_{k+1} = F(x_k, u_k)
 #   subject to 0 ≤ u_k ≤ u_max  [and Δ·Σu_k ≤ U_cum]
-#   ℓ = qN(N/K)² + qC(C/K)² + qT(T/B_tox)² + ru(u/u_max)² + b_μC(1 − (N+C)/B_cancer) + b_μT(1 − T/B_tox)
-#   φ = terminal_factor · [qN(N/K)² + qC(C/K)² + qT(T/B_tox)²]
+#   ℓ = qB(N+C)/K + qR·C/K + qT(T/B_tox)² + ru(u/u_max)² + b_μC(1 − (N+C)/B_cancer) + b_μT(1 − T/B_tox)
+#   φ = terminal_factor · [qB(N+C)/K + qR·C/K + qT(T/B_tox)²]
+# Goal (user decision 2026-10-02): low total burden and resistance held back. The burden is linear in
+# the counts (every cell costs the same at any tumour size); qR is the extra cost of a resistant cell.
 # b_μ is a relaxed logarithmic barrier (Feller & Ebenbauer 2017, IEEE Trans Autom Control 62:1223):
 #   −μ log z for z ≥ δ, and its quadratic continuation below δ, so an infeasible start still has a
 #   finite, steep cost and the optimiser is pushed back inside instead of failing.
@@ -28,24 +30,26 @@
 # branches whose partial cost already exceeds the best (every stage cost is ≥ 0).
 
 struct Weights
-    qN::Float64; qC::Float64; qT::Float64; ru::Float64; tf::Float64
+    qB::Float64; qR::Float64; qT::Float64; ru::Float64; tf::Float64
     μC::Float64; μT::Float64; δ::Float64
     Bc::Float64; Btox::Float64; umax::Float64; K::Float64
 end
 function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]))
     c = CFG["weights"]
-    qN, qC, qT, ru = w === nothing ? (c["qN"], c["qC"], c["qT"], c["ru"]) : Tuple(w)
-    Weights(qN, qC, qT, ru, c["terminal_factor"], c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
+    qB, qR, qT, ru = w === nothing ? (c["qB"], c["qR"], c["qT"], c["ru"]) : Tuple(w)
+    Weights(qB, qR, qT, ru, c["terminal_factor"], c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
             CFG["cancer"]["B_cancer_fraction_of_K"] * P.K, Btox, umax, P.K)
 end
 
+# tumour burden plus the resistance premium, linear in the counts (≥ 0, so the exact search can prune)
+burden_cost(N, C, W) = (W.qB * (max(N, zero(N)) + max(C, zero(C))) + W.qR * max(C, zero(C))) / W.K
 relaxed_barrier(z, μ, δ) = z >= δ ? -μ * log(z) : μ * (0.5 * ((z - 2δ) / δ)^2 - 0.5 - log(δ))
 function stage_cost(x, u, P::Plant, W::Weights)
     N, C, T = x[P.iN], x[P.iC], x[P.iT]
-    W.qN * (N / W.K)^2 + W.qC * (C / W.K)^2 + W.qT * (T / W.Btox)^2 + W.ru * (u / W.umax)^2 +
+    burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.ru * (u / W.umax)^2 +
         relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ)
 end
-terminal_cost(x, P::Plant, W::Weights) = W.tf * (W.qN * (x[P.iN] / W.K)^2 + W.qC * (x[P.iC] / W.K)^2 + W.qT * (x[P.iT] / W.Btox)^2)
+terminal_cost(x, P::Plant, W::Weights) = W.tf * (burden_cost(x[P.iN], x[P.iC], W) + W.qT * (x[P.iT] / W.Btox)^2)
 
 function rollout(x0, U, P::Plant, Δ)
     xs = [copy(x0)]

@@ -77,6 +77,15 @@ manifest = Dict{String,Any}(
     "julia" => string(VERSION), "GrowthParameterEstimation" => gpe_pin(), "steps" => Dict{String,Any}())
 const MANIFEST = joinpath(PKG, "outputs", "run_manifest.toml")
 save_manifest() = open(io -> TOML.print(io, manifest), MANIFEST, "w")
+# a run continued with --from / --only keeps the records of the earlier steps of the same run
+if first(todo) != stepnames[1] && isfile(MANIFEST)
+    old = TOML.parsefile(MANIFEST)
+    merge!(manifest["steps"], get(old, "steps", Dict()))
+    for k in ("data_sha256", "time_limit_hits")
+        haskey(old, k) && (manifest[k] = old[k])
+    end
+    manifest["continued_from"] = get(old, "started", "")
+end
 
 # ── run ────────────────────────────────────────────────────────────────────────
 mkpath(LOGS)
@@ -84,6 +93,15 @@ println("Pipeline: $(join(todo, " → ")) ($THREADS threads$(RESUME ? ", resume"
 for (name, what, dir, script, threaded, env) in STEPS
     name in todo || continue
     log = joinpath(LOGS, "$name.log")
+    # hold point: the file outputs/hold_before_<step> pauses the run before that step until it is deleted
+    hold = joinpath(PKG, "outputs", "hold_before_$name")
+    if isfile(hold)
+        println("[$(Dates.format(now(), "HH:MM"))] HOLD before $name: delete outputs/hold_before_$name to continue"); flush(stdout)
+        while isfile(hold)
+            sleep(20)
+        end
+        println("[$(Dates.format(now(), "HH:MM"))] hold released, continuing with $name"); flush(stdout)
+    end
     cmd = `$JL --startup-file=no $(threaded ? ["-t", string(THREADS)] : String[]) --project=$PKG $script`
     cmd = setenv(Cmd(cmd; dir=dir), merge(Dict(ENV), env))
     t0 = time(); println("\n[$(Dates.format(now(), "HH:MM"))] $name: $what  (log: outputs/logs/$name.log)"); flush(stdout)

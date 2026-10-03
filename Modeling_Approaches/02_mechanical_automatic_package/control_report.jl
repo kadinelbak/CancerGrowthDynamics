@@ -2,8 +2,7 @@
 #   julia --project=. control_report.jl
 # Writes outputs/control/report.html and docs/Modeling_Approaches/02_mechanical_automatic_package/outputs/control/report.html
 
-include(joinpath(@__DIR__, "control_model.jl"))
-include(joinpath(@__DIR__, "control_mpc.jl"))
+include(joinpath(@__DIR__, "control_fasting.jl"))     # includes control_model.jl and control_mpc.jl; lr_plant lives there
 const ZOO_DIR = joinpath(@__DIR__, "outputs", "zoo_fits")
 const ZOO_DOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "zoo_fits")
 const BOOT_B = ZOO_STATE.B
@@ -134,7 +133,7 @@ function outcome_table(m)
 end
 
 function env_section(env)
-    envname = env == :normal ? "normal medium (10% FBS), Stage 3 model" : "low resource (0.5% FBS), Stage 4 model"
+    envname = env == :normal ? "normal medium (10% FBS), Stage 3 model" : "low resource (0.5% FBS), Stage 3 model + low-resource modules, ε(u)"
     secs = String[]
     for scen in (:A, :B)
         m = main_of(env, scen, "50:50")
@@ -189,7 +188,7 @@ function robust_section()
     """<h2>Robustness over bootstrap parameter sets</h2>
 <div class='intro'><p>The schedules above are planned with the best-fit parameters. Here each one is replayed on bootstrap parameter sets: the growth, drug and coculture parameters of the same bootstrap replicate of their own stages (an approximation: each stage was bootstrapped with earlier-stage values held at their estimates). Threshold adaptive therapy re-decides on each plant. The closed-loop row lets MPC plan with the best-fit model but observe the bootstrap plant every 2 days, as it would in an experiment.</p></div>
 <div class='grid'>$(join(secs))</div>
-$(table([("Environment", "Normal medium (Stage 3 model) or low resource (Stage 4 model)."), ("Scenario", "A: the coculture fit as selected (Stage 3); B: monoculture drug response for both lines with crowding from the untreated cocultures."),
+$(table([("Environment", "Normal medium (Stage 3 model) or low resource (Stage 3 model with the fitted low-resource modules; their strength ε(u) depends on the dose and equals the Stage 4 fit at 1 µM)."), ("Scenario", "A: the coculture fit as selected (Stage 3); B: monoculture drug response for both lines with crowding from the untreated cocultures."),
          ("Policy", "The dosing rule; its schedule is planned with the best-fit model."), ("Draws", "Bootstrap parameter sets simulated."),
          ("Cancer bound hit", "Share of parameter sets in which N + C reaches B_cancer at any time."), ("Toxicity bound hit", "Share of parameter sets in which T reaches B_tox."),
          ("N $DL", "Median sensitive cells (95% range) across parameter sets."), ("C $DL", "Median resistant cells (95% range)."),
@@ -243,6 +242,7 @@ function model_section()
     eqlr = vcat(line_tex(S4.lines[1], "N", ctex(S4.alpha[1][2], "N", "C", "NC"), "K"), line_tex(S4.lines[2], "C", ctex(S4.alpha[2][1], "C", "N", "CN"), "K"))
     v = Dict(zip(c3.pnames, c3.params))
     Ln, Lc = P.sys.lines
+    ecC = ec50_of(Lc.s, P.p, Float64); kill1(β) = β / (ecC^Lc.s.h.v + 1)      # resistant kill at a steady 1 µM effect
     prow(sym, val, unit, src, note) = trow([td("\\($sym\\)"), tn(val isa Number ? fmt(val) : val), td(unit), td(src), td(hesc(note))])
     t = default_tox()
     prows = [prow("r_N", Ln.s.r.v, "/day", "DATA · Stage 1", "sensitive growth rate"), prow("r_C", Lc.s.r.v, "/day", "DATA · Stage 1", "resistant growth rate"),
@@ -250,7 +250,7 @@ function model_section()
              prow("\\alpha_{NC}", v["α_NC"], "—", "DATA · Stage 3", "crowding of N by C"), prow("\\alpha_{CN}", v["α_CN"], "—", "DATA · Stage 3", "crowding of C by N"),
              prow("d_N", v["d_N"], "/day", "DATA · Stage 3", "sensitive death in coculture"), prow("\\beta_N", v["β_N"], "/day", "DATA · Stage 3", "max sensitive kill (scenario A; B uses Stage 2)"),
              prow("h_N", Ln.s.h.v, "—", "DATA · Stage 2", "Hill slope, sensitive"), prow("k_N", Ln.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, sensitive"),
-             prow("\\beta_C", stage3_betaC().value, "/day", "DATA · $(stage3_betaC().source) (A) / Stage 2 (B)", "max resistant kill: $(fmt(stage3_betaC().value)) in A, $(fmt(zgroup("s2-a2780cis").cands[1].params[1])) in B"),
+             prow("\\beta_C", stage3_betaC().value, "/day", "DATA · $(stage3_betaC().source) (A) / Stage 2 (B)", "max resistant kill: $(fmt(stage3_betaC().value)) in A, $(fmt(zgroup("s2-a2780cis").cands[1].params[1])) in B. Not identifiable on its own: every measured dose is far below EC50,C, so the data fix only the kill at those doses, β_C·E^h_C/(EC50,C^h_C + E^h_C) = $(fmt(kill1(stage3_betaC().value))) /day at a steady 1 µM in A and $(fmt(kill1(zgroup("s2-a2780cis").cands[1].params[1]))) /day in B"),
              prow("h_C", Lc.s.h.v, "—", "DATA · Stage 2", "Hill slope, resistant"), prow("k_C", Lc.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, resistant"),
              prow("EC_{50,N}", ec50_of(Ln.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780"),
              prow("EC_{50,C}", ec50_of(Lc.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780cis"),
@@ -265,7 +265,7 @@ function model_section()
     """<h2>The model the controller uses</h2>
 <div class='intro'><p>The cell equations are exactly the carried compartment models: the control plant calls the same right-hand side as the fits, with the same parameter values (a test checks that it reproduces the fitted Stage 3 curves at 1 µM to 10⁻⁵). The controller only adds the dose input \\(u\\) and a toxicity proxy. Drug → effect → kill follows \\(u \\to A_{X,1} \\to A_{X,2} \\to A_{X,3}=E_X \\to\\) kill, and separately \\(u \\to B \\to T\\).</p>
 $(join(["<div class='eq'>$(i == 4 ? tip(TOX_TIP, "Lower T is better, and it must stay under the 0.25 bound (at least 75% of healthy tissue kept).") : "")\\[$e\\]</div>" for (i, e) in enumerate(eqs)]))
-<p><b>Low resource (Stage 4 model, as fitted; D = u, u<sub>R</sub> = $(U_R)).</b> $(tip("The Stage 4 equations exactly as the zoo writes them for the carried model: the cisplatin module and the low-resource module of each line. The drug-effect compartments and the toxicity states B, T are as above.", :none))</p>
+<p><b>Low resource (D = u, u<sub>R</sub> = $(U_R)).</b> $(tip("The low-resource equations as the zoo writes them for the carried Stage 4 model: the cisplatin module and the low-resource module of each line. The drug-effect compartments and the toxicity states B, T are as above.", :none)) The low-resource strengths depend on the dose, \\(\\varepsilon_X(u)=1+(\\varepsilon_X^{S4}-1)\\min(u/1\\,\\mu\\mathrm{M},1)\\): with no drug the model is the low-resource fit alone (\\(\\varepsilon=1\\)), and at 1 µM it is exactly the Stage 4 fit. This is the same plant as the 30-day fasting controller held in low resource throughout, so the two reports agree.</p>
 $(join(["<div class='eq'>\\[$e\\]</div>" for e in eqlr]))
 <p>Discrete transition over one decision interval (Δ = $(Δ0) days, u constant): \\(x_{k+1}=F(x_k,u_k)\\), fixed-step RK4 with step 0.05 day. Local linearisation \\(A_k=\\partial F/\\partial x\\), \\(B_k=\\partial F/\\partial u\\) by forward-mode automatic differentiation through the RK4 steps (one Jacobian of F over [x; u]: nx + 1 dual directions, about the cost of reverse mode at this size, with no tape).</p></div>
 <div class='grid'><div>$(table([("State", "Symbol."), ("Units", "Units."), ("Meaning", "What it represents.")], srows))</div>
@@ -279,9 +279,10 @@ function objective_section()
     """<h2>Objective, constraints and barriers</h2>
 <div class='intro'>
 <div class='eq'>\\[\\min_{u_1,\\dots,u_H}\\ \\sum_{k=1}^{H}\\ell(x_{k+1},u_k)+\\phi(x_{H+1}),\\qquad 0\\le u_k\\le u_{max}\\]</div>
-<div class='eq'>\\[\\ell=q_N\\Big(\\tfrac{N}{K}\\Big)^2+q_C\\Big(\\tfrac{C}{K}\\Big)^2+q_T\\Big(\\tfrac{T}{B_{tox}}\\Big)^2+r_u\\Big(\\tfrac{u}{u_{max}}\\Big)^2+b_{\\mu_C}\\!\\Big(1-\\tfrac{N+C}{B_{cancer}}\\Big)+b_{\\mu_T}\\!\\Big(1-\\tfrac{T}{B_{tox}}\\Big)\\]</div>
-<div class='eq'>\\[b_\\mu(z)=\\begin{cases}-\\mu\\log z, & z\\ge\\delta\\\\ \\mu\\left[\\tfrac12\\left(\\tfrac{z-2\\delta}{\\delta}\\right)^2-\\tfrac12-\\log\\delta\\right], & z<\\delta\\end{cases}\\qquad \\phi=$(CFG["weights"]["terminal_factor"])\\left[q_N\\Big(\\tfrac{N}{K}\\Big)^2+q_C\\Big(\\tfrac{C}{K}\\Big)^2+q_T\\Big(\\tfrac{T}{B_{tox}}\\Big)^2\\right]\\]</div>
-<p>States are normalised (by K and B_tox) so that numbers of cells do not swamp the toxicity terms. The cancer barrier grows as N + C nears B_cancer and favours treating; the toxicity barrier grows as T nears B_tox and favours stopping; the schedule is the balance of the two, not a hard-coded rule. The relaxed barrier (Feller &amp; Ebenbauer 2017) is the exact log barrier inside the feasible set and a steep quadratic below z = δ, so a start where the bound cannot be met still gives a finite, informative cost; violations are counted in the tables, never hidden. Defaults: q_N = q_C = q_T = 1, r_u = 0.1, μ = 0.05, δ = 0.02; the weights are swept below.</p>
+<div class='eq'>\\[\\ell=q_B\\,\\tfrac{N+C}{K}+q_R\\,\\tfrac{C}{K}+q_T\\Big(\\tfrac{T}{B_{tox}}\\Big)^2+r_u\\Big(\\tfrac{u}{u_{max}}\\Big)^2+b_{\\mu_C}\\!\\Big(1-\\tfrac{N+C}{B_{cancer}}\\Big)+b_{\\mu_T}\\!\\Big(1-\\tfrac{T}{B_{tox}}\\Big)\\]</div>
+<div class='eq'>\\[b_\\mu(z)=\\begin{cases}-\\mu\\log z, & z\\ge\\delta\\\\ \\mu\\left[\\tfrac12\\left(\\tfrac{z-2\\delta}{\\delta}\\right)^2-\\tfrac12-\\log\\delta\\right], & z<\\delta\\end{cases}\\qquad \\phi=$(CFG["weights"]["terminal_factor"])\\left[q_B\\,\\tfrac{N+C}{K}+q_R\\,\\tfrac{C}{K}+q_T\\Big(\\tfrac{T}{B_{tox}}\\Big)^2\\right]\\]</div>
+<p><b>Goal.</b> Keep the total tumour burden low <i>and</i> hold resistant cells back. The burden term \\(q_B(N+C)/K\\) is linear: every cell costs the same however large the tumour is, so the controller still treats a small culture when the drug removes cells. The resistance premium \\(q_R\\,C/K\\) makes a resistant cell cost more than a sensitive one (with \\(q_R=q_B\\) it counts as two cells), because further cisplatin cannot remove it. Sensitive cells are never rewarded: a schedule that leaves more cells in total is worse unless it buys a larger drop in resistant cells. The hard limit on the burden is the cancer barrier at B_cancer. Precedents: tumour burden as a linear cost (Schättler &amp; Ledzewicz 2015) and in-vitro chemotherapy optimised to avoid resistant growth (Carrère 2017).</p>
+<p>States are normalised (by K and B_tox) so that numbers of cells do not swamp the toxicity terms. The cancer barrier grows as N + C nears B_cancer and favours treating; the toxicity barrier grows as T nears B_tox and favours stopping; the schedule is the balance of the two, not a hard-coded rule. The relaxed barrier (Feller &amp; Ebenbauer 2017) is the exact log barrier inside the feasible set and a steep quadratic below z = δ, so a start where the bound cannot be met still gives a finite, informative cost; violations are counted in the tables, never hidden. Defaults: q_B = q_R = q_T = 1, r_u = 0.1, μ = 0.05, δ = 0.02; the weights (including q_R = 0, burden only, and q_R = 3) are swept below.</p>
 <p><b>Controller: sequential (SQP) MPC.</b> At each decision time: (1) simulate the nonlinear model over the horizon with the current plan; (2) linearise F along it (A_k, B_k by automatic differentiation); (3) gradient by the adjoint recursion \\(\\mu_k=\\nabla\\ell_k+A_k^\\top\\mu_{k+1}\\) (vector–Jacobian products); (4) Gauss–Newton Hessian from the forward sensitivities \\(S_{k+1}=A_kS_k+B_ke_k^\\top\\); (5) solve the box-constrained quadratic subproblem; (6) line search on the true nonlinear cost; repeat to convergence; apply the first dose; re-plan at the next media change. The local subproblem has the LQR structure \\(\\delta x_{k+1}=A_k\\delta x_k+B_k\\delta u_k\\), but it is re-linearised every iteration, bounded, and has non-quadratic barriers, so this is successive-linearisation MPC, not a fixed LQR.</p>
 <p><b>Two modes.</b> <i>Data-supported</i>: doses restricted to 0, 0.62, 1.0 and 1.47 µM (the measured doses); the finite-horizon problem is then solved exactly by searching every dose sequence (prefix sharing and pruning), $(LONG ? "4⁷ sequences over each 14-day look-ahead, re-planned at each of the $NRUN media changes (the last plans shrink to end at day $(round(Int, DAYS)))." : "4⁷ sequences over 14 days.") <i>Demonstration</i>: continuous doses up to $(CFG["dose"]["u_max_demo"]) µM with SQP; above 1.47 µM the Hill curve is extrapolated and the result is not supported by data.</p></div>"""
 end
@@ -315,9 +316,11 @@ const BEYOND_LONG = "<li><b>Days 15–$(round(Int, DAYS)) are extrapolation.</b>
     "mostly a plateau plus competitive release; resistant takeover under constant dosing is much larger by day $(round(Int, DAYS)) than by day 14. The model has no passaging or " *
     "confluence handling, the low-resource level is held constant, and the bootstrap bands widen after day 14.</li>"
 function warnings_section()
+    P = scenario_plant(:A); Ln, Lc = P.sys.lines
+    ecN, ecC = ec50_of(Ln.s, P.p, Float64), ec50_of(Lc.s, P.p, Float64)
     """<h2>What the data do not identify</h2>
 <div class='intro'><ul>
-$(LONG ? BEYOND_LONG : "")<li><b>Dose response outside 0.62–1.47 µM.</b> The monocultures were treated at three doses and the cocultures at 1 µM only. EC50 is fixed at 1 µM (the measured IC50), not estimated. Continuous-dose control above 1.47 µM (demonstration mode) extrapolates the Hill curve.</li>
+$(LONG ? BEYOND_LONG : "")<li><b>Dose response outside 0.62–1.47 µM.</b> The monocultures were treated at three doses and the cocultures at 1 µM only. EC50 is fixed at each line's measured IC50 ($(fmt(ecN)) µM for A2780, $(fmt(ecC)) µM for A2780cis), not estimated. Continuous-dose control above 1.47 µM (demonstration mode) extrapolates the Hill curve.</li>
 <li><b>Resistant kill in coculture.</b> The cocultures were treated at one dose only, so how strongly cisplatin kills A2780cis in coculture rests on the monoculture fit: scenario A uses $(stage3_betaC().free ? "the coculture refit (bounded below by half the monoculture value, so it is never switched off)" : "the monoculture value inherited by the coculture fit") and scenario B the monoculture drug response for both lines; every result is given for both.</li>
 <li><b>Toxicity.</b> Nothing in these in-vitro data measures host toxicity. Its structure and values come from de Pillis &amp; Radunskaya (2001); the mapping from medium concentration to systemic burden (s_B) and B_cancer are assumptions. Treat toxicity-limited results as illustrative.</li>
 $(LONG ? "" : "<li><b>Beyond 14 days.</b> The 28-day runs extrapolate every stage beyond the data.</li>")
@@ -337,6 +340,8 @@ $(LONG ? "" : "<li><b>Beyond 14 days.</b> The 28-day runs extrapolate every stag
 <li>Feller C, Ebenbauer C (2017). Relaxed logarithmic barrier function based model predictive control of linear systems. IEEE Trans Autom Control 62:1223–1238.</li>
 <li>Carrère C (2017). Optimization of an in vitro chemotherapy to avoid resistant tumours. J Theor Biol 413:24–33.</li>
 <li>Zhang J, Cunningham JJ, Brown JS, Gatenby RA (2017). Integrating evolutionary dynamics into treatment of metastatic castrate-resistant prostate cancer. Nat Commun 8:1816.</li>
+<li>Schättler H, Ledzewicz U (2015). Optimal Control for Mathematical Models of Cancer Therapies. Springer, New York.</li>
+<li>Carrère C (2017). Optimization of an in vitro chemotherapy to avoid resistant tumours. J Theor Biol 413:24–33.</li>
 <li>Strobl MAR et al. (2021). Turnover modulates the need for a cost of resistance in adaptive therapy. Cancer Res 81:1135–1147.</li></ul></div>"""
 end
 
@@ -375,7 +380,7 @@ const BETTER = Dict{String,Any}(
     "Line" => :none,
     "Model" => :none,
     "Fitted values" => :none,
-    "N $DL" => "Lower is better (fewer cancer cells), though some strategies keep sensitive cells on purpose to hold resistant cells back.",
+    "N $DL" => :lower,
     "C $DL" => :lower,
     "N + C" => :lower,
     "N + C $DL" => :lower,
@@ -421,7 +426,7 @@ function write_control_report()
 <script>window.MathJax={tex:{inlineMath:[['\\\\(','\\\\)']],displayMath:[['\\\\[','\\\\]']]}};</script><script defer src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>$nav
 <h1>$(TITLE)</h1>
-<div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control.jl</code> and <code>control_report.jl</code>. Sequential model-predictive control (MPC) chooses the cisplatin concentration for every 2-day interval between media changes, using the carried compartment models: normal medium (Stage 3) and low resource (Stage 4), starting from the 25:75, 50:50 and 75:25 seedings. Two drug-response scenarios are run throughout: <b>A</b> the coculture fit as selected (Stage 3) and <b>B</b> the monoculture drug response for both lines. The controller trades cancer burden against a literature-based toxicity proxy; everything it adds to the fitted biology is listed with its source below. Every result is a model simulation: none of these schedules has been tested experimentally yet.$(INTRO_EXTRA)</p>
+<div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control.jl</code> and <code>control_report.jl</code>. Sequential model-predictive control (MPC) chooses the cisplatin concentration for every 2-day interval between media changes, using the carried compartment models: normal medium (Stage 3) and low resource (Stage 4), starting from the 25:75, 50:50 and 75:25 seedings. Two drug-response scenarios are run throughout: <b>A</b> the coculture fit as selected (Stage 3) and <b>B</b> the monoculture drug response for both lines. The control goal is a low total tumour burden with resistant cells held back (a resistant cell counts as two), within a literature-based toxicity limit and a hard cap on the burden; everything it adds to the fitted biology is listed with its source below. Every result is a model simulation: none of these schedules has been tested experimentally yet.$(INTRO_EXTRA)</p>
 <h3>Key findings (50:50 start) $(tip("Auto-generated from the runs below. The schedule lists the dose (µM) chosen for each of the $NWORD 2-day intervals.", :none))</h3>$(key_findings())<p>$(hesc(adaptive_finding()))</p></div>
 $(model_section())
 $(objective_section())
@@ -454,9 +459,9 @@ function adaptive_finding()
                length(U) == blocks[1][2] - blocks[1][1] + 1 ? "treats throughout" :
                "treats on days " * join(["$(dd(a))–$(dd(b + 1))" for (a, b) in blocks], " and ") * " ($(@sprintf("%.1f", mp.o.cum_dose)) vs $(@sprintf("%.1f", c1.o.cum_dose)) µM·d under constant 1 µM)"
         extra = String[]
-        mp.o.N_final > 1.2 * c1.o.N_final && push!(extra, "more sensitive cells kept ($(cells(mp.o.N_final)) vs $(cells(c1.o.N_final)))")
-        c1.o.resistant_fraction - mp.o.resistant_fraction > 0.05 && push!(extra, @sprintf("lower resistant fraction (%.2f vs %.2f)", mp.o.resistant_fraction, c1.o.resistant_fraction))
-        mp.o.total_final < c1.o.total_final && push!(extra, "fewer total cells ($(cells(mp.o.total_final)) vs $(cells(c1.o.total_final)))")
+        # stated against the goal (fewer cells in total, fewer resistant cells); both directions are reported
+        push!(extra, "$(mp.o.total_final <= c1.o.total_final ? "fewer" : "more") total cells ($(cells(mp.o.total_final)) vs $(cells(c1.o.total_final)))")
+        push!(extra, "$(mp.o.C_final <= c1.o.C_final ? "fewer" : "more") resistant cells ($(cells(mp.o.C_final)) vs $(cells(c1.o.C_final)))")
         push!(parts, "$(env == :normal ? "normal medium" : "low resource") $scen: $kind" * (isempty(extra) ? "" : "; " * join(extra, ", ")))
     end
     "MPC schedule pattern (50:50, not hard-coded): " * join(parts, "; ") * "."

@@ -11,14 +11,14 @@
 #                 28-day extrapolation
 #   robustness    every schedule re-simulated on 200 bootstrap parameter sets; closed-loop MPC on 40
 
-include(joinpath(@__DIR__, "control_model.jl"))
-include(joinpath(@__DIR__, "control_mpc.jl"))
+include(joinpath(@__DIR__, "control_fasting.jl"))     # includes control_model.jl and control_mpc.jl; lr_plant lives there
 
 # Run length: CONTROL_DAYS (default closed_loop_days = 14). Longer runs (e.g. CONTROL_DAYS=30) keep the
 # 14-day look-ahead, re-planned at every media change, and write to outputs/control_<days>d/.
 const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["closed_loop_days"])))
-const COUT = DAYS == Float64(CFG["schedule"]["closed_loop_days"]) ? joinpath(@__DIR__, "outputs", "control") :
-             joinpath(@__DIR__, "outputs", "control_$(round(Int, DAYS))d"); mkpath(COUT)
+# CONTROL_OUT replaces the base folder "outputs" (a side run that must not overwrite the main results)
+const COUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")),
+                      DAYS == Float64(CFG["schedule"]["closed_loop_days"]) ? "control" : "control_$(round(Int, DAYS))d"); mkpath(COUT)
 const CKP = joinpath(COUT, "control_state.jls")
 cck = (isfile(CKP) && get(ENV, "REDO", "0") != "1") ? deserialize(CKP) : Dict{Symbol,Any}()
 savec() = serialize(CKP, cck)
@@ -73,7 +73,7 @@ if !haskey(cck, :sweeps)
     for scen in (:A, :B)
         P = plant_for(:normal, scen); x0 = x0_for(P, r.N0, r.C0)
         for w in CFG["weights"]["sweep"]
-            push!(tasks, (kind="weights", scen=scen, label="qN=$(w[1]) qC=$(w[2]) qT=$(w[3]) ru=$(w[4])", f=() -> mpc_outcome(P, x0, default_weights(P; w=Float64.(w)))))
+            push!(tasks, (kind="weights", scen=scen, label="qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])", f=() -> mpc_outcome(P, x0, default_weights(P; w=Float64.(w)))))
         end
         base = default_tox()
         for v in CFG["toxicity"]["r_H_sweep"]
@@ -130,7 +130,7 @@ if !haskey(cck, :robust)
             if Pb === nothing
                 draws[b] = nothing; continue
             end
-            Wb = default_weights(Pb); Wb = Weights(Wb.qN, Wb.qC, Wb.qT, Wb.ru, Wb.tf, Wb.μC, Wb.μT, Wb.δ, W0.Bc, Wb.Btox, Wb.umax, Wb.K)   # same bound as the nominal plan
+            Wb = default_weights(Pb); Wb = Weights(Wb.qB, Wb.qR, Wb.qT, Wb.ru, Wb.tf, Wb.μC, Wb.μT, Wb.δ, W0.Bc, Wb.Btox, Wb.umax, Wb.K)   # same bound as the nominal plan
             d = Dict{String,Any}()
             for pn in pols
                 U = pn == "Threshold adaptive (Zhang-style)" ? run_policy(threshold_policy(Pb, Wb), Pb, m.x0, Δ0, NRUN) : m.policies[pn].U
