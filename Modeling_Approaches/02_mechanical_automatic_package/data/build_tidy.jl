@@ -10,10 +10,12 @@ using CSV, DataFrames, XLSX, TOML
 
 const PKG_DIR  = normpath(joinpath(@__DIR__, ".."))
 const ROOT     = normpath(joinpath(PKG_DIR, "..", ".."))
-const SOURCES  = TOML.parsefile(joinpath(@__DIR__, "sources.toml"))["source"]
-const QC       = TOML.parsefile(joinpath(@__DIR__, "qc_rules.toml"))
+# SOURCES_TOML / QC_TOML / DATA_TABLE replace the sources, the QC rules and the output table
+# (sensitivity runs, e.g. without the day-0 or outlier exclusions); defaults are the files here
+const SOURCES  = TOML.parsefile(get(ENV, "SOURCES_TOML", joinpath(@__DIR__, "sources.toml")))["source"]
+const QC       = TOML.parsefile(get(ENV, "QC_TOML", joinpath(@__DIR__, "qc_rules.toml")))
 const SCHED    = TOML.parsefile(joinpath(@__DIR__, "schedules.toml"))
-const OUT      = joinpath(@__DIR__, "measurements.csv")
+const OUT      = get(ENV, "DATA_TABLE", joinpath(@__DIR__, "measurements.csv"))
 
 clean(s) = strip(replace(string(s), "﻿" => ""))
 

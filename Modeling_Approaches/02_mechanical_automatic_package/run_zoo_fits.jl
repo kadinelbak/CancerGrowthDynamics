@@ -29,7 +29,10 @@ include(joinpath(@__DIR__, "zoo_models.jl"))
 include(joinpath(@__DIR__, "bootstrap_tools.jl"))
 
 const BOOT_B   = parse(Int, get(ENV, "BOOT_B", "200"))
-const ZOO_DIR  = joinpath(@__DIR__, "outputs", "zoo_fits")
+# ZOO_OUT: a sensitivity run writes its fits, CSVs and report there and publishes nothing
+# (no docs copy, site bundle or Final Report)
+const ZOO_PUBLISH = !haskey(ENV, "ZOO_OUT")
+const ZOO_DIR  = get(ENV, "ZOO_OUT", joinpath(@__DIR__, "outputs", "zoo_fits"))
 const ZOO_DOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "zoo_fits")
 const BLUE, ORANGE, GREEN, PURPLE = "#0b6e99", "#d95f02", "#3b8b4f", "#8b5cf6"
 mkpath(ZOO_DIR)
@@ -79,10 +82,12 @@ function show_rows(tag, rows)
 end
 
 # a single-line mechanism from a catalogue entry, on top of the carried-forward growth law
-function zoo_line_cands(zoo, X, input, g, envs, X0)
+# ns: Norton–Simon coupling of the kill to growth (stages.toml kill_growth_coupled, drug stages only)
+function zoo_line_cands(zoo, X, input, g, envs, X0; ns=false)
     [begin
         free = Dict(k => i for (i, k) in enumerate(slots))
         L = line_spec(g.growth, kernel, action, input; fixed=Dict(:r => g.r, :K => g.K, :θ => g.θ, :EC50 => EC50_OF_SYM[X]), free=free)
+        ns && (L = merge(L, (ns=true,)))
         bnds = [SLOT_BOUNDS[k] for k in slots]
         make_cand(name, label, fam, [L], envs, NOALPHA, X0, [slot_name(k, X, input; combo=(:d0 in slots)) for k in slots], bnds,
                   [[SLOT_STARTS[k][j] for k in slots] for j in 1:3]; slots=slots)
@@ -94,7 +99,6 @@ end
 using Serialization
 STAGE_CFG["selection"]["rule_bic"] == RULE_BIC || error("stages.toml rule_bic differs from RULE_BIC in zoo_models.jl")
 const CATALOGUES = Dict("DRUG_ZOO" => DRUG_ZOO, "LR_ZOO" => LR_ZOO)
-keep(s) = (x=s.x[.!s.bad], y=s.y[.!s.bad])
 
 # DRYRUN=1: build every stage's candidates without fitting; fitted rows are taken from the last
 # zoo_state.jls so later stages inherit exactly what they did (used by test/test_stages.jl)
@@ -112,7 +116,7 @@ end
 function growth_rows(st, L)
     srcs = stage_sources(st; line=L.line); length(srcs) == 1 || error("$(st["id"]) $(L.line): expected one series")
     s = series(srcs[1]["id"]); d = keep(s); K0 = maximum(s.y)
-    ds = [(x=d.x, y=d.y, state_index=1)]; env = [mono_env(env_inputs(srcs[1])...)]
+    ds = [dataset(d, 1)]; env = [mono_env(env_inputs(srcs[1])...)]
     rel(k, v) = k == :K ? v * K0 : v
     cands = [begin
                  free = Symbol[Symbol(x) for x in c["free"]]
@@ -130,9 +134,10 @@ function mechanism_rows(st, L, g)
     srcs = stage_sources(st; line=L.line); input = Symbol(st["input"])
     S = [series(s["id"]) for s in srcs]
     envs = [mono_env(env_inputs(s)...) for s in srcs]
-    cands = zoo_line_cands(CATALOGUES[st["catalogue"]], L.sym, input, g, envs, [[s.y[1]] for s in S])
+    cands = zoo_line_cands(CATALOGUES[st["catalogue"]], L.sym, input, g, envs, [[s.y[1]] for s in S];
+                           ns=get(st, "kill_growth_coupled", false) && input == :D)
     obs = sys_obs(cands[1].sys)
-    ds = [(x=keep(s).x, y=keep(s).y, state_index=obs[i]) for (i, s) in enumerate(S)]
+    ds = [dataset(keep(s), obs[i]) for (i, s) in enumerate(S)]
     rows = order_rule(fit_stage(cands, ds, "$(st["id"])-$(lowercase(L.line))"))
     if input == :R          # long-run fate under low resource, shown on the pages
         rows = [begin
@@ -165,7 +170,7 @@ end
 # fixed: values used for K / α when not fitted; noinput: switch the low-resource input off;
 # betaC_floor: a refitted resistant kill stays ≥ this fraction of its inherited value
 function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=Dict{Symbol,Float64}(), noinput=false,
-                 family="Coculture", betaC_floor=0.0)
+                 family="Coculture", betaC_floor=0.0, kill_growth_coupled=false)
     idx = Dict(k => i for (i, k) in enumerate(free))
     slot(k, v) = haskey(idx, k) ? Slot(idx[k], 0.0) : Slot(0, get(fixed, k, v))
     Kslot = slot(:K, NaN)
@@ -175,6 +180,8 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
     xC = noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}()
     LN = cc_line(rows[1], growth["A2780"], Kslot, fN, xN, LINES[1].ec50)
     LC = cc_line(rows[2], growth["A2780cis"], Kslot, fC, xC, LINES[2].ec50)
+    # Norton–Simon: each line's drug kill scales with its growth factor (crowded cells die less)
+    kill_growth_coupled && (LN = merge(LN, (ns=true,)); LC = merge(LC, (ns=true,)))
     alpha = [[Slot(0, 1.0), slot(:αNC, 1.0)], [slot(:αCN, 1.0), Slot(0, 1.0)]]
     inh(k, row) = (i = findfirst(==(:β), row.slots); i === nothing ? 0.5 : row.params[i])
     start = Dict(:K => 1.1datasets_max, :αNC => 1.0, :αCN => 1.0, :βN => inh(:β, rows[1]), :βC => inh(:β, rows[2]),
@@ -204,11 +211,11 @@ function coculture_rows(st)
                      merge!(fx, Dict(:K => ccval(b, :K, NaN), :αNC => ccval(b, :αNC, 1.0), :αCN => ccval(b, :αCN, 1.0)))
                  end
                  make_cc(c["name"], c["label"], Symbol[Symbol(x) for x in c["free"]], mech, growth, envs, X0, ymax; fixed=fx,
-                         noinput=get(c, "noinput", false), betaC_floor=Float64(get(st, "betaC_floor", 0.0)))
+                         noinput=get(c, "noinput", false), betaC_floor=Float64(get(st, "betaC_floor", 0.0)),
+                         kill_growth_coupled=get(c, "kill_growth_coupled", get(st, "kill_growth_coupled", false)))
              end for c in st["candidate"]]
     obs = sys_obs(cands[1].sys)
-    ds = reduce(vcat, [[(x=keep(e.N).x, y=keep(e.N).y, state_index=obs[2i-1]), (x=keep(e.C).x, y=keep(e.C).y, state_index=obs[2i])]
-                       for (i, e) in enumerate(E)])
+    ds = reduce(vcat, [[dataset(keep(e.N), obs[2i-1]), dataset(keep(e.C), obs[2i])] for (i, e) in enumerate(E)])
     rows = order_rule(fit_stage(cands, ds, st["id"]))
     (rows=rows, ds=ds)
 end
@@ -363,7 +370,8 @@ println("Fits that reached their time limit: $(length(LIMIT_HITS))", isempty(LIM
 
 # checkpoint: zoo_rebuild_pages.jl redraws the report and site from this without refitting
 try
-    serialize(joinpath(ZOO_DIR, "zoo_state.jls"), (groups=groups, results=results, B=BOOT_B, joint=JOINT_INFO))
+    serialize(joinpath(ZOO_DIR, "zoo_state.jls"), (groups=groups, results=results, B=BOOT_B, joint=JOINT_INFO,
+              config=(stages=STAGES_FILE, sources=SOURCES_FILE, data_table=DATA_TABLE, selection=get(STAGE_CFG, "selection", Dict()))))
 catch err
     @warn "checkpoint not written" err
 end
@@ -371,11 +379,13 @@ end
 include(joinpath(@__DIR__, "export_zoo_bundle.jl"))
 include(joinpath(@__DIR__, "zoo_report.jl"))
 write_zoo_report(groups, results)
-export_zoo_bundle(groups, results)
-try
-    run(`$(Base.julia_cmd()) --startup-file=no $(joinpath(ROOT, "build_final_report.jl"))`)
-catch err
-    @warn "Final report rebuild failed" err
+if ZOO_PUBLISH
+    export_zoo_bundle(groups, results)
+    try
+        run(`$(Base.julia_cmd()) --startup-file=no $(joinpath(ROOT, "build_final_report.jl"))`)
+    catch err
+        @warn "Final report rebuild failed" err
+    end
 end
 println("\nDone.")
 

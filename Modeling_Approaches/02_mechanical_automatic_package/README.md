@@ -46,6 +46,33 @@ reproducible, which `test/test_regression.jl` checks against `test/reference_res
    condition becomes a new environment of that stage. Otherwise add a stage to `stages.toml`.
 3. `julia run_pipeline.jl`.
 
+### Sensitivity runs (without touching the main configuration)
+
+Copy a configuration file, change it, and point the scripts at the copy:
+
+| Variable | Replaces |
+|---|---|
+| `SOURCES_TOML`, `QC_TOML` | `data/sources.toml`, `data/qc_rules.toml` (read by `data/build_tidy.jl`; `SOURCES_TOML` also by the fits) |
+| `DATA_TABLE` | `data/measurements.csv` (written by `build_tidy.jl`, read by the fits) |
+| `STAGES_TOML` | `stages.toml` |
+| `ZOO_OUT` | `outputs/zoo_fits/`; a run with `ZOO_OUT` publishes nothing (no docs copy, site bundle or Final Report) |
+
+Options in `stages.toml [selection]` (defaults reproduce the reference run):
+
+- `residual_weighting = "none" | "sd" | "power"` (with `weight_power`, default 0.55): per-point residual
+  scales, the replicate SD floored at the series' median SD, or max(y, 50)^p. Weighted BICs compare
+  models within one scheme only.
+- `bootstrap_generator = "most_complex" | "selected"`: which candidate generates the bootstrap replicates.
+
+A coculture candidate with `kill_growth_coupled = true` multiplies each line's drug kill by its growth
+factor (Norton–Simon: 1 − x for logistic, 1 − x^θ for theta-logistic growth, x = crowding/K).
+
+Example: β_C floor at 25% without the outlier exclusions,
+```
+SOURCES_TOML=sens/sources.toml DATA_TABLE=sens/measurements.csv julia --project=. data/build_tidy.jl
+STAGES_TOML=sens/stages.toml SOURCES_TOML=sens/sources.toml DATA_TABLE=sens/measurements.csv ZOO_OUT=sens/fits julia -t 20 --project=. run_zoo_fits.jl
+```
+
 ## Stages (pages show the thesis names)
 
 | id | page name | data | model |

@@ -10,10 +10,14 @@
 # x is the model time t (day − time origin); bad marks points a QC rule excluded.
 # Include from zoo_common.jl (needs CSV, DataFrames, TOML).
 
-const DATA_TABLE = joinpath(@__DIR__, "data", "measurements.csv")
-isfile(DATA_TABLE) || error("data/measurements.csv is missing: run `julia --project=. data/build_tidy.jl` first")
+# Configuration files; each can be replaced for a sensitivity run through an environment variable:
+#   DATA_TABLE (tidy table), SOURCES_TOML (data/sources.toml), STAGES_TOML (stages.toml)
+const DATA_TABLE   = get(ENV, "DATA_TABLE", joinpath(@__DIR__, "data", "measurements.csv"))
+const SOURCES_FILE = get(ENV, "SOURCES_TOML", joinpath(@__DIR__, "data", "sources.toml"))
+const STAGES_FILE  = get(ENV, "STAGES_TOML", joinpath(@__DIR__, "stages.toml"))
+isfile(DATA_TABLE) || error("$DATA_TABLE is missing: run `julia --project=. data/build_tidy.jl` first")
 const MEAS      = CSV.read(DATA_TABLE, DataFrame; ntasks=1, stringtype=String, types=Dict(:ratio => String, :exclude_reason => String))
-const SOURCES   = TOML.parsefile(joinpath(@__DIR__, "data", "sources.toml"))["source"]
+const SOURCES   = TOML.parsefile(SOURCES_FILE)["source"]
 const SCHEDULES = TOML.parsefile(joinpath(@__DIR__, "data", "schedules.toml"))
 
 # source ids whose tags match every keyword (in sources.toml order)
@@ -26,7 +30,8 @@ function series(id)
     d = sort(MEAS[(MEAS.source_id .== id) .& (MEAS.t .>= 0), :], :t)
     nrow(d) > 0 || error("no rows for source $id in measurements.csv")
     (x=Vector{Float64}(d.t), y=Vector{Float64}(d.value), bad=Vector{Bool}(d.excluded),
-     why=String[coalesce(w, "") for w in d.exclude_reason], se=Vector{Union{Missing,Float64}}(d.sem))
+     why=String[coalesce(w, "") for w in d.exclude_reason], se=Vector{Union{Missing,Float64}}(d.sem),
+     sd=Vector{Union{Missing,Float64}}(d.sd))
 end
 
 # a schedule as (breakpoint times, doses); a constant schedule is a single step at t = 0
@@ -40,7 +45,7 @@ function constant_dose(name)
 end
 
 # the two lines, their symbols and measured IC50 (stages.toml [lines])
-const LINE_CFG = TOML.parsefile(joinpath(@__DIR__, "stages.toml"))["lines"]
+const LINE_CFG = TOML.parsefile(STAGES_FILE)["lines"]
 const LINES = [(line=L, sym=LINE_CFG[L]["sym"], ec50=Float64(LINE_CFG[L]["ec50"])) for L in ("A2780", "A2780cis")]
 const LINE_SYM = Dict(L.line => L.sym for L in LINES)
 const EC50_OF_SYM = Dict(L.sym => L.ec50 for L in LINES)       # EC50 by line symbol (N, C)
@@ -90,7 +95,36 @@ intermittent = Dict(L.line => Dict(source(i)["schedule"] => (s = series(i); (x=s
 
 # ── data of a fitting stage (stages.toml) ──────────────────────────────────────
 
-const STAGE_CFG = TOML.parsefile(joinpath(@__DIR__, "stages.toml"))
+const STAGE_CFG = TOML.parsefile(STAGES_FILE)
+selection_cfg(k, default) = get(get(STAGE_CFG, "selection", Dict()), k, default)
+
+# Per-point residual scale of a series under stages.toml [selection] residual_weighting:
+#   "none"  (default) unweighted squared error; returns nothing
+#   "sd"    the replicate SD of each point, floored at the median positive SD of the series
+#           (day 0 has SD 0)
+#   "power" max(y, 50)^weight_power: the spread grows like a power of the count
+# Weighted BICs compare models within one scheme, not across schemes.
+function point_scale(s)
+    mode = selection_cfg("residual_weighting", "none")
+    mode == "none" && return nothing
+    if mode == "sd"
+        sd = Float64[coalesce(v, NaN) for v in s.sd]
+        pos = sort(filter(v -> isfinite(v) && v > 0, sd))
+        fl = isempty(pos) ? 1.0 : pos[cld(length(pos), 2)]
+        return [isfinite(v) ? max(v, fl) : fl for v in sd]
+    elseif mode == "power"
+        pw = Float64(selection_cfg("weight_power", 0.55))
+        return [max(y, 50.0)^pw for y in s.y]
+    end
+    error("stages.toml [selection] residual_weighting must be none, sd or power, not $mode")
+end
+# the kept points of a series (QC-excluded points dropped), with their scales w when weighting is on
+function keep(s)
+    w = point_scale(s)
+    (x=s.x[.!s.bad], y=s.y[.!s.bad], w=w === nothing ? nothing : w[.!s.bad])
+end
+# a dataset for the fits; carries w only when weighting is on, so unweighted runs are unchanged
+dataset(k, idx) = k.w === nothing ? (x=k.x, y=k.y, state_index=idx) : (x=k.x, y=k.y, state_index=idx, w=k.w)
 const STAGES = STAGE_CFG["stage"]
 stage_cfg(id) = STAGES[findfirst(s -> s["id"] == id, STAGES)]
 ur_of(fbs) = (10 - fbs) / (10 - 0.05)                      # low-resource level u_R from the serum %, as U_R

@@ -14,6 +14,10 @@
 #              (condition, ratio, run) combinations in sources.toml order.
 # joint_rule   paired-line rule for per-line stages (zoo_selection.jl): "shared" = one structure for both
 #              lines chosen on the joint BIC; "ab" = a shared structure is tested and kept only if it wins.
+# kill_growth_coupled (optional, drug stages and coculture candidates): Norton–Simon, the drug kill is
+#              multiplied by the line's growth factor (1 − x, or 1 − x^θ); off unless set.
+# [selection] options: residual_weighting = "none" | "sd" | "power" (weight_power), bootstrap_generator =
+#              "most_complex" | "selected" (README, "Sensitivity runs").
 
 [lines.A2780]
 sym = "N"

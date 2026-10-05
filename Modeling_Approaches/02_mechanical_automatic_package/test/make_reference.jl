@@ -14,7 +14,8 @@ for g in state.groups
                                "params" => Dict(n => v for (n, v) in zip(g.cands[1].pnames, g.cands[1].params)),
                                "boot_bic" => [Dict(c.name => r.bic[b, j] for (j, c) in enumerate(r.cands)) for b in 1:nb])
 end
-for (name, f) in (("control14", "outputs/control/control_outcomes.csv"), ("control30", "outputs/control_30d/fasting_outcomes.csv"))
+const LONG = round(Int, TOML.parsefile(joinpath(PK, "control_config.toml"))["schedule"]["long_days"])
+for (name, f) in (("control14", "outputs/control/control_outcomes.csv"), ("control_long", "outputs/control_$(LONG)d/fasting_outcomes.csv"))
     isfile(joinpath(PK, f)) || continue
     df = CSV.read(joinpath(PK, f), DataFrame)
     ref[name] = [Dict(string(k) => (v isa Number ? Float64(v) : string(v)) for (k, v) in pairs(row) if !ismissing(v)) for row in eachrow(df)]

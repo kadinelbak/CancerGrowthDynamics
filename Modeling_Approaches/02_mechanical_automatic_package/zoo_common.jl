@@ -35,10 +35,18 @@ function dense(model, u0, p, tmax; dt=0.1)
     ts, sol
 end
 
+# per-point residual scales of a dataset (1 when unweighted, see point_scale in zoo_data.jl)
+dweights(d) = hasproperty(d, :w) ? d.w : Iterators.repeated(1.0, length(d.x))
+# datasets as GrowthParameterEstimation takes them: a weighted dataset becomes one dataset per point,
+# each with its residual_scale (the package solves the model once per evaluation, so this is cheap)
+gpe_datasets(ds) = any(d -> hasproperty(d, :w), ds) ?
+    reduce(vcat, [hasproperty(d, :w) ? [(x=[xi], y=[yi], state_index=d.state_index, residual_scale=wi) for (xi, yi, wi) in zip(d.x, d.y, d.w)] :
+                  [(x=d.x, y=d.y, state_index=d.state_index)] for d in ds]) : ds
+
 function predict_candidate(name, label, model, datasets, u0)
     tmax = maximum(maximum(d.x) for d in datasets)
     sol = solve(ODEProblem(model, u0, (0.0, tmax), Float64[]), Tsit5(); reltol=1e-8, abstol=1e-8)
-    sse = sum(sum((sol(xi)[d.state_index] - yi)^2 for (xi, yi) in zip(d.x, d.y)) for d in datasets)
+    sse = sum(sum(((sol(xi)[d.state_index] - yi) / wi)^2 for (xi, yi, wi) in zip(d.x, d.y, dweights(d))) for d in datasets)
     n = sum(length(d.x) for d in datasets)
     (name=name, label=label, model=model, pnames=String[], params=Float64[], bic=n*log(max(sse, 1e-12)/n), sse=sse, bounds=Tuple{Float64,Float64}[])
 end
@@ -48,7 +56,7 @@ function param_se(model, datasets, u0, p)
     k = length(p); k == 0 && return Float64[]
     tmax = maximum(maximum(d.x) for d in datasets)
     resid(q) = (sol = solve(ODEProblem(model, u0, (0.0, tmax), q), Tsit5(); reltol=1e-10, abstol=1e-10);
-                reduce(vcat, [[sol(xi)[d.state_index] - yi for (xi, yi) in zip(d.x, d.y)] for d in datasets]))
+                reduce(vcat, [[(sol(xi)[d.state_index] - yi) / wi for (xi, yi, wi) in zip(d.x, d.y, dweights(d))] for d in datasets]))
     r0 = resid(p); n = length(r0); J = zeros(n, k)
     for j in 1:k
         h = 1e-5 * max(abs(p[j]), 1e-2); qp = copy(p); qp[j] += h; qm = copy(p); qm[j] -= h

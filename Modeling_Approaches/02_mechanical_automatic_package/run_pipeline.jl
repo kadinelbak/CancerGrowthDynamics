@@ -5,7 +5,7 @@
 #   julia run_pipeline.jl                       everything from the raw data (about 5–6 h on 20 threads)
 #   julia run_pipeline.jl --threads 12          threads for the fitting steps (default: all cores − 2)
 #   julia run_pipeline.jl --from analyses       start at a step (earlier outputs are reused)
-#   julia run_pipeline.jl --only report14       one step
+#   julia run_pipeline.jl --only report14       one step (see --list)
 #   julia run_pipeline.jl --resume              reuse unchanged fits and bootstraps (ZOO_RESUME, ZOO_REUSE_BOOT)
 #                                               and the control checkpoints instead of recomputing
 #   julia run_pipeline.jl --list                the steps
@@ -43,8 +43,8 @@ const STEPS = [
     ("analyses",   "bootstrap comparison, sensitivity, validation",         PKG,  ["zoo_analyses.jl"],                true,  Dict{String,String}()),
     ("control14",  "14-day optimal control (dose)",                         PKG,  ["run_control.jl"],                 true,  redo),
     ("report14",   "14-day control report",                                 PKG,  ["control_report.jl"],              false, Dict{String,String}()),
-    ("control30",  "30-day optimal control (dose + fasting)",               PKG,  ["run_control_fasting.jl"],         true,  redo),
-    ("report30",   "30-day control report",                                 PKG,  ["control_fasting_report.jl"],      false, Dict{String,String}()),
+    ("control_long", "long optimal control, dose + fasting (control_config long_days)", PKG, ["run_control_fasting.jl"], true, redo),
+    ("report_long",  "long control report",                                 PKG,  ["control_fasting_report.jl"],      false, Dict{String,String}()),
     ("tests",      "control, stage and validation tests on the new results", PKG, ["test/run_tests.jl"],              true,  Dict{String,String}()),
     ("final",      "Final Report (all chapters)",                           ROOT, ["build_final_report.jl"],          false, Dict{String,String}()),
 ]

@@ -191,6 +191,17 @@ function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}) where {T}
     reff, Keff, loss, out
 end
 
+# Norton–Simon (optional, L.ns): the drug kill is scaled by the line's growth factor, 1 − x for
+# logistic and 1 − x^θ for theta-logistic growth (x = crowding / capacity, floored at 0), so crowded,
+# slowly cycling cells die less. No extra parameter. Lines without `ns` are unchanged.
+ns_on(L) = hasproperty(L, :ns) && L.ns
+@inline function growth_factor(g, x, θ)
+    x = max(x, zero(x))
+    g == :logistic && return max(1 - x, zero(x))
+    g == :theta && return max(1 - x^θ, zero(x))
+    error("Norton–Simon coupling needs logistic or theta-logistic growth")
+end
+
 function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}) where {T}
     s = L.s; z = zero(T)
     X = max(u[xi+1], z)
@@ -201,6 +212,7 @@ function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}) where {T}
     V = max(X - cells, z)
     r = sv(s.r, p, T); K = sv(s.K, p, T); θ = sv(s.θ, p, T)
     reff, Keff, loss, out = module_effect!(du, u, o, L, p, w, X, V, r, K, T)
+    ns_on(L) && L.input == :D && (loss *= growth_factor(L.growth, crowd / Keff, θ))
     du[xi+1] = growth_term(L.growth, reff, V, crowd / Keff, θ) - (sv(s.d, p, T) + loss)*V - out
     nothing
 end
@@ -223,12 +235,24 @@ function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}) where {T}
     reff, Keff, loss, out = r, K, sv(s.d, p, T), z
     χ = hasproperty(L, :chi) ? sv(L.chi, p, T) : z
     off = o
-    for M in mods
-        w = M.input == :D ? T(env.D) : T(env.R)
-        re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T)
-        reff *= re / r; Keff *= Ke / K
-        loss += M.input == :D ? lo * (1 + χ * T(env.R) / T(U_R)) : lo
-        out += ou; off += mwidth(M)
+    if !ns_on(L)
+        for M in mods
+            w = M.input == :D ? T(env.D) : T(env.R)
+            re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T)
+            reff *= re / r; Keff *= Ke / K
+            loss += M.input == :D ? lo * (1 + χ * T(env.R) / T(U_R)) : lo
+            out += ou; off += mwidth(M)
+        end
+    else                                     # Norton–Simon: drug losses scaled by the growth factor
+        dloss = z
+        for M in mods
+            w = M.input == :D ? T(env.D) : T(env.R)
+            re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T)
+            reff *= re / r; Keff *= Ke / K
+            M.input == :D ? (dloss += lo * (1 + χ * T(env.R) / T(U_R))) : (loss += lo)
+            out += ou; off += mwidth(M)
+        end
+        loss += dloss * growth_factor(L.growth, crowd / Keff, θ)
     end
     du[xi+1] = growth_term(L.growth, reff, V, crowd / Keff, θ) - loss*V - out
     nothing
@@ -354,8 +378,10 @@ function line_tex(L, X, crowd, Ksym)
     rhs = G
     (L.s.d.i > 0 || L.s.d.v != 0) && (rhs *= "-$(ptex(slot_name(:d, X, L.input)))\\,$V")
     chi = hasproperty(L, :chi) && !isoff(L.chi)
+    nsf = !ns_on(L) ? "" : L.growth == :theta ? "\\left[1-\\left($frac\\right)^{$th}\\right]" : "\\left(1-$frac\\right)"
     for q in parts, lo in q.losses
-        rhs *= (chi && q.input == :D) ? "-\\left(1+\\chi_{$X}\\,\\hat u_R\\right)\\left[$(lo[2:end])\\right]" : lo
+        lo = (chi && q.input == :D) ? "-\\left(1+\\chi_{$X}\\,\\hat u_R\\right)\\left[$(lo[2:end])\\right]" : lo
+        rhs *= (nsf != "" && q.input == :D) ? "-$nsf\\left[$(lo[2:end])\\right]" : lo
     end
     lines = reduce(vcat, [q.lines for q in parts]; init=String[])
     chi && push!(lines, "\\hat u_R=u_R/0.955\\ (1\\text{ at }0.5\\%\\text{ FBS})")

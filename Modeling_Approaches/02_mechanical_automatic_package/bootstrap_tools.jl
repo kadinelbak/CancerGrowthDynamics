@@ -19,11 +19,13 @@ function bs_predict(model, u0, p, datasets)
     [[sol(xi)[d.state_index] for xi in d.x] for d in datasets]
 end
 
-# circular moving-block resample of the residuals for days after day 0
-function bs_resample(rng, yhat, e)
+# circular moving-block resample of the residuals for days after day 0; with per-point scales w
+# the standardised residuals e/w are resampled and rescaled by the scale of the point they land on
+function bs_resample(rng, yhat, e, w=nothing)
     n = length(e)
     n <= 1 && return copy(yhat)
-    pool = e[2:end]; m = length(pool)
+    z = w === nothing ? e : e ./ w
+    pool = z[2:end]; m = length(pool)
     out = Float64[]
     while length(out) < m
         s = rand(rng, 1:m)
@@ -31,7 +33,8 @@ function bs_resample(rng, yhat, e)
             push!(out, pool[mod1(s + k, m)])
         end
     end
-    vcat(yhat[1] + e[1], max.(yhat[2:end] .+ out[1:m], 0.0))
+    w === nothing ? vcat(yhat[1] + e[1], max.(yhat[2:end] .+ out[1:m], 0.0)) :
+                    vcat(yhat[1] + e[1], max.(yhat[2:end] .+ w[2:end] .* out[1:m], 0.0))
 end
 
 # Reproducibility: every optimiser call stops on its iteration cap; the wall-clock limit is only a
@@ -47,7 +50,7 @@ function bs_fit(model, datasets, u0, p_start, bounds; maxtime=120.0, tag="")
     for opt in (:bfgs, :nelder_mead)
         t0 = time()
         try
-            r = run_joint_fit(model, datasets, u0, isfinite(best.bic) ? best.params : p0; bounds=bounds, optimizer=opt,
+            r = run_joint_fit(model, gpe_datasets(datasets), u0, isfinite(best.bic) ? best.params : p0; bounds=bounds, optimizer=opt,
                               maxiters = opt == :bfgs ? 1500 : 2500, maxtime=maxtime, reltol=1e-7, abstol=1e-7)
             isfinite(r.bic) && r.bic < best.bic && (best = (params=r.params, bic=r.bic, sse=r.sse))
         catch
@@ -68,7 +71,11 @@ end
 function bootstrap(g; B, seed=20260927)
     cands = g.cands; nc = length(cands)
     ks = [length(c.params) for c in cands]
-    ref = cands[sort(1:nc; by=j -> (-ks[j], cands[j].bic))[1]]
+    # replicates are generated from the most complex candidate (default) or from the carried model
+    # (stages.toml [selection] bootstrap_generator = "selected"; candidate 1 is the carried one)
+    gen = isdefined(Main, :selection_cfg) ? selection_cfg("bootstrap_generator", "most_complex") : "most_complex"
+    gen in ("most_complex", "selected") || error("bootstrap_generator must be most_complex or selected")
+    ref = gen == "selected" ? cands[1] : cands[sort(1:nc; by=j -> (-ks[j], cands[j].bic))[1]]
     yhat = bs_predict(ref.model, cu0(ref, g), ref.params, g.datasets)
     resid = [d.y .- yh for (d, yh) in zip(g.datasets, yhat)]
     bic = fill(Inf, B, nc)
@@ -76,7 +83,8 @@ function bootstrap(g; B, seed=20260927)
     done = Threads.Atomic{Int}(0)
     Threads.@threads :dynamic for b in 1:B
         rng = Xoshiro(seed + b)
-        ds = [(x=d.x, y=bs_resample(rng, yh, e), state_index=d.state_index) for (d, yh, e) in zip(g.datasets, yhat, resid)]
+        ds = [hasproperty(d, :w) ? (x=d.x, y=bs_resample(rng, yh, e, d.w), state_index=d.state_index, w=d.w) :
+                                   (x=d.x, y=bs_resample(rng, yh, e), state_index=d.state_index) for (d, yh, e) in zip(g.datasets, yhat, resid)]
         for (j, c) in enumerate(cands)
             if ks[j] == 0
                 bic[b, j] = predict_candidate(c.name, c.label, c.model, ds, cu0(c, g)).bic

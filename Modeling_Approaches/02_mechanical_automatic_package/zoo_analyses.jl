@@ -74,16 +74,10 @@ println("=== zoo analyses: $(Threads.nthreads()) threads; checkpoint has $(colle
 
 # ── shared helpers ─────────────────────────────────────────────────────────────
 
-const FIT_KW = (optimizer=:nelder_mead, maxiters=2000, maxtime=180.0, reltol=1e-8, abstol=1e-8, initial_time=0.0)
-evaluate(model, ds, u0, p) = GPE.evaluate_joint_fit(model, ds, u0, p; initial_time=0.0, reltol=1e-8, abstol=1e-8)
-function gfit(model, ds, u0, p0, bounds; starts=3, seed=1)
-    st = GPE.generate_multistarts(p0, bounds; n_starts=starts, seed=seed)
-    GPE.run_joint_multistart(model, ds, u0, st; bounds=bounds, FIT_KW...).fit
-end
+include(joinpath(@__DIR__, "zoo_heldout.jl"))   # FIT_KW, evaluate, gfit, nobs, VAL and the held-out Ce1 test
 sub_ds(d, keep) = (x=d.x[keep], y=d.y[keep], state_index=d.state_index)
 rmse_of(ev) = ev.rmse
 nrmse_of(ev, ds) = ev.rmse / mean(reduce(vcat, [d.y for d in ds]))
-nobs(ds) = sum(length(d.x) for d in ds)
 # value q with the i-th entry v inserted (keeps ForwardDiff / Dual element types)
 function insert_at(q, i, v)
     T = promote_type(eltype(q), typeof(v)); r = Vector{T}(undef, length(q) + 1)
@@ -328,8 +322,6 @@ function blocked(g, labels, scheme)
 end
 
 # time-block forecast: fit days ≤ 70% of the last day, predict the later days
-# validation.toml: which data are held out and how they are predicted
-const VAL = TOML.parsefile(joinpath(@__DIR__, "validation.toml"))
 
 function forecast(g)
     c = g.cands[1]; tmax = maximum(maximum(d.x) for d in g.datasets); split = round(VAL["forecast"]["fit_fraction"] * tmax)
@@ -340,38 +332,6 @@ function forecast(g)
     m = mean(reduce(vcat, [d.y for d in test]))
     (group=g.id, scheme="forecast", block="fit days ≤ $(Int(split)), predict days > $(Int(split))", status="completed", n_test=ho.n_points,
      rmse_heldout=ho.rmse, rmse_insample=ins.rmse, nrmse_heldout=ho.rmse / m, nrmse_insample=ins.rmse / m)
-end
-
-# A held-out condition (validation.toml [heldout]): the group's crowding is refitted on the training
-# data only (the untreated Ce0 cocultures), the kill strengths come from the monoculture drug fits
-# (Stage 3a's own were fitted with Ce1, so they are not used), and the held-out data are predicted.
-const HO = VAL["heldout"]
-g3 = gid(HO["group"]); c3 = g3.cands[1]
-βof(c) = c.params[findfirst(==(:β), c.slots)]
-βN2 = βof(gid("$(HO["drug_from"])-a2780").cands[1]); βC2 = βof(gid("$(HO["drug_from"])-a2780cis").cands[1])
-function heldout_ce1_model(βN, βC)
-    LN, LC = c3.sys.lines
-    LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βN),)),)); LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βC),)),))
-    sys = build_system([LN2, LC2], c3.sys.envs, c3.sys.alpha)
-    make_system_model(sys)
-end
-tag_match(s, sel) = all(string(get(s, k, "")) == string(v) for (k, v) in sel)
-const HO_TAGS = dataset_tags(HO["group"])
-const CE0 = [k for (k, s) in enumerate(HO_TAGS) if tag_match(s, HO["train"])]
-const CE1 = [k for (k, s) in enumerate(HO_TAGS) if tag_match(s, HO["predict"])]
-# the refitted parameters must lead the carried model's parameter vector (the kill slots are then fixed)
-const HO_RI = [findfirst(==(n), c3.pnames) for n in HO["refit"]]
-HO_RI == collect(1:length(HO_RI)) || error("validation.toml heldout.refit must be the first parameters of $(c3.name): $(c3.pnames)")
-function heldout_ce1()
-    m = heldout_ce1_model(βN2, βC2)
-    f = gfit(m, g3.datasets[CE0], c3.u0, c3.params[HO_RI], c3.bounds[HO_RI]; starts=4)
-    ce1 = [(variant="cisplatin from Stage 2 for both lines", params=f.params, fit_ce0=evaluate(m, g3.datasets[CE0], c3.u0, f.params),
-            pred=evaluate(m, g3.datasets[CE1], c3.u0, f.params))]
-    full = evaluate(c3.model, g3.datasets[CE1], c3.u0, c3.params)
-    # reference with no drug model: the same Ce0-fitted growth and crowding, no drug term
-    HO["baseline"] == "logistic" || error("validation.toml heldout.baseline: only \"logistic\" is implemented")
-    base = evaluate(heldout_ce1_model(0.0, 0.0), g3.datasets[CE1], c3.u0, f.params)
-    (ce1=ce1, ce1_full=full, ce1_baseline_rmse=base.rmse, ce1_baseline="logistic")
 end
 
 # blocked validations (validation.toml [[leave_out]]): (group, scheme, held-out label of each dataset)

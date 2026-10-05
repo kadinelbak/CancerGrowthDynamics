@@ -16,15 +16,14 @@ freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
 freeze_line(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple(freeze_slot(getfield(L.s, k), p) for k in keys(L.s))),))
 
 # (name, label, crowding source, resistant kill on, free parameters) from the combination stage of stages.toml
-const S4_SPECS = let st = only(s for s in TOML.parsefile(joinpath(@__DIR__, "stages.toml"))["stage"] if s["kind"] == "combination")
+const S4_SPECS = let st = only(s for s in TOML.parsefile(STAGES_FILE)["stage"] if s["kind"] == "combination")
     [(c["name"], c["label"], c["crowd"] == "s3b" ? :S3b : :S3, get(c, "reskill", false), Symbol[Symbol(x) for x in c["free"]]) for c in st["candidate"]]
 end
+# stage-level Norton–Simon coupling of the drug kill to growth (stages.toml kill_growth_coupled)
+const S4_NS = get(only(s for s in TOML.parsefile(STAGES_FILE)["stage"] if s["kind"] == "combination"), "kill_growth_coupled", false)
 const S4_PNAME = Dict(:K => "K", :χ => "χ", :χN => "χ_N", :χC => "χ_C", :εN => "ε_N^R", :εC => "ε_C^R")
 
-function combo_datasets(obs)
-    [(x=combo.xN[.!combo.bN], y=combo.yN[.!combo.bN], state_index=obs[1]),
-     (x=combo.xC[.!combo.bC], y=combo.yC[.!combo.bC], state_index=obs[2])]
-end
+combo_datasets(obs) = [dataset(keep(series(COMBO_SOURCES.N)), obs[1]), dataset(keep(series(COMBO_SOURCES.C)), obs[2])]
 
 # hidden drug and stress states after one day of exposure (the data start at day 1), counts reset
 function preexposed_u0(sys, model, p, X0)
@@ -58,6 +57,7 @@ function stage4_cands(c3, c3b, βC2)
         χN = haskey(idx, :χ) ? Slot(idx[:χ], 0.0) : sl(:χN, 0.0)
         χC = haskey(idx, :χ) ? Slot(idx[:χ], 0.0) : sl(:χC, 0.0)
         lines = [merge(LN, (extra=Any[mN], chi=χN)), merge(LC, (extra=Any[mC], chi=χC))]
+        S4_NS && (lines = [merge(l, (ns=true,)) for l in lines])
         alpha = crowd == :S3 ? a3 : a3b
         sys = build_system(lines, [(D=COMBO_DOSE, R=U_R, lines=[1, 2])], alpha)
         model = make_system_model(sys)
