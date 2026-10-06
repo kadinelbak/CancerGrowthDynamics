@@ -1,0 +1,4 @@
+row,rmse,nrmse,n,params
+"prediction (crowding from Ce0, kills from Stage 2b)",711.1437672005806,0.6064623233037638,90,K=4276.233469696545; α_NC=0.6891546382273842; α_CN=1.4998556030355925; d_N=0.160385400568585
+in-sample (Stage 3a fitted with Ce1),374.6194243684584,0.3194748754552938,90,
+"untreated reference (same crowding, no drug)",870.2535840848814,0.7421509332003798,90,

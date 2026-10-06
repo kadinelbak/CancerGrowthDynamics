@@ -87,6 +87,7 @@ function zoo_sim(c)
                  d = modict(L)
                  hasproperty(L, :extra) && (d["extra"] = [modict(M) for M in L.extra])     # extra mechanism modules (Stage 4)
                  hasproperty(L, :chi) && (d["chi"] = [L.chi.i, L.chi.v])                   # drug × low-resource interaction
+                 ns_on(L) && (d["ns"] = true)                                              # Norton–Simon: drug losses × growth factor
                  d
              end for L in S.lines]
     envs = [Dict{String,Any}("D" => e.D, "R" => e.R, "lines" => e.lines .- 1) for e in S.envs]
@@ -212,7 +213,8 @@ function zoo_builder(g)
         "kernels" => kern, "actions" => [Dict("id" => string(a), "label" => alab[a], "slots" => string.(aslots(a))) for a in acts],
         "slots" => Dict(string(k) => Dict("name" => slot_name(k, X, L.input), "tex" => ptex(slot_name(k, X, L.input)),
                                           "lo" => SLOT_BOUNDS[k][1], "hi" => SLOT_BOUNDS[k][2], "start" => SLOT_STARTS[k][1]) for k in slots),
-        "uR" => U_R, "EC50" => ec50_of(L.s, Float64[], Float64))      # this line's EC50 (the builder makes one line)
+        "uR" => U_R, "EC50" => ec50_of(L.s, Float64[], Float64),      # this line's EC50 (the builder makes one line)
+        "ns" => ns_on(L))                                             # built drug models get the stage's Norton–Simon coupling
 end
 
 function selection_note(g)
@@ -226,6 +228,18 @@ function selection_note(g)
         (i.useB ? "B is within $(Int(RULE_BIC)) BIC with no more parameters, so both lines share it." : "B is not within $(Int(RULE_BIC)) BIC with no more parameters, so each line keeps its own model.")
 end
 
+# Per-point residual scales of the fit (stages.toml [selection] residual_weighting), attached to each plotted
+# series so the Explorer's in-browser SSE and BIC are on the same scale as the fits. A series is matched to the
+# fitted dataset with the same state and the same days; unweighted fits add nothing.
+function with_weights(g, series)
+    any(d -> hasproperty(d, :w), g.datasets) || return series
+    map(series) do s
+        j = findfirst(d -> d.state_index == s.state && length(d.x) == length(s.x) && all(abs.(d.x .- s.x) .< 1e-9), g.datasets)
+        j === nothing && (@warn "no fitted dataset matches series $(s.name) of $(g.id); its points are unweighted in the Explorer"; return s)
+        merge(s, (w=collect(Float64, dweights(g.datasets[j])),))
+    end
+end
+
 function export_zoo_bundle(groups, results; B=BOOT_B)
     out = Any[]
     for g in groups
@@ -234,7 +248,7 @@ function export_zoo_bundle(groups, results; B=BOOT_B)
                                     "dbic" => c.bic - g.cands[1].bic, "lowest" => size(r.bic, 1) > 0 ? pct(r.winner, j) : NaN,
                                     "pick" => size(r.bic, 1) > 0 ? pct(r.pick, j) : NaN, "compartments" => ncompartments(c.sys.lines[1].kernel, c.sys.lines[1].action))
                    for (j, c) in enumerate(g.cands)]
-        series = zoo_series(g)
+        series = with_weights(g, zoo_series(g))
         push!(out, Dict{String,Any}("id" => g.id, "stage" => stage_label(g.stage), "title" => g.title, "kind" => string(g.kind), "text" => ZOO_GROUP_TEXT[g.kind],
             "series" => series, "panels" => zoo_panels(g), "mainPanel" => zoo_main_panel(g),
             "optimal" => zoo_entry(g, r, 1, results[g.id].band), "candidates" => length(g.cands), "ranking" => ranking, "selectionNote" => selection_note(g),
@@ -243,7 +257,7 @@ function export_zoo_bundle(groups, results; B=BOOT_B)
             "xmax" => g.kind == :s1b ? 20.0 : XMAX,
             "ymax" => g.kind == :s1b ? ceil(maximum(maximum(s.y) for s in series) * 1.2; sigdigits=2) : YMAX))
     end
-    bundle = Dict{String,Any}("generated" => Dates.format(now(), "yyyy-mm-dd HH:MM"), "replicates" => B, "selection" => "fewest free parameters within 3 BIC of the lowest", "ruleBIC" => RULE_BIC, "maxCompartments" => MAX_COMPARTMENTS,
+    bundle = Dict{String,Any}("generated" => Dates.format(now(), "yyyy-mm-dd HH:MM"), "replicates" => B, "selection" => "fewest free parameters within 3 BIC of the lowest", "ruleBIC" => RULE_BIC, "maxCompartments" => MAX_COMPARTMENTS, "weighting" => selection_cfg("residual_weighting", "none"),
                               "zoo" => "autonomous", "groups" => out)
     mkpath(RESULTS_DIR)
     write(joinpath(RESULTS_DIR, "bundle.js"), stage_names("window.RESULTS = " * jsonv(bundle) * ";\n"))

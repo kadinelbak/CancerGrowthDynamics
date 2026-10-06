@@ -1,84 +1,82 @@
-steps_requested = ["analyses", "control14", "report14", "control30", "report30", "tests", "final"]
-continued_from = "2026-10-02T20:49:41.508"
+steps_requested = ["final"]
+continued_from = "2026-10-06T16:24:01.807"
 threads = 20
-finished = "2026-10-03T12:53:35.299"
-started = "2026-10-02T22:16:53.074"
+finished = "2026-10-06T16:30:51.418"
+started = "2026-10-06T16:30:45.633"
 resume = false
-time_limit_hits = 203
+time_limit_hits = 83
 julia = "1.12.7"
 
 [steps.checks]
 log = "outputs/logs/checks.log"
 ok = true
-seconds = 63.5
-finished = "2026-10-02T17:42:39.287"
+seconds = 28.7
+finished = "2026-10-06T11:44:47.728"
 
     [steps.checks.env]
+
+[steps.control_long]
+log = "outputs/logs/control_long.log"
+ok = true
+seconds = 1090.8
+finished = "2026-10-06T16:12:19.615"
+
+    [steps.control_long.env]
+    REDO = "1"
 
 [steps.analyses]
 log = "outputs/logs/analyses.log"
 ok = true
-seconds = 892.9
-finished = "2026-10-02T22:31:51.634"
+seconds = 61.3
+finished = "2026-10-06T16:15:42.504"
 
     [steps.analyses.env]
 
-[steps.report30]
-log = "outputs/logs/report30.log"
+[steps.report_long]
+log = "outputs/logs/report_long.log"
 ok = true
-seconds = 109.9
-finished = "2026-10-03T12:38:22.701"
+seconds = 39.4
+finished = "2026-10-06T16:17:06.505"
 
-    [steps.report30.env]
-
-[steps.control30]
-log = "outputs/logs/control30.log"
-ok = true
-seconds = 47810.1
-finished = "2026-10-03T12:36:32.801"
-
-    [steps.control30.env]
-    REDO = "1"
+    [steps.report_long.env]
 
 [steps.data]
 log = "outputs/logs/data.log"
 ok = true
-seconds = 38.8
-finished = "2026-10-02T17:41:32.480"
+seconds = 12.2
+finished = "2026-10-06T11:44:18.058"
 
     [steps.data.env]
 
 [steps.fits]
 log = "outputs/logs/fits.log"
 ok = true
-seconds = 5224.1
-finished = "2026-10-02T22:16:48.425"
+seconds = 13816.1
+finished = "2026-10-06T15:35:03.822"
 
     [steps.fits.env]
-    ZOO_RESUME = "1"
-    ZOO_REUSE_BOOT = "1"
 
 [steps.report14]
 log = "outputs/logs/report14.log"
 ok = true
-seconds = 94.4
-finished = "2026-10-02T23:19:42.683"
+seconds = 37.0
+finished = "2026-10-06T16:16:23.327"
 
     [steps.report14.env]
 
 [steps.final]
 log = "outputs/logs/final.log"
 ok = true
-seconds = 5.0
-finished = "2026-10-03T12:53:35.283"
+seconds = 2.6
+finished = "2026-10-06T16:30:50.466"
 
     [steps.final.env]
 
 [steps.control14]
 log = "outputs/logs/control14.log"
 ok = true
-seconds = 2093.5
-finished = "2026-10-02T23:18:08.263"
+seconds = 769.2
+finished = "2026-10-06T15:53:27.650"
 
     [steps.control14.env]
     REDO = "1"
@@ -86,8 +84,8 @@ finished = "2026-10-02T23:18:08.263"
 [steps.tests]
 log = "outputs/logs/tests.log"
 ok = true
-seconds = 907.6
-finished = "2026-10-03T12:53:30.275"
+seconds = 360.1
+finished = "2026-10-06T16:30:04.049"
 
     [steps.tests.env]
 
@@ -123,5 +121,5 @@ version = "0.4.1"
 
 [git]
 branch = "reproducible-pipeline"
-commit = "5c0817889c6fa7f34b692aa1d94018802f5d7cfe"
+commit = "f89b0ad250eff26f62b8e8bbcd1750963f51438b"
 uncommitted_changes = true

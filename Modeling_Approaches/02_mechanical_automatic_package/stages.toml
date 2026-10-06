@@ -29,6 +29,9 @@ ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-1
 
 [selection]
 rule_bic = 3.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC)
+# SD-weighted residuals (user, 2026-10-06): the replicate SD grows with the count, so raw squared error let the
+# large late counts dominate; weighting improved the held-out treated-coculture prediction (sensitivity variants V5, V6).
+residual_weighting = "sd"
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
@@ -80,6 +83,7 @@ plot_tmax = 20.0
 # ── 2b · treated monocultures, all doses jointly ─────────────────────────────
 [[stage]]
 id = "s2"
+kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
 kind = "mechanism"
 stage_label = "2 Treated monoculture"
 title = "Stage 2 · {line} treated (3 doses jointly)"
@@ -92,6 +96,7 @@ joint_rule = "shared"
 # ── 3a · untreated (Ce0) and treated (Ce1) cocultures, shared K ──────────────
 [[stage]]
 id = "s3"
+kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
 kind = "coculture"
 stage_label = "3 Ce0 + Ce1 coculture"
 title = "Stage 3 · Ce0 + Ce1 coculture (shared K)"
@@ -184,6 +189,7 @@ inherits = { growth = "s1", mechanism = "s1b" }
 # ── 4 · low resource + cisplatin coculture (both mechanisms per line) ────────
 [[stage]]
 id = "s4"
+kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
 kind = "combination"
 stage_label = "4 Low resource + cisplatin coculture"
 title = "Stage 4 · low resource + cisplatin coculture (1:1)"

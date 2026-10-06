@@ -38,7 +38,7 @@ const TIPS = {
   flag: "'at bound' = the value sits at its search limit; 'interval reaches 0' = the data are consistent with this term being absent.",
   model: "The optimal model: fewest free parameters within 3 BIC of the lowest, with its equations. N, C: sensitive (A2780) and resistant (A2780cis) counts; D: cisplatin dose (µM); u_R: low-resource level; A, S: delay compartments driven by D or u_R; K: carrying capacity; α: crowding coefficients.",
   chosen: "Share of the bootstrap data sets in which the same selection rule picks this model. Above about 70% = a robust choice; low = another model is about as good.",
-  bic: "Bayesian information criterion, n·ln(SSE/n) + k·ln(n): the fit error penalised for the number of parameters. Lower is better; differences under about 2 are negligible, above 10 decisive. Only comparable within one fit.",
+  bic: "Bayesian information criterion, n·ln(SSE/n) + k·ln(n): the fit error penalised for the number of parameters. When the fits are weighted, SSE uses each residual divided by that point's replicate SD, so BICs are on that scale. Lower is better; differences under about 2 are negligible, above 10 decisive. Only comparable within one fit.",
   runner: "The next candidate and its ΔBIC relative to the optimal model. Negative = it fits slightly better but needs more parameters, so the rule keeps the smaller model.",
   k: "Number of free parameters fitted at this stage (values carried over from earlier stages are not counted).",
   family: "The delay mechanism: immediate, effect compartment, transit compartments, second order, accumulation, or damaged cells.",
@@ -302,17 +302,20 @@ function zooSystem(sim, p) {
     for (const M of mods) { const nc = ZOO_NCELL[M.action] || 0; for (let j = 1; j <= nc; j++) cells += Math.max(u[off + j], 0); off += width(M); }
     const V = Math.max(X - cells, 0);
     const r = sv(L.s.r), K = sv(L.s.K);
-    let reff = r, Keff = K, loss = sv(L.s.d), out = 0;
-    const chi = L.chi ? sv(L.chi) : 0;
+    let reff = r, Keff = K, loss = sv(L.s.d), dloss = 0, out = 0;
+    const chi = L.chi ? sv(L.chi) : 0, th = sv(L.s['θ']);
     off = o;
     for (const M of mods) {
       const w = M.input === 'D' ? env.D : env.R;
       const [re, Ke, lo, ou] = mod(du, u, off, M, w, X, V, r, K);
       reff *= re / r; Keff *= Ke / K;
-      loss += M.input === 'D' ? lo * (1 + chi * env.R / uR) : lo;
+      if (M.input === 'D') dloss += lo * (1 + chi * env.R / uR); else loss += lo;
       out += ou; off += width(M);
     }
-    du[xi] = growth(L.growth, reff, V, crowd / Keff, sv(L.s['θ'])) - loss * V - out;
+    // Norton–Simon (L.ns, mirrors growth_factor in zoo_models.jl): drug losses × the line's growth factor
+    if (L.ns) { const x = Math.max(crowd / Keff, 0); dloss *= L.growth === 'theta' ? Math.max(1 - Math.pow(x, th), 0) : Math.max(1 - x, 0); }
+    loss += dloss;
+    du[xi] = growth(L.growth, reff, V, crowd / Keff, th) - loss * V - out;
   }
   return (t, u) => {
     const du = new Array(u.length).fill(0);
@@ -347,7 +350,7 @@ function zooBuild(b, kernel, action, free) {
     if (kernel === 'second') clampMask[nE + i * w + nc + 1] = false;
   });
   return { id: 'zoo', uR: b.uR, EC50: b.EC50, u0, clamp: clampMask,
-    sys: { lines: [{ growth: b.growth, kernel, action, input: b.input, s }], envs: b.envs.map(e => ({ D: e.D, R: e.R, lines: [0] })),
+    sys: { lines: [{ growth: b.growth, kernel, action, input: b.input, s, ns: !!b.ns && b.input === 'D' }], envs: b.envs.map(e => ({ D: e.D, R: e.R, lines: [0] })),
            alpha: [[[0, 1]]], xi, hb, n: u0.length } };
 }
 // symbolic equations for one monoculture line (a port of line_tex in zoo_models.jl)
@@ -384,7 +387,8 @@ function sseOf(g, sim, p, fast = false) {
   const res = fast ? simulate(sim, p, g.xmax, 0.25, 4) : simulate(sim, p, g.xmax);
   if (!res) return Infinity;
   let s = 0;
-  for (const ser of g.series) ser.x.forEach((x, i) => { const d = at(res, ser.state, x) - ser.y[i]; s += d * d; });
+  // residuals divided by each point's scale when the fits are weighted (ser.w, from the bundle), as in the fits
+  for (const ser of g.series) ser.x.forEach((x, i) => { const d = (at(res, ser.state, x) - ser.y[i]) / (ser.w ? ser.w[i] : 1); s += d * d; });
   return isFinite(s) ? s : Infinity;
 }
 const dsign = d => (d >= 0 ? '+' : '') + fmt(d);

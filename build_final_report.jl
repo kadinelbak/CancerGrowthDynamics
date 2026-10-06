@@ -3,7 +3,9 @@
 # chapters keep their own styles, scripts and equations and none of the source pages is modified.
 # Rerun after any chapter's report is regenerated:   julia build_final_report.jl
 
-using Dates
+using Dates, TOML
+# length of the long dose + fasting run (control_config.toml), for chapter 7
+const LONG_DAYS = round(Int, TOML.parsefile(joinpath(@__DIR__, "Modeling_Approaches", "02_mechanical_automatic_package", "control_config.toml"))["schedule"]["long_days"])
 
 const DOCS = joinpath(@__DIR__, "docs")
 const OUT  = joinpath(DOCS, "outputs", "final_report")
@@ -21,10 +23,10 @@ chapters = [
      "$PKG/zoo_analyses/sensitivity/report.html"),
     ("validation", "5 · Validation", "Held-out treated cocultures predicted from the untreated cocultures and the monoculture drug fits, blocked leave-one-dose / ratio / run-out validation, and forecasts of the last 30% of days.",
      "$PKG/zoo_analyses/validation/report.html"),
-    ("control", "6 · Optimal control", "Sequential (successive-linearisation) model-predictive control of the cisplatin dose at each media change, on the carried Stage 3 (normal medium) and Stage 4 (low resource) models, with a literature toxicity proxy, barriers on cancer burden and toxicity, baseline schedules, bootstrap robustness, identifiability warnings and suggested experiments.",
+    ("control", "6 · Optimal control", "Sequential (successive-linearisation) model-predictive control of the cisplatin dose at each media change, on the carried Stage 3 model (normal medium) and the same model with the fitted low-resource modules (low resource; equal to the Stage 4 fit at 1 µM), with one stated goal (low total burden, resistant cells counted double), a literature toxicity proxy, barriers on cancer burden and toxicity, baseline schedules, bootstrap robustness, identifiability warnings and suggested experiments.",
      "$PKG/control/report.html"),
-    ("control30", "7 · Optimal control over 30 days: cisplatin and fasting", "Model-predictive control choosing both the cisplatin dose and fasting (low resource) at every media change for 30 days, with a body-weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days 14–30 are beyond the data, and the fasting effect is the in-vitro effect at full strength.",
-     "$PKG/control_30d/report.html"),
+    ("control30", "7 · Optimal control over $LONG_DAYS days: cisplatin and fasting", "Model-predictive control choosing both the cisplatin dose and fasting (low resource) at every media change for $LONG_DAYS days, read off at days 14, 30, 60 and $LONG_DAYS of the same run, with a body-weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days 14–$LONG_DAYS are beyond the data, and the fasting effect is the in-vitro effect at full strength.",
+     "$PKG/control_$(LONG_DAYS)d/report.html"),
 ]
 
 # Turns each chapter into dropdowns so nothing has to be scrolled past: every top-level (h2)

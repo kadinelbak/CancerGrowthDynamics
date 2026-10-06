@@ -1,6 +1,6 @@
-# 30-day optimal control with two inputs: cisplatin dose u and low resource / fasting v (control_fasting.jl).
+# Long-run optimal control (long_days, default 120 days; CONTROL_DAYS overrides) with two inputs: cisplatin dose u and low resource / fasting v (control_fasting.jl).
 #   julia -t 12 --project=. run_control_fasting.jl        (REDO=1 recomputes; the checkpoint is per section)
-# Writes outputs/control_30d/fasting_state.jls and fasting_outcomes.csv; control_fasting_report.jl renders the page.
+# Writes outputs/control_<days>d/fasting_state.jls and fasting_outcomes.csv; control_fasting_report.jl renders the page.
 #
 #   scenarios   A (selected coculture drug response), B (monoculture drug response for both lines)
 #   ratios      25:75, 50:50, 75:25 from the untreated-coculture day-0 counts
@@ -13,12 +13,12 @@
 
 include(joinpath(@__DIR__, "control_fasting.jl"))
 
-const DAYS = Float64(CFG["schedule"]["long_days"])
+const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["long_days"])))
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
-const NRUN = round(Int, DAYS / Δ0)                                   # 15 decisions over 30 days
+const NRUN = round(Int, DAYS / Δ0)                                   # one decision per 2-day interval
 const NDEC = round(Int, CFG["schedule"]["horizon_days"] / Δ0)       # 7-interval (14-day) look-ahead
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
-const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), "control_30d"); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
+const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), "control_$(round(Int, DAYS))d"); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
 const FCK = joinpath(FOUT, "fasting_state.jls")
 fck = (isfile(FCK) && get(ENV, "REDO", "0") != "1") ? deserialize(FCK) : Dict{Symbol,Any}()
 savef() = serialize(FCK, fck)
@@ -28,7 +28,7 @@ ratios = [(ratio=("25:75", "50:50", "75:25")[i], N0=co_data[i].S[2][1], C0=co_da
 const MPC2 = "MPC, dose + fasting (measured levels)"
 const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
-println("=== 30-day control with fasting: $(Threads.nthreads()) threads; $NRUN decisions, look-ahead $NDEC; checkpoint has $(collect(keys(fck))) ==="); flush(stdout)
+println("=== $(round(Int, DAYS))-day control with fasting: $(Threads.nthreads()) threads; $NRUN decisions, look-ahead $NDEC; checkpoint has $(collect(keys(fck))) ==="); flush(stdout)
 
 # ── checks against the two measured low-resource conditions ──────────────────
 function compute_checks()

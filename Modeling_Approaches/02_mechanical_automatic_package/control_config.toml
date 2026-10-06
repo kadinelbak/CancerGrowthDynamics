@@ -11,7 +11,8 @@ decision_interval_days = 2.0     # DATA: media are changed about every 2 days, s
 horizon_days = 14.0              # DATA: the experiments run 14 days
 closed_loop_days = 14.0          # DATA: closed-loop simulations cover the experimental window
 extrapolation_days = 28.0        # ASSUMPTION: longer runs extrapolate beyond the data (flagged in the report)
-long_days = 30.0                 # ASSUMPTION: the long report (CONTROL_DAYS=30) runs this long; days after 14 are beyond the data
+long_days = 120.0                # ASSUMPTION: the long dose + fasting run (run_control_fasting.jl) lasts this long; days after 14 are beyond the data
+snapshot_days = [14.0, 30.0, 60.0, 120.0]   # the long run is read off at these days (one continuing policy, not separate runs)
 data_days = 14.0                 # DATA: the last measured day; marked on the long report's time plots
 rk4_step_days = 0.05             # numerical: fixed RK4 step for F(x, u); checked against Tsit5 in test/test_control.jl
 

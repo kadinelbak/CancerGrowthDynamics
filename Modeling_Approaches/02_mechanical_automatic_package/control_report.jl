@@ -87,7 +87,7 @@ function dose_svg(title, pols; W=760, umax=3.0)
 end
 function flow_svg()
     boxes = [("Stage 1", "untreated monocultures", "r, K, θ"), ("Stage 1b", "low-resource monocultures", "low-resource mechanism per line"),
-             ("Stage 2", "treated monocultures", "drug chain k, Hill h, kill β"), ("Stage 3", "Ce0 + Ce1 cocultures", "shared K, α_NC, α_CN, d_N, β_N"),
+             ("Stage 2", "treated monocultures", DRUG_HILL ? "drug chain k, Hill h, kill β" : "drug chain k, linear kill β" * (DRUG_NS ? " (Norton–Simon)" : "")), ("Stage 3", "Ce0 + Ce1 cocultures", "shared K, " * join(filter(n -> n in zgroup("s3").cands[1].pnames, ["α_NC", "α_CN", "d_N", "β_N", "β_C"]), ", ")),
              ("Stage 3b", "low-resource cocultures", "shared K (low resource)"), ("Stage 4", "low resource + cisplatin", "ε_N, ε_C (low-resource strength)"),
              ("Control", "MPC plant", "+ dose u, toxicity B, T")]
     pos = [(20, 40), (20, 150), (230, 40), (440, 40), (440, 150), (650, 150), (650, 40)]
@@ -216,6 +216,10 @@ end
 # the "i" on the toxicity equations: what they are, the source, and why the proxy is appropriate
 # highest toxicity over every main run that stays within the measured doses (the demonstration MPC is excluded)
 const TMAX_DATA = maximum(v.o.max_tox for m in C[:main] for (pn, v) in m.policies if !startswith(pn, "MPC demonstration"))
+# the carried drug model (Stage 2b), for the text below: Hill or linear kill, Norton–Simon or not
+const DRUG_HILL = zgroup("s2-a2780").cands[1].sys.lines[1].action == :hill
+const DRUG_NS = ns_on(zgroup("s2-a2780").cands[1].sys.lines[1])
+const DRUG_CURVE = DRUG_HILL ? "the Hill curve" : "the linear kill"
 const TOX_TIP = "Toxicity proxy: the damage the same drug exposure would do to healthy host tissue. No toxicity was measured in these in-vitro experiments, so it comes from the literature. " *
     "B = systemic drug burden (built up by the dose, cleared at d_B); T = 1 − H = fraction of healthy tissue lost (0 = none). " *
     "SOURCE: the normal-cell compartment of de Pillis LG & Radunskaya AE (2001), 'A mathematical tumor model with immune resistance and drug therapy: an optimal control approach', " *
@@ -232,28 +236,30 @@ const TOX_TIP = "Toxicity proxy: the damage the same drug exposure would do to h
 
 function model_section()
     P = scenario_plant(:A); c3 = zgroup("s3").cands[1]
-    eqs = ["\\frac{dN}{dt}=r_N N\\left(1-\\frac{N+\\alpha_{NC}C}{K}\\right)-d_N N-\\beta_N\\frac{E_N^{h_N}}{EC_{50,N}^{h_N}+E_N^{h_N}}N",
-           "\\frac{dC}{dt}=r_C C\\left[1-\\left(\\frac{C+\\alpha_{CN}N}{K}\\right)^{\\theta_C}\\right]-\\beta_C\\frac{E_C^{h_C}}{EC_{50,C}^{h_C}+E_C^{h_C}}C",
-           "\\frac{dA_{X,1}}{dt}=k_X\\,(u-A_{X,1}),\\quad \\frac{dA_{X,j}}{dt}=k_X\\,(A_{X,j-1}-A_{X,j}),\\ j=2,3,\\quad E_X=A_{X,3}\\qquad (X=N,C)",
-           "\\frac{dB}{dt}=s_B\\,u-d_B\\,B,\\qquad \\frac{dT}{dt}=a_H\\left(1-e^{-B}\\right)(1-T)-r_H\\,T(1-T)"]
+    # normal-medium cell equations generated from the carried Stage 3 model itself (D = u), as on the zoo pages,
+    # so they follow whatever drug model was selected (Hill or linear kill, Norton–Simon or not)
+    ctex(a, X, Y, nm) = (a.i == 0 && a.v == 0) ? X : (a.i == 0 && a.v == 1) ? "$X+$Y" : "$X+\\alpha_{$nm}$Y"
+    S3 = c3.sys
+    eqs = vcat(line_tex(S3.lines[1], "N", ctex(S3.alpha[1][2], "N", "C", "NC"), "K"), line_tex(S3.lines[2], "C", ctex(S3.alpha[2][1], "C", "N", "CN"), "K"),
+               ["\\frac{dB}{dt}=s_B\\,u-d_B\\,B,\\qquad \\frac{dT}{dt}=a_H\\left(1-e^{-B}\\right)(1-T)-r_H\\,T(1-T)"])
     # low-resource (Stage 4) equations generated from the fitted model itself, as on the zoo pages (D = u)
     c4 = zgroup("s4").cands[1]; S4 = c4.sys
-    ctex(a, X, Y, nm) = (a.i == 0 && a.v == 0) ? X : (a.i == 0 && a.v == 1) ? "$X+$Y" : "$X+\\alpha_{$nm}$Y"
     eqlr = vcat(line_tex(S4.lines[1], "N", ctex(S4.alpha[1][2], "N", "C", "NC"), "K"), line_tex(S4.lines[2], "C", ctex(S4.alpha[2][1], "C", "N", "CN"), "K"))
     v = Dict(zip(c3.pnames, c3.params))
     Ln, Lc = P.sys.lines
-    ecC = ec50_of(Lc.s, P.p, Float64); kill1(β) = β / (ecC^Lc.s.h.v + 1)      # resistant kill at a steady 1 µM effect
+    hill = Lc.action == :hill; ecC = ec50_of(Lc.s, P.p, Float64)
+    kill1(β) = hill ? β / (ecC^Lc.s.h.v + 1) : β                       # resistant kill at a steady 1 µM effect (before any Norton–Simon factor)
     prow(sym, val, unit, src, note) = trow([td("\\($sym\\)"), tn(val isa Number ? fmt(val) : val), td(unit), td(src), td(hesc(note))])
     t = default_tox()
     prows = [prow("r_N", Ln.s.r.v, "/day", "DATA · Stage 1", "sensitive growth rate"), prow("r_C", Lc.s.r.v, "/day", "DATA · Stage 1", "resistant growth rate"),
              prow("\\theta_C", Lc.s.θ.v, "—", "DATA · Stage 1", "resistant crowding shape"), prow("K", v["K"], "cells", "DATA · Stage 3", "shared carrying capacity"),
              prow("\\alpha_{NC}", v["α_NC"], "—", "DATA · Stage 3", "crowding of N by C"), prow("\\alpha_{CN}", v["α_CN"], "—", "DATA · Stage 3", "crowding of C by N"),
-             prow("d_N", v["d_N"], "/day", "DATA · Stage 3", "sensitive death in coculture"), prow("\\beta_N", v["β_N"], "/day", "DATA · Stage 3", "max sensitive kill (scenario A; B uses Stage 2)"),
-             prow("h_N", Ln.s.h.v, "—", "DATA · Stage 2", "Hill slope, sensitive"), prow("k_N", Ln.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, sensitive"),
-             prow("\\beta_C", stage3_betaC().value, "/day", "DATA · $(stage3_betaC().source) (A) / Stage 2 (B)", "max resistant kill: $(fmt(stage3_betaC().value)) in A, $(fmt(zgroup("s2-a2780cis").cands[1].params[1])) in B. Not identifiable on its own: every measured dose is far below EC50,C, so the data fix only the kill at those doses, β_C·E^h_C/(EC50,C^h_C + E^h_C) = $(fmt(kill1(stage3_betaC().value))) /day at a steady 1 µM in A and $(fmt(kill1(zgroup("s2-a2780cis").cands[1].params[1]))) /day in B"),
-             prow("h_C", Lc.s.h.v, "—", "DATA · Stage 2", "Hill slope, resistant"), prow("k_C", Lc.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, resistant"),
-             prow("EC_{50,N}", ec50_of(Ln.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780"),
-             prow("EC_{50,C}", ec50_of(Lc.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780cis"),
+             (haskey(v, "d_N") ? prow("d_N", v["d_N"], "/day", "DATA · Stage 3", "sensitive death in coculture") : ""), prow("\\beta_N", v["β_N"], "/day", "DATA · Stage 3", "max sensitive kill (scenario A; B uses Stage 2)"),
+             (hill ? prow("h_N", Ln.s.h.v, "—", "DATA · Stage 2", "Hill slope, sensitive") : ""), prow("k_N", Ln.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, sensitive"),
+             prow("\\beta_C", stage3_betaC().value, "/day", "DATA · $(stage3_betaC().source) (A) / Stage 2 (B)", "max resistant kill: $(fmt(stage3_betaC().value)) in A, $(fmt(zgroup("s2-a2780cis").cands[1].params[1])) in B. $(hill ? "Not identifiable on its own: every measured dose is far below EC50,C, so the data fix only the kill at those doses, β_C·E^h_C/(EC50,C^h_C + E^h_C)" : "The kill is linear in the effect, β_C·E (per µM-equivalent per day)") = $(fmt(kill1(stage3_betaC().value))) /day at a steady 1 µM in A and $(fmt(kill1(zgroup("s2-a2780cis").cands[1].params[1]))) /day in B$(ns_on(Lc) ? ", before the Norton–Simon growth factor, which lowers it as the culture fills" : "")"),
+             (hill ? prow("h_C", Lc.s.h.v, "—", "DATA · Stage 2", "Hill slope, resistant") : ""), prow("k_C", Lc.s.k.v, "/day", "DATA · Stage 2", "drug-effect transit rate, resistant"),
+             (hill ? prow("EC_{50,N}", ec50_of(Ln.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780") : ""),
+             (hill ? prow("EC_{50,C}", ec50_of(Lc.s, P.p, Float64), "µM", "DATA (fixed)", "measured IC50 of A2780cis") : ""),
              prow("s_B", t.s_B, "per µM", "ASSUMPTION", "medium µM → systemic burden"), prow("d_B", t.d_B, "/day", "LITERATURE", "drug decay (de Pillis & Radunskaya 2001)"),
              prow("a_H", t.a_H, "—", "LITERATURE", "fractional kill of normal tissue (de Pillis & Radunskaya 2001)"), prow("r_H", t.r_H, "/day", "LITERATURE", "normal-tissue regrowth (de Pillis & Radunskaya 2001)"),
              prow("B_{tox}", CFG["toxicity"]["B_tox"], "—", "LITERATURE", "normal tissue ≥ 75% (de Pillis & Radunskaya 2001)"),
@@ -264,7 +270,7 @@ function model_section()
              ("B", "dose units", "systemic drug burden (toxicity side)"), ("T", "fraction 0–1", "toxicity burden = healthy tissue lost"), ("u", "µM", "cisplatin in the medium (control)")]]
     """<h2>The model the controller uses</h2>
 <div class='intro'><p>The cell equations are exactly the carried compartment models: the control plant calls the same right-hand side as the fits, with the same parameter values (a test checks that it reproduces the fitted Stage 3 curves at 1 µM to 10⁻⁵). The controller only adds the dose input \\(u\\) and a toxicity proxy. Drug → effect → kill follows \\(u \\to A_{X,1} \\to A_{X,2} \\to A_{X,3}=E_X \\to\\) kill, and separately \\(u \\to B \\to T\\).</p>
-$(join(["<div class='eq'>$(i == 4 ? tip(TOX_TIP, "Lower T is better, and it must stay under the 0.25 bound (at least 75% of healthy tissue kept).") : "")\\[$e\\]</div>" for (i, e) in enumerate(eqs)]))
+$(join(["<div class='eq'>$(i == length(eqs) ? tip(TOX_TIP, "Lower T is better, and it must stay under the 0.25 bound (at least 75% of healthy tissue kept).") : "")\\[$e\\]</div>" for (i, e) in enumerate(eqs)]))
 <p><b>Low resource (D = u, u<sub>R</sub> = $(U_R)).</b> $(tip("The low-resource equations as the zoo writes them for the carried Stage 4 model: the cisplatin module and the low-resource module of each line. The drug-effect compartments and the toxicity states B, T are as above.", :none)) The low-resource strengths depend on the dose, \\(\\varepsilon_X(u)=1+(\\varepsilon_X^{S4}-1)\\min(u/1\\,\\mu\\mathrm{M},1)\\): with no drug the model is the low-resource fit alone (\\(\\varepsilon=1\\)), and at 1 µM it is exactly the Stage 4 fit. This is the same plant as the 30-day fasting controller held in low resource throughout, so the two reports agree.</p>
 $(join(["<div class='eq'>\\[$e\\]</div>" for e in eqlr]))
 <p>Discrete transition over one decision interval (Δ = $(Δ0) days, u constant): \\(x_{k+1}=F(x_k,u_k)\\), fixed-step RK4 with step 0.05 day. Local linearisation \\(A_k=\\partial F/\\partial x\\), \\(B_k=\\partial F/\\partial u\\) by forward-mode automatic differentiation through the RK4 steps (one Jacobian of F over [x; u]: nx + 1 dual directions, about the cost of reverse mode at this size, with no tape).</p></div>
@@ -284,7 +290,7 @@ function objective_section()
 <p><b>Goal.</b> Keep the total tumour burden low <i>and</i> hold resistant cells back. The burden term \\(q_B(N+C)/K\\) is linear: every cell costs the same however large the tumour is, so the controller still treats a small culture when the drug removes cells. The resistance premium \\(q_R\\,C/K\\) makes a resistant cell cost more than a sensitive one (with \\(q_R=q_B\\) it counts as two cells), because further cisplatin cannot remove it. Sensitive cells are never rewarded: a schedule that leaves more cells in total is worse unless it buys a larger drop in resistant cells. The hard limit on the burden is the cancer barrier at B_cancer. Precedents: tumour burden as a linear cost (Schättler &amp; Ledzewicz 2015) and in-vitro chemotherapy optimised to avoid resistant growth (Carrère 2017).</p>
 <p>States are normalised (by K and B_tox) so that numbers of cells do not swamp the toxicity terms. The cancer barrier grows as N + C nears B_cancer and favours treating; the toxicity barrier grows as T nears B_tox and favours stopping; the schedule is the balance of the two, not a hard-coded rule. The relaxed barrier (Feller &amp; Ebenbauer 2017) is the exact log barrier inside the feasible set and a steep quadratic below z = δ, so a start where the bound cannot be met still gives a finite, informative cost; violations are counted in the tables, never hidden. Defaults: q_B = q_R = q_T = 1, r_u = 0.1, μ = 0.05, δ = 0.02; the weights (including q_R = 0, burden only, and q_R = 3) are swept below.</p>
 <p><b>Controller: sequential (SQP) MPC.</b> At each decision time: (1) simulate the nonlinear model over the horizon with the current plan; (2) linearise F along it (A_k, B_k by automatic differentiation); (3) gradient by the adjoint recursion \\(\\mu_k=\\nabla\\ell_k+A_k^\\top\\mu_{k+1}\\) (vector–Jacobian products); (4) Gauss–Newton Hessian from the forward sensitivities \\(S_{k+1}=A_kS_k+B_ke_k^\\top\\); (5) solve the box-constrained quadratic subproblem; (6) line search on the true nonlinear cost; repeat to convergence; apply the first dose; re-plan at the next media change. The local subproblem has the LQR structure \\(\\delta x_{k+1}=A_k\\delta x_k+B_k\\delta u_k\\), but it is re-linearised every iteration, bounded, and has non-quadratic barriers, so this is successive-linearisation MPC, not a fixed LQR.</p>
-<p><b>Two modes.</b> <i>Data-supported</i>: doses restricted to 0, 0.62, 1.0 and 1.47 µM (the measured doses); the finite-horizon problem is then solved exactly by searching every dose sequence (prefix sharing and pruning), $(LONG ? "4⁷ sequences over each 14-day look-ahead, re-planned at each of the $NRUN media changes (the last plans shrink to end at day $(round(Int, DAYS)))." : "4⁷ sequences over 14 days.") <i>Demonstration</i>: continuous doses up to $(CFG["dose"]["u_max_demo"]) µM with SQP; above 1.47 µM the Hill curve is extrapolated and the result is not supported by data.</p></div>"""
+<p><b>Two modes.</b> <i>Data-supported</i>: doses restricted to 0, 0.62, 1.0 and 1.47 µM (the measured doses); the finite-horizon problem is then solved exactly by searching every dose sequence (prefix sharing and pruning), $(LONG ? "4⁷ sequences over each 14-day look-ahead, re-planned at each of the $NRUN media changes (the last plans shrink to end at day $(round(Int, DAYS)))." : "4⁷ sequences over 14 days.") <i>Demonstration</i>: continuous doses up to $(CFG["dose"]["u_max_demo"]) µM with SQP; above 1.47 µM $DRUG_CURVE is extrapolated and the result is not supported by data.</p></div>"""
 end
 
 function tests_section()
@@ -320,7 +326,9 @@ function warnings_section()
     ecN, ecC = ec50_of(Ln.s, P.p, Float64), ec50_of(Lc.s, P.p, Float64)
     """<h2>What the data do not identify</h2>
 <div class='intro'><ul>
-$(LONG ? BEYOND_LONG : "")<li><b>Dose response outside 0.62–1.47 µM.</b> The monocultures were treated at three doses and the cocultures at 1 µM only. EC50 is fixed at each line's measured IC50 ($(fmt(ecN)) µM for A2780, $(fmt(ecC)) µM for A2780cis), not estimated. Continuous-dose control above 1.47 µM (demonstration mode) extrapolates the Hill curve.</li>
+$(LONG ? BEYOND_LONG : "")<li><b>The toxicity limit is inactive at the default settings.</b> Since \\(dT/dt=(1-T)\\big[a_H(1-e^{-B})-r_H\\,T\\big]\\), T can never exceed \\(a_H/r_H\\) = $(fmt(default_tox().a_H / default_tox().r_H)), below the bound B_tox = $(CFG["toxicity"]["B_tox"]), whatever the dose. The toxicity term in the cost still discourages dosing, but the hard limit only matters in the sweep with slower host recovery (r_H = $(minimum(CFG["toxicity"]["r_H_sweep"])) /day, bound \\(a_H/r_H\\) = $(fmt(default_tox().a_H / minimum(CFG["toxicity"]["r_H_sweep"])))). The schedules are therefore not toxicity-constrained in the main runs.</li>
+<li><b>How each scenario is validated.</b> Scenario A (the Stage 3a coculture fit) passes leave-one-ratio-out validation, but it was fitted to the treated cocultures, so there is no held-out test of its drug response in coculture. Scenario B is the construction that was tested on held-out data: crowding fitted to the untreated cocultures only, then the treated cocultures predicted with no refit (<a href='../zoo_analyses/validation/report.html'>Validation</a>).</li>
+<li><b>Dose response outside 0.62–1.47 µM.</b> The monocultures were treated at three doses and the cocultures at 1 µM only. $(DRUG_HILL ? "EC50 is fixed at each line's measured IC50 ($(fmt(ecN)) µM for A2780, $(fmt(ecC)) µM for A2780cis), not estimated." : "The carried kill is linear in the drug effect, so it never saturates: it cannot show a maximum kill at high doses.") Continuous-dose control above 1.47 µM (demonstration mode) extrapolates $DRUG_CURVE.</li>
 <li><b>Resistant kill in coculture.</b> The cocultures were treated at one dose only, so how strongly cisplatin kills A2780cis in coculture rests on the monoculture fit: scenario A uses $(stage3_betaC().free ? "the coculture refit (bounded below by half the monoculture value, so it is never switched off)" : "the monoculture value inherited by the coculture fit") and scenario B the monoculture drug response for both lines; every result is given for both.</li>
 <li><b>Toxicity.</b> Nothing in these in-vitro data measures host toxicity. Its structure and values come from de Pillis &amp; Radunskaya (2001); the mapping from medium concentration to systemic burden (s_B) and B_cancer are assumptions. Treat toxicity-limited results as illustrative.</li>
 $(LONG ? "" : "<li><b>Beyond 14 days.</b> The 28-day runs extrapolate every stage beyond the data.</li>")
@@ -328,7 +336,7 @@ $(LONG ? "" : "<li><b>Beyond 14 days.</b> The 28-day runs extrapolate every stag
 <li><b>Parameter uncertainty propagation.</b> The bootstrap combines replicates across stages, but each stage was bootstrapped with earlier-stage values held fixed, so the bands are approximate.</li></ul></div>
 <h2>Experiments that would most improve control</h2>
 <div class='intro'><ol>
-<li><b>Coculture dose series</b> (e.g. 0.25, 0.5, 2 and 4 µM at 50:50, 14 days): identifies the coculture dose response and whether A2780cis is killed in coculture (scenario A vs B), the largest structural uncertainty for control, and lets the Hill slope and EC50 be estimated in the condition that is being controlled.</li>
+<li><b>Coculture dose series</b> (e.g. 0.25, 0.5, 2 and 4 µM at 50:50, 14 days): identifies the coculture dose response and whether A2780cis is killed in coculture (scenario A vs B), the largest structural uncertainty for control, and lets the shape of the dose response (linear or saturating) be estimated in the condition that is being controlled.</li>
 <li><b>Coculture washout / intermittent schedules</b> (1 µM on for 2 or 4 days then off, repeated): tests the drug-effect decay and the regrowth after removal in the controlled system; the monoculture intermittent data only test it for single lines.</li>
 <li><b>Replicate-level counts over time.</b> The sensitivity analysis ranks sensitive growth r_N, coculture death d_N and the crowding coefficients as the main drivers of the controlled outcome; more replicates of the untreated and treated cocultures narrow exactly those.</li>
 <li><b>Low resource + cisplatin at a second dose.</b> Stage 4 has one condition; a second dose separates the low-resource strengths from a drug × low-resource interaction.</li>

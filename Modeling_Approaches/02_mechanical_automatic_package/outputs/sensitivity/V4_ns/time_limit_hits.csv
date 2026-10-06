@@ -1,0 +1,2 @@
+fit,optimizer,seconds,limit
+second_hill,bfgs,300.021999835968,300.0

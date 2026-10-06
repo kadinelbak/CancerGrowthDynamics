@@ -5,7 +5,7 @@
 <style>.glance-eq{font-size:.86em;overflow-x:auto;max-width:640px;margin-top:4px}.glance-eq mjx-container[display]{margin:.15em 0 !important;text-align:left !important}</style>
 <script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]}};</script>
 <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script><script src="control.js?' + __v + '"><\/script><script src="control30.js?' + __v + '"><\/script>');</script>
+<script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script><script src="control.js?' + __v + '"><\/script><script src="controlLong.js?' + __v + '"><\/script>');</script>
 </head><body><main id="app"></main>
 <script>
 const app = document.getElementById('app');
@@ -32,18 +32,23 @@ function controlTable(C) {
   const rows = C.rows.map(r => `<tr><td>${esc(r.run)}</td><td>${r.schedule.map(u => u.toFixed(2).replace(/\.?0+$/, '')).join(', ')}</td><td class="num">${Math.round(r.mpc.total)} · ${Math.round(r.const1.total)} · ${Math.round(r.mtd.total)}</td><td class="num">${r.mpc.rf.toFixed(2)} · ${r.const1.rf.toFixed(2)}</td><td class="num">${r.mpc.cum.toFixed(1)} · ${r.const1.cum.toFixed(1)}</td><td class="num">${r.mpc.maxTox.toFixed(3)}</td></tr>`).join('');
   return `<div class="tscroll"><table><tr><th>Run${infoTip(T.run, 'none')}</th><th>MPC schedule (µM)${infoTip(T.sched, 'none')}</th><th>N + C day 14: MPC · 1 µM · 1.47 µM${infoTip(T.tot, 'lower')}</th><th>Resistant fraction: MPC · 1 µM${infoTip(T.rf, 'lower')}</th><th>Dose µM·d: MPC · 1 µM${infoTip(T.dose, 'lower')}</th><th>Max toxicity${infoTip(T.tox, 'lower')}</th></tr>${rows}</table></div>`;
 }
-// 30-day dose + fasting control summary (control30.js, written by control_fasting_report.jl)
-function control30Table(C) {
+// long-run dose + fasting control summary (controlLong.js, written by control_fasting_report.jl)
+function controlLongTable(C) {
   const T = {
-    run: 'Drug-response scenario (A: coculture fit as selected; B: monoculture drug response). 50:50 start, 30 days (days after ' + C.dataDays + ' are beyond the data).',
-    sched: 'Dose (µM) chosen by MPC for each 2-day interval; F marks an interval run in low resource ("fasting", 0.5% FBS). Measured levels only; fasts up to 48 h with at least 2 days of refeeding.',
-    tot: 'Total cells N + C on day ' + C.days + ': MPC with fasting · MPC without fasting · constant 1 µM.',
-    C: 'Resistant A2780cis cells on day ' + C.days + ': MPC with fasting · MPC without fasting · constant 1 µM.',
-    dose: 'Cumulative cisplatin (µM·days) and days spent fasting under MPC with fasting.',
+    run: 'Drug-response scenario (A: coculture fit as selected; B: monoculture drug response). 50:50 start, one ' + C.days + '-day run (days after ' + C.dataDays + ' are beyond the data).',
+    sched: 'Dose (µM) chosen by MPC for each 2-day interval, with repeats collapsed (1.47×13 = 13 intervals at 1.47 µM); F marks intervals run in low resource ("fasting", 0.5% FBS). Measured levels only; fasts up to 48 h with at least 2 days of refeeding.',
+    day: 'The same continuing run read off on this day (not a separate shorter run).',
+    tot: 'Total cells N + C on that day: MPC with fasting · MPC without fasting · constant 1 µM.',
+    C: 'Resistant A2780cis cells on that day: MPC with fasting · MPC without fasting · constant 1 µM.',
+    dose: 'Cumulative cisplatin (µM·days) and days spent fasting under MPC with fasting, over the whole run.',
     host: 'Lowest body weight (fraction of baseline; limit ' + C.Wmin + ', the cachexia threshold) and highest healthy-tissue loss T (limit 0.25) under MPC with fasting.'
   };
-  const rows = C.rows.map(r => `<tr><td>${esc(r.run)}</td><td>${r.dose.map((u, k) => (r.fast[k] > 0 ? '<b>F</b>' : '') + u.toFixed(2).replace(/\.?0+$/, '')).join(' ')}</td><td class="num">${Math.round(r.mpc2.total)} · ${Math.round(r.mpc1.total)} · ${Math.round(r.const1.total)}</td><td class="num">${Math.round(r.mpc2.C)} · ${Math.round(r.mpc1.C)} · ${Math.round(r.const1.C)}</td><td class="num">${r.mpc2.cum.toFixed(1)} µM·d · ${Math.round(r.mpc2.fast)} d</td><td class="num">${r.mpc2.minW.toFixed(3)} · ${r.mpc2.maxTox.toFixed(3)}</td></tr>`).join('');
-  return `<div class="tscroll"><table><tr><th>Run${infoTip(T.run, 'none')}</th><th>MPC schedule (µM; F = fasting)${infoTip(T.sched, 'none')}</th><th>N + C day ${C.days}: fasting MPC · MPC · 1 µM${infoTip(T.tot, 'lower')}</th><th>Resistant C day ${C.days}${infoTip(T.C, 'lower')}</th><th>Dose · fasting days${infoTip(T.dose, 'lower')}</th><th>Min weight · max toxicity${infoTip(T.host, 'Higher weight and lower toxicity are better.')}</th></tr>${rows}</table></div>`;
+  const lab = (u, f) => (f > 0 ? 'F' : '') + u.toFixed(2).replace(/\.?0+$/, '');
+  const compress = r => { const out = []; r.dose.forEach((u, k) => { const l = lab(u, r.fast[k]); const last = out[out.length - 1]; if (last && last.l === l) last.n++; else out.push({ l, n: 1 }); });
+    return out.map(o => (o.l.startsWith('F') ? '<b>F</b>' + o.l.slice(1) : o.l) + (o.n > 1 ? '×' + o.n : '')).join(' '); };
+  const snaps = r => r.snap && r.snap.length ? r.snap : [{ day: C.days, mpc2: r.mpc2, mpc1: r.mpc1, const1: r.const1 }];
+  const rows = C.rows.map(r => snaps(r).map((s, i) => `<tr>${i === 0 ? `<td rowspan="${snaps(r).length}">${esc(r.run)}<div class="muted" style="font-size:12px;max-width:340px">${compress(r)}</div></td>` : ''}<td class="num">${s.day}</td><td class="num">${Math.round(s.mpc2.total)} · ${Math.round(s.mpc1.total)} · ${Math.round(s.const1.total)}</td><td class="num">${Math.round(s.mpc2.C)} · ${Math.round(s.mpc1.C)} · ${Math.round(s.const1.C)}</td>${i === 0 ? `<td class="num" rowspan="${snaps(r).length}">${r.mpc2.cum.toFixed(1)} µM·d · ${Math.round(r.mpc2.fast)} d</td><td class="num" rowspan="${snaps(r).length}">${r.mpc2.minW.toFixed(3)} · ${r.mpc2.maxTox.toFixed(3)}</td>` : ''}</tr>`).join('')).join('');
+  return `<div class="tscroll"><table><tr><th>Run and MPC schedule (µM; F = fasting)${infoTip(T.run + ' ' + T.sched, 'none')}</th><th>Day${infoTip(T.day, 'none')}</th><th>N + C: fasting MPC · MPC · 1 µM${infoTip(T.tot, 'lower')}</th><th>Resistant C${infoTip(T.C, 'lower')}</th><th>Dose · fasting days${infoTip(T.dose, 'lower')}</th><th>Min weight · max toxicity${infoTip(T.host, 'Higher weight and lower toxicity are better.')}</th></tr>${rows}</table></div>`;
 }
 const glanceEq = m => `<div class="glance-eq">${m.tex.map(t => `\\[${t}\\]`).join('')}</div>`;
 // why the rule kept this model: the other candidates within 3 BIC of the lowest, and what beat them
@@ -98,11 +103,11 @@ function render() {
       ${controlTable(window.CONTROL)}
       <p class="note">${esc(window.CONTROL.finding)}</p>
       <div class="links"><a class="btn" href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/control/report.html">Full optimal-control report</a></div></section>` : ''}
-    ${window.CONTROL30 ? `<section class="card" id="control30"><h2>Optimal control over ${window.CONTROL30.days} days: cisplatin and fasting</h2>
-      <p class="muted">MPC chooses both the dose and whether to fast (low resource, 0.5% FBS) at each media change, with a weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days after ${window.CONTROL30.dataDays} are beyond the data, and the fasting effect is the in-vitro effect at full strength (no in-vivo attenuation yet), so it is an upper bound.</p>
-      ${control30Table(window.CONTROL30)}
-      ${window.CONTROL30.caveat ? `<p class="note">${esc(window.CONTROL30.caveat)}</p>` : ''}
-      <div class="links"><a class="btn" href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/control_30d/report.html">Full 30-day report</a></div></section>` : ''}`;
+    ${window.CONTROL_LONG ? `<section class="card" id="control30"><h2>Optimal control over ${window.CONTROL_LONG.days} days: cisplatin and fasting</h2>
+      <p class="muted">MPC chooses both the dose and whether to fast (low resource, 0.5% FBS) at each media change, with a weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days after ${window.CONTROL_LONG.dataDays} are beyond the data, and the fasting effect is the in-vitro effect at full strength (no in-vivo attenuation yet), so it is an upper bound.</p>
+      ${controlLongTable(window.CONTROL_LONG)}
+      ${window.CONTROL_LONG.caveat ? `<p class="note">${esc(window.CONTROL_LONG.caveat)}</p>` : ''}
+      <div class="links"><a class="btn" href="../../Modeling_Approaches/02_mechanical_automatic_package/outputs/control_${window.CONTROL_LONG.days}d/report.html">Full ${window.CONTROL_LONG.days}-day report</a></div></section>` : ''}`;
   typeset(app);
   // re-typeset a candidates table when it is opened, in case it was laid out while collapsed
   app.querySelectorAll('details').forEach(d => d.addEventListener('toggle', () => d.open && typeset(d)));

@@ -76,22 +76,32 @@ end
 function scenario_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox())
     g3 = zgroup("s3"); c3 = g3.cands[1]
     LN, LC = c3.sys.lines
-    draw(gid, i) = (P = ZOO_STATE.results[gid].res.pars[1]; b === nothing ? zgroup(gid).cands[1].params[i] : P[b, i])
+    # a carried parameter of an earlier stage by name ("θ" → θ_N or θ_C), from its fit or bootstrap replicate b;
+    # nothing when the carried model has no such parameter (e.g. h for a linear kill)
+    function draw(gid, sym)
+        c = zgroup(gid).cands[1]; i = findfirst(n -> n in ("$(sym)_N", "$(sym)_C"), c.pnames)
+        i === nothing && return nothing
+        b === nothing ? c.params[i] : ZOO_STATE.results[gid].res.pars[1][b, i]
+    end
+    setdraw!(d, sym, gid) = (v = draw(gid, sym); v === nothing || (d[sym] = v); d)
     fixed_N = Dict{Symbol,Float64}(); fixed_C = Dict{Symbol,Float64}()
     if b !== nothing       # carried parameters from the same bootstrap replicate of their own stage
-        fixed_N[:r] = draw("s1-a2780", 1); fixed_C[:r] = draw("s1-a2780cis", 1); fixed_C[:θ] = draw("s1-a2780cis", 3)
-        fixed_N[:h] = draw("s2-a2780", 2); fixed_N[:k] = draw("s2-a2780", 3)
-        fixed_C[:h] = draw("s2-a2780cis", 2); fixed_C[:k] = draw("s2-a2780cis", 3)
+        setdraw!(fixed_N, :r, "s1-a2780"); setdraw!(fixed_N, :θ, "s1-a2780"); setdraw!(fixed_C, :r, "s1-a2780cis"); setdraw!(fixed_C, :θ, "s1-a2780cis")
+        for s in (:h, :k)
+            setdraw!(fixed_N, s, "s2-a2780"); setdraw!(fixed_C, s, "s2-a2780cis")
+        end
     end
     if scen == :A
         p = b === nothing ? copy(c3.params) : ZOO_STATE.results["s3"].res.pars[1][b, :]
         # an inherited resistant kill follows its own Stage 2 bootstrap draw, as h and k do
-        b !== nothing && LC.s.β.i == 0 && (fixed_C[:β] = draw("s2-a2780cis", 1))
+        b !== nothing && LC.s.β.i == 0 && setdraw!(fixed_C, :β, "s2-a2780cis")
         name = "A: Stage 3 coculture model as selected"
     else
-        ce0 = AN_STATE[:validation].ce1[1].params          # K, α_NC, α_CN, d_N fitted to untreated cocultures
-        p = b === nothing ? copy(ce0) : ZOO_STATE.results["s3"].res.pars[1][b, 1:4] .* (ce0 ./ c3.params[1:4])
-        fixed_N[:β] = draw("s2-a2780", 1); fixed_C[:β] = draw("s2-a2780cis", 1)
+        # crowding (K, α_NC, α_CN and d_N where the model has it) fitted to the untreated cocultures; these
+        # lead the Stage 3 parameter vector (run_heldout.jl checks the same), the kills come from Stage 2
+        ce0 = AN_STATE[:validation].ce1[1].params; n = length(ce0)
+        p = b === nothing ? copy(ce0) : ZOO_STATE.results["s3"].res.pars[1][b, 1:n] .* (ce0 ./ c3.params[1:n])
+        setdraw!(fixed_N, :β, "s2-a2780"); setdraw!(fixed_C, :β, "s2-a2780cis")
         name = "B: monoculture drug response for both lines, crowding from untreated cocultures"
     end
     any(isnan, p) && return nothing

@@ -1,0 +1,2 @@
+fit,optimizer,seconds,limit
+cc_K_alpha_deathN_beta,bfgs,15884.493999958038,300.0

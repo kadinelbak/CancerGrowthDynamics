@@ -35,6 +35,7 @@ end
 struct LineSpec
     ix::Int; other::Int; α::Float64; logistic::Bool; r::Float64; K::Float64; θ::Float64; d::Float64
     mods::Vector{ModSpec}
+    ns::Bool                    # Norton–Simon: drug losses × growth factor (zoo_models.jl growth_factor)
 end
 function line_specs(base::Plant, iε)
     S = base.sys; p = base.p; out = LineSpec[]
@@ -56,7 +57,7 @@ function line_specs(base::Plant, iε)
         end
         m = 3 - j
         push!(out, LineSpec(xi + 1, S.xi[1][m] + 1, sv(S.alpha[l][S.envs[1].lines[m]], p, Float64), L.growth == :logistic,
-                            sv(L.s.r, p, Float64), sv(L.s.K, p, Float64), sv(L.s.θ, p, Float64), sv(L.s.d, p, Float64), mods))
+                            sv(L.s.r, p, Float64), sv(L.s.K, p, Float64), sv(L.s.θ, p, Float64), sv(L.s.d, p, Float64), mods, ns_on(L)))
     end
     out
 end
@@ -144,7 +145,7 @@ function fast_rhs!(du, x, w, FP::FPlant)
     f = εfactor(FP, T(u)); uR = T(U_R) * v
     @inbounds for L in FP.spec
         X = max(x[L.ix], z); crowd = X + L.α * max(x[L.other], z)
-        Keff = T(L.K); loss = T(L.d)
+        Keff = T(L.K); loss = T(L.d); dloss = z                   # dloss: drug-module losses (Norton–Simon scales these)
         for M in L.mods
             ε = M.εj == 0 ? T(M.ε) : 1 + (FP.ε[M.εj] - 1) * f
             wi = (M.input_D ? T(u) : uR) * ε
@@ -157,14 +158,17 @@ function fast_rhs!(du, x, w, FP::FPlant)
                 E = max(x[o+3], z)
             end
             if M.action == :hill
-                loss += E > 0 ? M.β * E^M.h / (T(M.ec50)^M.h + E^M.h) : z
+                lo = E > 0 ? M.β * E^M.h / (T(M.ec50)^M.h + E^M.h) : z
+                M.input_D ? (dloss += lo) : (loss += lo)
             elseif M.action == :capacity
                 Keff /= 1 + M.c * E
             else                                     # :loss
-                loss += M.d0 * wi + M.β * E
+                lo = M.d0 * wi + M.β * E
+                M.input_D ? (dloss += lo) : (loss += lo)
             end
         end
         q = max(crowd / Keff, z)
+        loss += L.ns ? dloss * (L.logistic ? max(1 - q, z) : max(1 - q^L.θ, z)) : dloss
         du[L.ix] = L.r * X * (L.logistic ? 1 - q : 1 - q^L.θ) - loss * X
     end
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
