@@ -33,7 +33,11 @@ const HO_TAGS = dataset_tags(HO["group"])
 const CE0 = [k for (k, s) in enumerate(HO_TAGS) if tag_match(s, HO["train"])]
 const CE1 = [k for (k, s) in enumerate(HO_TAGS) if tag_match(s, HO["predict"])]
 # the refitted parameters must lead the carried model's parameter vector (the kill slots are then fixed)
-const HO_RI = [findfirst(==(n), c3.pnames) for n in HO["refit"]]
+# the listed crowding parameters the carried model has (e.g. a model without sensitive death has no d_N);
+# they must lead its parameter vector, so the kill slots after them can be fixed to the monoculture values
+const HO_NAMES = [n for n in HO["refit"] if n in c3.pnames]
+const HO_RI = [findfirst(==(n), c3.pnames) for n in HO_NAMES]
+isempty(HO_RI) && error("$(c3.name) has none of the validation.toml heldout.refit parameters $(HO["refit"])")
 HO_RI == collect(1:length(HO_RI)) || error("validation.toml heldout.refit must be the first parameters of $(c3.name): $(c3.pnames)")
 function heldout_ce1()
     m = heldout_ce1_model(βN2, βC2)

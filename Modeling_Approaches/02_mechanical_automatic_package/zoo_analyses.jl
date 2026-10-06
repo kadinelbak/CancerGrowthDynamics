@@ -791,7 +791,7 @@ function write_validation()
                              "The untreated (Ce0) cocultures that the crowding terms were fitted to for this validation. Points: data; lines: the fit.", "Better: the lines run through the points.")
                      for (pn, pt) in enumerate(zoo_panels(g3))])
     n1 = nobs(g3.datasets[CE1]); m1 = mean(reduce(vcat, [d.y for d in g3.datasets[CE1]]))
-    ce1rows = vcat([trow([td(hesc(v.variant)), td(join(["$(pl(n)) = $(fmt(x))" for (n, x) in zip(c3.pnames[1:4], v.params)], ", ")),
+    ce1rows = vcat([trow([td(hesc(v.variant)), td(join(["$(pl(n)) = $(fmt(x))" for (n, x) in zip(c3.pnames[HO_RI], v.params)], ", ")),
                         tn(fmt(v.pred.rmse)), tn(@sprintf("%.2f", v.pred.rmse / m1))]; cls=i == 1 ? "win" : "") for (i, v) in enumerate(V.ce1)],
                    [trow([td("In-sample reference: the Stage 3 optimal model fitted with Ce1"), td("—"), tn(fmt(V.ce1_full.rmse)), tn(@sprintf("%.2f", V.ce1_full.rmse / m1))]),
                     trow([td(get(V, :ce1_baseline, "no_change") == "logistic" ? "Untreated-growth reference: the same logistic growth and crowding fitted to Ce0, no drug term" :
