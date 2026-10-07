@@ -11,9 +11,17 @@ using Test
 same_slots(a, b) = all(isequal(getfield(a, k), getfield(b, k)) for k in keys(b))
 same_line(a, b) = all(k in (:s, :extra) || isequal(getfield(a, k), getfield(b, k)) for k in keys(b)) && same_slots(a.s, b.s) && keys(a) == keys(b) &&
                   (!hasproperty(b, :extra) || all(same_line(x, y) for (x, y) in zip(a.extra, b.extra)))
+# starting states agree except where the saved run estimated a starting value (x0est), which the built candidate
+# holds at the nominal seeding; the estimated indices and nominal values must agree too
+function same_u0(c, p)
+    est = hasproperty(p, :x0est) ? p.x0est : Int[]
+    keepi = setdiff(eachindex(p.u0), est)
+    length(c.u0) == length(p.u0) && isequal(c.u0[keepi], p.u0[keepi]) &&
+        (!hasproperty(p, :x0est) || (c.x0est == p.x0est && isequal(c.x0nom, p.x0nom)))
+end
 function same_cand(c, p)
     ok = c.name == p.name && c.label == p.label && c.family == p.family && c.pnames == p.pnames &&
-         isequal(c.bounds, p.bounds) && isequal(c.p0s, p.p0s) && isequal(c.u0, p.u0) &&
+         isequal(c.bounds, p.bounds) && isequal(c.p0s, p.p0s) && same_u0(c, p) &&
          length(c.sys.lines) == length(p.sys.lines) && all(same_line(a, b) for (a, b) in zip(c.sys.lines, p.sys.lines)) &&
          isequal(c.sys.alpha, p.sys.alpha) && isequal(c.sys.envs, p.sys.envs) && c.sys.xi == p.sys.xi && c.sys.hb == p.sys.hb
     for k in (:slots, :fixedcc, :noinput, :crowd, :reskill, :βC2)

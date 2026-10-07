@@ -8,9 +8,12 @@
 #   φ = terminal_factor · [qB(N+C)/K + qR·C/K + qT(T/B_tox)²]
 # Goal (user decision 2026-10-02): low total burden and resistance held back. The burden is linear in
 # the counts (every cell costs the same at any tumour size); qR is the extra cost of a resistant cell.
+# MPC minimises this WEIGHTED cost, not the burden alone, so a fixed policy can end with fewer cells.
 # b_μ is a relaxed logarithmic barrier (Feller & Ebenbauer 2017, IEEE Trans Autom Control 62:1223):
-#   −μ log z for z ≥ δ, and its quadratic continuation below δ, so an infeasible start still has a
-#   finite, steep cost and the optimiser is pushed back inside instead of failing.
+#   −μ log z for z ≥ δ, and its quadratic continuation below δ, so a state beyond the limit has a
+#   finite, steep cost. It is a SOFT constraint (a penalty), not a hard limit: at B_cancer it is the
+#   "soft burden penalty", which every growing normal-medium culture exceeds (counted in the report).
+#   B_cancer_fraction_of_K = 0 (sweep only) removes it: Bc = Inf, so b_μC = −μ log 1 = 0.
 #
 # Continuous mode ("demonstration"): SQP iterations. Each iteration
 #   1. rolls the nonlinear model forward,
@@ -27,18 +30,28 @@
 #
 # Discrete mode ("data-supported"): u restricted to the measured doses; the finite-horizon problem is
 # solved exactly by depth-first search over all dose sequences, sharing rollout prefixes and pruning
-# branches whose partial cost already exceeds the best (every stage cost is ≥ 0).
+# branches whose partial cost already exceeds the best (every stage cost is ≥ 0). The search starts
+# from the cost of the warm-start plan (the previous plan shifted by one interval) and expands the
+# children of each node cheapest-first, so it prunes early; it stays exact.
+#
+# Receding horizon: the look-ahead is FIXED at H decisions, also for the last decisions of a run (the
+# plant is simply simulated past the run's end), so a run's schedule is the first decisions of a
+# continuing policy and does not depend on the run length (no end-of-run effect).
+
+import Random
 
 struct Weights
     qB::Float64; qR::Float64; qT::Float64; ru::Float64; tf::Float64
     μC::Float64; μT::Float64; δ::Float64
     Bc::Float64; Btox::Float64; umax::Float64; K::Float64
 end
-function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]))
+# bc_frac: B_cancer as a fraction of K (0 = no burden penalty); tf: terminal factor (both swept in the report)
+function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]),
+                         bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]))
     c = CFG["weights"]
     qB, qR, qT, ru = w === nothing ? (c["qB"], c["qR"], c["qT"], c["ru"]) : Tuple(w)
-    Weights(qB, qR, qT, ru, c["terminal_factor"], c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
-            CFG["cancer"]["B_cancer_fraction_of_K"] * P.K, Btox, umax, P.K)
+    Weights(qB, qR, qT, ru, tf, c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
+            bc_frac > 0 ? bc_frac * P.K : Inf, Btox, umax, P.K)
 end
 
 # tumour burden plus the resistance premium, linear in the counts (≥ 0, so the exact search can prune)
@@ -63,6 +76,18 @@ function total_cost(x0, U, P::Plant, Δ, W::Weights)
     sum(stage_cost(xs[k+1], U[k], P, W) for k in eachindex(U)) + terminal_cost(xs[end], P, W)
 end
 
+# The stage cost ℓ split into its terms, summed over the intervals of an applied schedule (the terminal
+# cost is a planning device and is left out). Same terms and weights as stage_cost: total = Σ_k ℓ.
+function cost_terms(P::Plant, x0, U, Δ, W::Weights)
+    xs = rollout(x0, U, P, Δ); z = zeros(6)
+    for k in eachindex(U)
+        x = xs[k+1]; N, C, T = x[P.iN], x[P.iC], x[P.iT]
+        z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (U[k] / W.umax)^2,
+               relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ), relaxed_barrier(1 - T / W.Btox, W.μT, W.δ)]
+    end
+    (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6], total=sum(z))
+end
+
 # gradient of J by the adjoint (reverse) recursion over the explicit Jacobians: vector–Jacobian products
 function adjoint_gradient(xs, As, Bs, U, P, W)
     H = length(U)
@@ -75,6 +100,14 @@ function adjoint_gradient(xs, As, Bs, U, P, W)
         k > 1 && (μ = gx(k - 1) .+ As[k]' * μ)                                  # μ_k = ∇ℓ(x_k) + A_kᵀ μ_{k+1}
     end
     g
+end
+# ∇J at a schedule U from x0 (rollout, linearisation, adjoint); used by the optimality test
+function cost_gradient(x0, U, P::Plant, Δ, W::Weights)
+    xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Vector{Float64}[]
+    for k in eachindex(U)
+        xn, A, B = linearize(xs[k], U[k], P, Δ); push!(xs, xn); push!(As, A); push!(Bs, B)
+    end
+    adjoint_gradient(xs, As, Bs, U, P, W)
 end
 
 psd(M) = (E = LA.eigen(LA.Symmetric((M + M') / 2)); E.vectors * LA.Diagonal(max.(E.values, 0.0)) * E.vectors')
@@ -151,55 +184,96 @@ function sqp_solve(x0, U0, P::Plant, Δ, W::Weights; cum=0.0, max_iter=Int(CFG["
     (U=U, J=J, iters=it, history=hist)
 end
 
-# exact search over discrete dose levels (prefix sharing + pruning)
-function discrete_solve(x0, P::Plant, Δ, H, levels, W::Weights; min_gap=0.0, cum=0.0)
-    best = Ref(Inf); bestU = Ref(zeros(H))
+# exact search over discrete dose levels (prefix sharing, warm-start bound, cheapest-first, pruning)
+function discrete_solve(x0, P::Plant, Δ, H, levels, W::Weights; min_gap=0.0, cum=0.0, Uinit=nothing)
+    na = length(levels); best = Ref(Inf); bestU = zeros(H); U = zeros(H)
     gap_steps = ceil(Int, min_gap / Δ - 1e-9)
-    function dfs(x, k, U, cost, last_dose_k, used)
+    allowed(u, k, last, used) = !(u > 0 && gap_steps > 0 && k - last <= gap_steps) && !(cum > 0 && used + u * Δ > cum + 1e-12)
+    if Uinit !== nothing && length(Uinit) >= H           # upper bound from the warm-start plan, if it is admissible
+        x = copy(x0); c = 0.0; last = -10^6; used = 0.0; ok = true
+        for k in 1:H
+            u = Uinit[k]
+            (any(==(u), levels) && allowed(u, k, last, used)) || (ok = false; break)
+            x = F(x, u, P, Δ); c += stage_cost(x, u, P, W)
+            u > 0 && (last = k); used += u * Δ
+        end
+        ok && (best[] = c + terminal_cost(x, P, W); bestU .= Uinit[1:H])
+    end
+    X = [Vector{Vector{Float64}}(undef, na) for _ in 1:H]; cst = [zeros(na) for _ in 1:H]; ord = [collect(1:na) for _ in 1:H]
+    function dfs(x, k, cost, last, used)
         if k > H
             c = cost + terminal_cost(x, P, W)
-            c < best[] && (best[] = c; bestU[] = copy(U))
+            c < best[] && (best[] = c; bestU .= U)
             return
         end
-        for u in levels
-            u > 0 && gap_steps > 0 && k - last_dose_k <= gap_steps && continue
-            (cum > 0 && used + u * Δ > cum + 1e-12) && continue
-            xn = F(x, u, P, Δ)
-            c = cost + stage_cost(xn, u, P, W)
-            c >= best[] && continue
-            U[k] = u
-            dfs(xn, k + 1, U, c, u > 0 ? k : last_dose_k, used + u * Δ)
+        for a in 1:na
+            u = levels[a]
+            if allowed(u, k, last, used)
+                X[k][a] = F(x, u, P, Δ); cst[k][a] = cost + stage_cost(X[k][a], u, P, W)
+            else
+                cst[k][a] = Inf
+            end
+        end
+        sortperm!(ord[k], cst[k])
+        for a in ord[k]
+            cst[k][a] >= best[] && break
+            u = levels[a]; U[k] = u
+            dfs(X[k][a], k + 1, cst[k][a], u > 0 ? k : last, used + u * Δ)
         end
     end
-    dfs(copy(x0), 1, zeros(H), 0.0, -10^6, 0.0)
-    (U=bestU[], J=best[])
+    dfs(copy(x0), 1, 0.0, -10^6, 0.0)
+    (U=copy(bestU), J=best[])
 end
 
-# receding-horizon closed loop on the plant Pp, planning with Pm (the same model unless testing mismatch)
+# ── closed loop ──────────────────────────────────────────────────────────────
+# Measurement noise of the cell counts for bootstrap draw b: n×2 multiplicative factors (N, C), log-normal
+# with mean 1 and coefficient of variation cv (control_config.toml [observation]). The seed depends on b
+# only, so every policy simulated on draw b sees the same noise (paired comparisons).
+function obs_noise(b, n; cv=Float64(CFG["observation"]["count_cv"]), seed=Int(CFG["observation"]["noise_seed"]))
+    cv <= 0 && return ones(n, 2)
+    σ = sqrt(log(1 + cv^2)); rng = Random.Xoshiro(seed + b)
+    exp.(σ .* randn(rng, n, 2) .- σ^2 / 2)
+end
+# What the planner knows at decision k: its own model state xm (hidden states simulated under the applied
+# inputs) with the cell counts replaced by the plant's counts × noise (exact counts when noise === nothing)
+function observe!(xm, x, Pm, Pp, noise, k)
+    xm[Pm.iN] = x[Pp.iN] * (noise === nothing ? 1.0 : noise[k, 1])
+    xm[Pm.iC] = x[Pp.iC] * (noise === nothing ? 1.0 : noise[k, 2])
+    xm
+end
+
+# Receding-horizon closed loop on the plant Pp, planning with Pm (the same model unless testing mismatch).
+# The planner observes only N and C (observe!); the drug-effect chains, B and T are reconstructed by
+# simulating Pm under the applied doses, as they are driven by the input alone. With Pm = Pp and no noise
+# the reconstruction is exact, so the nominal closed loop equals replaying its own schedule (tested).
+# Fixed look-ahead H at every decision (shrink=true: the old horizon that ends with the run; comparison only).
 function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:continuous, levels=Float64[],
-                     shrink=true, cum=0.0, min_gap=0.0, u_init=0.5)
-    x = copy(x0); applied = Float64[]; Uwarm = fill(min(u_init, W.umax), H); used = 0.0; iters = Int[]
+                     shrink=false, cum=0.0, min_gap=0.0, u_init=0.5, noise=nothing)
+    x = copy(x0); xm = copy(x0); applied = Float64[]; Uwarm = fill(min(u_init, W.umax), H); used = 0.0; iters = Int[]
     for k in 1:n_dec
+        observe!(xm, x, Pm, Pp, noise, k)
         Hk = shrink ? min(H, n_dec - k + 1) : H
         rem = cum > 0 ? max(cum - used, 0.0) : 0.0
         if mode == :continuous
-            sol = sqp_solve(x, Uwarm[1:Hk], Pm, Δ, W; cum=cum > 0 ? max(rem, 1e-9) : 0.0)
+            sol = sqp_solve(xm, Uwarm[1:Hk], Pm, Δ, W; cum=cum > 0 ? max(rem, 1e-9) : 0.0)
             push!(iters, sol.iters)
         else
-            sol = discrete_solve(x, Pm, Δ, Hk, levels, W; min_gap=min_gap, cum=cum > 0 ? rem : 0.0)
+            sol = discrete_solve(xm, Pm, Δ, Hk, levels, W; min_gap=min_gap, cum=cum > 0 ? rem : 0.0, Uinit=Uwarm[1:Hk])
         end
         u = sol.U[1]; push!(applied, u); used += u * Δ
-        x = F(x, u, Pp, Δ)
+        x = F(x, u, Pp, Δ); xm = F(xm, u, Pm, Δ)
         Uwarm = vcat(sol.U[2:end], fill(sol.U[end], H - Hk + 1))[1:H]
     end
-    (U=applied, iters=iters)
+    (U=applied, iters=iters, x=x)
 end
 
 # ── baseline policies (state feedback at decision times) ────────────────────
-function run_policy(policy, P::Plant, x0, Δ, n_dec)
-    x = copy(x0); U = Float64[]; on = true
+# noise: the same measurement noise as the closed-loop MPC (the policy sees N, C × noise[k, :])
+function run_policy(policy, P::Plant, x0, Δ, n_dec; noise=nothing)
+    x = copy(x0); U = Float64[]
     for k in 1:n_dec
-        u = policy(x, k)
+        xo = noise === nothing ? x : (y = copy(x); y[P.iN] *= noise[k, 1]; y[P.iC] *= noise[k, 2]; y)
+        u = policy(xo, k)
         push!(U, u); x = F(x, u, P, Δ)
     end
     U
@@ -224,12 +298,13 @@ baseline_policies(P::Plant, W::Weights) = [
     ("Threshold adaptive (Zhang-style)", threshold_policy(P, W)),
 ]
 
-# biologically interpretable outcomes of a schedule
+# biologically interpretable outcomes of a schedule; days_over = days with N + C at or above B_cancer
 function outcomes(P::Plant, x0, U, Δ, W::Weights)
     ts, xs = trajectory(x0, U, P, Δ)
     N = [x[P.iN] for x in xs]; C = [x[P.iC] for x in xs]; T = [x[P.iT] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
+    days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      max_total=maximum(tot), max_tox=maximum(T), cum_dose=sum(U) * Δ, cancer_violation=over !== nothing,
-     tox_violation=maximum(T) >= W.Btox, day_over_bound=over === nothing ? NaN : ts[over], ts=ts, N=N, C=C, T=T)
+     tox_violation=maximum(T) >= W.Btox, day_over_bound=over === nothing ? NaN : ts[over], days_over=days_over, ts=ts, N=N, C=C, T=T)
 end

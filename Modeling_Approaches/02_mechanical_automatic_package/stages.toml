@@ -29,9 +29,15 @@ ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-1
 
 [selection]
 rule_bic = 3.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC)
-# SD-weighted residuals (user, 2026-10-06): the replicate SD grows with the count, so raw squared error let the
-# large late counts dominate; weighting improved the held-out treated-coculture prediction (sensitivity variants V5, V6).
-residual_weighting = "sd"
+# Residual weights (review, 2026-10-07): one pooled variance model for every series, scale = max(y, 50)^0.55
+# (the log-log slope of replicate SD against the mean count over all series; 50 cells = a noise floor). This
+# replaces the per-point 3-well SDs, which have 2 degrees of freedom each and, with per-series floors, made
+# weights between series differ up to 3500-fold. Raw squared error would let the large late counts dominate.
+residual_weighting = "power"
+weight_power = 0.55
+# Bootstrap replicates are generated from the carried model, so its intervals are centred on its estimates;
+# replicates from the most complex candidate biased the selection frequencies against simpler models.
+bootstrap_generator = "selected"
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
@@ -104,9 +110,11 @@ line = "coculture"
 data = { culture = "co", condition = ["Ce0", "Ce1"] }
 input = "D"
 inherits = { growth = "s1", mechanism = "s2" }
-# Cisplatin kills A2780cis in monoculture, so a refitted resistant kill β_C is bounded below by this
-# fraction of its Stage 2b value: it may weaken in coculture but never switch off (user, 2026-10-01).
-betaC_floor = 0.5
+# The resistant kill β_C may be refitted down to 0, and the "no resistant cisplatin term" candidates
+# (fixed βC = 0) compete under the selection rule (user, 2026-10-06; replaces the 2026-10-01 floor of
+# 0.5 × Stage 2b). Every sensitivity variant put β_C on whatever floor it had. In monoculture (Stage 2b)
+# the A2780cis kill stays: dropping it costs +59 weighted BIC there.
+betaC_floor = 0.0
   [[stage.candidate]]
   name = "cc_K"
   label = "Shared K, one-for-one crowding, drug mechanisms from Stage 2"
@@ -121,7 +129,7 @@ betaC_floor = 0.5
   free = ["K", "αNC", "αCN", "βN"]
   [[stage.candidate]]
   name = "cc_K_alpha_beta"
-  label = "Shared K + crowding, both kill strengths refitted (resistant ≥ 50% of Stage 2)"
+  label = "Shared K + crowding, both kill strengths refitted (resistant kill may reach 0)"
   free = ["K", "αNC", "αCN", "βN", "βC"]
   [[stage.candidate]]
   name = "cc_K_alpha_death"
@@ -133,12 +141,33 @@ betaC_floor = 0.5
   free = ["K", "αNC", "αCN", "dN", "βN"]
   [[stage.candidate]]
   name = "cc_K_alpha_deathN_beta"
-  label = "Shared K + crowding + sensitive death, both kill strengths refitted (resistant ≥ 50% of Stage 2)"
+  label = "Shared K + crowding + sensitive death, both kill strengths refitted (resistant kill may reach 0)"
   free = ["K", "αNC", "αCN", "dN", "βN", "βC"]
   [[stage.candidate]]
   name = "cc_full"
-  label = "Shared K + crowding + death, both kill strengths refitted (resistant ≥ 50% of Stage 2)"
+  label = "Shared K + crowding + death, both kill strengths refitted (resistant kill may reach 0)"
   free = ["K", "αNC", "αCN", "dN", "dC", "βN", "βC"]
+
+  [[stage.candidate]]
+  name = "cc_K_alpha_betaN_noC"
+  label = "Shared K + crowding, sensitive kill refitted, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN", "βN"]
+  fixed = { "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_noC"
+  label = "Shared K + crowding, sensitive kill from Stage 2, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN"]
+  fixed = { "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_deathN_betaN_noC"
+  label = "Shared K + crowding + sensitive death, sensitive kill refitted, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN", "dN", "βN"]
+  fixed = { "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_full_noC"
+  label = "Shared K + crowding + death, sensitive kill refitted, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN", "dN", "dC", "βN"]
+  fixed = { "βC" = 0.0 }
 
 # ── 3b · low-resource cocultures, shared K ───────────────────────────────────
 [[stage]]

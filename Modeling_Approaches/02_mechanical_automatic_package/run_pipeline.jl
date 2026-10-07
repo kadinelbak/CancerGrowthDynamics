@@ -40,11 +40,12 @@ const STEPS = [
     ("data",       "tidy data table from the raw sources",                  PKG,  ["data/build_tidy.jl"],             false, Dict{String,String}()),
     ("checks",     "the tidy table reproduces the source files", PKG, ["test/test_data.jl"],             false, Dict{String,String}()),
     ("fits",       "staged model-zoo fits and bootstrap",                   PKG,  ["run_zoo_fits.jl"],                true,  RESUME ? Dict("ZOO_RESUME" => "1", "ZOO_REUSE_BOOT" => "1") : Dict{String,String}()),
-    ("analyses",   "bootstrap comparison, sensitivity, validation",         PKG,  ["zoo_analyses.jl"],                true,  Dict{String,String}()),
+    ("analyses",   "bootstrap comparison, sensitivity, validation",         PKG,  ["zoo_analyses.jl"],                true,  redo),     # a full run recomputes every analysis (its cache only tracks the carried models)
     ("control14",  "14-day optimal control (dose)",                         PKG,  ["run_control.jl"],                 true,  redo),
     ("report14",   "14-day control report",                                 PKG,  ["control_report.jl"],              false, Dict{String,String}()),
     ("control_long", "long optimal control, dose + fasting (control_config long_days)", PKG, ["run_control_fasting.jl"], true, redo),
     ("report_long",  "long control report",                                 PKG,  ["control_fasting_report.jl"],      false, Dict{String,String}()),
+    ("findings",   "key findings, assumptions register and limitations",   PKG,  ["build_findings_report.jl"],       false, Dict{String,String}()),
     ("tests",      "control, stage and validation tests on the new results", PKG, ["test/run_tests.jl"],              true,  Dict{String,String}()),
     ("final",      "Final Report (all chapters)",                           ROOT, ["build_final_report.jl"],          false, Dict{String,String}()),
 ]
@@ -105,13 +106,18 @@ for (name, what, dir, script, threaded, env) in STEPS
     cmd = `$JL --startup-file=no $(threaded ? ["-t", string(THREADS)] : String[]) --project=$PKG $script`
     cmd = setenv(Cmd(cmd; dir=dir), merge(Dict(ENV), env))
     t0 = time(); println("\n[$(Dates.format(now(), "HH:MM"))] $name: $what  (log: outputs/logs/$name.log)"); flush(stdout)
+    # one handle for both streams (two handles on the same path overwrite each other's output)
     ok = try
-        run(pipeline(cmd; stdout=log, stderr=log)); true
+        open(log, "w") do io
+            run(pipeline(cmd; stdout=io, stderr=io))
+        end; true
     catch
         false
     end
+    # the code version of every step, so a run continued with --from / --only records what produced each output
     manifest["steps"][name] = Dict("ok" => ok, "seconds" => round(time() - t0; digits=1), "log" => "outputs/logs/$name.log",
-                                   "env" => env, "finished" => string(now()))
+                                   "env" => env, "finished" => string(now()), "commit" => git("rev-parse", "HEAD"),
+                                   "uncommitted_changes" => !isempty(git("status", "--porcelain")))
     name == "data" && (manifest["data_sha256"] = data_files())
     if name == "fits" && ok      # fits that reached their safety time limit (0 = the run is reproducible)
         f = joinpath(PKG, "outputs", "zoo_fits", "time_limit_hits.csv")

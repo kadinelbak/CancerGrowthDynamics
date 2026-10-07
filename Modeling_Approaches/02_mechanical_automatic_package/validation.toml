@@ -1,13 +1,15 @@
 # Validation run by zoo_analyses.jl: which data are held out and how they are predicted.
 # Groups are fitted groups of the zoo (stages.toml ids: s2-a2780, s3, …); tags are those of
-# data/sources.toml. Each check refits the group's carried model without the held-out data and
-# predicts them.
+# data/sources.toml. Each check refits the group's carried model without the held-out data (with the
+# same residual weights as the carried fits) and predicts them; held-out series start from the nominal
+# seeding where the full fit had estimated their starting value.
 
 [forecast]
 # every group: refit on the first fit_fraction of its days, predict the rest
 fit_fraction = 0.7
 
-# leave one block out: one value of a tag at a time (GrowthParameterEstimation.blocked_joint_validation)
+# leave one block out: one value of a tag at a time (the scheme of GrowthParameterEstimation.
+# blocked_joint_validation, run in zoo_analyses.jl with the run's residual weights)
 [[leave_out]]
 group = "s2-a2780"
 tag = "schedule"            # one dose at a time
@@ -33,8 +35,10 @@ group = "s3b"
 tag = "ratio"
 scheme = "leave one ratio out"
 
-# a held-out condition: the group's crowding is refitted on `train` only, with the drug response
-# taken from the monoculture fits (drug_from), and `predict` is predicted with no refit
+# a held-out condition: the group's crowding is refitted (with the run's residual weights) on `train`
+# only, with the drug response taken from the monoculture fits (drug_from), and `predict` is predicted
+# with no refit, from the nominal seeding. Not fully independent: Ce1 was used to choose the weighting
+# scheme and the drug model (variant comparison), which the Validation page states.
 [heldout]
 group = "s3"
 train = { condition = "Ce0" }
@@ -45,10 +49,14 @@ drug_from = "s2"
 # untreated logistic law, shared K), with no drug term (user, 2026-10-01: "normal logistic")
 baseline = "logistic"
 
-# a dose schedule the models never saw: the carried drug stage predicts it with no refit
+# a dose schedule the models never saw (the untouched validation set): the carried drug stage predicts
+# it with no refit and no free scale, from the nominal seeding at day 0
 [schedule_prediction]
 data = { condition = "intermittent" }
 model_from = "s2"
 schedules = { onoff = "on0_off7", offon = "off0_on7" }
-scale = "free"              # one scale per trajectory (image area normalised to cell size)
-washout_test = true         # test a separate clearance rate of the effect compartment after removal
+scale = 1.0                 # fixed: the values are image areas already normalised to cell size (≈ cell counts)
+nominal_count = 100.0       # starting count at day 0 for a monoculture seeded at nominal_seeding cells
+nominal_seeding = 30000     # (start = nominal_count × seeding / nominal_seeding × line share of the ratio)
+washout_test = true         # hypothesis test (not validation): a separate clearance rate k_off of the
+                            # effect compartment after removal, fitted to these data, kept only by the 3-BIC rule

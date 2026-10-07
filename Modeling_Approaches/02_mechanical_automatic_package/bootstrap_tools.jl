@@ -19,13 +19,13 @@ function bs_predict(model, u0, p, datasets)
     [[sol(xi)[d.state_index] for xi in d.x] for d in datasets]
 end
 
-# circular moving-block resample of the residuals for days after day 0; with per-point scales w
-# the standardised residuals e/w are resampled and rescaled by the scale of the point they land on
+# circular moving-block resample of the residuals (every fitted point: day 0, the seeding, is not in the
+# data); with per-point scales w the standardised residuals e/w are resampled and rescaled by the scale of
+# the point they land on
 function bs_resample(rng, yhat, e, w=nothing)
-    n = length(e)
-    n <= 1 && return copy(yhat)
-    z = w === nothing ? e : e ./ w
-    pool = z[2:end]; m = length(pool)
+    m = length(e)
+    m <= 1 && return copy(yhat)
+    pool = w === nothing ? e : e ./ w
     out = Float64[]
     while length(out) < m
         s = rand(rng, 1:m)
@@ -33,32 +33,64 @@ function bs_resample(rng, yhat, e, w=nothing)
             push!(out, pool[mod1(s + k, m)])
         end
     end
-    w === nothing ? vcat(yhat[1] + e[1], max.(yhat[2:end] .+ out[1:m], 0.0)) :
-                    vcat(yhat[1] + e[1], max.(yhat[2:end] .+ w[2:end] .* out[1:m], 0.0))
+    w === nothing ? max.(yhat .+ out[1:m], 0.0) : max.(yhat .+ w .* out[1:m], 0.0)
 end
 
-# Reproducibility: every optimiser call stops on its iteration cap; the wall-clock limit is only a
-# safety net (without it the bounded BFGS can run for a very long time on a few candidates). Measured
-# 2026-10-02 on 20 threads: no primary fit came near it, so the fits are deterministic. A call that
-# reaches 95% of its limit may depend on the machine; it is recorded in LIMIT_HITS and run_zoo_fits.jl
-# writes the list to outputs/zoo_fits/time_limit_hits.csv.
+# Reproducibility: every optimiser call stops on its iteration cap only (BFGS 1500, Nelder–Mead 2500); there
+# is no wall-clock limit, so a fit does not depend on machine load, threads or sleep (review, 2026-10-07: the
+# earlier 120 s / 300 s limits were hit 83 times). LIMIT_HITS stays empty and is kept for the CSV it feeds.
 const LIMIT_HITS = NamedTuple[]
-const LIMIT_LOCK = ReentrantLock()
-function bs_fit(model, datasets, u0, p_start, bounds; maxtime=120.0, tag="")
+# u0_builder (optional): the starting state as a function of the parameter vector (estimated starting values)
+function bs_fit(model, datasets, u0, p_start, bounds; tag="", u0_builder=nothing)
     p0 = [clamp(p, lo + 1e-4*(hi - lo), hi - 1e-4*(hi - lo)) for (p, (lo, hi)) in zip(p_start, bounds)]
     best = (params=fill(NaN, length(p0)), bic=Inf, sse=Inf)
     for opt in (:bfgs, :nelder_mead)
-        t0 = time()
         try
             r = run_joint_fit(model, gpe_datasets(datasets), u0, isfinite(best.bic) ? best.params : p0; bounds=bounds, optimizer=opt,
-                              maxiters = opt == :bfgs ? 1500 : 2500, maxtime=maxtime, reltol=1e-7, abstol=1e-7)
+                              maxiters = opt == :bfgs ? 1500 : 2500, reltol=1e-7, abstol=1e-7, u0_builder=u0_builder,
+                              initial_time=0.0)   # u0 is the state at day 0 (the seeding), not at the first data point
             isfinite(r.bic) && r.bic < best.bic && (best = (params=r.params, bic=r.bic, sse=r.sse))
         catch
         end
-        dt = time() - t0
-        dt >= 0.95 * maxtime && lock(() -> push!(LIMIT_HITS, (fit=tag, optimizer=opt, seconds=dt, limit=maxtime)), LIMIT_LOCK)
     end
     best
+end
+
+# Starting-value fields of a candidate (zoo_data.jl x0_info): x0nom = the nominal seeding of every observed
+# state (in sys_obs order), x0est = the u0 indices whose starting value is estimated, with bounds and starts
+function x0_fields(sys, infos)
+    obs = sys_obs(sys)
+    length(infos) == length(obs) || error("one starting-value record per observed state expected")
+    e = [i for i in eachindex(infos) if infos[i].est]
+    (x0nom=[x.nom for x in infos], x0est=obs[e], x0bounds=[(infos[i].lo, infos[i].hi) for i in e], x0start=[infos[i].start for i in e])
+end
+
+# Fit one candidate from each of its starts and polish the best. Estimated starting values (x0est) are extra
+# parameters after the model parameters, counted in the BIC; the fitted starting state is stored as u0 and
+# `params` holds the model parameters only, so every later use (bootstrap, analyses, control) is unchanged.
+function fit_cand(c, datasets)
+    np = length(c.pnames); est = hasproperty(c, :x0est) ? c.x0est : Int[]; nx = length(est)
+    builder = nx == 0 ? nothing : (p -> (u = Vector{eltype(p)}(c.u0); u[est] .= p[np+1:end]; u))
+    if np + nx == 0
+        f = predict_candidate(c.name, c.label, c.model, datasets, c.u0)
+        return merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[], x0fit=Float64[]))
+    end
+    bounds = vcat(c.bounds, nx == 0 ? Tuple{Float64,Float64}[] : c.x0bounds)
+    starts = np == 0 ? [Float64[]] : c.p0s
+    best = (params=fill(NaN, np + nx), bic=Inf, sse=Inf)
+    for p0 in starts
+        f = bs_fit(c.model, datasets, c.u0, vcat(p0, nx == 0 ? Float64[] : c.x0start), bounds; tag=c.name, u0_builder=builder)
+        f.bic < best.bic && (best = f)
+    end
+    if isfinite(best.bic)
+        f = bs_fit(c.model, datasets, c.u0, best.params, bounds; tag=c.name, u0_builder=builder)
+        f.bic < best.bic && (best = f)
+    end
+    isfinite(best.bic) || return merge(c, (params=fill(NaN, np), bic=Inf, sse=Inf, se=fill(NaN, np), x0fit=fill(NaN, nx)))
+    u0 = builder === nothing ? c.u0 : Float64.(builder(best.params))
+    pm = best.params[1:np]
+    se = np == 0 ? Float64[] : (try param_se(c.model, datasets, u0, pm) catch; fill(NaN, np) end)
+    merge(c, (params=pm, bic=best.bic, sse=best.sse, se=se, u0=u0, x0fit=best.params[np+1:end]))
 end
 
 function choose(bics, ks)

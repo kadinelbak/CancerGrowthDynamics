@@ -4,25 +4,29 @@
 #   DATA        from the fitted models or the experimental design
 #   LITERATURE  taken from a cited model of the same kind
 #   ASSUMPTION  exploratory; not measured in these experiments. Swept in the report, never trusted alone.
+#               Numerical and reporting settings are labelled ASSUMPTION too (they are choices, not data).
 # Replace ASSUMPTION values with measurements when they exist.
 
 [schedule]
 decision_interval_days = 2.0     # DATA: media are changed about every 2 days, so a new dose can start at each change
-horizon_days = 14.0              # DATA: the experiments run 14 days
+horizon_days = 14.0              # DATA: the experiments run 14 days; also the look-ahead of every decision
 closed_loop_days = 14.0          # DATA: closed-loop simulations cover the experimental window
 extrapolation_days = 28.0        # ASSUMPTION: longer runs extrapolate beyond the data (flagged in the report)
 long_days = 120.0                # ASSUMPTION: the long dose + fasting run (run_control_fasting.jl) lasts this long; days after 14 are beyond the data
-snapshot_days = [14.0, 30.0, 60.0, 120.0]   # the long run is read off at these days (one continuing policy, not separate runs)
+snapshot_days = [14.0, 30.0, 60.0, 120.0]   # ASSUMPTION (reporting choice): the long run is read off at these days (one continuing policy, not separate runs)
 data_days = 14.0                 # DATA: the last measured day; marked on the long report's time plots
-rk4_step_days = 0.05             # numerical: fixed RK4 step for F(x, u); checked against Tsit5 in test/test_control.jl
+rk4_step_days = 0.05             # ASSUMPTION (numerical setting): fixed RK4 step for F(x, u); checked against Tsit5 in test/test_control.jl and by the step sweep in the report
+# The look-ahead is FIXED: every decision, including the last ones of a run, plans horizon_days ahead
+# (past the end of the run if need be). A run's schedule is therefore the first decisions of a
+# continuing policy, and runs of different lengths make the same decisions (no end-of-run effect).
 
 [dose]
-units = "µM cisplatin in the medium"
+units = "µM cisplatin in the medium"   # DATA: the experimental dose unit
 u_max_data = 1.47                # DATA: highest dose with measurements (Stage 2 monoculture, IC25 file)
 levels_data = [0.0, 0.62, 1.0, 1.47]   # DATA: every dose that was measured
-u_max_demo = 3.0                 # ASSUMPTION: demonstration mode only; above 1.47 µM the Hill curve is extrapolated
-cumulative_max_uM_days = 0.0     # optional budget on ∫u dt; 0 = no budget
-min_gap_days = 0.0               # optional minimum time between dosing intervals (discrete mode); 0 = none
+u_max_demo = 3.0                 # ASSUMPTION: demonstration mode only; above 1.47 µM the fitted dose response is extrapolated
+cumulative_max_uM_days = 0.0     # ASSUMPTION: optional budget on ∫u dt; 0 = no budget (none is used)
+min_gap_days = 0.0               # ASSUMPTION: optional minimum time between dosing intervals (discrete mode); 0 = none (none is used)
 
 [toxicity]
 # Host-tissue toxicity, following the normal-cell compartment of de Pillis & Radunskaya (2001,
@@ -41,38 +45,65 @@ B_tox = 0.25                     # LITERATURE: normal cells kept ≥ 75% of capa
 # sweeps reported in the robustness section
 r_H_sweep = [1.0, 0.5, 0.2]      # ASSUMPTION: 0.2 /day ~ a 5-day recovery, the order of the maturation time in Friberg et al. 2002 (J Clin Oncol 20:4713)
 s_B_sweep = [1.0, 2.0, 4.0]      # ASSUMPTION: stronger mappings of medium µM to systemic burden
-B_tox_sweep = [0.15, 0.25, 0.30]
+B_tox_sweep = [0.15, 0.25, 0.30] # ASSUMPTION: stricter and looser healthy-tissue limits around the literature value
 
 [cancer]
-B_cancer_fraction_of_K = 0.8     # ASSUMPTION: total N + C must stay below 80% of the fitted shared capacity K
+# B_cancer is a SOFT burden penalty, not a hard limit: a relaxed log barrier (Feller & Ebenbauer 2017,
+# IEEE Trans Autom Control 62:1223) that rises as N + C nears B_cancer and continues above it as a steep
+# quadratic penalty. Relaxed barriers are by construction a soft-constraint (penalty) formulation, and in
+# cancer optimal control a tumour-burden limit is usually a penalised state constraint or a progression
+# threshold (e.g. adaptive-therapy thresholds set relative to the burden, Zhang et al. 2017, Nat Commun
+# 8:1816), not a hard bound. In normal medium every policy that lets the culture grow exceeds it; the
+# report counts how often and for how long, and sweeps B_cancer and the terminal weight.
+B_cancer_fraction_of_K = 0.8     # ASSUMPTION: the burden penalty rises steeply from 80% of the fitted shared capacity K
+B_cancer_sweep = [0.8, 0.9, 1.0, 0.0]    # ASSUMPTION: sensitivity of the 50:50 MPC; 0 = no burden penalty at all
+terminal_factor_sweep = [1.0, 5.0, 10.0] # ASSUMPTION: sensitivity of the 50:50 MPC to the terminal weight
+
+[initial]
+# Starting state of every control run: the nominal seeding of the coculture experiments (100 cells in
+# total, in Mean Cells units, split by the seeding ratio: 25:75 -> N = 25, C = 75), not a measured
+# day-0 value. The drug, stress and host states start at 0 (body weight W at 1).
+seeding_total = 100.0            # DATA: experimental design (seeding density)
+
+[observation]
+# Closed-loop robustness runs: the controller sees only the cell counts N and C, with multiplicative
+# log-normal measurement noise (mean 1), and reconstructs every hidden state (drug-effect and stress
+# chains, B, T, P, W) by simulating its own model under the doses (and fasting) it has applied.
+count_cv = 0.10                  # ASSUMPTION: coefficient of variation of a measured cell count
+noise_seed = 20261006            # ASSUMPTION (reproducibility): draw b uses seed noise_seed + b, shared by every policy (paired draws)
+
+[robustness]
+open_loop_draws = 200            # ASSUMPTION (runtime): bootstrap parameter sets on which every fixed schedule is replayed
+closed_loop_draws = 40           # ASSUMPTION (runtime): bootstrap sets with closed-loop MPC; the paired comparison uses these same draws for every policy
 
 [weights]
 # Control goal (user decision 2026-10-02): keep the total tumour burden low AND hold resistance back.
-#   ℓ = qB·(N + C)/K + qR·C/K + qT·(T/B_tox)² + ru·(u/u_max)² + barriers;  terminal ×terminal_factor
+#   ℓ = qB·(N + C)/K + qR·C/K + qT·(T/B_tox)² + ru·(u/u_max)² + soft penalties;  terminal ×terminal_factor
 # The burden terms are LINEAR in the cell counts: every cell costs the same however large the tumour is
 # (a squared term made a cell in a small low-resource culture almost free, so the drug never paid off there).
 # qR is the extra cost of a resistant cell: with qR = 1 a resistant cell counts as two cells, because
-# further cisplatin cannot remove it. The hard limit on the total burden is the cancer barrier (B_cancer).
+# further cisplatin cannot remove it. On top: a soft burden penalty (relaxed barrier above B_cancer) and
+# a relaxed barrier at the toxicity limit B_tox.
 qB = 1.0                         # ASSUMPTION: weight of the total burden (N + C)/K
 qR = 1.0                         # ASSUMPTION: resistance premium; a resistant cell counts as (qB + qR)/qB cells; swept 0 / 1 / 3
-qT = 1.0
-ru = 0.1
-terminal_factor = 5.0
-mu_cancer = 0.05                 # barrier weights μ (relaxed log barriers)
-mu_tox = 0.05
-barrier_delta = 0.02             # relaxed-barrier switch point (Feller & Ebenbauer 2017): quadratic below z = δ
-# weight sets for the sensitivity sweep: [qB, qR, qT, ru]
-sweep = [[1.0, 1.0, 1.0, 0.1], [1.0, 0.0, 1.0, 0.1], [1.0, 3.0, 1.0, 0.1], [3.0, 1.0, 1.0, 0.1], [1.0, 1.0, 3.0, 0.1], [1.0, 1.0, 1.0, 1.0]]
+qT = 1.0                         # ASSUMPTION: weight of toxicity (T/B_tox)²; swept 1 / 3
+ru = 0.1                         # ASSUMPTION: weight of the dose (u/u_max)², a small cost of drug use; swept 0.1 / 1
+terminal_factor = 5.0            # ASSUMPTION: terminal cost = this × (burden + resistance + toxicity terms) at the end of the look-ahead; swept 1 / 5 / 10
+mu_cancer = 0.05                 # ASSUMPTION: weight μ of the soft burden penalty (relaxed log barrier at B_cancer)
+mu_tox = 0.05                    # ASSUMPTION: weight μ of the relaxed log barrier at B_tox
+barrier_delta = 0.02             # ASSUMPTION: relaxed-barrier switch point δ (Feller & Ebenbauer 2017): quadratic penalty below z = δ
+sweep = [[1.0, 1.0, 1.0, 0.1], [1.0, 0.0, 1.0, 0.1], [1.0, 3.0, 1.0, 0.1], [3.0, 1.0, 1.0, 0.1], [1.0, 1.0, 3.0, 0.1], [1.0, 1.0, 1.0, 1.0]]   # ASSUMPTION: weight sets [qB, qR, qT, ru] for the sensitivity sweep
 
 [sqp]
-max_iter = 40
-tol = 1e-7
+max_iter = 40                    # ASSUMPTION (numerical setting)
+tol = 1e-7                       # ASSUMPTION (numerical setting): relative change of the cost at which SQP stops
 
 [fasting]
 # Low resource as a second control input v (1 = the interval is run at 0.5% FBS / "fasting", 0 = fed, 10% FBS).
 # The cancer-cell effect of v is the fitted in-vitro low-resource effect at full strength: u_R = 0.955·v.
 # NO in-vivo attenuation is applied yet (planned as a future piece): serum starvation in vitro is far
 # stronger than any fast a patient can do, so the tumour-side benefit of fasting here is an upper bound.
+# Days are in-vitro culture days, not patient days.
 levels = [0.0, 1.0]              # DATA: the two measured media (10% and 0.5% FBS)
 max_consecutive_intervals = 1    # LITERATURE-informed: one 2-day interval = a 48-h fast; fasts of 24–72 h around platinum chemotherapy were feasible (Dorff et al. 2016, BMC Cancer 16:360)
 min_gap_intervals = 1            # ASSUMPTION: at least one fed interval (2 days of refeeding) between fasts
@@ -82,16 +113,16 @@ rv = 0.05                        # ASSUMPTION: cost weight of a fasting interval
 # reproduces both exactly and interpolates linearly in the dose between them, capped at the Stage 4
 # value above 1 µM:  ε_X(u) = 1 + (ε_X^S4 − 1)·min(u / u_ref, 1).
 eps_u_ref = 1.0                  # DATA: the Stage 4 dose (µM)
-eps_mode = "interp"              # "interp" (above) or "stage4" (ε = ε^S4 whatever the dose; swept in the report)
+eps_mode = "interp"              # ASSUMPTION: "interp" (above) or "stage4" (ε = ε^S4 whatever the dose; swept in the report)
 
 [host]
 # Host cost of fasting: body weight W (fraction of baseline, 1 = baseline).
 #   dW/dt = −k_W·v + r_W·(1 − W)·(1 − v)
 k_W = 0.012                      # LITERATURE-informed: ≈1.2% of body weight lost per fasting day (a patient in the Safdie et al. 2009 case series, Aging 1:988, lost ≈3 kg over a multi-day fast); swept
 r_W = 0.15                       # LITERATURE-informed: weight partly regained within days and fully within ≈3 weeks after refeeding (Safdie et al. 2009); 1/r_W ≈ 7 days; swept
-W_min = 0.95                     # LITERATURE: > 5% weight loss is the cancer-cachexia criterion (Fearon et al. 2011, Lancet Oncol 12:489); barrier keeps W ≥ W_min
-qW = 1.0                         # cost weight of weight loss, qW·((1 − W)/(1 − W_min))²
-mu_host = 0.05                   # barrier weight on W ≥ W_min
+W_min = 0.95                     # ASSUMPTION informed by LITERATURE: > 5% weight loss over 6 months is the cancer-cachexia criterion (Fearon et al. 2011, Lancet Oncol 12:489), a chronic definition, not an acute-fasting limit (acute fasting weight loss is largely water and glycogen and is regained); the barrier keeps W ≥ W_min
+qW = 1.0                         # ASSUMPTION: cost weight of weight loss, qW·((1 − W)/(1 − W_min))²
+mu_host = 0.05                   # ASSUMPTION: barrier weight on W ≥ W_min
 # Protection of healthy tissue by fasting (differential stress resistance: Raffaghello et al. 2008,
 # PNAS 105:8215; Lee et al. 2012, Sci Transl Med 4:124ra27; less chemotherapy-induced DNA damage in
 # T cells with a fasting-mimicking diet, de Groot et al. 2020, Nat Commun 11:3083).
@@ -99,6 +130,6 @@ mu_host = 0.05                   # barrier weight on W ≥ W_min
 #   toxicity kill a_H(1 − e^(−B)) is multiplied by (1 − p_H·P)
 k_P = 1.0                        # ASSUMPTION: protection builds over ≈1 day (the trials fast 24–48 h before the drug)
 p_H = 0.5                        # ASSUMPTION: at most 50% less healthy-tissue damage while fully protected; swept 0 / 0.5 / 0.8 (0 = no protection, since DIRECT saw no difference in toxicity grades)
-p_H_sweep = [0.0, 0.5, 0.8]
-k_W_sweep = [0.006, 0.012, 0.024]
-W_min_sweep = [0.90, 0.95, 0.98]
+p_H_sweep = [0.0, 0.5, 0.8]      # ASSUMPTION
+k_W_sweep = [0.006, 0.012, 0.024]   # ASSUMPTION: half and twice the literature-informed rate
+W_min_sweep = [0.90, 0.95, 0.98]    # ASSUMPTION

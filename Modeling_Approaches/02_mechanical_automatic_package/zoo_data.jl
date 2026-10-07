@@ -25,13 +25,40 @@ select_sources(; tags...) = [s["id"] for s in SOURCES if all(string(get(s, strin
 source(id) = SOURCES[findfirst(s -> s["id"] == id, SOURCES)]
 only_source(; tags...) = (ids = select_sources(; tags...); length(ids) == 1 ? ids[1] : error("expected one source for $tags, found $ids"))
 
-# one source's series from the time origin on, sorted by t
+# Nominal seeding of a source's line (user, 2026-10-07): 100 cells per well at 30k, 66.7 at 20k, times the
+# line's share in a coculture (25S75R → 25 sensitive, 75 resistant). Day 0 in the files is this nominal value
+# (99.8 with SD 0), not a measurement.
+function nominal_seed(src)
+    total = 100.0 * Float64(src["seeding"]) / 30000
+    r = string(src["ratio"])
+    r == "100" && return total
+    m = match(r"^(\d+)S(\d+)R$", r); m === nothing && error("ratio $r of $(src["id"]) not understood")
+    total * parse(Float64, src["line"] == "A2780" ? m[1] : m[2]) / 100
+end
+
+# one source's series from the time origin on, sorted by t; nom = its nominal seeding
 function series(id)
     d = sort(MEAS[(MEAS.source_id .== id) .& (MEAS.t .>= 0), :], :t)
     nrow(d) > 0 || error("no rows for source $id in measurements.csv")
     (x=Vector{Float64}(d.t), y=Vector{Float64}(d.value), bad=Vector{Bool}(d.excluded),
      why=String[coalesce(w, "") for w in d.exclude_reason], se=Vector{Union{Missing,Float64}}(d.sem),
-     sd=Vector{Union{Missing,Float64}}(d.sd))
+     sd=Vector{Union{Missing,Float64}}(d.sd), nom=nominal_seed(source(id)))
+end
+
+# Starting value of a series (user, 2026-10-07): the nominal seeding, unless the first measured count is
+# more than X0_FOLD^t (t = its day, normally 1) times above or below it. No growth or kill moves a culture
+# 3-fold in a day (A2780 doubles in about a day and the drug and low-resource effects build up over days), so
+# such a series was seeded or imaged at a different effective density and its starting value is estimated
+# (a free parameter in that stage's fits, counted in the BIC), between nom/10 and 3 × the larger of nom and
+# the first count.
+const X0_FOLD = 3.0
+function x0_info(s)
+    k = findfirst(i -> s.x[i] > 0 && !s.bad[i], eachindex(s.x))
+    k === nothing && error("series without measurements after day 0")
+    y1 = s.y[k]; nom = s.nom; f = X0_FOLD^s.x[k]
+    est = y1 > f * nom || y1 < nom / f
+    lo, hi = nom / 10, 3 * max(nom, y1)
+    (nom=nom, est=est, y1=y1, day1=s.x[k], start=clamp(sqrt(nom * y1), 1.01lo, 0.99hi), lo=lo, hi=hi)
 end
 
 # a schedule as (breakpoint times, doses); a constant schedule is a single step at t = 0
@@ -81,7 +108,7 @@ for run in (1, 2), label in ("25S75R", "50S50R", "75S25R")
                   xN=N.x, yN=N.y, bN=N.bad, xC=C.x, yC=C.y, bC=C.bad))
 end
 
-# Stage 4: low resource + 1 µM cisplatin, 1:1 (day 1 is t = 0, see sources.toml)
+# Stage 4: low resource + 1 µM cisplatin, 1:1
 const COMBO_SOURCES = (N=only_source(condition="combination", line="A2780"), C=only_source(condition="combination", line="A2780cis"))
 const COMBO_DOSE = constant_dose(source(COMBO_SOURCES.N)["schedule"])
 combo = let N = series(COMBO_SOURCES.N), C = series(COMBO_SOURCES.C)
@@ -118,10 +145,12 @@ function point_scale(s)
     end
     error("stages.toml [selection] residual_weighting must be none, sd or power, not $mode")
 end
-# the kept points of a series (QC-excluded points dropped), with their scales w when weighting is on
+# the fitted points of a series: QC-excluded points and day 0 (the seeding, which is the initial condition,
+# not a measurement) dropped; with their scales w when weighting is on
 function keep(s)
     w = point_scale(s)
-    (x=s.x[.!s.bad], y=s.y[.!s.bad], w=w === nothing ? nothing : w[.!s.bad])
+    k = .!s.bad .& (s.x .> 0)
+    (x=s.x[k], y=s.y[k], w=w === nothing ? nothing : w[k])
 end
 # a dataset for the fits; carries w only when weighting is on, so unweighted runs are unchanged
 dataset(k, idx) = k.w === nothing ? (x=k.x, y=k.y, state_index=idx) : (x=k.x, y=k.y, state_index=idx, w=k.w)

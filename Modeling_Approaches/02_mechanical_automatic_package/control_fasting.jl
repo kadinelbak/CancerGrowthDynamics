@@ -23,44 +23,9 @@ include(joinpath(@__DIR__, "control_mpc.jl"))
 const FCFG = CFG["fasting"]; const HCFG = CFG["host"]
 default_host() = (k_W=Float64(HCFG["k_W"]), r_W=Float64(HCFG["r_W"]), k_P=Float64(HCFG["k_P"]), p_H=Float64(HCFG["p_H"]))
 
-# Flattened, type-stable copy of the plant's cell equations (the same modules and values as the zoo's
-# line_rhs_multi!, which is generic and dispatches dynamically, about 50× slower). test_control.jl
-# checks it against the zoo right-hand side to 1e-12. Only the module types of the carried models
-# are supported; anything else stops with an error rather than silently differing.
-struct ModSpec
-    input_D::Bool; kernel_chain::Int; k::Float64; o::Int     # chain length (0 = immediate), rate, first hidden index − 1
-    action::Symbol; β::Float64; h::Float64; c::Float64; d0::Float64; ec50::Float64
-    ε::Float64; εj::Int                                       # fixed strength, or index into FPlant.ε (0 = fixed)
-end
-struct LineSpec
-    ix::Int; other::Int; α::Float64; logistic::Bool; r::Float64; K::Float64; θ::Float64; d::Float64
-    mods::Vector{ModSpec}
-    ns::Bool                    # Norton–Simon: drug losses × growth factor (zoo_models.jl growth_factor)
-end
-function line_specs(base::Plant, iε)
-    S = base.sys; p = base.p; out = LineSpec[]
-    for (j, l) in enumerate(S.envs[1].lines)
-        L = S.lines[l]; xi = S.xi[1][j]; off = S.hb[1][j]
-        (hasproperty(L, :chi) && sv(L.chi, p, Float64) != 0) && error("χ interaction not supported in the fast plant")
-        L.growth in (:logistic, :theta) || error("growth law $(L.growth) not supported in the fast plant")
-        mods = ModSpec[]
-        for M in modules(L)
-            ncell(M.action) == 0 && naux(M.action) == 0 || error("action $(M.action) not supported in the fast plant")
-            M.kernel in (:none, :chain3) || error("kernel $(M.kernel) not supported in the fast plant")
-            M.action in (:hill, :capacity, :loss) || error("action $(M.action) not supported in the fast plant")
-            nk = nker(M.kernel); gs(k) = hasproperty(M.s, k) ? sv(getfield(M.s, k), p, Float64) : 0.0
-            εs = M.s.ε; εj = εs.i > 0 ? findfirst(==(εs.i), iε) : 0
-            εs.i > 0 && εj === nothing && error("unexpected free slot")
-            push!(mods, ModSpec(M.input == :D, nk, nk > 0 ? gs(:k) : 0.0, off, M.action, gs(:β), gs(:h), gs(:c), gs(:d0), ec50_of(M.s, p, Float64),
-                                εs.i > 0 ? NaN : εs.v, εj))
-            off += mwidth(M)
-        end
-        m = 3 - j
-        push!(out, LineSpec(xi + 1, S.xi[1][m] + 1, sv(S.alpha[l][S.envs[1].lines[m]], p, Float64), L.growth == :logistic,
-                            sv(L.s.r, p, Float64), sv(L.s.K, p, Float64), sv(L.s.θ, p, Float64), sv(L.s.d, p, Float64), mods, ns_on(L)))
-    end
-    out
-end
+# The cell equations are simulated with the flattened, type-stable copy of control_model.jl (ModSpec,
+# LineSpec, line_specs, spec_cells_rhs!), here with the low-resource modules and their free strengths ε.
+# test_control_fasting.jl checks it against the zoo right-hand side (line_rhs_multi!) to 1e-12.
 
 struct FPlant{TT<:NamedTuple,HT<:NamedTuple}
     name::String
@@ -91,7 +56,7 @@ function fast_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox
         merge(P0.sys.lines[j], (extra=[merge(M, (s=shift_slots(M.s, np),)) for M in L4.extra],))
     end
     p = vcat(P0.p, ε)
-    base = make_plant(P0.name, lines, P0.sys.alpha, p; uR=0.0, tox=tox)
+    base = make_plant(P0.name, lines, P0.sys.alpha, p; uR=0.0, tox=tox, fast=false)     # the FPlant has its own spec
     n = base.sys.n
     name = (scen == :A ? "A: Stage 3 coculture model as selected" : "B: monoculture drug response for both lines") *
            " + fitted low-resource modules"
@@ -109,7 +74,7 @@ function lr_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox()
     B = FP.base
     name = (scen == :A ? "A (low resource): Stage 3 coculture model" : "B (low resource): monoculture drug response") *
            " + fitted low-resource modules, dose-dependent strength ε(u)"
-    Plant(name, B.sys, B.p, FP.nx, FP.iN, FP.iC, FP.iB, FP.iT, FP.K, tox, U_R, FP)
+    Plant(name, B.sys, B.p, FP.nx, FP.iN, FP.iC, FP.iB, FP.iT, FP.K, tox, U_R, FP, nothing)
 end
 
 εfactor(FP::FPlant, u) = FP.eps_mode == :stage4 ? one(u) : min(u / FP.u_ref, one(u))
@@ -142,35 +107,7 @@ end
 function fast_rhs!(du, x, w, FP::FPlant)
     u, v = w[1], w[2]
     T = promote_type(eltype(x), eltype(w)); z = zero(T)
-    f = εfactor(FP, T(u)); uR = T(U_R) * v
-    @inbounds for L in FP.spec
-        X = max(x[L.ix], z); crowd = X + L.α * max(x[L.other], z)
-        Keff = T(L.K); loss = T(L.d); dloss = z                   # dloss: drug-module losses (Norton–Simon scales these)
-        for M in L.mods
-            ε = M.εj == 0 ? T(M.ε) : 1 + (FP.ε[M.εj] - 1) * f
-            wi = (M.input_D ? T(u) : uR) * ε
-            E = wi
-            if M.kernel_chain == 3
-                o = M.o
-                # low-resource stress chains may fade faster after refeeding (sensitivity only; default = fitted rate)
-                k = (M.input_D || isnan(FP.koff)) ? T(M.k) : M.k * v + FP.koff * (1 - v)
-                du[o+1] = k * (wi - x[o+1]); du[o+2] = k * (x[o+1] - x[o+2]); du[o+3] = k * (x[o+2] - x[o+3])
-                E = max(x[o+3], z)
-            end
-            if M.action == :hill
-                lo = E > 0 ? M.β * E^M.h / (T(M.ec50)^M.h + E^M.h) : z
-                M.input_D ? (dloss += lo) : (loss += lo)
-            elseif M.action == :capacity
-                Keff /= 1 + M.c * E
-            else                                     # :loss
-                lo = M.d0 * wi + M.β * E
-                M.input_D ? (dloss += lo) : (loss += lo)
-            end
-        end
-        q = max(crowd / Keff, z)
-        loss += L.ns ? dloss * (L.logistic ? max(1 - q, z) : max(1 - q^L.θ, z)) : dloss
-        du[L.ix] = L.r * X * (L.logistic ? 1 - q : 1 - q^L.θ) - loss * X
-    end
+    spec_cells_rhs!(du, x, T(u), T(U_R) * v, εfactor(FP, T(u)), FP.spec, FP.ε, FP.koff, v)     # control_model.jl
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
     du[FP.iB] = tp.s_B * u - tp.d_B * Bd
     du[FP.iT] = tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, z))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
@@ -215,11 +152,13 @@ struct Weights2
     μC::Float64; μT::Float64; μW::Float64; δ::Float64
     Bc::Float64; Btox::Float64; Wmin::Float64; umax::Float64; K::Float64
 end
-function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Float64(HCFG["W_min"]), w=nothing, rv=Float64(FCFG["rv"]))
+# bc_frac: B_cancer as a fraction of K (0 = no soft burden penalty); tf: terminal factor (both swept)
+function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Float64(HCFG["W_min"]), w=nothing, rv=Float64(FCFG["rv"]),
+                  bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]))
     c = CFG["weights"]
     qB, qR, qT, ru = w === nothing ? (c["qB"], c["qR"], c["qT"], c["ru"]) : Tuple(w)
-    Weights2(qB, qR, qT, HCFG["qW"], ru, rv, c["terminal_factor"], c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
-             CFG["cancer"]["B_cancer_fraction_of_K"] * FP.K, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K)
+    Weights2(qB, qR, qT, HCFG["qW"], ru, rv, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
+             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
 function stage_cost2(x, w, FP::FPlant, W::Weights2)
@@ -237,6 +176,20 @@ function total_cost2(x0, U, FP, Δ, W)
         x = F2(x, U[k, :], FP, Δ); J += stage_cost2(x, U[k, :], FP, W)
     end
     J + terminal_cost2(x, FP, W)
+end
+
+# The stage cost split into its terms, summed over the intervals of an applied schedule (no terminal
+# term), as cost_terms in control_mpc.jl plus the host terms of fasting: total = Σ_k stage_cost2.
+function cost_terms2(FP::FPlant, x0, U, Δ, W::Weights2)
+    x = copy(x0); z = zeros(9)
+    for k in axes(U, 1)
+        w = U[k, :]; x = F2(x, w, FP, Δ); N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
+        z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (w[1] / W.umax)^2,
+               relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ), relaxed_barrier(1 - T / W.Btox, W.μT, W.δ),
+               W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ)]
+    end
+    (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6],
+     weight=z[7], fasting=z[8], barrier_weight=z[9], total=sum(z))
 end
 
 # adjoint (vector–Jacobian) gradient and Gauss–Newton Hessian of J over the stacked controls
@@ -357,20 +310,25 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
     (U=copy(bestU), J=best[])
 end
 
-# receding horizon on plant Pp, planning with Pm; the fasting rules carry over between decisions
-function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mode=:discrete, shrink=true, kw...)
-    x = copy(x0); applied = zeros(n_dec, 2); run = 0; gap = 10^6
+# Receding horizon on plant Pp, planning with Pm; the fasting rules carry over between decisions.
+# Fixed look-ahead H at every decision, past the end of the run if need be (shrink=true: comparison only),
+# so the schedule is the first decisions of a continuing policy. The planner observes only N and C
+# (× noise[k, :] when given; control_mpc.jl: observe!) and reconstructs the drug-effect and stress chains,
+# B, T, P and W by simulating its own model under the applied doses and fasting.
+function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mode=:discrete, shrink=false, noise=nothing, kw...)
+    x = copy(x0); xm = copy(x0); applied = zeros(n_dec, 2); run = 0; gap = 10^6
     Uwarm = repeat([mode == :discrete ? 0.0 : 0.5  0.0], H)
     for k in 1:n_dec
+        observe!(xm, x, Pm, Pp, noise, k)
         Hk = shrink ? min(H, n_dec - k + 1) : H
-        sol = mode == :discrete ? discrete_solve2(x, Pm, Δ, Hk, W; run0=run, gap0=gap, Uinit=Uwarm[1:Hk, :], kw...) :
-                                  sqp_solve2(x, Uwarm[1:Hk, :], Pm, Δ, W)
+        sol = mode == :discrete ? discrete_solve2(xm, Pm, Δ, Hk, W; run0=run, gap0=gap, Uinit=Uwarm[1:Hk, :], kw...) :
+                                  sqp_solve2(xm, Uwarm[1:Hk, :], Pm, Δ, W)
         w = sol.U[1, :]; applied[k, :] = w
         run = w[2] > 0 ? run + 1 : 0; gap = w[2] > 0 ? 0 : gap + 1
-        x = F2(x, w, Pp, Δ)
+        x = F2(x, w, Pp, Δ); xm = F2(xm, w, Pm, Δ)
         Uwarm = vcat(sol.U[2:end, :], repeat([sol.U[end, 1] 0.0], H - Hk + 1))[1:H, :]     # shift; pad fed
     end
-    (U=applied,)
+    (U=applied, x=x)
 end
 
 # ── baseline schedules ────────────────────────────────────────────────────────
@@ -405,8 +363,9 @@ function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2)
     N = [x[FP.iN] for x in xs]; C = [x[FP.iC] for x in xs]; T = [x[FP.iT] for x in xs]
     Pr = [x[FP.iP] for x in xs]; Wt = [x[FP.iW] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
+    days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)     # days with N + C ≥ B_cancer
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      max_total=maximum(tot), max_tox=maximum(T), min_weight=minimum(Wt), cum_dose=sum(U[:, 1]) * Δ, fast_days=sum(U[:, 2]) * Δ,
-     cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin,
+     cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin, days_over=days_over,
      ts=ts, N=N, C=C, T=T, P=Pr, W=Wt)
 end

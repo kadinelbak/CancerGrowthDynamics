@@ -1,10 +1,12 @@
-# Quality-control rules. A rule only applies to the sources that list it (sources.toml, `qc`).
-# Excluded points stay in measurements.csv with excluded = true and the reason; they are never deleted.
+# Quality-control rules. Excluded points stay in measurements.csv with excluded = true and the reason; they
+# are never deleted.
 #
-# User decision 2026-10-02: keep the current behaviour exactly. The two rules below are applied to the
-# low-resource monocultures, the low-resource cocultures and the Stage 4 combination culture only; the
-# untreated, treated and Ce0/Ce1 coculture sources list no rules. Listing a rule on another source
-# switches it on there (and changes that stage's fit).
+# Since 2026-10-07 (review; user: "choose the simply best option") every rule in `apply_to_all` is applied to
+# every source (before, only the low-resource and Stage 4 sources listed rules), the transient rule is
+# symmetric (drops and spikes), and in a coculture a day flagged in one line is flagged in the other line of
+# the same well too (the artefact is in the image, not in one population). A source may still list extra
+# rules in its own `qc`.
+apply_to_all = ["exact_duplicate", "transient_drop", "transient_spike"]
 
 [exact_duplicate]
 # a value (> 0) that exactly repeats an earlier day's value of the same series is a copy error
@@ -14,6 +16,14 @@ description = "exact duplicate of an earlier day"
 # a point below `frac` × the last kept value, by more than `floor` cells, followed later by a recovery
 # to at least `recover` × that value, is an imaging artefact rather than cell death
 description = "transient drop"
+frac = 0.5
+recover = 0.8
+floor = 50.0
+
+[transient_spike]
+# the mirror image of transient_drop: a point above last-kept-value / `frac`, by more than `floor` cells, whose
+# next kept point falls back to at most last-kept-value / `recover`, is an imaging artefact rather than growth
+description = "transient spike"
 frac = 0.5
 recover = 0.8
 floor = 50.0

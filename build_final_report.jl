@@ -27,6 +27,10 @@ chapters = [
      "$PKG/control/report.html"),
     ("control30", "7 · Optimal control over $LONG_DAYS days: cisplatin and fasting", "Model-predictive control choosing both the cisplatin dose and fasting (low resource) at every media change for $LONG_DAYS days, read off at days 14, 30, 60 and $LONG_DAYS of the same run, with a body-weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days 14–$LONG_DAYS are beyond the data, and the fasting effect is the in-vitro effect at full strength.",
      "$PKG/control_$(LONG_DAYS)d/report.html"),
+    ("findings", "8 · Key findings, assumptions and limitations", "What did not carry over between conditions, the estimated starting values, validation, the controller against the best fixed policies, linear vs Hill drug response, the mechanistic vs neural-network comparison, the assumptions register and the limitations with the experiments that would resolve them. Generated from the outputs of the same run.",
+     "$PKG/findings/report.html"),
+    ("nn", "9 · Mechanistic vs neural-network models", "The neural-network and universal-differential-equation track and its matched comparison with the mechanistic models on the same held-out data.",
+     "outputs/nn_track/comparison/report.html"),
 ]
 
 # Turns each chapter into dropdowns so nothing has to be scrolled past: every top-level (h2)
@@ -157,7 +161,7 @@ iframe{display:block;width:100%;border:0;min-height:400px;background:var(--page)
 <header>
 <a class='home' href='../../index.html' aria-label='Reports home'>⌂ Reports home</a>
 <h1>Final report — A2780 / A2780cis new data</h1>
-<p class='lead'>The analysis on one page: the data, the compartment models used at every stage, their bootstrapping, sensitivity analysis and validation, and optimal control of the cisplatin schedule built on them, over 14 days and, with fasting as a second control, over 30 days. Earlier time-based models are kept only in the <a href='../archive_time/index.html'>time-based archive</a>. Each chapter is the full report for that step (assembled $(Dates.format(now(), "yyyy-mm-dd HH:MM"))); the date under each heading is when that report was last generated. Rebuild with <code>julia build_final_report.jl</code>.</p>
+<p class='lead'>The analysis on one page: the data, the compartment models used at every stage, their bootstrapping, sensitivity analysis and validation, and optimal control of the cisplatin schedule built on them, over 14 days and, with fasting as a second control, over $LONG_DAYS days (read off at days 14, 30, 60 and $LONG_DAYS). Earlier time-based models are kept only in the <a href='../archive_time/index.html'>time-based archive</a>. Each chapter is the full report for that step (assembled $(Dates.format(now(), "yyyy-mm-dd HH:MM"))); the date under each heading is when that report was last generated. Rebuild with <code>julia build_final_report.jl</code>.</p>
 $(isempty(missing_parts) ? "" : "<p class='warn'>Not found, so left out: " * join(missing_parts, ", ") * "</p>")
 </header>
 <nav class='toc' aria-label='Final report chapters'><div>$(join(toc))</div></nav>

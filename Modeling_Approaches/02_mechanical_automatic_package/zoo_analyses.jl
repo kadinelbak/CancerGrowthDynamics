@@ -1,20 +1,24 @@
 # Bootstrapping, sensitivity analysis and validation of the compartment-model (zoo) fits.
 # Reads the checkpoint of run_zoo_fits.jl (outputs/zoo_fits/zoo_state.jls); the carried-forward
-# (optimal) model of every fit group is the first candidate. Uses the GrowthParameterEstimation
-# routines the earlier reports used:
+# (optimal) model of every fit group is the first candidate. Every refit uses the run's residual
+# weights (datasets carrying `w`, passed to GrowthParameterEstimation through gpe_datasets), so it
+# minimises the same weighted SSE as the carried fits; starting values are fixed nuisance values.
 #   bootstrapping   the zoo's 200-replicate moving-block residual bootstrap (every candidate refitted,
-#                   selection rule replayed) + GrowthParameterEstimation.bootstrap_joint_fit (within-
-#                   trajectory residual bootstrap of the optimal model) for comparison; residual
-#                   autocorrelation shows why blocks are used
+#                   selection rule replayed) + a within-trajectory iid residual bootstrap of the optimal
+#                   model (the scheme of GrowthParameterEstimation.bootstrap_joint_fit, on standardised
+#                   residuals e/w) for comparison; residual autocorrelation shows why blocks are used
 #   sensitivity     local sensitivity index (the formula of GrowthParameterEstimation.
 #                   parameter_sensitivity_analysis: ±10% per parameter, max relative change of the
-#                   prediction / 0.1, applied to every observed state), profile likelihood refits
-#                   (run_joint_multistart) and the bound check of profile_joint_fit_bounds
-#   validation      GrowthParameterEstimation.blocked_joint_validation (leave one dose / ratio / run
-#                   out), a time-block forecast (fit the first 70% of days, predict the rest) and the
-#                   treated (Ce1) cocultures held out: crowding fitted to Ce0 only, cisplatin from
-#                   Stage 2, Ce1 predicted (the same held-out set as the neural-network track)
-# Heavy results are checkpointed in outputs/zoo_analyses/analyses_state.jls (REDO=1 recomputes).
+#                   prediction / 0.1, applied to every observed state), weighted profile likelihood refits
+#                   (run_joint_multistart) with the small-sample F threshold, a bound check, and Sobol indices
+#   validation      leave one dose / ratio / run out (the scheme of GrowthParameterEstimation.
+#                   blocked_joint_validation), a time-block forecast (fit the first 70% of days, predict
+#                   the rest), the treated (Ce1) cocultures held out (crowding fitted to Ce0 only,
+#                   cisplatin from Stage 2, Ce1 predicted from the nominal seeding; Ce1 informed the
+#                   choice of weighting and drug model, so it is not fully independent) and the
+#                   intermittent-dosing data, predicted with no refit (the untouched validation set)
+# Heavy results are checkpointed in outputs/zoo_analyses/analyses_state.jls (REDO=1 recomputes all).
+# No wall-clock limits: every optimiser call stops on its iteration cap (reproducible).
 #   julia -t 12 --project=. zoo_analyses.jl
 
 include(joinpath(@__DIR__, "zoo_common.jl"))
@@ -47,6 +51,14 @@ const SMOKE = get(ENV, "SMOKE", "0") == "1"
 const NBOOT = SMOKE ? 2 : BOOT_B
 const CKPT = joinpath(AN_DIR, SMOKE ? "analyses_smoke.jls" : "analyses_state.jls")
 ck = (isfile(CKPT) && get(ENV, "REDO", "0") != "1") ? deserialize(CKPT) : Dict{Symbol,Any}()
+# analysis method version: a checkpoint written by another version is discarded (2 = weighted refits,
+# nominal held-out starts, F-based profile threshold, no wall-clock limits; 2026-10-06)
+const AN_VERSION = 2
+if get(ck, :version, 1) != AN_VERSION
+    isempty(ck) || println("checkpoint is from analysis version $(get(ck, :version, 1)), not $AN_VERSION: recomputing everything")
+    global ck = Dict{Symbol,Any}()
+end
+ck[:version] = AN_VERSION
 save_ck() = serialize(CKPT, ck)
 # Groups whose carried model is new or has changed since the checkpoint are recomputed; the rest reuse it.
 # A model is identified by its name and fitted values, and a group is also stale when a stage it inherits
@@ -74,8 +86,10 @@ println("=== zoo analyses: $(Threads.nthreads()) threads; checkpoint has $(colle
 
 # ── shared helpers ─────────────────────────────────────────────────────────────
 
-include(joinpath(@__DIR__, "zoo_heldout.jl"))   # FIT_KW, evaluate, gfit, nobs, VAL and the held-out Ce1 test
-sub_ds(d, keep) = (x=d.x[keep], y=d.y[keep], state_index=d.state_index)
+include(joinpath(@__DIR__, "zoo_heldout.jl"))   # FIT_KW, evaluate, gfit, nobs, nominal_u0, VAL and the held-out Ce1 test
+# a dataset restricted to some points (keeps the per-point scales w)
+sub_ds(d, keep) = hasproperty(d, :w) ? (x=d.x[keep], y=d.y[keep], state_index=d.state_index, w=d.w[keep]) :
+                                       (x=d.x[keep], y=d.y[keep], state_index=d.state_index)
 rmse_of(ev) = ev.rmse
 nrmse_of(ev, ds) = ev.rmse / mean(reduce(vcat, [d.y for d in ds]))
 # value q with the i-th entry v inserted (keeps ForwardDiff / Dual element types)
@@ -92,33 +106,52 @@ f3(x) = isfinite(x) ? fmt(x) : "—"
 
 # ── 1. bootstrapping ───────────────────────────────────────────────────────────
 
+# Within-trajectory iid residual bootstrap of the optimal model: the scheme of GrowthParameterEstimation.
+# bootstrap_joint_fit, which cannot be used on residual-weighted data (gpe_datasets splits a weighted
+# trajectory into one-point datasets, so the package would resample nothing). Here the standardised
+# residuals e/w of each trajectory are resampled independently with replacement, rescaled by the scale of
+# the point they land on, added to the fit (counts kept ≥ 0) and the optimal model is refitted with the
+# same weights (1 start, ≤ 600 Nelder–Mead iterations, as the package call used). Unweighted runs: w = 1.
+function iid_replicate(g, yhat, seed)
+    c = g.cands[1]; rng = Xoshiro(seed)
+    ds = [begin
+              w = collect(Float64, dweights(d)); z = (d.y .- yh) ./ w
+              merge(d, (y=max.(yh .+ w .* z[rand(rng, 1:length(z), length(z))], 0.0),))
+          end for (d, yh) in zip(g.datasets, yhat)]
+    gfit(c.model, ds, c.u0, c.params, c.bounds; starts=1, maxiters=600).params
+end
 todo_pk = [g for g in groups if !haskey(get(ck, :pkgboot, Dict()), g.id)]
 if !isempty(todo_pk)
-    println("\n--- package bootstrap_joint_fit (within-trajectory residuals): $(join([g.id for g in todo_pk], ", ")) ---"); flush(stdout)
-    out = Vector{Any}(undef, length(todo_pk))
-    Threads.@threads :dynamic for i in eachindex(todo_pk)
-        g = todo_pk[i]; c = g.cands[1]; t0 = time()
-        out[i] = try
-            ev = evaluate(c.model, g.datasets, c.u0, c.params)
-            fitted = (params=c.params, predictions=ev.predictions)
-            b = GPE.bootstrap_joint_fit(c.model, g.datasets, c.u0, fitted; bounds=c.bounds, n_bootstrap=NBOOT, starts_per_bootstrap=1,
-                                        seed=20260929 + i, optimizer=:nelder_mead, maxiters=600, maxtime=30.0, reltol=1e-7, abstol=1e-7, initial_time=0.0)
-            (summary=b.parameter_summary, ok=b.successful_replicates, method=b.method)
-        catch err
-            @warn "package bootstrap failed" g.id err
-            nothing
+    println("\n--- within-trajectory iid residual bootstrap: $(join([g.id for g in todo_pk], ", ")) ---"); flush(stdout)
+    t0 = time()
+    gidx = Dict(g.id => i for (i, g) in enumerate(groups))
+    yhats = Dict(g.id => bs_predict(g.cands[1].model, g.cands[1].u0, g.cands[1].params, g.datasets) for g in todo_pk)
+    P = Dict(g.id => fill(NaN, NBOOT, length(g.cands[1].params)) for g in todo_pk)
+    jobs = [(g, b) for g in todo_pk if !isempty(g.cands[1].params) for b in 1:NBOOT]
+    Threads.@threads :dynamic for (g, b) in jobs
+        try
+            P[g.id][b, :] = iid_replicate(g, yhats[g.id], 20260929 + 1000 * gidx[g.id] + b)
+        catch
         end
-        @printf("  %-12s package bootstrap done in %.0fs\n", g.id, time() - t0); flush(stdout)
     end
-    ck[:pkgboot] = merge(get(ck, :pkgboot, Dict{String,Any}()), Dict(todo_pk[i].id => out[i] for i in eachindex(todo_pk))); save_ck()
+    pkout = Dict{String,Any}()
+    for g in todo_pk
+        M = P[g.id]; ok = [all(isfinite, M[b, :]) for b in 1:size(M, 1)]
+        pkout[g.id] = (isempty(g.cands[1].params) || !any(ok)) ? nothing :
+            (summary=DataFrame(parameter_index=collect(1:size(M, 2)), ci95_lower=[quantile(M[ok, i], 0.025) for i in 1:size(M, 2)],
+                               ci95_upper=[quantile(M[ok, i], 0.975) for i in 1:size(M, 2)]),
+             ok=count(ok), method="within-trajectory iid residual bootstrap (standardised residuals)")
+    end
+    @printf("  done in %.0fs\n", time() - t0); flush(stdout)
+    ck[:pkgboot] = merge(get(ck, :pkgboot, Dict{String,Any}()), pkout); save_ck()
 end
 
-# lag-1 autocorrelation of the optimal model's residuals, per trajectory
+# lag-1 autocorrelation of the optimal model's standardised residuals (e/w), per trajectory
 function residual_acf(g)
     c = g.cands[1]; ev = evaluate(c.model, g.datasets, c.u0, c.params)
     acs = Float64[]
     for (d, p) in zip(g.datasets, ev.predictions)
-        e = d.y .- p; length(e) < 4 && continue
+        e = (d.y .- p) ./ collect(Float64, dweights(d)); length(e) < 4 && continue
         e = e .- mean(e); den = sum(abs2, e); den > 0 || continue
         push!(acs, sum(e[1:end-1] .* e[2:end]) / den)
     end
@@ -152,16 +185,35 @@ function local_si(g; pert=0.1)
 end
 
 # Profile likelihood: fix one parameter on a grid (0.5×–2× the estimate), refit the others with
-# run_joint_multistart, and record n·ln(SSE/SSE_min); a 95% interval is where this stays ≤ 3.84 (χ²₁).
+# run_joint_multistart (residual-weighted like the carried fit, 3 starts, the first at the estimate) and
+# record d(θ) = n·ln(SSE_w(θ)/SSE_w,min), SSE_w,min the lowest weighted SSE of the carried fit and every
+# profile refit of the group. A 95% interval is where d stays below the small-sample likelihood-ratio
+# threshold n·ln(1 + F_{1,n−k;0.95}/(n−k)) (→ 3.84 as n grows); its ends are interpolated linearly
+# between grid points. An estimate at a search bound is flagged "at bound" and not profiled.
 const PROFILE_MULT = [0.5, 0.63, 0.79, 0.9, 1.0, 1.11, 1.26, 1.59, 2.0]
+const PROFILE_STARTS = 3
+# F_{1,ν;0.95} = t²_{ν;0.975}: Distributions (loaded by GrowthParameterEstimation) if reachable, else the
+# Cornish–Fisher expansion of the t quantile (F error < 2e-3 for ν ≥ 5, < 1e-4 for ν ≥ 10)
+const DIST = isdefined(GPE, :Analysis) && isdefined(GPE.Analysis, :Distributions) ? GPE.Analysis.Distributions : nothing
+function fcrit95(ν)
+    DIST === nothing || return DIST.quantile(DIST.FDist(1, ν), 0.95)
+    z = 1.959963984540054
+    t = z + (z^3 + z) / (4ν) + (5z^5 + 16z^3 + 3z) / (96ν^2) + (3z^7 + 19z^5 + 17z^3 - 15z) / (384ν^3) +
+        (79z^9 + 776z^7 + 1482z^5 - 1920z^3 - 945z) / (92160ν^4)
+    t^2
+end
+profile_threshold(n, k) = (ν = max(n - k, 1); n * log(1 + fcrit95(ν) / ν))
+at_bound(c, i) = (lo = c.bounds[i][1]; hi = c.bounds[i][2]; tol = 1e-3 * (hi - lo); c.params[i] - lo <= tol || hi - c.params[i] <= tol)
 function profile_jobs(gs)
     jobs = NamedTuple[]
+    gidx = Dict(g.id => j for (j, g) in enumerate(groups))
     for g in gs, (i, n) in enumerate(g.cands[1].pnames)
         c = g.cands[1]; lo, hi = c.bounds[i]; est = c.params[i]
+        at_bound(c, i) && continue
         vals = abs(est) > 1e-6 ? est .* PROFILE_MULT : collect(range(lo, lo + 0.1 * (hi - lo); length=9))
         vals = unique(clamp.(vals, lo, hi))
-        for v in vals
-            push!(jobs, (gid=g.id, i=i, name=n, v=v))
+        for (jv, v) in enumerate(vals)
+            push!(jobs, (gid=g.id, i=i, name=n, v=v, seed=10_000 * gidx[g.id] + 100 * i + jv))
         end
     end
     jobs
@@ -175,12 +227,12 @@ if !isempty(todo_prof)
     out = Vector{Any}(undef, length(jobs)); done = Threads.Atomic{Int}(0)
     Threads.@threads :dynamic for j in eachindex(jobs)
         J = jobs[j]; g = gid(J.gid); c = g.cands[1]; k = length(c.params)
-        sse = try
+        sse = try          # weighted SSE (the carried fits' criterion)
             if k == 1
-                evaluate(c.model, g.datasets, c.u0, [J.v]).raw_sse
+                evaluate(c.model, g.datasets, c.u0, [J.v]).wsse
             else
                 m = (du, u, q, t) -> c.model(du, u, insert_at(q, J.i, J.v), t)
-                gfit(m, g.datasets, c.u0, drop(c.params, J.i), drop(c.bounds, J.i); starts=2, seed=j).sse
+                gfit(m, g.datasets, c.u0, drop(c.params, J.i), drop(c.bounds, J.i); starts=PROFILE_STARTS, seed=J.seed).sse
             end
         catch err
             NaN
@@ -192,33 +244,56 @@ if !isempty(todo_prof)
     ck[:profile] = vcat(get(ck, :profile, NamedTuple[]), out); save_ck()
 end
 
+# first crossing of the threshold walking outward from the profile minimum (seq ordered outward,
+# starting at the minimum); linear interpolation between the last point below and the first above
+function profile_crossing(seq, thr)
+    for j in 2:length(seq)
+        a, b = seq[j-1], seq[j]
+        b.d > thr && return a.v + (thr - a.d) / (b.d - a.d) * (b.v - a.v)
+    end
+    NaN
+end
+# one row per parameter of the carried model, in pnames order
 function profile_summary(g)
-    c = g.cands[1]; n = nobs(g.datasets)
+    c = g.cands[1]; n = nobs(g.datasets); k = length(c.params)
+    thr = profile_threshold(n, k)
+    s_carried = try evaluate(c.model, g.datasets, c.u0, c.params).wsse catch; c.sse end
+    allpts = [p for p in get(ck, :profile, NamedTuple[]) if p.gid == g.id && isfinite(p.sse)]
+    smin = minimum(vcat(s_carried, [p.sse for p in allpts]))
     rows = NamedTuple[]
     for (i, name) in enumerate(c.pnames)
-        pts = sort([p for p in ck[:profile] if p.gid == g.id && p.i == i && isfinite(p.sse)]; by=p -> p.v)
-        isempty(pts) && continue
-        smin = min(c.sse, minimum(p.sse for p in pts))
-        prof = [(v=p.v, d=n * log(p.sse / smin)) for p in pts]
-        est = c.params[i]
-        lower = [p for p in prof if p.v < est]; upper = [p for p in prof if p.v > est]
-        lo_ok = any(p -> p.d > 3.84, lower); hi_ok = any(p -> p.d > 3.84, upper)
-        inside = [p.v for p in prof if p.d <= 3.84]
-        status = lo_ok && hi_ok ? "identifiable" : (lo_ok || hi_ok) ? "one-sided" : "flat (not identifiable within 0.5–2×)"
-        lo, hi = c.bounds[i]; span = hi - lo
+        est = c.params[i]; lo, hi = c.bounds[i]; span = hi - lo
         pos = span > 0 ? (est - lo) / span : NaN
-        push!(rows, (group=g.id, param=name, estimate=est, ci_lo=isempty(inside) ? NaN : minimum(inside), ci_hi=isempty(inside) ? NaN : maximum(inside),
-                     reached_lo=lo_ok, reached_hi=hi_ok, status=status, bound_position=pos,
+        pts = sort([p for p in allpts if p.i == i]; by=p -> p.v)
+        s_est = minimum(vcat(s_carried, [p.sse for p in pts if p.v == est]))   # the carried fit or the refit at the estimate
+        prof = vcat([(v=p.v, d=n * log(p.sse / smin)) for p in pts if p.v != est], [(v=est, d=n * log(s_est / smin))])
+        sort!(prof; by=p -> p.v)
+        ab = at_bound(c, i)
+        if ab || isempty(pts)
+            status = ab ? "at bound (not tested)" : "no profile (refits failed)"
+            push!(rows, (group=g.id, param=name, estimate=est, ci_lo=NaN, ci_hi=NaN, reached_lo=false, reached_hi=false, status=status,
+                         threshold=thr, n=n, k=k, sse_w_min=smin, grid_lo=NaN, grid_hi=NaN, bound_position=pos, at_bound=ab,
+                         near_bound=(pos >= 0.98 || est - lo <= 0.02 * abs(est) + 1e-8), profile=ab ? typeof(prof)() : prof))
+            continue
+        end
+        im = argmin([p.d for p in prof])                 # the minimum (the estimate unless a refit found lower)
+        ci_lo = profile_crossing(prof[im:-1:1], thr); ci_hi = profile_crossing(prof[im:end], thr)
+        lo_ok, hi_ok = isfinite(ci_lo), isfinite(ci_hi)
+        status = lo_ok && hi_ok ? "identifiable" : (lo_ok || hi_ok) ? "one-sided" : "flat (not identifiable within 0.5–2×)"
+        push!(rows, (group=g.id, param=name, estimate=est, ci_lo=ci_lo, ci_hi=ci_hi, reached_lo=lo_ok, reached_hi=hi_ok, status=status,
+                     threshold=thr, n=n, k=k, sse_w_min=smin, grid_lo=prof[1].v, grid_hi=prof[end].v, bound_position=pos, at_bound=false,
                      near_bound=(pos >= 0.98 || est - lo <= 0.02 * abs(est) + 1e-8), profile=prof))
     end
     rows
 end
 
 # ── 2b. global sensitivity (Sobol indices) ────────────────────────────────────
-# Variance-based global sensitivity: every parameter is drawn uniformly over its 95% block-
-# bootstrap interval (its plausible range given the data), the model is solved for each draw, and
-# the variance of an output is split between the parameters. First-order index S1 = share
-# explained by that parameter alone; total index ST = share including its interactions.
+# Variance-based global sensitivity: every parameter is drawn uniformly and independently over its
+# marginal 95% block-bootstrap percentile interval (correlations between parameters are ignored), the
+# model is solved for each draw, and the variance of an output is split between the parameters.
+# First-order index S1 = share explained by that parameter alone; total index ST = share including its
+# interactions. A parameter whose interval collapses (pinned at a bound) is varied by ±1% only, so it
+# shows ≈ 0 by construction; fixed values and starting values are not varied.
 # Saltelli sampling with the Saltelli (2010) S1 and Jansen ST estimators; 95% intervals from
 # resampling the draws. Not in GrowthParameterEstimation, so implemented here.
 using Random: Xoshiro
@@ -282,56 +357,89 @@ function gsa_stage(g)
     (outputs=[o[1] for o in outs], names=c.pnames, lo=lo, hi=hi, rows=sobol(f, lo, hi, length(outs)))
 end
 
-# The whole treated-coculture model (Stage 3, Ce1 at 1 µM): every parameter free, including the
-# growth and drug parameters carried over from Stages 1 and 2, each over its own bootstrap interval.
+# The whole treated-coculture model (Stage 3, Ce1 50:50 at 1 µM): every free parameter of the carried
+# Stage 3 model plus every parameter it inherits unchanged from the carried Stage 1 and Stage 2 models of
+# its line (found from those models' slots and pnames, so the list follows the current models), each over
+# its own bootstrap interval. Values the Stage 3 model fixes differently (e.g. a kill set to 0) or refits
+# are not inherited and are not added. Starts from the nominal seeding of the two Ce1 50:50 series.
+const GSA_FULL_FROM = (("s1-a2780", "s2-a2780"), ("s1-a2780cis", "s2-a2780cis"))
+gsa_full_key() = join([get(current_models, id, "") for id in vcat(HO["group"], collect(Iterators.flatten(GSA_FULL_FROM)))], " || ")
+function gsa_full_spec()
+    src = Any[(n, g3, i) for (i, n) in enumerate(c3.pnames)]
+    nxt = length(c3.params); lines = Any[]
+    for (L, ids) in zip(c3.sys.lines, GSA_FULL_FROM)
+        news = Pair{Symbol,Slot}[]
+        for id in ids
+            cU = gid(id).cands[1]
+            hasproperty(cU, :slots) || continue
+            for (j, s) in enumerate(cU.slots)
+                (s in keys(L.s) && !any(p -> p.first == s, news)) || continue
+                q = getfield(L.s, s)
+                (q.i == 0 && isapprox(q.v, cU.params[j]; rtol=1e-8, atol=1e-12)) || continue
+                nxt += 1; push!(news, s => Slot(nxt, 0.0)); push!(src, (cU.pnames[j], gid(id), j))
+            end
+        end
+        push!(lines, isempty(news) ? L : merge(L, (s=merge(L.s, NamedTuple{Tuple(first.(news))}(Tuple(last.(news)))),)))
+    end
+    (sys=build_system(lines, c3.sys.envs, c3.sys.alpha), src=src)
+end
 function gsa_full()
-    LN, LC = c3.sys.lines
-    LNf = merge(LN, (s=merge(LN.s, (r=Slot(6, 0.0), h=Slot(7, 0.0), k=Slot(8, 0.0))),))
-    LCf = merge(LC, (s=merge(LC.s, (r=Slot(9, 0.0), θ=Slot(10, 0.0), h=Slot(11, 0.0), k=Slot(12, 0.0))),))
-    sys = build_system([LNf, LCf], c3.sys.envs, c3.sys.alpha); m = make_system_model(sys)
-    s1N, s1C, s2N, s2C = gid("s1-a2780"), gid("s1-a2780cis"), gid("s2-a2780"), gid("s2-a2780cis")
-    src = vcat([(n, g3, i) for (i, n) in enumerate(c3.pnames)],
-               [("r_N", s1N, 1), ("h_N", s2N, 2), ("k_N", s2N, 3), ("r_C", s1C, 1), ("θ_C", s1C, 3), ("h_C", s2C, 2), ("k_C", s2C, 3)])
-    @assert [s[2].cands[1].pnames[s[3]] for s in src] == [s[1] for s in src]
+    spec = gsa_full_spec(); m = make_system_model(spec.sys); src = spec.src
+    max_free_index(spec.sys) == length(src) || error("gsa_full: the model reads $(max_free_index(spec.sys)) parameters, the source list has $(length(src))")
     lo = [boot_range(g, i)[1] for (_, g, i) in src]; hi = [boot_range(g, i)[2] for (_, g, i) in src]
-    iN, iC = g3.datasets[9].state_index, g3.datasets[10].state_index      # Ce1 50:50
+    k50(line) = (k = findfirst(s -> tag_match(s, Dict("condition" => "Ce1", "ratio" => "50S50R", "line" => line)), HO_TAGS);
+                 k === nothing ? error("gsa_full: no Ce1 50S50R $line series in $(HO["group"])") : k)
+    iN, iC = g3.datasets[k50("A2780")].state_index, g3.datasets[k50("A2780cis")].state_index
+    u0 = nominal_u0(c3, [iN, iC])
     T = XMAX
-    f(p) = (s = solve(ODEProblem(m, c3.u0, (0.0, T), p), Tsit5(); saveat=[T], reltol=1e-6, abstol=1e-6);
+    f(p) = (s = solve(ODEProblem(m, u0, (0.0, T), p), Tsit5(); saveat=[T], reltol=1e-6, abstol=1e-6);
             (N = s.u[end][iN]; C = s.u[end][iC]; [N, C, N + C, C / (N + C)]))
     (outputs=["sensitive (A2780), day 14", "resistant (A2780cis), day 14", "total, day 14", "resistant fraction, day 14"],
-     names=[s[1] for s in src], carried=[s[2].id for s in src], lo=lo, hi=hi, rows=sobol(f, lo, hi, 4))
+     names=[s[1] for s in src], carried=[s[2].id for s in src], lo=lo, hi=hi, rows=sobol(f, lo, hi, 4), key=gsa_full_key())
 end
 
 
 # ── 3. validation ──────────────────────────────────────────────────────────────
 
-# blocks: one label per trajectory; uses GrowthParameterEstimation.blocked_joint_validation
+# Leave one block out (the scheme of GrowthParameterEstimation.blocked_joint_validation, run here so the
+# refits use the run's residual weights): labels = one block label per trajectory; each block is held out
+# in turn, the carried model is refitted (weighted, 3 starts, the first at the carried values) to the rest
+# and the block is predicted. Held-out series start from the nominal seeding where the full fit had
+# estimated their start. Scores: RMSE in cells (raw) and weighted RMSE √(SSE_w/n).
 function blocked(g, labels, scheme)
-    c = g.cands[1]
-    df = GPE.blocked_joint_validation(c.model, g.datasets, c.u0, c.params, labels; bounds=c.bounds, starts_per_fold=3, seed=42,
-                                      optimizer=:nelder_mead, maxiters=2000, maxtime=180.0, reltol=1e-8, abstol=1e-8, initial_time=0.0)
-    rows = NamedTuple[]
-    for r in eachrow(df)
-        held = [k for k in eachindex(labels) if string(labels[k]) == r.block]
+    c = g.cands[1]; rows = NamedTuple[]
+    for (bi, lab) in enumerate(unique(labels))
+        held = findall(==(lab), labels); train = setdiff(eachindex(labels), held)
+        (isempty(train) || isempty(held)) && continue
         insample = evaluate(c.model, g.datasets[held], c.u0, c.params)
         m = mean(reduce(vcat, [g.datasets[k].y for k in held]))
-        push!(rows, (group=g.id, scheme=scheme, block=r.block, status=r.status, n_test=r.n_test_points,
-                     rmse_heldout=r.rmse, rmse_insample=insample.rmse, nrmse_heldout=r.rmse / m, nrmse_insample=insample.rmse / m))
+        u0h = nominal_u0(c, [g.datasets[k].state_index for k in held])
+        st, ho = try
+            f = gfit(c.model, g.datasets[train], c.u0, c.params, c.bounds; starts=3, seed=42 + bi)
+            ("completed", evaluate(c.model, g.datasets[held], u0h, f.params))
+        catch err
+            @warn "blocked validation fold failed" g.id scheme lab err
+            ("failed", (n_points=nobs(g.datasets[held]), rmse=NaN, wrmse=NaN))
+        end
+        push!(rows, (group=g.id, scheme=scheme, block=string(lab), status=st, n_test=ho.n_points,
+                     rmse_heldout=ho.rmse, rmse_insample=insample.rmse, nrmse_heldout=ho.rmse / m, nrmse_insample=insample.rmse / m,
+                     wrmse_heldout=ho.wrmse, wrmse_insample=insample.wrmse))
     end
     rows
 end
 
-# time-block forecast: fit days ≤ 70% of the last day, predict the later days
-
+# time-block forecast: fit days ≤ 70% of the last day (weighted), predict the later days; starting
+# values stay those of the carried fit (a fixed nuisance value)
 function forecast(g)
     c = g.cands[1]; tmax = maximum(maximum(d.x) for d in g.datasets); split = round(VAL["forecast"]["fit_fraction"] * tmax)
     train = [sub_ds(d, d.x .<= split) for d in g.datasets]; test = [sub_ds(d, d.x .> split) for d in g.datasets]
-    test = [d for d in test if !isempty(d.x)]
+    train = [d for d in train if !isempty(d.x)]; test = [d for d in test if !isempty(d.x)]
     f = gfit(c.model, train, c.u0, c.params, c.bounds; starts=3)
     ho = evaluate(c.model, test, c.u0, f.params); ins = evaluate(c.model, test, c.u0, c.params)
     m = mean(reduce(vcat, [d.y for d in test]))
     (group=g.id, scheme="forecast", block="fit days ≤ $(Int(split)), predict days > $(Int(split))", status="completed", n_test=ho.n_points,
-     rmse_heldout=ho.rmse, rmse_insample=ins.rmse, nrmse_heldout=ho.rmse / m, nrmse_insample=ins.rmse / m)
+     rmse_heldout=ho.rmse, rmse_insample=ins.rmse, nrmse_heldout=ho.rmse / m, nrmse_insample=ins.rmse / m,
+     wrmse_heldout=ho.wrmse, wrmse_insample=ins.wrmse)
 end
 
 # blocked validations (validation.toml [[leave_out]]): (group, scheme, held-out label of each dataset)
@@ -367,12 +475,27 @@ if haskey(ck, :gsa) && get(ck[:gsa], :N, 0) == GSA_N && any(g -> !haskey(ck[:gsa
     end
     ck[:gsa] = merge(ck[:gsa], (stages=st,)); save_ck()
 end
+function gsa_full_safe()
+    try
+        gsa_full()
+    catch err
+        @warn "global sensitivity of the full treated-coculture model failed" err
+        (failed=true, key=gsa_full_key())
+    end
+end
 if !haskey(ck, :gsa) || get(ck[:gsa], :N, 0) != GSA_N
     println("\n--- global sensitivity (Sobol, N = $GSA_N) ---"); flush(stdout)
     t0 = time()
-    full = gsa_full()
+    full = gsa_full_safe()
     stages = Dict(g.id => gsa_stage(g) for g in groups)
     ck[:gsa] = (full=full, stages=stages, N=GSA_N); save_ck()
+    @printf("  done in %.0fs\n", time() - t0); flush(stdout)
+elseif get(ck[:gsa].full, :key, "") != gsa_full_key()
+    # the full model's parameter list and ranges come from the carried Stage 1, 2 and 3 models: redo it
+    # whenever any of them changed (older checkpoints have no key and are redone once)
+    println("\n--- global sensitivity of the full treated-coculture model (Stage 1, 2 or 3 changed) ---"); flush(stdout)
+    t0 = time()
+    ck[:gsa] = merge(ck[:gsa], (full=gsa_full_safe(),)); save_ck()
     @printf("  done in %.0fs\n", time() - t0); flush(stdout)
 end
 
@@ -402,14 +525,26 @@ if haskey(ck, :validation)
 end
 
 # ── intermittent dosing: 1 µM on days 0–7 then off, or off then on ─────────────────────────────
-# Predicted with no refit from each line's carried Stage 2b model (its growth is the carried
-# Stage 1 law), driven by the schedule D(t) of the data (data/schedules.toml) through the model
-# engine itself. Values are image areas normalised to cell size, so each trajectory has one scale,
-# profiled out. A second question: does the drug effect decay after removal at the build-up rate k
-# (the model's assumption)? A separate washout rate k_off of the first effect compartment while
-# D = 0 is tested and kept only if the 3-BIC rule supports it (chain and compartment kernels only).
+# The untouched validation set. Predicted with no refit and no free scale from each line's carried
+# Stage 2b model (its growth is the carried Stage 1 law), driven by the schedule D(t) of the data
+# (data/schedules.toml) through the model engine itself, from the nominal seeding at day 0 (the
+# values are image areas already normalised to cell size, i.e. ≈ cell counts). Scored as RMSE in cells
+# and nRMSE. Separately, a hypothesis test (not validation, since it fits one rate to these data):
+# does the drug effect decay after removal at the build-up rate k (the model's assumption)? A separate
+# washout rate k_off of the first effect compartment while D = 0 is fitted and kept only if the 3-BIC
+# rule supports it (weighted SSE with the run's weights; chain and compartment kernels only).
 const SP = VAL["schedule_prediction"]
 const INT_SCHED = Dict(Symbol(k) => v for (k, v) in SP["schedules"])
+SP["scale"] isa Real || error("validation.toml schedule_prediction.scale must be a number (fixed scale); a free scale is no longer supported")
+const INT_SCALE = Float64(SP["scale"])
+# one intermittent series: kept points, their scales (1 when unweighted), SEM and the nominal start
+function int_data(line, sc)
+    id = only(i for i in select_sources(; (Symbol(k) => v for (k, v) in SP["data"])..., line=line) if source(i)["schedule"] == INT_SCHED[sc])
+    s = series(id); k = keep(s); src = source(id)
+    share = (r = tryparse(Float64, string(get(src, "ratio", "100"))); r === nothing ? 1.0 : r / 100)
+    x0 = Float64(SP["nominal_count"]) * Float64(src["seeding"]) / Float64(SP["nominal_seeding"]) * share
+    (x=k.x, y=k.y, w=k.w === nothing ? ones(length(k.x)) : collect(Float64, k.w), se=Float64.(coalesce.(s.se[.!s.bad], NaN)), x0=x0, id=id)
+end
 freeze_all(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple((q = getfield(L.s, k); q.i > 0 ? Slot(0, p[q.i]) : q) for k in keys(L.s))),))
 function int_system(line, sc)
     c = gid("$(SP["model_from"])-$(lowercase(line))").cands[1]
@@ -426,45 +561,39 @@ function int_model(line, sc, koff)
     g!(du, u, p, t) = (f!(du, u, p, t); input_at(sys.envs[1].D, t) == 0 && (du[i1] += (k - koff) * u[i1]); nothing)
     sys, g!
 end
-# counts at days x from day 1 (= x0); days 0–1 run first from one cell so the effect states hold
-# one day of the schedule, as in the experiment
+# counts at days x, starting from x0 cells at day 0 (the seeding) with empty effect states; the
+# schedule starts at day 0 as in the experiment; × the fixed scale
 function int_predict(line, sc, koff, x, x0)
     sys, m = int_model(line, sc, koff)
     m === nothing && return fill(NaN, length(x))
-    u = sys_u0(sys, [[1.0]])
-    pre = solve(ODEProblem(m, u, (0.0, 1.0), Float64[]), Tsit5(); reltol=1e-9, abstol=1e-9).u[end]
-    pre[sys.xi[1][1]+1] = x0
-    sol = solve(ODEProblem(m, pre, (1.0, maximum(x)), Float64[]), Tsit5(); saveat=x, tstops=sys_breakpoints(sys), reltol=1e-9, abstol=1e-9)
-    [u[sys.xi[1][1]+1] for u in sol.u]
-end
-function int_fit_scale(line, sc, koff, x, y)
-    f(ls) = (sc_ = exp(ls); sum(abs2, y .- sc_ .* int_predict(line, sc, koff, x, y[1] / sc_)))
-    grid = range(log(0.05), log(20.0); length=40); v = [f(g) for g in grid]; i = argmin(v)
-    a, b = grid[max(i - 1, 1)], grid[min(i + 1, end)]
-    for _ in 1:40
-        c = b - (b - a) / 1.618; d = a + (b - a) / 1.618
-        f(c) < f(d) ? (b = d) : (a = c)
-    end
-    s = exp((a + b) / 2)
-    (scale=s, sse=f((a + b) / 2), pred=s .* int_predict(line, sc, koff, x, y[1] / s))
+    u = sys_u0(sys, [[x0]])
+    sol = solve(ODEProblem(m, u, (0.0, maximum(x)), Float64[]), Tsit5(); saveat=x, tstops=sys_breakpoints(sys), reltol=1e-9, abstol=1e-9)
+    i = sys.xi[1][1] + 1
+    [INT_SCALE * sol.u[findlast(τ -> isapprox(τ, t; atol=1e-9), sol.t)][i] for t in x]
 end
 if !haskey(ck, :intermittent)
-    println("\n--- intermittent dosing ---"); flush(stdout)
+    println("\n--- intermittent dosing (prediction, no refit; washout hypothesis test) ---"); flush(stdout)
     res = Dict{String,Any}()
     for line in ("A2780", "A2780cis")
-        xy = Dict(sc => (d = intermittent[line][INT_SCHED[sc]]; (d.x, d.y, Float64.(coalesce.(d.se, NaN)))) for sc in (:onoff, :offon))
-        n = sum(length(v[1]) for v in values(xy))
-        tot(koff) = sum(int_fit_scale(line, sc, koff, xy[sc][1], xy[sc][2]).sse for sc in (:onoff, :offon))
-        s_eq = tot(nothing)
-        bic(sse, k) = n * log(sse / n) + k * log(n)
-        grid = exp.(range(log(0.01), log(20.0); length=50)); vals = [tot(ko) for ko in grid]
+        D = Dict(sc => int_data(line, sc) for sc in (:onoff, :offon))
+        n = sum(length(D[sc].x) for sc in keys(D))
+        pred = Dict(sc => int_predict(line, sc, nothing, D[sc].x, D[sc].x0) for sc in keys(D))
+        sc_rmse = Dict(sc => sqrt(mean(abs2, pred[sc] .- D[sc].y)) for sc in keys(D))
+        sc_nrmse = Dict(sc => sc_rmse[sc] / mean(D[sc].y) for sc in keys(D))
+        raw = sum(sum(abs2, pred[sc] .- D[sc].y) for sc in keys(D)); rmse = sqrt(raw / n)
+        nrmse = rmse / mean(vcat([D[sc].y for sc in (:onoff, :offon)]...))
+        # washout hypothesis test (weighted SSE, as the fits): equal rates (0 extra parameters) vs k_off (1)
+        wsse(koff) = sum(sum(abs2, (int_predict(line, sc, koff, D[sc].x, D[sc].x0) .- D[sc].y) ./ D[sc].w) for sc in keys(D))
+        bic(s, k) = n * log(s / n) + k * log(n)
+        s_eq = wsse(nothing)
+        grid = exp.(range(log(0.01), log(20.0); length=50)); vals = SP["washout_test"] ? [wsse(ko) for ko in grid] : Float64[]
         ok = SP["washout_test"] && all(isfinite, vals); ib = ok ? argmin(vals) : 1
-        fits = Dict(sc => int_fit_scale(line, sc, nothing, xy[sc][1], xy[sc][2]) for sc in (:onoff, :offon))
-        res[line] = (xy=xy, n=n, sse_equal=s_eq, bic_equal=bic(s_eq, 2), koff_best=ok ? grid[ib] : NaN, sse_koff=ok ? vals[ib] : NaN,
-                     bic_koff=ok ? bic(vals[ib], 3) : NaN, profile=ok ? collect(zip(grid, vals)) : Tuple{Float64,Float64}[], fits=fits,
+        res[line] = (data=D, n=n, pred=pred, rmse=rmse, nrmse=nrmse, sc_rmse=sc_rmse, sc_nrmse=sc_nrmse, scale=INT_SCALE,
+                     wsse_equal=s_eq, bic_equal=bic(s_eq, 0), koff_best=ok ? grid[ib] : NaN, wsse_koff=ok ? vals[ib] : NaN,
+                     bic_koff=ok ? bic(vals[ib], 1) : NaN, profile=ok ? collect(zip(grid, vals)) : Tuple{Float64,Float64}[],
                      model=gid("$(SP["model_from"])-$(lowercase(line))").cands[1].name)
-        @printf("  %-9s equal rates BIC %.2f; best k_off %.3g BIC %.2f (Δ %+.2f)\n", line, bic(s_eq, 2), res[line].koff_best, res[line].bic_koff,
-                res[line].bic_koff - bic(s_eq, 2))
+        @printf("  %-9s prediction RMSE %.1f cells (nRMSE %.2f); washout test: equal rates BIC %.2f, best k_off %.3g BIC %.2f (Δ %+.2f)\n",
+                line, rmse, nrmse, res[line].bic_equal, res[line].koff_best, res[line].bic_koff, res[line].bic_koff - res[line].bic_equal)
     end
     ck[:intermittent] = res; save_ck()
 end
@@ -492,7 +621,7 @@ function page(file, title, active, body)
     html = """<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>$title</title>
 <script>window.MathJax={tex:{inlineMath:[['\\\\(','\\\\)']],displayMath:[['\\\\[','\\\\]']]}};</script><script defer src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>$nav<h1>$title</h1>
-<p class='muted'>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the model zoo run of $(Dates.format(unix2datetime(mtime(joinpath(ZOO_DIR, "zoo_state.jls"))), "yyyy-mm-dd HH:MM")) by <code>zoo_analyses.jl</code>. Every model here is a compartment model with no time-based terms; the model analysed in each fit is the carried-forward optimal model (fewest free parameters within 3 BIC of the lowest). Buttons marked $(tip("Hover over, tap or focus an i button to see how to read the graph or column next to it. Click elsewhere or press Esc to close.", "Every tip ends with what is better: lower, higher, or closer to a target value.")) explain how to read the graph or column next to them.</p>
+<p class='muted'>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the model zoo run of $(Libc.strftime("%Y-%m-%d %H:%M", mtime(joinpath(ZOO_DIR, "zoo_state.jls")))) by <code>zoo_analyses.jl</code>. Every model here is a compartment model with no time-based terms; the model analysed in each fit is the carried-forward optimal model (fewest free parameters within 3 BIC of the lowest). Buttons marked $(tip("Hover over, tap or focus an i button to see how to read the graph or column next to it. Click elsewhere or press Esc to close.", "Every tip ends with what is better: lower, higher, or closer to a target value.")) explain how to read the graph or column next to them.</p>
 $body</main></body></html>"""
     dir = joinpath(AN_DIR, file); mkpath(dir); write(joinpath(dir, "report.html"), stage_names(html))
     ddir = joinpath(AN_DOCS, file); mkpath(ddir); cp(joinpath(dir, "report.html"), joinpath(ddir, "report.html"); force=true)
@@ -517,7 +646,11 @@ const BETTER = Dict{String,Any}(
     "Best k_off (/day)" => :none,
     "Block median" => "Closer to the estimate is better; a large gap means a skewed or unstable fit.",
     "95% block bootstrap" => "Narrower is better: the parameter is more precisely determined.",
-    "95% within-trajectory bootstrap (package)" => "Narrower means more precise, but this interval is over-confident; trust the block interval.",
+    "95% within-trajectory bootstrap (iid)" => "Narrower means more precise, but this interval is over-confident; trust the block interval.",
+    "Schedule" => :none,
+    "Start (cells)" => :none,
+    "Weighted RMSE" => :lower,
+    "Held-out weighted RMSE" => :lower,
     "Chosen by the rule" => :higher,
     "Lowest BIC" => :higher,
     "Sensitivity index" => "Neither: large means the prediction depends strongly on this parameter (so it must be known precisely); near 0 means it barely matters.",
@@ -603,20 +736,20 @@ function write_bootstrap()
         bars = withtip(bars_svg("How often each candidate is chosen (top 6)", items),
                        "Each bar is the share of the $(size(r.bic, 1)) bootstrap data sets in which the selection rule picks that candidate; the dark bar is the model carried forward. One dominant bar = a stable choice; several similar bars = the data cannot separate those models.", "Better: one dominant dark bar, i.e. a stable choice.")
         push!(secs, "<section class='panel' id='$(g.id)'><h3>$(hesc(g.title))</h3>" *
-            "<p><b>Optimal model:</b> $(hesc(c.label)) (k = $(length(c.params))). Chosen by the selection rule in <b>$(pctfmt(pct(r.pick, 1)))</b> of $(size(r.bic, 1)) replicates; lowest BIC in $(pctfmt(pct(r.winner, 1))). Package bootstrap: $(pk === nothing ? "failed" : "$(pk.ok) of $NBOOT replicates completed").</p>" *
+            "<p><b>Optimal model:</b> $(hesc(c.label)) (k = $(length(c.params))). Chosen by the selection rule in <b>$(pctfmt(pct(r.pick, 1)))</b> of $(size(r.bic, 1)) replicates; lowest BIC in $(pctfmt(pct(r.winner, 1))). Within-trajectory (iid) bootstrap: $(pk === nothing ? "failed" : "$(pk.ok) of $NBOOT replicates completed").</p>" *
             "<div class='grid'><div>$bars</div><div>$(withtip(plot, T_BAND, "Better: the line runs through the points and the shaded band is narrow."))</div></div>" *
             table([("Parameter", "Symbol of the fitted parameter; values carried over from earlier stages are fixed and not bootstrapped here."),
                    ("Estimate", "Value fitted to the real data."),
                    ("Block median", "Median of the values refitted to the bootstrap data sets."),
                    ("95% block bootstrap", "95% of the bootstrap refits fall in this range. Residuals are resampled in 3-day blocks, which keeps day-to-day correlation: this is the interval to use."),
-                   ("95% within-trajectory bootstrap (package)", "Same idea with GrowthParameterEstimation.bootstrap_joint_fit, which resamples each day's residual independently. It ignores correlation between neighbouring days, so it is usually narrower (over-confident)."),
+                   ("95% within-trajectory bootstrap (iid)", "Same idea, but each day's standardised residual (residual ÷ its weight scale) is resampled independently within its trajectory, the scheme of GrowthParameterEstimation.bootstrap_joint_fit, with the same residual weights as the fit. It ignores correlation between neighbouring days, so it is usually narrower (over-confident)."),
                    ("", "Flags an interval that runs into the search limit: the data do not bound the parameter on that side.", "Better: no flag, i.e. the data bound the parameter.")], prow) *
-            "<p class='muted'>Residual lag-1 autocorrelation of the optimal fit: $(isempty(acf) ? "—" : join([@sprintf("%.2f", a) for a in acf], ", ")) (mean $(isempty(acf) ? "—" : @sprintf("%.2f", mean(acf))))$(tip("Correlation between each day's fit error and the next day's, one value per trajectory. 0 = independent errors; positive = errors come in runs, so treating days as independent overstates certainty. That is why whole 3-day blocks are resampled.", "Closer to 0 is better (independent errors).")). Positive values mean neighbouring days are correlated, which is why whole 3-day blocks of residuals are resampled.</p></section>")
+            "<p class='muted'>Residual lag-1 autocorrelation of the optimal fit: $(isempty(acf) ? "—" : join([@sprintf("%.2f", a) for a in acf], ", ")) (mean $(isempty(acf) ? "—" : @sprintf("%.2f", mean(acf))))$(tip("Correlation between each day's standardised fit error (residual ÷ its weight scale) and the next day's, one value per trajectory. 0 = independent errors; positive = errors come in runs, so treating days as independent overstates certainty. That is why whole 3-day blocks are resampled.", "Closer to 0 is better (independent errors).")). Positive values mean neighbouring days are correlated, which is why whole 3-day blocks of residuals are resampled.</p></section>")
     end
     CSV.write(joinpath(AN_DIR, "bootstrap_parameters.csv"), DataFrame(csvp)); CSV.write(joinpath(AN_DIR, "bootstrap_selection.csv"), DataFrame(csvs))
     summ = [trow([td("<a href='#$(g.id)'>$(hesc(g.title))</a>"), td(hesc(g.cands[1].label)), tn(pctfmt(pct(results[g.id].res.pick, 1))), tn(pctfmt(pct(results[g.id].res.winner, 1)))]) for g in groups]
     page("bootstrap", "Bootstrapping — compartment models", "bootstrap", """
-<div class='intro'><p><b>Method.</b> Each fit is resampled $BOOT_B times. The residuals of the most complex candidate are resampled in circular blocks of $BLOCK days within each trajectory (day 0 kept as observed) and added back to its fit; <b>every candidate</b> is refitted to every replicate and the selection rule (fewest free parameters within 3 BIC of the lowest; shared cisplatin structure across lines; Stage 1b shared-vs-separate test) is replayed on each. This gives how often the optimal model is chosen, 95% parameter intervals and the band around the fit. For comparison the optimal model is also passed through <code>GrowthParameterEstimation.bootstrap_joint_fit</code>, which resamples residuals one by one within each trajectory, as the earlier linked-treatment reports did; it ignores day-to-day correlation, so its intervals are usually narrower.</p></div>
+<div class='intro'><p><b>Method.</b> Each fit is resampled $BOOT_B times. The standardised residuals (residual ÷ its weight scale) of the generating model are resampled in circular blocks of $BLOCK days within each trajectory, rescaled and added back to its fit; <b>every candidate</b> is refitted to every replicate and the selection rule (fewest free parameters within 3 BIC of the lowest; shared cisplatin structure across lines; Stage 1b shared-vs-separate test) is replayed on each. This gives how often the optimal model is chosen, 95% parameter intervals and the band around the fit. For comparison the optimal model is also refitted to a within-trajectory bootstrap that resamples the standardised residuals one by one (the scheme of <code>GrowthParameterEstimation.bootstrap_joint_fit</code>, used by the earlier linked-treatment reports; it is run here with the same residual weights as the fits, because the package routine cannot resample weighted data); it ignores day-to-day correlation, so its intervals are usually narrower.</p></div>
 <h2>Selection stability</h2>$(table([("Fit", "The data set and stage."), ("Optimal model", "The model carried forward: fewest free parameters within 3 BIC of the lowest."),
     ("Chosen by the rule", "Share of the bootstrap data sets in which the same selection rule picks this model. Above about 70% the choice is robust; low values mean another model is about as good."),
     ("Lowest BIC", "Share of the bootstrap data sets in which this model had the lowest BIC outright, before preferring fewer parameters. It can differ from 'chosen' when a model with more terms often fits slightly better.")], summ))
@@ -625,13 +758,13 @@ function write_bootstrap()
 end
 
 # ---- sensitivity page
-function profile_svg(title, prof, est; W=360, H=200)
+function profile_svg(title, prof, est, thr; W=360, H=200)
     L, R, T, B = 44, 12, 24, 30
-    vs = [p.v for p in prof]; ds = [min(p.d, 30.0) for p in prof]
+    vs = [p.v for p in prof]; ds = [clamp(p.d, 0.0, 30.0) for p in prof]
     x0, x1 = minimum(vs), maximum(vs); x1 > x0 || (x1 = x0 + 1)
     sx(v) = L + (v - x0) / (x1 - x0) * (W - L - R); sy(d) = H - B - d / 30 * (H - T - B)
     p = ["<svg viewBox='0 0 $W $H' role='img' aria-label='$(hesc(title))'><rect width='100%' height='100%' fill='white'/><text x='$L' y='15' font-size='12' font-weight='bold'>$(hesc(title))</text>",
-         @sprintf("<line x1='%d' x2='%d' y1='%.1f' y2='%.1f' stroke='#b45309' stroke-dasharray='4,3'/><text x='%d' y='%.1f' font-size='9' fill='#b45309'>3.84</text>", L, W - R, sy(3.84), sy(3.84), W - R - 22, sy(3.84) - 3),
+         @sprintf("<line x1='%d' x2='%d' y1='%.1f' y2='%.1f' stroke='#b45309' stroke-dasharray='4,3'/><text x='%d' y='%.1f' font-size='9' fill='#b45309' text-anchor='end'>%.2f</text>", L, W - R, sy(thr), sy(thr), W - R, sy(thr) - 3, thr),
          "<line x1='$L' y1='$(H-B)' x2='$(W-R)' y2='$(H-B)' stroke='#555'/><line x1='$L' y1='$T' x2='$L' y2='$(H-B)' stroke='#555'/>",
          @sprintf("<text x='%d' y='%.1f' font-size='9' text-anchor='end'>0</text><text x='%d' y='%.1f' font-size='9' text-anchor='end'>30</text>", L - 4, sy(0) + 3, L - 4, sy(30) + 3),
          @sprintf("<text x='%d' y='%d' font-size='9'>%s</text><text x='%d' y='%d' font-size='9' text-anchor='end'>%s</text>", L, H - B + 13, fmt(x0), W - R, H - B + 13, fmt(x1)),
@@ -640,7 +773,7 @@ function profile_svg(title, prof, est; W=360, H=200)
          join([@sprintf("<circle cx='%.1f' cy='%.1f' r='2.5' fill='#176b87'/>", sx(v), sy(d)) for (v, d) in zip(vs, ds)]), "</svg>"]
     join(p)
 end
-const T_PROFILE = "Profile likelihood. x: the value this parameter is fixed at (0.5× to 2× the estimate). y: n·ln(SSE/SSE_min) after refitting the other parameters, 0 at the best fit and capped at 30. Values under the dashed 3.84 line fit the data equally well (95% level). A narrow valley = well determined; a flat curve = poorly determined. Grey line: the estimate."
+const T_PROFILE = "Profile likelihood. x: the value this parameter is fixed at (0.5× to 2× the estimate). y: d = n·ln(SSE_w/SSE_w,min) after refitting the other parameters with the same residual weights as the fit (SSE_w = weighted sum of squared residuals; SSE_w,min = the lowest value found by the carried fit or any profile refit), 0 at the best fit and capped at 30. Values under the dashed line fit the data equally well at the 95% level; the line is the small-sample threshold n·ln(1 + F(1, n−k; 0.95)/(n−k)), slightly above the large-sample 3.84. The interval ends are interpolated between grid points. A narrow valley = well determined; a flat curve = poorly determined. Grey line: the estimate."
 
 # grouped bars of Sobol indices for one output: first-order (dark) and total (light), with 95% whiskers
 function sobol_svg(title, names, rows; W=560)
@@ -669,40 +802,47 @@ function write_sensitivity()
         append!(si_all, si); append!(pr_all, [Base.structdiff(p, NamedTuple{(:profile,)}) for p in pr])
         maxsi = maximum(filter(isfinite, [s.si for s in si]); init=1.0)
         rows = String[]
+        prange(p) = p.at_bound ? "at bound" : isempty(p.profile) ? "—" :
+            (isfinite(p.ci_lo) ? fmt(p.ci_lo) : "< $(fmt(p.grid_lo))") * " – " * (isfinite(p.ci_hi) ? fmt(p.ci_hi) : "> $(fmt(p.grid_hi))")
         for (s, p) in zip(si, pr)
             status = p.status == "identifiable" ? "<span class='ok'>identifiable</span>" : "<span class='flag'>$(p.status)</span>"
             push!(rows, trow([td(pl(s.param)), tn(fmt(s.value)), tn(@sprintf("%.2f", s.si)),
                             td(@sprintf("<svg viewBox='0 0 120 12' style='width:120px;margin:0'><rect width='%.1f' height='10' fill='#176b87'/></svg>", 120 * (isfinite(s.si) ? s.si : 0) / maxsi)),
-                            tn(isfinite(p.ci_lo) ? "$(fmt(p.ci_lo)) – $(fmt(p.ci_hi))" : "—"), td(status),
-                            td(p.near_bound ? "<span class='flag'>at the edge of its search range</span>" : "inside bounds")]))
+                            tn(prange(p)), td(status),
+                            td(p.at_bound ? "<span class='flag'>at a search bound</span>" : p.near_bound ? "<span class='flag'>at the edge of its search range</span>" : "inside bounds")]))
         end
-        plots = join([withtip(profile_svg("$(s.param)", p.profile, p.estimate), T_PROFILE, "Better: a deep, narrow valley, i.e. a well-determined parameter.") for (s, p) in zip(si, pr)])
+        thr = isempty(pr) ? NaN : pr[1].threshold
+        plots = join([withtip(profile_svg("$(s.param)", p.profile, p.estimate, p.threshold), T_PROFILE, "Better: a deep, narrow valley, i.e. a well-determined parameter.")
+                      for (s, p) in zip(si, pr) if length(p.profile) >= 2])
         push!(secs, "<section class='panel' id='$(g.id)'><h3>$(hesc(g.title)) · $(hesc(c.label))</h3>" *
             table([("Parameter", "Fitted parameter of this stage's carried model."), ("Estimate", "Value fitted to the data."),
                    ("Sensitivity index", "Local sensitivity: how much the predicted curves change when this parameter is moved ±10% with the others held fixed, divided by 0.1. 1 = proportional response; above 1 = the prediction amplifies changes in it; near 0 = the prediction barely depends on it."),
                    ("", "Bar length = sensitivity index relative to the largest one in this fit.", "Neither: a long bar means the prediction depends strongly on this parameter."),
-                   ("Profile 95% range (within 0.5–2×)", "Values of this parameter the data cannot distinguish from the best fit once the other parameters are refitted (profile likelihood within 3.84 of its minimum), searched from 0.5× to 2× the estimate. A range touching 0.5× or 2× may extend further."),
-                   ("Profile", "Identifiable: the data pin the value on both sides. One-sided: only an upper or a lower limit is pinned. Flat: within 0.5–2× the data hardly constrain it, usually because it trades off against another parameter."),
-                   ("Bound check", "Whether the estimate sits against its search limit (top 2% of the range, or pinned at the lower limit); if so the limit should be widened and the model refitted.")], rows) *
+                   ("Profile 95% range (within 0.5–2×)", "Values of this parameter the data cannot distinguish from the best fit once the other parameters are refitted with the residual weights (d = n·ln(SSE_w/SSE_w,min) below the small-sample 95% threshold n·ln(1 + F(1, n−k; 0.95)/(n−k)) = $(isfinite(thr) ? @sprintf("%.2f", thr) : "—") for this fit), searched from 0.5× to 2× the estimate; the ends are interpolated between grid points. '< a' or '> b': the threshold is not crossed inside the grid, so the range extends at least that far. 'at bound': the estimate sits on a search bound and was not profiled."),
+                   ("Profile", "Identifiable: the data pin the value on both sides. One-sided: only an upper or a lower limit is pinned. Flat: within 0.5–2× the data hardly constrain it, usually because it trades off against another parameter. At bound: the estimate is on its search limit (often a term the data push to 0), so the profile test does not apply."),
+                   ("Bound check", "Whether the estimate sits on its search limit (within 0.1% of the range) or near it (top 2% of the range, or pinned at the lower limit); if so the limit may need widening, or the term is not supported by the data.")], rows) *
+            "<p class='muted'>n = $(isempty(pr) ? "—" : pr[1].n) points, k = $(length(c.params)) parameters; 95% profile threshold $(isfinite(thr) ? @sprintf("%.2f", thr) : "—") (large-sample χ² value 3.84).</p>" *
             "<div class='grid'>$plots</div></section>")
     end
     CSV.write(joinpath(AN_DIR, "sensitivity_local.csv"), DataFrame(si_all)); CSV.write(joinpath(AN_DIR, "sensitivity_profile.csv"), DataFrame(pr_all))
     top = sort(filter(s -> isfinite(s.si), si_all); by=s -> -s.si)
     toprows = [trow([td(hesc(gid(s.group).title)), td(pl(s.param)), tn(@sprintf("%.2f", s.si)), tn(@sprintf("%.1f%%", 100 * s.max_rel_change))]) for s in top[1:min(10, end)]]
-    nflat = count(p -> p.status != "identifiable", pr_all)
-    nb = count(p -> p.near_bound, pr_all)
+    nflat = count(p -> p.status != "identifiable" && !p.at_bound, pr_all)
+    nab = count(p -> p.at_bound, pr_all)
+    nb = count(p -> p.near_bound || p.at_bound, pr_all)
 
     # global sensitivity
-    G = ck[:gsa]; F = G.full
+    G = ck[:gsa]; F = G.full; hasfull = !get(F, :failed, false)
     gcsv = NamedTuple[]
-    for r in F.rows
+    for r in (hasfull ? F.rows : NamedTuple[])
         push!(gcsv, (scope="treated coculture, all parameters", output=F.outputs[r.output], param=F.names[r.param], lo=F.lo[r.param], hi=F.hi[r.param],
                      S1=r.S1, S1_lo=r.S1_lo, S1_hi=r.S1_hi, ST=r.ST, ST_lo=r.ST_lo, ST_hi=r.ST_hi, n=r.n_ok))
     end
-    fullcharts = join([withtip(sobol_svg(o, F.names, [r for r in F.rows if r.output == j]), T_SOBOL * " Output: " * o * ".", "Neither: long bars mark the parameters that drive the prediction's uncertainty, the ones worth measuring more precisely.") for (j, o) in enumerate(F.outputs)])
+    fullcharts = !hasfull ? "<p class='flag'>The global sensitivity of the full model failed in this run (see the log).</p>" :
+        join([withtip(sobol_svg(o, F.names, [r for r in F.rows if r.output == j]), T_SOBOL * " Output: " * o * ".", "Neither: long bars mark the parameters that drive the prediction's uncertainty, the ones worth measuring more precisely.") for (j, o) in enumerate(F.outputs)])
     src_title = Dict(g.id => g.title for g in groups)
-    rangerows = [trow([td(pl(n)), tn("$(fmt(F.lo[i])) – $(fmt(F.hi[i]))"), td(hesc(src_title[F.carried[i]]))]) for (i, n) in enumerate(F.names)]
-    outstat = [trow([td(hesc(o)), tn(fmt(first(r.mean_out for r in F.rows if r.output == j))), tn(fmt(first(r.sd_out for r in F.rows if r.output == j)))]) for (j, o) in enumerate(F.outputs)]
+    rangerows = !hasfull ? String[] : [trow([td(pl(n)), tn("$(fmt(F.lo[i])) – $(fmt(F.hi[i]))"), td(hesc(src_title[F.carried[i]]))]) for (i, n) in enumerate(F.names)]
+    outstat = !hasfull ? String[] : [trow([td(hesc(o)), tn(fmt(first(r.mean_out for r in F.rows if r.output == j))), tn(fmt(first(r.sd_out for r in F.rows if r.output == j)))]) for (j, o) in enumerate(F.outputs)]
     stagerows = String[]
     for g in groups
         S = G.stages[g.id]
@@ -715,25 +855,25 @@ function write_sensitivity()
     end
     CSV.write(joinpath(AN_DIR, "sensitivity_global.csv"), DataFrame(gcsv))
     # the parameter with the largest total index for the resistant fraction
-    rf = sort([r for r in F.rows if r.output == 4]; by=r -> -r.ST)
+    rf = hasfull ? sort([r for r in F.rows if r.output == 4]; by=r -> -r.ST) : NamedTuple[]
     lead = isempty(rf) ? "" : "For the resistant fraction at day 14 the largest total index is $(pl(F.names[rf[1].param])) (ST = $(@sprintf("%.2f", rf[1].ST)))" *
                               (length(rf) > 1 ? ", then $(pl(F.names[rf[2].param])) ($(@sprintf("%.2f", rf[2].ST)))" : "") * "."
 
     page("sensitivity", "Sensitivity analysis — compartment models", "sensitivity", """
 <div class='intro'><p>Three views of how the fitted models depend on their parameters:</p><ul>
-<li><b>Global sensitivity (Sobol indices)</b>: every parameter varied together across its whole plausible range (its 95% bootstrap interval), and the variance of an output split between parameters. This is the view that matters for optimal control: which uncertain parameters actually change the predicted outcome.</li>
+<li><b>Global sensitivity (Sobol indices)</b>: every parameter varied together, each drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, and the variance of an output split between parameters. This is the view that matters for optimal control: which uncertain parameters actually change the predicted outcome. Two caveats: correlations between parameters in the bootstrap are ignored, so combinations the data rule out are sampled too; and a parameter pinned at a bound (its interval collapses, so it is varied by only ±1%) or held fixed shows an index of about 0 by construction, not because it is unimportant.</li>
 <li><b>Local sensitivity</b>: the index of <code>GrowthParameterEstimation.parameter_sensitivity_analysis</code>, each fitted parameter moved ±10% with the others held: \\(SI = \\max|\\Delta \\hat y| / \\max(\\hat y, 1) / 0.1\\) over every observed trajectory. (The package function handles one-state models, so the same formula is applied here to the multi-state compartment models.)</li>
-<li><b>Profile likelihood</b>: each parameter fixed at 0.5× to 2× its estimate and the others refitted with <code>run_joint_multistart</code>, to see whether the data pin it down; plus the bound check of <code>profile_joint_fit_bounds</code> ($(nb == 0 ? "no estimate sits at a search limit, so no bound needed widening" : "$(nb) estimate(s) sit at a search limit")).</li></ul>
-<p class='note'>$(nflat) of $(length(pr_all)) fitted parameters are not fully identifiable from these data. $lead</p></div>
+<li><b>Profile likelihood</b>: each parameter fixed at 0.5× to 2× its estimate and the others refitted with <code>run_joint_multistart</code> (3 starts, the same residual weights as the fit), to see whether the data pin it down. The profile is \\(d(\\theta) = n\\ln(SSE_w(\\theta)/SSE_{w,min})\\) and a value is inside the 95% range while \\(d\\) stays below the small-sample threshold \\(n\\ln(1 + F_{1,n-k;0.95}/(n-k))\\) ($(isempty(pr_all) ? "—" : @sprintf("%.2f–%.2f", extrema(p.threshold for p in pr_all)...)) for these fits, against 3.84 for large n); the range ends are interpolated between grid points. Estimates on a search bound are flagged and not profiled ($(nb == 0 ? "no estimate sits at or near a search limit" : "$(nb) estimate(s) sit at or near a search limit, $(nab) of them on it")).</li></ul>
+<p class='note'>$(nflat) of $(length(pr_all) - nab) profiled parameters are not pinned on both sides within 0.5–2× of their estimate$(nab > 0 ? "; $(nab) more sit on a search bound" : ""). $lead</p></div>
 
-<h2>Global sensitivity: the treated coculture, all parameters $(tip("The Stage 3 model of the 50:50 coculture at 1 µM cisplatin, with every parameter free, including those carried over from Stages 1 and 2. Each is drawn uniformly across its 95% block-bootstrap interval; $(GSA_N) × (k + 2) model runs (Saltelli sampling). Outputs are the predicted counts on day 14.", :none))</h2>
+<h2>Global sensitivity: the treated coculture, all parameters $(tip("The Stage 3 model of the 50:50 coculture at 1 µM cisplatin, started from the nominal seeding, with every free parameter of the carried Stage 3 model and every parameter it inherits unchanged from the carried Stage 1 and Stage 2 models varied together (the list is built from the current models). Each is drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, ignoring correlations; a parameter pinned at a bound or fixed shows ≈ 0 by construction. $(GSA_N) × (k + 2) model runs (Saltelli sampling). Outputs are the predicted counts on day 14.", :none))</h2>
 <div class='grid'>$fullcharts</div>
-<div class='grid'><div>$(table([("Parameter", "Every parameter of the treated-coculture model."), ("Range varied", "Uniform range used for the draws: the parameter's 95% block-bootstrap interval, i.e. its plausible range given the data."), ("Fitted in", "The stage whose data determine this parameter.")], rangerows))</div>
+<div class='grid'><div>$(table([("Parameter", "Every varied parameter of the treated-coculture model."), ("Range varied", "Uniform range used for the draws: the parameter's marginal 95% block-bootstrap percentile interval (±1% of the estimate if that interval collapses at a bound)."), ("Fitted in", "The stage whose data determine this parameter.")], rangerows))</div>
 <div>$(table([("Output", "What is predicted: day-14 counts in the 50:50 treated coculture."), ("Mean", "Average of the output across all parameter draws."), ("SD", "Standard deviation across the draws: how much the output varies over the plausible parameter ranges. Sobol indices split this variance.")], outstat))</div></div>
 
 <h2>Global sensitivity: each stage's own parameters</h2>
 $(table([("Fit", "The stage and data set."), ("Output", "Predicted count on the last observed day of the named trajectory."), ("Parameter", "Free parameter of that stage's carried model; carried values are held fixed."),
-         ("Range varied", "Uniform range for the draws: the 95% block-bootstrap interval."),
+         ("Range varied", "Uniform range for the draws: the marginal 95% block-bootstrap percentile interval (drawn independently of the other parameters; ±1% of the estimate if the interval collapses at a bound, which gives an index ≈ 0 by construction)."),
          ("First-order S1 (95%)", "Share of the output's variance caused by this parameter alone. Values near 0 can be slightly negative from sampling noise."),
          ("Total ST (95%)", "Share of the output's variance involving this parameter, including interactions. ST ≈ 0: the parameter could be fixed without changing this output.")], stagerows))
 
@@ -746,76 +886,98 @@ end
 function intermittent_html()
     haskey(ck, :intermittent) || return ""
     I = ck[:intermittent]
-    rows = String[]; plots = String[]
+    prow = String[]; trows = String[]; plots = String[]
+    labs = ((:onoff, "1 µM days 0–7, then off"), (:offon, "off, then 1 µM from day 7"))
     for line in ("A2780", "A2780cis")
         R = I[line]
-        m = mean(vcat(R.xy[:onoff][2], R.xy[:offon][2]))
-        rm = sqrt(R.sse_equal / R.n)
+        for (sc, lab) in labs
+            push!(prow, trow([td(line), td(lab), tn(fmt(R.data[sc].x0)), tn(length(R.data[sc].x)), tn(fmt(R.sc_rmse[sc])), tn(@sprintf("%.2f", R.sc_nrmse[sc]))]))
+        end
+        push!(prow, trow([td("<b>$line</b>"), td("both schedules"), td("—"), tn(R.n), tn(fmt(R.rmse)), tn(@sprintf("%.2f", R.nrmse))]; cls="win"))
         d = R.bic_koff - R.bic_equal
-        push!(rows, trow([td(line), tn(fmt(rm)), tn(@sprintf("%.2f", rm / m)), tn(@sprintf("%.2f", R.bic_equal)), tn(isfinite(R.koff_best) ? fmt(R.koff_best) : "—"), tn(isfinite(R.bic_koff) ? @sprintf("%.2f", R.bic_koff) : "—"),
-                          td(!isfinite(d) ? "not tested (kernel has no effect compartment)" :
-                             @sprintf("%+.2f", d) * (d > -3 ? " <span class='ok'>equal rates kept</span>" : " <span class='flag'>separate washout supported</span>"))]))
-        for (sc, lab) in ((:onoff, "1 µM days 0–7, then off"), (:offon, "off, then 1 µM from day 7"))
-            x, y, se = R.xy[sc]; f = R.fits[sc]
-            ts = collect(1.0:0.1:maximum(x)); pred = f.scale .* int_predict(line, sc, nothing, ts, y[1] / f.scale)
-            ymax = ceil(max(maximum(y .+ se), maximum(pred)) * 1.1; sigdigits=2)
-            series = [(panel=1, name="observed (area)", color=line == "A2780" ? BLUE : ORANGE, filled=true, dashed=false, state=1, x=x, y=y, xbad=Float64[], ybad=Float64[])]
+        push!(trows, trow([td(line), tn(@sprintf("%.2f", R.bic_equal)), tn(isfinite(R.koff_best) ? fmt(R.koff_best) : "—"), tn(isfinite(R.bic_koff) ? @sprintf("%.2f", R.bic_koff) : "—"),
+                           td(!isfinite(d) ? "not tested (kernel has no effect compartment)" :
+                              @sprintf("%+.2f", d) * (d > -3 ? " <span class='ok'>equal rates kept</span>" : " <span class='flag'>separate washout supported</span>"))]))
+        for (sc, lab) in labs
+            D = R.data[sc]
+            ts = collect(0.0:0.1:maximum(D.x)); pred = int_predict(line, sc, nothing, ts, D.x0)
+            se = [isfinite(v) ? v : 0.0 for v in D.se]
+            ymax = ceil(max(maximum(D.y .+ se), maximum(pred)) * 1.1; sigdigits=2)
+            series = [(panel=1, name="observed (cells)", color=line == "A2780" ? BLUE : ORANGE, filled=true, dashed=false, state=1, x=D.x, y=D.y, xbad=Float64[], ybad=Float64[])]
             svg = zoo_band_svg("$line · $lab: prediction (line) vs data (points)", series, ts, [[v] for v in pred], nothing, 14.0, ymax)
-            push!(plots, withtip(svg, "Points: measured cell area (µm², mean of 3 wells) in the intermittent experiment. Line: the Stage 1 growth + Stage 2 drug model, not refitted to these data; only one area-per-cell scale is fitted per trajectory. The drug switch at day 7 tests whether the model's delay and recovery are right.", "Better: the line runs through the points and the shaded band is narrow."))
+            push!(plots, withtip(svg, "Points: measured cells in the intermittent experiment (image area normalised to cell size, i.e. ≈ cell counts; mean of 3 wells). Line: the carried Stage 1 growth + Stage 2b drug model, started from the nominal seeding ($(fmt(D.x0)) cells at day 0) and driven by the schedule. Nothing is fitted to these data: no refit and no free scale. The drug switch at day 7 tests whether the model's delay and recovery are right.", "Better: the line runs through the points."))
         end
     end
-    """<h2>Intermittent dosing (drug switched on or off at day 7)</h2>
-<div class='intro'><p>The intermittent monoculture experiments (30k; 1 µM cisplatin for days 0–7 then removed, or added from day 7) were never used for fitting. The Stage 1 growth and Stage 2 drug models predict them with no refit (values are image areas, so one area-per-cell scale is profiled per trajectory). They also test the one untested assumption that matters for scheduling: after the drug is removed, the drug effect decays at the same rate k as it built up. A separate washout rate \\(k_{off}\\) is fitted and kept only if it passes the 3-BIC rule.</p></div>
-$(table([("Line", "Cell line; each row uses both intermittent trajectories of that line."), ("RMSE (µm²)", "Error of the no-refit prediction, in image-area units."),
-         ("nRMSE", T_NRMSE), ("BIC, equal rates", "BIC of the prediction with decay rate = build-up rate (the model as fitted)."),
-         ("Best k_off (/day)", "Separate decay rate after the drug is removed that fits best."), ("BIC with k_off", "BIC with that extra parameter."),
-         ("ΔBIC", "BIC(with k_off) − BIC(equal rates). Negative by more than 3 would justify the extra washout parameter.")], rows))
-<div class='grid'>$(join(plots))</div>"""
+    """<h2>Intermittent dosing (drug switched on or off at day 7): the untouched validation set</h2>
+<div class='intro'><p>The intermittent monoculture experiments (30k seeding; 1 µM cisplatin for days 0–7 then removed, or added from day 7) were never used for fitting or for choosing any model. The carried Stage 1 growth and Stage 2b drug models predict them with <b>no refit and no free scale</b>: the values are image areas already normalised to cell size, i.e. ≈ cell counts, and each prediction starts from the nominal seeding at day 0. This is the cleanest validation in this report.</p></div>
+$(table([("Line", "Cell line."), ("Schedule", "The dose schedule of the trajectory; the highlighted row pools both schedules of the line."),
+         ("Start (cells)", "Starting count at day 0 used for the prediction: the nominal seeding, not a fitted value."), ("Points", "Number of measurements scored."),
+         ("RMSE (cells)", "Error of the no-refit prediction, in cells. " * T_RMSE), ("nRMSE", T_NRMSE)], prow))
+<div class='grid'>$(join(plots))</div>
+<h3>Washout hypothesis test (not a validation)</h3>
+<p>Separately, these data test the one untested assumption that matters for scheduling: after the drug is removed, the drug effect decays at the same rate \\(k\\) as it built up. A separate washout rate \\(k_{off}\\) of the first effect compartment while the dose is 0 is <i>fitted to these data</i> (one parameter, everything else fixed), so this part is a hypothesis test, not a validation. BICs use the weighted SSE with the same residual weights as the fits; the extra rate is kept only if it lowers the BIC by more than 3.</p>
+$(table([("Line", "Cell line; each row uses both intermittent trajectories of that line."),
+         ("BIC, equal rates", "BIC of the no-refit prediction (decay rate = build-up rate, the model as fitted; no free parameters)."),
+         ("Best k_off (/day)", "Separate decay rate after the drug is removed that fits best."), ("BIC with k_off", "BIC with that one extra parameter."),
+         ("ΔBIC", "BIC(with k_off) − BIC(equal rates). Negative by more than 3 would justify the extra washout parameter.")], trows))"""
 end
 
 # ---- validation page
 function write_validation()
     V = ck[:validation]
     CSV.write(joinpath(AN_DIR, "validation_blocked.csv"), DataFrame(V.rows))
+    write_heldout_csv(V, ZOO_DIR)          # the same file as run_heldout.jl, from this run's checkpoint
+    wr(x) = isfinite(x) ? @sprintf("%.2f", x) : "—"
     rows = [trow([td(hesc(gid(r.group).title)), td(hesc(r.scheme)), td(hesc(r.block)), tn(r.n_test),
                 tn(isfinite(r.rmse_heldout) ? fmt(r.rmse_heldout) : "failed"), tn(fmt(r.rmse_insample)),
                 tn(isfinite(r.nrmse_heldout) ? @sprintf("%.2f", r.nrmse_heldout) : "—"), tn(@sprintf("%.2f", r.nrmse_insample)),
+                tn(wr(get(r, :wrmse_heldout, NaN))),
                 tn(isfinite(r.rmse_heldout) ? @sprintf("%.2f", r.rmse_heldout / r.rmse_insample) : "—")]) for r in V.rows]
     prim = V.ce1[1]; m = heldout_ce1_model(βN2, βC2)
-    ts, sol = dense(m, c3.u0, prim.params, XMAX; dt=0.1)
+    ts, sol = dense(m, U0_CE1, prim.params, XMAX; dt=0.1)
     series = zoo_series(g3)
-    T_CE1 = "Points: the measured treated (Ce1, 1 µM) coculture, never used to fit these lines. Lines: the prediction from crowding fitted to the untreated cocultures plus the monoculture drug fits. Blue = sensitive A2780, orange = resistant A2780cis. Close agreement = the model generalises to a condition it has not seen."
+    T_CE1 = "Points: the measured treated (Ce1, 1 µM) coculture, not used to fit these predictions. Lines: the prediction from crowding fitted to the untreated cocultures plus the monoculture drug fits, started from the nominal seeding. Blue = sensitive A2780, orange = resistant A2780cis. Close agreement = the model generalises to this condition."
     plots = join([withtip(zoo_band_svg("Held-out Ce1 · $pt: prediction (lines) vs data (points)", [s for s in series if s.panel == pn && s.dashed], ts, sol.u, nothing, XMAX, YMAX), T_CE1, "Better: the lines run through the points.")
                   for (pn, pt) in enumerate(zoo_panels(g3))])
     fitplots = join([withtip(zoo_band_svg("Ce0 · $pt: crowding fitted here", [s for s in series if s.panel == pn && !s.dashed], ts, sol.u, nothing, XMAX, YMAX),
                              "The untreated (Ce0) cocultures that the crowding terms were fitted to for this validation. Points: data; lines: the fit.", "Better: the lines run through the points.")
                      for (pn, pt) in enumerate(zoo_panels(g3))])
     n1 = nobs(g3.datasets[CE1]); m1 = mean(reduce(vcat, [d.y for d in g3.datasets[CE1]]))
+    bev = get(V, :ce1_baseline_ev, nothing)
     ce1rows = vcat([trow([td(hesc(v.variant)), td(join(["$(pl(n)) = $(fmt(x))" for (n, x) in zip(c3.pnames[HO_RI], v.params)], ", ")),
-                        tn(fmt(v.pred.rmse)), tn(@sprintf("%.2f", v.pred.rmse / m1))]; cls=i == 1 ? "win" : "") for (i, v) in enumerate(V.ce1)],
-                   [trow([td("In-sample reference: the Stage 3 optimal model fitted with Ce1"), td("—"), tn(fmt(V.ce1_full.rmse)), tn(@sprintf("%.2f", V.ce1_full.rmse / m1))]),
+                        tn(fmt(v.pred.rmse)), tn(@sprintf("%.2f", v.pred.rmse / m1)), tn(wr(get(v.pred, :wrmse, NaN)))]; cls=i == 1 ? "win" : "") for (i, v) in enumerate(V.ce1)],
+                   [trow([td("In-sample reference: the Stage 3 optimal model fitted with Ce1"), td("—"), tn(fmt(V.ce1_full.rmse)), tn(@sprintf("%.2f", V.ce1_full.rmse / m1)), tn(wr(get(V.ce1_full, :wrmse, NaN)))]),
                     trow([td(get(V, :ce1_baseline, "no_change") == "logistic" ? "Untreated-growth reference: the same logistic growth and crowding fitted to Ce0, no drug term" :
-                              "No-change reference: each trajectory stays at its day-0 count"), td("—"), tn(fmt(V.ce1_baseline_rmse)), tn(@sprintf("%.2f", V.ce1_baseline_rmse / m1))])])
+                              "No-change reference: each trajectory stays at its starting count"), td("—"), tn(fmt(V.ce1_baseline_rmse)), tn(@sprintf("%.2f", V.ce1_baseline_rmse / m1)),
+                         tn(wr(bev === nothing ? NaN : bev.wrmse))])])
+    B = get(V, :ce1_boot, nothing)
+    boottxt = B === nothing ? "" :
+        "<p>Prediction minus untreated reference: RMSE difference <b>$(fmt(B.diff)) cells</b> (95% paired bootstrap interval $(fmt(B.lo)) to $(fmt(B.hi)); $(pctfmt(100 * B.share_below0)) of the $(B.B) draws below 0)$(tip("The $(B.n_traj) Ce1 trajectories are resampled with replacement and both RMSEs are recomputed on the same draw (predictions fixed, no refit). An interval entirely below 0 means the drug model predicts Ce1 better than untreated growth, beyond trajectory-to-trajectory variation. The sensitive and resistant series of one well are resampled as separate trajectories although they are correlated, so the interval is somewhat narrow.", "More negative is better: the drug model beats the untreated reference by more."))</p>"
     page("validation", "Validation — compartment models", "validation", """
-<div class='intro'><p>Three kinds of validation, each refitting the carried model without the held-out data and then predicting it:</p><ul>
-<li><b>Held-out treated cocultures (Ce1).</b> The same held-out set as the neural-network track. The Stage 3 model's crowding terms ($(join(HO_NAMES, ", "))) are fitted to the untreated Ce0 cocultures only; cisplatin comes from the Stage 2 monoculture fits (\\(\\beta_N = $(fmt(βN2))\\), \\(\\beta_C = $(fmt(βC2))\\), with their delays$(any(L -> L.action == :hill, c3.sys.lines) ? " and Hill slopes" : "")$(any(ns_on, c3.sys.lines) ? "; each kill is scaled by its line's Norton–Simon growth factor" : "")). The Ce1 cocultures ($(n1) points) are then predicted without refitting.</li>
-<li><b>Blocked validation</b> with <code>GrowthParameterEstimation.blocked_joint_validation</code>, as in the earlier linked-treatment reports: each whole block of trajectories (one dose, one seeding ratio, one experimental run) is held out in turn, the model is refitted to the rest from 3 starts, and the held-out block is predicted.</li>
-<li><b>Forecast.</b> Each fit is refitted to the first 70% of days and predicts the remaining days.</li></ul>
-<p>Scores: RMSE in cells; nRMSE = RMSE / mean of the held-out data. The ratio held-out / in-sample compares with the full fit on the same points (1 = no loss from holding the data out).</p></div>
+<div class='intro'><p>Four kinds of validation, each predicting data that the fit being tested did not use:</p><ul>
+<li><b>Intermittent dosing</b>, the untouched validation set: never used for fitting or model choice, predicted with no refit and no free scale from the nominal seeding.</li>
+<li><b>Held-out treated cocultures (Ce1).</b> The same held-out set as the neural-network track. The Stage 3 model's crowding terms ($(join(HO_NAMES, ", "))) are fitted to the untreated Ce0 cocultures only, with the same residual weights as the carried fits; cisplatin comes from the Stage 2 monoculture fits (\\(\\beta_N = $(fmt(βN2))\\), \\(\\beta_C = $(fmt(βC2))\\), with their delays$(any(L -> L.action == :hill, c3.sys.lines) ? " and Hill slopes" : "")$(any(ns_on, c3.sys.lines) ? "; each kill is scaled by its line's Norton–Simon growth factor" : "")). The Ce1 cocultures ($(n1) points) are then predicted without refitting, from $(hesc(get(V, :ce1_u0_note, "the carried starting values"))).</li>
+<li><b>Blocked validation</b> (the leave-one-block-out scheme of <code>GrowthParameterEstimation.blocked_joint_validation</code>, as in the earlier linked-treatment reports, run here so the refits use the same residual weights as the carried fits): each whole block of trajectories (one dose, one seeding ratio, one experimental run) is held out in turn, the model is refitted to the rest from 3 starts, and the held-out block is predicted (from the nominal seeding where the full fit had estimated a start).</li>
+<li><b>Forecast.</b> Each fit is refitted to the first 70% of days (weighted) and predicts the remaining days.</li></ul>
+<p>Scores: RMSE in cells (raw, for interpretation); nRMSE = RMSE / mean of the held-out data; weighted RMSE = \\(\\sqrt{SSE_w/n}\\), the residuals divided by their weight scales as in the fits (no units; it weighs small and large counts the way the fits do). The ratio held-out / in-sample (raw RMSE) compares with the full fit on the same points (1 = no loss from holding the data out). Every refit stops on an iteration cap (no time limit), so the scores are reproducible.</p></div>
+$(intermittent_html())
 <h2>Held-out treated cocultures (Ce1)</h2>
-$(table([("Prediction", "First row: the real test (crowding fitted without Ce1, drug from the monocultures). In-sample reference: the Stage 3 fit that saw Ce1, the best case. No-change reference: counts that never change, a floor any useful model must beat."),
-         ("Crowding fitted to Ce0", "Carrying capacity, crowding coefficients and sensitive death rate refitted to the untreated cocultures only."),
-         ("RMSE (cells)", T_RMSE), ("nRMSE", T_NRMSE)], ce1rows))
+<p class='note'><b>Not a fully independent test.</b> The Ce1 cocultures were used when choosing the modelling setup: the residual weighting scheme and the drug model were compared partly on how well each variant predicted Ce1. The Ce1 data are not used in the fit that makes this prediction, but the score below is optimistic compared with data never looked at; the intermittent-dosing data above are the untouched validation set.</p>
+$(table([("Prediction", "First row: the test (crowding fitted without Ce1, drug from the monocultures, nominal Ce1 starting values). In-sample reference: the Stage 3 fit that saw Ce1, the best case. Untreated-growth reference: the same Ce0 fit with no drug term, which any useful drug model must beat."),
+         ("Crowding fitted to Ce0", "Carrying capacity and crowding coefficients (and the sensitive death rate if the model has one) refitted to the untreated cocultures only, with the same residual weights as the carried fits."),
+         ("RMSE (cells)", T_RMSE), ("nRMSE", T_NRMSE),
+         ("Weighted RMSE", "√(SSE_w/n): residuals divided by their weight scales, as the fits measure error. No units; compares rows on the fits' own scale.")], ce1rows))
+$boottxt
 <div class='grid'>$plots</div>
 <details><summary>The Ce0 fits used for the prediction</summary><div class='grid'>$fitplots</div></details>
-$(intermittent_html())
 <h2>Blocked validation and forecasts</h2>
 $(table([("Fit", "The stage and data set."), ("Scheme", "What is held out: one whole dose, seeding ratio or experimental run (blocked validation), or the last 30% of days (forecast)."),
          ("Held-out block", "The part predicted without being used for fitting."), ("Points", "Number of held-out measurements scored."),
-         ("Held-out RMSE", "Error of the refitted model on the held-out data, in cells. " * T_RMSE), ("In-sample RMSE", "Error of the full fit (which saw these data) on the same points: the best case."),
+         ("Held-out RMSE", "Error of the refitted model on the held-out data, in cells. " * T_RMSE), ("In-sample RMSE", "Error of the full fit (which saw these data) on the same points, in cells: the best case."),
          ("Held-out nRMSE", T_NRMSE), ("In-sample nRMSE", "In-sample RMSE divided by the mean of the same data."),
-         ("Ratio", "Held-out ÷ in-sample RMSE. 1 = holding the data out costs nothing; 2 = errors double on unseen data.")], rows))
-<p class='muted'>The low-resource + cisplatin coculture is now fitted as Stage 4 (at the user's request), so it is not used as held-out validation; its forecast (fit the first 70% of days, predict the rest) is in the table above. Outputs: <code>validation_blocked.csv</code> in <code>outputs/zoo_analyses/</code>.</p>""")
+         ("Held-out weighted RMSE", "√(SSE_w/n) on the held-out points: residuals divided by their weight scales, as the fits measure error (no units)."),
+         ("Ratio", "Held-out ÷ in-sample RMSE (in cells). 1 = holding the data out costs nothing; 2 = errors double on unseen data.")], rows))
+<p class='muted'>The low-resource + cisplatin coculture is now fitted as Stage 4 (at the user's request), so it is not used as held-out validation; its forecast (fit the first 70% of days, predict the rest) is in the table above. Outputs: <code>validation_blocked.csv</code> in <code>outputs/zoo_analyses/</code>; <code>heldout_ce1.csv</code> in <code>outputs/zoo_fits/</code>.</p>""")
 end
 
 write_bootstrap()

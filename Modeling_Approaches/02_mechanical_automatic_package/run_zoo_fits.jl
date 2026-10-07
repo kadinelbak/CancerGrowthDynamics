@@ -46,27 +46,19 @@ mono_env(D, R) = (D=D, R=R, lines=[1])
 const NOALPHA = [[Slot(0, 1.0)]]
 inner(bounds, v) = [clamp(x, lo + 1e-3*(hi - lo), hi - 1e-3*(hi - lo)) for (x, (lo, hi)) in zip(v, bounds)]
 
-function make_cand(name, label, family, lines, envs, alpha, X0, pnames, bounds, p0s; extra...)
+# X0: nominal starting value per environment and line; x0: the x0_info record of each observed series
+# (zoo_data.jl), which marks the series whose starting value is estimated
+function make_cand(name, label, family, lines, envs, alpha, X0, pnames, bounds, p0s; x0=nothing, extra...)
     sys = build_system(lines, envs, alpha)
+    xf = x0 === nothing ? (x0nom=Float64[], x0est=Int[], x0bounds=Tuple{Float64,Float64}[], x0start=Float64[]) : x0_fields(sys, x0)
     (name=name, label=label, family=family, sys=sys, model=make_system_model(sys), u0=sys_u0(sys, X0),
-     pnames=pnames, bounds=bounds, p0s=[inner(bounds, p) for p in p0s], extra...)
+     pnames=pnames, bounds=bounds, p0s=[inner(bounds, p) for p in p0s], xf..., extra...)
 end
 
-function fit_zoo(cands, datasets; maxtime=300.0)
+function fit_zoo(cands, datasets)
     rows = Vector{Any}(undef, length(cands))
     Threads.@threads :dynamic for i in eachindex(cands)
-        c = cands[i]
-        best = (params=fill(NaN, length(c.pnames)), bic=Inf, sse=Inf)
-        for p0 in c.p0s
-            f = bs_fit(c.model, datasets, c.u0, p0, c.bounds; maxtime=maxtime, tag=c.name)
-            f.bic < best.bic && (best = f)
-        end
-        if isfinite(best.bic)
-            f = bs_fit(c.model, datasets, c.u0, best.params, c.bounds; maxtime=maxtime, tag=c.name)
-            f.bic < best.bic && (best = f)
-        end
-        se = isfinite(best.bic) ? (try param_se(c.model, datasets, c.u0, best.params) catch; fill(NaN, length(c.pnames)) end) : fill(NaN, length(c.pnames))
-        rows[i] = merge(c, (params=best.params, bic=best.bic, sse=best.sse, se=se))
+        rows[i] = fit_cand(cands[i], datasets)          # bootstrap_tools.jl (estimated starting values included)
     end
     failed = [r.name for r in rows if !isfinite(r.bic)]
     isempty(failed) || @warn "no fit" failed
@@ -83,14 +75,14 @@ end
 
 # a single-line mechanism from a catalogue entry, on top of the carried-forward growth law
 # ns: Norton–Simon coupling of the kill to growth (stages.toml kill_growth_coupled, drug stages only)
-function zoo_line_cands(zoo, X, input, g, envs, X0; ns=false)
+function zoo_line_cands(zoo, X, input, g, envs, X0; ns=false, x0=nothing)
     [begin
         free = Dict(k => i for (i, k) in enumerate(slots))
         L = line_spec(g.growth, kernel, action, input; fixed=Dict(:r => g.r, :K => g.K, :θ => g.θ, :EC50 => EC50_OF_SYM[X]), free=free)
         ns && (L = merge(L, (ns=true,)))
         bnds = [SLOT_BOUNDS[k] for k in slots]
         make_cand(name, label, fam, [L], envs, NOALPHA, X0, [slot_name(k, X, input; combo=(:d0 in slots)) for k in slots], bnds,
-                  [[SLOT_STARTS[k][j] for k in slots] for j in 1:3]; slots=slots)
+                  [[SLOT_STARTS[k][j] for k in slots] for j in 1:3]; slots=slots, x0=x0)
      end for (name, label, fam, kernel, action, slots) in zoo]
 end
 
@@ -121,9 +113,9 @@ function growth_rows(st, L)
     cands = [begin
                  free = Symbol[Symbol(x) for x in c["free"]]
                  Lsp = line_spec(Symbol(c["growth"]), :none, :loss, :D; fixed=Dict(:EC50 => L.ec50), free=Dict(k => i for (i, k) in enumerate(free)))
-                 make_cand(c["name"], c["label"], "Growth", [Lsp], env, NOALPHA, [[s.y[1]]], ["$(k)_$(L.sym)" for k in free],
+                 make_cand(c["name"], c["label"], "Growth", [Lsp], env, NOALPHA, [[s.nom]], ["$(k)_$(L.sym)" for k in free],
                            [(rel(k, b[1]), rel(k, b[2])) for (k, b) in zip(free, c["bounds"])],
-                           [[rel(k, v) for (k, v) in zip(free, p)] for p in c["starts"]]; slots=free)
+                           [[rel(k, v) for (k, v) in zip(free, p)] for p in c["starts"]]; slots=free, x0=[x0_info(s)])
              end for c in st["candidate"]]
     rows = order_rule(fit_stage(cands, ds, "$(st["id"])-$(lowercase(L.line))"))
     b = rows[1]; v = Dict(zip(b.slots, b.params))
@@ -134,8 +126,10 @@ function mechanism_rows(st, L, g)
     srcs = stage_sources(st; line=L.line); input = Symbol(st["input"])
     S = [series(s["id"]) for s in srcs]
     envs = [mono_env(env_inputs(s)...) for s in srcs]
-    cands = zoo_line_cands(CATALOGUES[st["catalogue"]], L.sym, input, g, envs, [[s.y[1]] for s in S];
-                           ns=get(st, "kill_growth_coupled", false) && input == :D)
+    cands = zoo_line_cands(CATALOGUES[st["catalogue"]], L.sym, input, g, envs, [[s.nom] for s in S];
+                           ns=get(st, "kill_growth_coupled", false) && input == :D, x0=[x0_info(s) for s in S])
+    # optional restriction to named catalogue entries (stages.toml only = [...]; e.g. a Hill-only variant)
+    haskey(st, "only") && (cands = [c for c in cands if c.name in st["only"]]; isempty(cands) && error("$(st["id"]): no candidate left by `only`"))
     obs = sys_obs(cands[1].sys)
     ds = [dataset(keep(s), obs[i]) for (i, s) in enumerate(S)]
     rows = order_rule(fit_stage(cands, ds, "$(st["id"])-$(lowercase(L.line))"))
@@ -170,14 +164,16 @@ end
 # fixed: values used for K / α when not fitted; noinput: switch the low-resource input off;
 # betaC_floor: a refitted resistant kill stays ≥ this fraction of its inherited value
 function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=Dict{Symbol,Float64}(), noinput=false,
-                 family="Coculture", betaC_floor=0.0, kill_growth_coupled=false)
+                 family="Coculture", betaC_floor=0.0, kill_growth_coupled=false, x0=nothing)
     idx = Dict(k => i for (i, k) in enumerate(free))
     slot(k, v) = haskey(idx, k) ? Slot(idx[k], 0.0) : Slot(0, get(fixed, k, v))
     Kslot = slot(:K, NaN)
     lf(ks) = Dict(s => idx[k] for (k, s) in ks if haskey(idx, k))
     fN = lf([(:βN, :β), (:dN, :d), (:εN, :ε)]); fC = lf([(:βC, :β), (:dC, :d), (:εC, :ε)])
-    xN = noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}()
-    xC = noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}()
+    # fixed line values from the candidate (e.g. βC = 0: no resistant cisplatin term) override the inherited ones
+    fixline(ks) = Dict{Symbol,Float64}(s => Float64(fixed[k]) for (k, s) in ks if haskey(fixed, k) && !haskey(idx, k))
+    xN = merge(noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}(), fixline([(:βN, :β), (:dN, :d), (:εN, :ε)]))
+    xC = merge(noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}(), fixline([(:βC, :β), (:dC, :d), (:εC, :ε)]))
     LN = cc_line(rows[1], growth["A2780"], Kslot, fN, xN, LINES[1].ec50)
     LC = cc_line(rows[2], growth["A2780cis"], Kslot, fC, xC, LINES[2].ec50)
     # Norton–Simon: each line's drug kill scales with its growth factor (crowded cells die less)
@@ -193,14 +189,15 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
     bounds = [k == :K ? (CC_BOUNDS[:K][1] * datasets_max, CC_BOUNDS[:K][2] * datasets_max) :
               k == :βC ? (betaC_floor * start[:βC], CC_BOUNDS[:βC][2]) : CC_BOUNDS[k] for k in free]
     make_cand(name, label, family, [LN, LC], envs, alpha, X0, [CC_PNAME[k] for k in free], bounds,
-              [[s[k] for k in free] for s in (start, alt, alt2)]; slots=free, fixedcc=fixed, noinput=noinput, mech=rows)
+              [[s[k] for k in free] for s in (start, alt, alt2)]; slots=free, fixedcc=fixed, noinput=noinput, mech=rows, x0=x0)
 end
 ccval(r, k, default) = (i = findfirst(==(k), r.slots); i === nothing ? get(r.fixedcc, k, default) : r.params[i])
 
 function coculture_rows(st)
     E = cc_envs(st)
     envs = [(D=e.inputs.D, R=e.inputs.R, lines=[1, 2]) for e in E]
-    X0 = [[e.N.y[1], e.C.y[1]] for e in E]
+    X0 = [[e.N.nom, e.C.nom] for e in E]
+    x0 = reduce(vcat, [[x0_info(e.N), x0_info(e.C)] for e in E])
     ymax = maximum(maximum(vcat(e.N.y, e.C.y)) for e in E)
     mech = [PL[st["inherits"]["mechanism"]]["A2780"].best, PL[st["inherits"]["mechanism"]]["A2780cis"].best]
     growth = PL[st["inherits"]["growth"]]
@@ -212,7 +209,7 @@ function coculture_rows(st)
                  end
                  make_cc(c["name"], c["label"], Symbol[Symbol(x) for x in c["free"]], mech, growth, envs, X0, ymax; fixed=fx,
                          noinput=get(c, "noinput", false), betaC_floor=Float64(get(st, "betaC_floor", 0.0)),
-                         kill_growth_coupled=get(c, "kill_growth_coupled", get(st, "kill_growth_coupled", false)))
+                         kill_growth_coupled=get(c, "kill_growth_coupled", get(st, "kill_growth_coupled", false)), x0=x0)
              end for c in st["candidate"]]
     obs = sys_obs(cands[1].sys)
     ds = reduce(vcat, [[dataset(keep(e.N), obs[2i-1]), dataset(keep(e.C), obs[2i])] for (i, e) in enumerate(E)])
@@ -363,10 +360,22 @@ for attempt in 1:3
     end
 end
 
-# fits that reached their time limit (should be none; any listed may differ on another machine)
+# starting values of the carried model of every group: nominal seeding, or estimated (zoo_data.jl x0_info)
+x0_rows = NamedTuple[]
+for g in groups
+    c = g.cands[1]; hasproperty(c, :x0nom) && !isempty(c.x0nom) || continue
+    obs = sys_obs(c.sys)
+    names = g.id == "s4" ? [COMBO_SOURCES.N, COMBO_SOURCES.C] : [s["id"] for s in dataset_tags(g.id)]
+    for (i, o) in enumerate(obs)
+        push!(x0_rows, (group=g.id, series=i <= length(names) ? names[i] : "state $o", nominal=c.x0nom[i],
+                        estimated=o in c.x0est, start=c.u0[o], fold=c.u0[o] / c.x0nom[i]))
+    end
+end
+CSV.write(joinpath(ZOO_DIR, "starting_values.csv"), isempty(x0_rows) ? DataFrame(group=String[]) : DataFrame(x0_rows))
+
+# no optimiser has a wall-clock limit any more, so this list stays empty (kept for the manifest's count)
 CSV.write(joinpath(ZOO_DIR, "time_limit_hits.csv"),
           isempty(LIMIT_HITS) ? DataFrame(fit=String[], optimizer=String[], seconds=Float64[], limit=Float64[]) : DataFrame(LIMIT_HITS))
-println("Fits that reached their time limit: $(length(LIMIT_HITS))", isempty(LIMIT_HITS) ? " (the run is reproducible)" : " (see time_limit_hits.csv)")
 
 # checkpoint: zoo_rebuild_pages.jl redraws the report and site from this without refitting
 try

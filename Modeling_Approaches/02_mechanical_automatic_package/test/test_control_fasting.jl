@@ -96,6 +96,32 @@ end
             @test all(0 .<= s.U[:, 1] .<= W.umax + 1e-12) && all(0 .<= s.U[:, 2] .<= 1 + 1e-12)
             @test s.J <= total_cost2(x0, U0, FP, Δ, W) + 1e-12
         end
+
+        @testset "scenario $scen: every stage and terminal cost is ≥ 0 (exact pruning relies on it)" begin
+            Ws = [W, weights2(FP; bc_frac=1.0, tf=10.0), weights2(FP; bc_frac=0.0, tf=1.0), weights2(FP; umax=3.0)]
+            ok = true
+            for _ in 1:200
+                x = random_state2(FP, rng); x[FP.iN] *= 2rand(rng); x[FP.iC] *= 2rand(rng)    # also far above B_cancer
+                w = [rand(rng) * 3.0, rand(rng)]
+                for Wi in Ws
+                    ok &= stage_cost2(x, w, FP, Wi) >= 0 && terminal_cost2(x, FP, Wi) >= 0
+                end
+            end
+            @test ok
+            x0 = x0_fast(FP, 50.0, 50.0); U = [0.0 1.0; 1.47 0.0; 0.62 1.0; 1.0 0.0]
+            x = copy(x0); J = 0.0
+            for k in axes(U, 1); x = F2(x, U[k, :], FP, Δ); J += stage_cost2(x, U[k, :], FP, W); end
+            @test isapprox(cost_terms2(FP, x0, U, Δ, W).total, J; rtol=1e-12)              # the per-term split adds up
+        end
+
+        @testset "scenario $scen: nominal closed loop (fixed look-ahead) equals replaying its own schedule" begin
+            s = nominal_seeding("50:50"); x0 = x0_fast(FP, s.N0, s.C0); n, H = 3, 3
+            cl = closed_loop2(FP, FP, x0, Δ, n, H, W)
+            x = copy(x0)
+            for k in 1:n; x = F2(x, cl.U[k, :], FP, Δ); end
+            @test x == cl.x                                                                 # planner's reconstruction = plant
+            @test closed_loop2(FP, FP, x0, Δ, n, H, W; noise=ones(n, 2)).U == cl.U          # noise factors of 1 = exact counts
+        end
     end
 
     @testset "host states behave as specified" begin

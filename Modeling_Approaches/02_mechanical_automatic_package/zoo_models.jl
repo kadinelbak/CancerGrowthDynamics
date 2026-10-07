@@ -136,7 +136,9 @@ end
 # One mechanism module: its delay kernel (hidden states from o+1) and its action. Returns the
 # effective growth rate and capacity (given r, K), the extra per-viable-cell loss, and the outflow
 # of dying damaged cells. Used by single-module lines (line_rhs!) and multi-module lines.
-function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}) where {T}
+# ks: Norton–Simon factor for the damaged-cell actions, whose kill is the transfer β·E·V into the damaged
+# compartment rather than a loss rate (1 = no coupling)
+function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}; ks=one(T)) where {T}
     s = M.s; z = zero(T)
     nc = ncell(M.action); nk = nker(M.kernel)
     w = w * sv(s.ε, p, T)
@@ -169,10 +171,10 @@ function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}) where {T}
         loss += E > 0 ? sv(s.β, p, T) * E^h / (ec^h + E^h) : z
     elseif a == :damage
         δ = sv(s.δ, p, T); Dm = max(u[o+1], z)
-        du[o+1] = sv(s.β, p, T)*E*V - δ*Dm; out = δ*Dm
+        du[o+1] = ks*sv(s.β, p, T)*E*V - δ*Dm; out = δ*Dm
     elseif a == :transit
         τ = sv(s.τ, p, T); D1 = max(u[o+1], z); D2 = max(u[o+2], z)
-        du[o+1] = sv(s.β, p, T)*E*V - τ*D1; du[o+2] = τ*(D1 - D2); out = τ*D2
+        du[o+1] = ks*sv(s.β, p, T)*E*V - τ*D1; du[o+2] = τ*(D1 - D2); out = τ*D2
     elseif a == :capacity
         Keff = K / (1 + sv(s.c, p, T)*E)
     elseif a == :fade
@@ -211,8 +213,12 @@ function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}) where {T}
     end
     V = max(X - cells, z)
     r = sv(s.r, p, T); K = sv(s.K, p, T); θ = sv(s.θ, p, T)
-    reff, Keff, loss, out = module_effect!(du, u, o, L, p, w, X, V, r, K, T)
-    ns_on(L) && L.input == :D && (loss *= growth_factor(L.growth, crowd / Keff, θ))
+    # Norton–Simon: the kill is scaled by the growth factor; for the damaged-cell actions the transfer into the
+    # damaged compartment is scaled (the module's own capacity is K, as no drug action changes K)
+    ns = ns_on(L) && L.input == :D
+    ks = ns && L.action in (:damage, :transit) ? growth_factor(L.growth, crowd / K, θ) : one(T)
+    reff, Keff, loss, out = module_effect!(du, u, o, L, p, w, X, V, r, K, T; ks=ks)
+    ns && (loss *= growth_factor(L.growth, crowd / Keff, θ))
     du[xi+1] = growth_term(L.growth, reff, V, crowd / Keff, θ) - (sv(s.d, p, T) + loss)*V - out
     nothing
 end
@@ -244,6 +250,8 @@ function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}) where {T}
             out += ou; off += mwidth(M)
         end
     else                                     # Norton–Simon: drug losses scaled by the growth factor
+        any(M -> M.input == :D && M.action in (:damage, :transit), mods) &&
+            error("Norton–Simon with a damaged-cell drug action is only implemented for single-module lines")
         dloss = z
         for M in mods
             w = M.input == :D ? T(env.D) : T(env.R)

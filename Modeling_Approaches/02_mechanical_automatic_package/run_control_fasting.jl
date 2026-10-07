@@ -3,53 +3,81 @@
 # Writes outputs/control_<days>d/fasting_state.jls and fasting_outcomes.csv; control_fasting_report.jl renders the page.
 #
 #   scenarios   A (selected coculture drug response), B (monoculture drug response for both lines)
-#   ratios      25:75, 50:50, 75:25 from the untreated-coculture day-0 counts
+#   ratios      25:75, 50:50, 75:25 from the NOMINAL seeding (control_config.toml [initial]: 100 cells split
+#               by the ratio), not a measured day-0 count
 #   policies    8 fixed schedules (5 fed, 3 with fasting), MPC dose only (fed), MPC dose + fasting (measured
-#               levels, exact search), MPC demonstration (continuous u ≤ u_max_demo, v ∈ [0, 1], SQP)
-#   checks      the plant against both measured low-resource conditions
+#               levels, exact search), MPC demonstration (continuous u ≤ u_max_demo, v ∈ [0, 1], SQP);
+#               every MPC looks a FIXED 14 days ahead at every decision, also near the end of the run
+#   checks      the plant against both measured low-resource conditions (RMSE in cells)
 #   sweeps      protection p_H, weight-loss rate k_W, weight limit W_min, fasting cost, interaction mode,
-#               look-ahead, weights
-#   robustness  fixed schedules on 200 bootstrap parameter sets; closed-loop MPC on a subset
+#               look-ahead, weights, soft burden penalty (B_cancer) and terminal factor
+#   robustness  fixed schedules on the open-loop bootstrap draws; closed-loop MPC (observes N and C with
+#               measurement noise, reconstructs the hidden states with its own model) on the first
+#               closed-loop draws, where every policy is compared on the same draws and noise
 
 include(joinpath(@__DIR__, "control_fasting.jl"))
 
 const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["long_days"])))
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const NRUN = round(Int, DAYS / Δ0)                                   # one decision per 2-day interval
-const NDEC = round(Int, CFG["schedule"]["horizon_days"] / Δ0)       # 7-interval (14-day) look-ahead
+const NDEC = round(Int, CFG["schedule"]["horizon_days"] / Δ0)       # fixed 7-interval (14-day) look-ahead
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
 const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), "control_$(round(Int, DAYS))d"); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
 const FCK = joinpath(FOUT, "fasting_state.jls")
 fck = (isfile(FCK) && get(ENV, "REDO", "0") != "1") ? deserialize(FCK) : Dict{Symbol,Any}()
 savef() = serialize(FCK, fck)
-const BOOT_N = min(200, size(ZOO_STATE.results["s3"].res.pars[1], 1), size(ZOO_STATE.results["s4"].res.pars[1], 1))
-const NCL = 24                                                       # closed-loop robustness runs per scenario
-ratios = [(ratio=("25:75", "50:50", "75:25")[i], N0=co_data[i].S[2][1], C0=co_data[i].R[2][1]) for i in 1:3]
+const BOOT_N = min(Int(CFG["robustness"]["open_loop_draws"]), size(ZOO_STATE.results["s3"].res.pars[1], 1), size(ZOO_STATE.results["s4"].res.pars[1], 1))
+const NCL = min(Int(CFG["robustness"]["closed_loop_draws"]), BOOT_N)   # closed-loop robustness runs per scenario (paired with every policy)
+const CL_NAME = "Closed-loop MPC, dose + fasting (observes N, C with noise)"
+# starting counts: the nominal seeding split by the ratio (control_model.jl: nominal_seeding)
+ratios = [merge((ratio=r,), nominal_seeding(r)) for r in ("25:75", "50:50", "75:25")]
 const MPC2 = "MPC, dose + fasting (measured levels)"
 const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
-println("=== $(round(Int, DAYS))-day control with fasting: $(Threads.nthreads()) threads; $NRUN decisions, look-ahead $NDEC; checkpoint has $(collect(keys(fck))) ==="); flush(stdout)
+println("=== $(round(Int, DAYS))-day control with fasting: $(Threads.nthreads()) threads; $NRUN decisions, fixed look-ahead $NDEC; checkpoint has $(collect(keys(fck))) ==="); flush(stdout)
 
 # ── checks against the two measured low-resource conditions ──────────────────
+# Every RMSE is in cells (unweighted). The controller's plant (fed the nominal seeding, constant low resource,
+# no drug) is scored on every observation after day 0 (QC-excluded points left out) of the six low-resource
+# cocultures; the plant and the Stage 3b fit (its own model and starting state) are also compared on exactly
+# the points both use (the Stage 3b data can differ slightly in QC), so the two numbers are like for like.
 function compute_checks()
     out = Dict{Symbol,Any}()
+    g3b = zgroup("s3b"); c3b = g3b.cands[1]
+    sol3b = solve(ODEProblem(c3b.model, c3b.u0, (0.0, maximum(maximum(d.x) for d in g3b.datasets)), c3b.params), Tsit5(); reltol=1e-10, abstol=1e-10)
+    # the Stage 3b dataset holding most of these observations (matched on the (day, count) pairs) and the shared points
+    function match3b(xk, yk)
+        best = (j=0, idx=Int[])
+        for (j, d) in enumerate(g3b.datasets)
+            idx = [i for i in eachindex(xk) if any(m -> d.x[m] == xk[i] && isapprox(d.y[m], yk[i]; rtol=1e-9), eachindex(d.x))]
+            length(idx) > length(best.idx) && (best = (j=j, idx=idx))
+        end
+        length(best.idx) >= 3 ? best : nothing
+    end
+    ratio_of = Dict("25S75R" => "25:75", "50S50R" => "50:50", "75S25R" => "75:25")
     for mode in (:interp, :stage4)
-        FP = fast_plant(:A; eps_mode=mode); se = 0.0; n = 0; per = NamedTuple[]
+        FP = fast_plant(:A; eps_mode=mode); se = 0.0; n = 0; sec = 0.0; se3 = 0.0; n3 = 0; per = NamedTuple[]
         for c in lr_cc
-            ts, xs = trajectory2(x0_fast(FP, c.yN[1], c.yC[1]), repeat([0.0 1.0], 7), FP, 2.0; dt=0.5)
+            s = nominal_seeding(ratio_of[c.label])
+            ts, xs = trajectory2(x0_fast(FP, s.N0, s.C0), repeat([0.0 1.0], 7), FP, 2.0; dt=0.5)
             for (lab, xd, yd, idx, bad) in (("A2780", c.xN, c.yN, FP.iN, c.bN), ("A2780cis", c.xC, c.yC, FP.iC, c.bC))
-                s2 = 0.0; m = 0
-                for (i, t) in enumerate(xd)
-                    (i == 1 || bad[i]) && continue
-                    j = argmin(abs.(ts .- t)); s2 += (xs[j][idx] - yd[i])^2; m += 1
+                keep = [i for i in eachindex(xd) if xd[i] > 0 && !bad[i]]
+                xk, yk = xd[keep], yd[keep]
+                pm = [xs[argmin(abs.(ts .- t))][idx] for t in xk]
+                s2 = sum(abs2, pm .- yk); se += s2; n += length(keep)
+                mt = match3b(xk, yk); r3 = NaN; rpc = NaN
+                if mt !== nothing
+                    I = mt.idx; p3 = [sol3b(xk[i])[g3b.datasets[mt.j].state_index] for i in I]
+                    e3 = sum(abs2, p3 .- yk[I]); ep = sum(abs2, pm[I] .- yk[I])
+                    se3 += e3; sec += ep; n3 += length(I); r3 = sqrt(e3 / length(I)); rpc = sqrt(ep / length(I))
                 end
-                se += s2; n += m; push!(per, (run=c.run, ratio=c.label, line=lab, rmse=sqrt(s2 / m), last_obs=yd[end], last_pred=xs[argmin(abs.(ts .- xd[end]))][idx]))
+                push!(per, (run=c.run, ratio=c.label, line=lab, rmse=sqrt(s2 / length(keep)), rmse_3b=r3, rmse_common=rpc,
+                            last_obs=yd[end], last_pred=xs[argmin(abs.(ts .- xd[end]))][idx]))
             end
         end
-        out[mode] = (rmse=sqrt(se / n), n=n, per=per)
+        out[mode] = (rmse=sqrt(se / n), n=n, rmse_common=n3 > 0 ? sqrt(sec / n3) : NaN, per=per)
+        out[:s3b_rmse] = n3 > 0 ? sqrt(se3 / n3) : NaN; out[:s3b_n] = n3
     end
-    g3b = zgroup("s3b"); c3b = g3b.cands[1]
-    out[:s3b_rmse] = sqrt(c3b.sse / sum(length(d.x) for d in g3b.datasets))
     FP = fast_plant(:A); c4 = zgroup("s4").cands[1]
     sol = solve(ODEProblem(c4.model, c4.u0, (0.0, 12.0), c4.params), Tsit5(); reltol=1e-10, abstol=1e-10)
     x = vcat(c4.u0, zeros(3), 1.0); mr = 0.0
@@ -63,7 +91,8 @@ end
 if !haskey(fck, :checks)
     out = compute_checks()
     fck[:checks] = out; savef()
-    @printf("  checks: low resource alone RMSE interp %.0f, stage4 %.0f (Stage 3b fit %.0f); Stage 4 reproduced to %.1e\n", out[:interp].rmse, out[:stage4].rmse, out[:s3b_rmse], out[:stage4_maxrel]); flush(stdout)
+    @printf("  checks: low resource alone RMSE (cells) interp %.0f, stage4 %.0f on %d points; on the %d points shared with Stage 3b: plant %.0f, Stage 3b fit %.0f; Stage 4 reproduced to %.1e\n",
+            out[:interp].rmse, out[:stage4].rmse, out[:interp].n, out[:s3b_n], out[:interp].rmse_common, out[:s3b_rmse], out[:stage4_maxrel]); flush(stdout)
 end
 
 function run_all2(FP, x0; n=NRUN, H=NDEC)
@@ -97,8 +126,12 @@ main_of(scen, ratio) = only(filter(m -> m.scen == scen && m.ratio == ratio, fck[
 # ── sweeps (50:50, MPC dose + fasting) ─────────────────────────────────────────
 if !haskey(fck, :sweeps)
     r = ratios[2]; tasks = Any[]
-    mpc(FP, W; H=NDEC, kw...) = (x0 = x0_fast(FP, r.N0, r.C0); cl = closed_loop2(FP, FP, x0, Δ0, NRUN, H, W; kw...); (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W)))
+    # Wo: the weights the outcomes are scored with (bound counts always at the default B_cancer)
+    mpc(FP, W; Wo=W, H=NDEC, kw...) = (x0 = x0_fast(FP, r.N0, r.C0); cl = closed_loop2(FP, FP, x0, Δ0, NRUN, H, W; kw...); (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, Wo)))
     h0 = default_host()
+    bc0 = Float64(CFG["cancer"]["B_cancer_fraction_of_K"]); tf0 = Float64(CFG["weights"]["terminal_factor"])
+    # soft burden penalty, one setting at a time (the full B_cancer × terminal grid is in the 14-day report)
+    pen = vcat([(Float64(b), tf0) for b in CFG["cancer"]["B_cancer_sweep"] if b != bc0], [(bc0, Float64(t)) for t in CFG["cancer"]["terminal_factor_sweep"] if t != tf0])
     for scen in (:A, :B)
         for v in HCFG["p_H_sweep"]
             push!(tasks, (kind="protection", scen=scen, label="p_H = $v", f=() -> (FP = fast_plant(scen; host=merge(h0, (p_H=Float64(v),))); mpc(FP, weights2(FP)))))
@@ -120,6 +153,10 @@ if !haskey(fck, :sweeps)
         for w in ([1.0, 3.0, 1.0, 0.1], [3.0, 1.0, 1.0, 0.1], [1.0, 1.0, 3.0, 0.1])
             push!(tasks, (kind="weights", scen=scen, label="qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; w=w)))))
         end
+        for (bc, tf) in pen
+            lab = (bc > 0 ? "B_cancer = $(bc) K" : "no burden penalty") * ", terminal ×$(tf)"
+            push!(tasks, (kind="burden penalty", scen=scen, label=lab, f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; bc_frac=bc, tf=tf); Wo=weights2(FP)))))
+        end
     end
     out = Vector{Any}(undef, length(tasks))
     Threads.@threads :dynamic for i in eachindex(tasks)
@@ -130,9 +167,16 @@ if !haskey(fck, :sweeps)
 end
 
 # ── robustness over bootstrap parameter sets ───────────────────────────────────
+# Every draw b: the fixed schedules (planned once with the best-fit model) are replayed on plant b; on the
+# first NCL draws the closed-loop MPC plans with the best-fit model, observes plant b's N and C with
+# measurement noise and reconstructs the hidden states with its own model. Paired: every policy meets the
+# same plants on those draws.
 if !haskey(fck, :robust)
     rob = Dict{Any,Any}()
-    pols = ["No treatment", "Constant 1 µM", "Periodic 1 µM, 2 days on / 2 off", "Periodic 1 µM with a 48-h fast on each dosing interval", MPC1, MPC2]
+    pols = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off",
+            "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", MPC1, MPC2]
+    summ(o) = (N=o.N, C=o.C, T=o.T, W=o.W, cum=o.cum_dose, fast=o.fast_days, cv=o.cancer_violation, tv=o.tox_violation, wv=o.weight_violation, dover=o.days_over,
+               Nf=o.N_final, Cf=o.C_final, tot=o.total_final, rf=o.resistant_fraction, minW=o.min_weight, maxT=o.max_tox)
     for scen in (:A, :B)
         m = main_of(scen, "50:50"); FP0 = fast_plant(scen); W0 = weights2(FP0)
         draws = Vector{Any}(undef, BOOT_N)
@@ -141,23 +185,20 @@ if !haskey(fck, :robust)
             if FPb === nothing
                 draws[b] = nothing; continue
             end
-            d = Dict{String,Any}()
+            d = Dict{String,Any}("b" => b)
             for pn in pols
                 o = try outcomes2(FPb, m.x0, m.policies[pn].U, Δ0, W0) catch; nothing end
-                d[pn] = o === nothing ? nothing : (N=o.N, C=o.C, T=o.T, W=o.W, cum=o.cum_dose, fast=o.fast_days, cv=o.cancer_violation, tv=o.tox_violation,
-                                                   wv=o.weight_violation, Nf=o.N_final, Cf=o.C_final, tot=o.total_final, rf=o.resistant_fraction, minW=o.min_weight)
+                d[pn] = o === nothing ? nothing : summ(o)
+            end
+            if b <= NCL
+                c = try closed_loop2(FP0, FPb, m.x0, Δ0, NRUN, NDEC, W0; noise=obs_noise(b, NRUN)) catch; nothing end
+                d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes2(FPb, m.x0, c.U, Δ0, W0)), (U=c.U,))
             end
             draws[b] = d
         end
-        cl = Vector{Any}(undef, NCL)
-        Threads.@threads :dynamic for b in 1:NCL
-            FPb = try fast_plant(scen; b=b) catch; nothing end
-            cl[b] = FPb === nothing ? nothing : (c = closed_loop2(FP0, FPb, m.x0, Δ0, NRUN, NDEC, W0);
-                                               o = outcomes2(FPb, m.x0, c.U, Δ0, W0);
-                                               (U=c.U, N=o.N, C=o.C, T=o.T, W=o.W, cum=o.cum_dose, fast=o.fast_days, cv=o.cancer_violation, tv=o.tox_violation,
-                                                wv=o.weight_violation, tot=o.total_final, rf=o.resistant_fraction, minW=o.min_weight))
-        end
-        rob[scen] = (ts=m.policies["No treatment"].o.ts, draws=[d for d in draws if d !== nothing], closed=[c for c in cl if c !== nothing])
+        ds = [d for d in draws if d !== nothing]
+        rob[scen] = (ts=m.policies["No treatment"].o.ts, draws=ds, closed=[d[CL_NAME] for d in ds if get(d, CL_NAME, nothing) !== nothing],
+                     ncl=NCL, cv=Float64(CFG["observation"]["count_cv"]))
         @printf("  robustness %s: %d draws, %d closed-loop\n", scen, length(rob[scen].draws), length(rob[scen].closed)); flush(stdout)
     end
     fck[:robust] = rob; savef()
@@ -176,8 +217,7 @@ if !haskey(fck, :washout)
         replay = Dict(pn => outcomes2(FP, m.x0, m.policies[pn].U, Δ0, W) for pn in ("Fasting only, 48 h every 6 days", "Constant 1 µM", MPC1, MPC2))
         cl = closed_loop2(FP, FP, m.x0, Δ0, NRUN, NDEC, W)
         out[i] = (scen=T.scen, koff=T.koff, replay=replay, U=cl.U, o=outcomes2(FP, m.x0, cl.U, Δ0, W))
-        @printf("  washout %s k_off=%.1f [%.0fs]
-", T.scen, T.koff, time() - t); flush(stdout)
+        @printf("  washout %s k_off=%.1f [%.0fs]\n", T.scen, T.koff, time() - t); flush(stdout)
     end
     fck[:washout] = out; savef()
 end
@@ -189,7 +229,7 @@ for m in fck[:main], (pn, v) in m.policies
     push!(rows, (scenario=string(m.scen), ratio=m.ratio, policy=pn, dose_uM=join(round.(v.U[:, 1]; digits=3), " "), fasting=join(round.(v.U[:, 2]; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction, max_total=o.max_total,
                  max_toxicity=o.max_tox, min_weight=o.min_weight, cumulative_dose_uM_days=o.cum_dose, fasting_days=o.fast_days,
-                 cancer_bound_violated=o.cancer_violation, toxicity_bound_violated=o.tox_violation, weight_bound_violated=o.weight_violation))
+                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation, weight_bound_violated=o.weight_violation))
 end
 CSV.write(joinpath(FOUT, "fasting_outcomes.csv"), DataFrame(rows))
 println("Wrote $(joinpath(FOUT, "fasting_outcomes.csv"))")

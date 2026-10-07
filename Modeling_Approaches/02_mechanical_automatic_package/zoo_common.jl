@@ -1,6 +1,6 @@
 # Data loading and fitting helpers for the autonomous model zoo (run_zoo_fits.jl).
 # Standalone: it does not include run_new_data_staged_fits.jl. The data come from the tidy table
-# (zoo_data.jl), which reproduces that script's files, excluded points and day-0 shifts exactly.
+# (zoo_data.jl); since 2026-10-07 day 0 is the nominal seeding, used as the initial condition (zoo_data.jl x0_info).
 
 import Pkg
 Pkg.activate(@__DIR__)
@@ -12,7 +12,7 @@ using OrdinaryDiffEq: ODEProblem, solve, Tsit5
 using LinearAlgebra: pinv, diag
 
 const ROOT     = normpath(joinpath(@__DIR__, "..", ".."))
-const EC50     = 1.0                        # µM, fixed
+const EC50     = 1.0                        # µM: fallback only, for lines saved before the per-line EC50 slot (stages.toml [lines])
 const FBS_LR   = 0.5
 const U_R      = (10 - FBS_LR) / (10 - 0.05)   # low-resource level: 0 in 10% FBS, 0.955 in 0.5% FBS
 

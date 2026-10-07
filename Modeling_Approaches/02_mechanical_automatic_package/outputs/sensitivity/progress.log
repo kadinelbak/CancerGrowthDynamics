@@ -1,0 +1,26 @@
+16:15 V4_ns fits start
+16:30 V4_ns fits exit 0
+16:31 V4_ns heldout exit 0
+16:31 V1_floor0 fits start
+21:01 V1_floor0 fits exit 0
+21:02 V1_floor0 heldout exit 0
+21:02 V5_ns_sd fits start
+21:11 V5_ns_sd fits exit 0
+21:12 V5_ns_sd heldout exit 0
+21:12 V6_sd fits start
+21:17 V6_sd fits exit 0
+21:18 V6_sd heldout exit 0
+21:18 V2_floor25 fits start
+21:25 V2_floor25 fits exit 0
+21:25 V2_floor25 heldout exit 0
+21:25 V3_floor75 fits start
+21:34 V3_floor75 fits exit 0
+21:35 V3_floor75 heldout exit 0
+21:35 ALL DONE
+09:14 V8_sd_floor0 fits start
+09:18 V8_sd_floor0 fits exit 0
+09:18 V8_sd_floor0 heldout exit 0
+09:18 V7_ns_sd_floor0 fits start
+09:26 V7_ns_sd_floor0 fits exit 0
+09:27 V7_ns_sd_floor0 heldout exit 0
+09:27 ALL DONE

@@ -2,9 +2,21 @@
 
 Autonomous compartment models of A2780 (cisplatin-sensitive) and A2780cis (resistant) ovarian
 cancer cells, fitted stage by stage to the New Datasets experiments, then used for optimal control
-of the cisplatin schedule (and, over 30 days, of fasting). No model uses time directly: delays and
+of the cisplatin schedule (and, over 120 days, of fasting). No model uses time directly: delays and
 accumulation come from states driven by the inputs, so every model can be driven by any dose
 schedule D(t). Fitting uses GrowthParameterEstimation.jl, pinned in `Manifest.toml`.
+
+## Setup (clean clone)
+
+Julia 1.12.7 (juliaup). The raw data live in `New Datasets/` at the repository root (see `data/sources.toml`).
+
+```
+julia --project=. -e 'using Pkg; Pkg.instantiate()'   # installs the pinned packages, incl. GrowthParameterEstimation
+```
+
+Checkpoints (`*.jls`) are not in git, so a clean clone starts with `julia run_pipeline.jl` (no `--from`).
+Long runs: keep the machine awake and the lid open (a closed lid sleeps it); `sensitivity/run_awake.ps1` runs a
+script detached with a Windows keep-awake request.
 
 ## Run everything
 
@@ -20,12 +32,17 @@ records the git commit, Julia and package versions, thread count, SHA-256 of eve
 time and exit code of each step. A full run takes about 5–6 hours on 20 threads.
 
 **Reproducibility.** Data selection, stages and hold-outs are configuration; bootstrap replicates and
-multistarts are seeded; optimisers stop on iteration caps. Each optimiser call also has a wall-clock
-safety limit (300 s for the stage fits, 120 s per bootstrap fit), because without one the bounded BFGS
-can run for a very long time on a few candidates. A fit that reaches 95% of its limit may give a
-slightly different answer on another machine, so every such fit is listed in
-`outputs/zoo_fits/time_limit_hits.csv` and counted in the run manifest; a run with 0 hits is
-reproducible, which `test/test_regression.jl` checks against `test/reference_results.toml`.
+multistarts are seeded; optimisers stop on iteration caps only (BFGS 1500, Nelder–Mead 2500) — there is no
+wall-clock limit (since 2026-10-07), so results do not depend on machine load, threads or sleep.
+`test/test_regression.jl` fails unless `test/reference_results.toml` was made (by `test/make_reference.jl`)
+with the same configuration and data (SHA-256 fingerprint); it refits Stages 1 and 2b and the first
+bootstrap replicates from scratch and compares the control tables. After an intended change, accept the
+new run with `make_reference.jl`, then rerun the test.
+
+**Starting values (user, 2026-10-07).** Day 0 is the nominal seeding — 100 cells per well at 30k, 66.7 at 20k,
+split by the seeding ratio in cocultures — and is the initial condition, not a data point. A series whose first
+measured count is more than 3-fold above or below it gets its starting value estimated (one extra parameter
+per series, counted in the BIC; `zoo_data.jl` `x0_info`, `bootstrap_tools.jl` `fit_cand`).
 
 ## Configuration (no data, stage or hold-out is hard-coded)
 
@@ -80,7 +97,7 @@ STAGES_TOML=sens/stages.toml SOURCES_TOML=sens/sources.toml DATA_TABLE=sens/meas
 | s1 | 1 | untreated monocultures | growth law per line |
 | s1b | 2a | low-resource monocultures | Stage 1 growth + every low-resource mechanism (A/B shared-structure test) |
 | s2 | 2b | treated monocultures, 3 doses jointly | Stage 1 growth + every cisplatin mechanism; one structure shared by both lines |
-| s3 | 3a | untreated (Ce0) + 1 µM (Ce1) cocultures | both lines, shared K; the resistant kill is never switched off (floor 50% of Stage 2b) |
+| s3 | 3a | untreated (Ce0) + 1 µM (Ce1) cocultures | both lines, shared K; the resistant kill may be refitted down to 0 or dropped ("_noC" candidates, user 2026-10-06) |
 | s3b | 3b | low-resource cocultures | both lines with their Stage 2a mechanisms |
 | s4 | 4 | low resource + 1 µM coculture | both mechanisms per line, inherited; a few refitted parameters |
 
@@ -97,17 +114,17 @@ replicates. The Hill kill uses each line's measured IC50 as EC50 (A2780 1 µM, A
 | `run_zoo_fits.jl` | runs the stages of `stages.toml`, bootstraps, writes `outputs/zoo_fits/` and the site bundle |
 | `zoo_analyses.jl` | package bootstrap, sensitivity (local, profile, Sobol), validation (`validation.toml`) |
 | `run_control.jl`, `control_report.jl` | 14-day dose control (sequential MPC with a toxicity proxy) |
-| `run_control_fasting.jl`, `control_fasting_report.jl` | 30-day dose + fasting control |
+| `run_control_fasting.jl`, `control_fasting_report.jl` | long (120-day, `long_days`) dose + fasting control, read off at days 14/30/60/120 |
 | `../../build_final_report.jl` | the Final Report from every chapter |
 
 ## Tests
 
 | Test | Checks |
 |---|---|
-| `test/test_data.jl` | the tidy table reproduces the earlier hard-coded loaders exactly |
+| `test/test_data.jl` | the tidy table reproduces the source values of the earlier loaders (QC since 2026-10-07 may only add exclusions; day 0 is the seeding) |
 | `test/test_stages.jl` | `stages.toml` rebuilds every candidate of the saved run (`DRYRUN=1`) |
 | `test/test_validation_config.jl` | `validation.toml` selects the intended data |
-| `test/check_intermittent.jl` | the engine reproduces the earlier intermittent-schedule predictions |
+| `test/check_intermittent.jl` | retired (2026-10-07): compared against the earlier scale-fitted intermittent predictions; the intermittent data are now predicted with the scale fixed at 1 (Validation page) |
 | `test/test_control.jl`, `test/test_control_fasting.jl` | plants, linearisation, gradients and controllers |
 | `test/test_regression.jl` | a rerun reproduces the reference results (`test/reference_results.toml`) |
 

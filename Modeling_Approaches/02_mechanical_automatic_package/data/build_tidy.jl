@@ -35,8 +35,8 @@ end
 
 num(v) = v === missing || v === nothing ? missing : Float64(v)
 
-# The two QC rules (qc_rules.toml), exactly as the fitting scripts applied them: duplicates first,
-# then transient drops among the points that are not duplicates.
+# The QC rules (qc_rules.toml): duplicates first, then transient drops and spikes among the points that are
+# not duplicates.
 function qc_flags(y, rules)
     n = length(y); bad = falses(n); reason = fill("", n)
     if "exact_duplicate" in rules
@@ -60,11 +60,27 @@ function qc_flags(y, rules)
             end
         end
     end
+    if "transient_spike" in rules
+        R = QC["transient_spike"]; frac, recover, floor = R["frac"], R["recover"], R["floor"]
+        prev = y[1]
+        for i in 2:n
+            bad[i] && continue
+            nxt = something(findfirst(k -> k > i && !bad[k], 1:n), 0)
+            if nxt > 0 && y[i] > prev / frac && y[i] - prev > floor && y[nxt] <= prev / recover
+                bad[i] = true; reason[i] = R["description"]
+            else
+                prev = y[i]
+            end
+        end
+    end
     bad, reason
 end
 
+# the rules of a source: those applied to every source plus any it lists itself
+qc_rules_of(src) = unique(vcat(String.(get(QC, "apply_to_all", String[])), String.(get(src, "qc", String[]))))
+
 function tidy_rows(src)
-    for r in get(src, "qc", String[])
+    for r in qc_rules_of(src)
         haskey(QC, r) || error("source $(src["id"]): unknown QC rule $r")
     end
     haskey(SCHED, src["schedule"]) || error("source $(src["id"]): unknown schedule $(src["schedule"])")
@@ -82,7 +98,7 @@ function tidy_rows(src)
     for i in findall(.!keep)
         bad[i] = true; why[i] = "before the time origin (day $(Int(t0))): " * get(src, "time_origin_reason", "")
     end
-    kb, kr = qc_flags(y[keep], get(src, "qc", String[]))
+    kb, kr = qc_flags(y[keep], qc_rules_of(src))
     bad[keep] .= kb; why[keep] .= kr
     tags = (source_id=src["id"], experiment=src["experiment"], condition=src["condition"], line=src["line"], culture=src["culture"],
             ratio=string(src["ratio"]), run=src["run"], seeding=src["seeding"], fbs=Float64(src["fbs"]), schedule=src["schedule"],
@@ -95,6 +111,17 @@ function build_tidy()
     ids = [s["id"] for s in SOURCES]
     length(unique(ids)) == length(ids) || error("duplicate source ids in sources.toml")
     df = DataFrame(reduce(vcat, [tidy_rows(s) for s in SOURCES]))
+    # a QC artefact in one line of a coculture well is an artefact of the image: flag that day in both lines
+    qc_reason(r) = !r.excluded || startswith(r.exclude_reason, "before the time origin") ? "" : r.exclude_reason
+    well = [(r.experiment, r.condition, r.culture, r.ratio, r.run, r.seeding, r.schedule, r.fbs, r.file) for r in eachrow(df)]
+    for i in eachindex(well)
+        df.culture[i] == "mono" && continue
+        df.excluded[i] && continue
+        why = [qc_reason(df[j, :]) for j in eachindex(well) if j != i && well[j] == well[i] && df.day[j] == df.day[i]]
+        k = findfirst(!isempty, why)
+        k === nothing && continue
+        df.excluded[i] = true; df.exclude_reason[i] = why[k] * " (flagged in the other line of the same well)"
+    end
     CSV.write(OUT, df)
     println("Wrote $OUT: $(nrow(df)) rows from $(length(SOURCES)) sources, $(count(df.excluded)) excluded")
     df

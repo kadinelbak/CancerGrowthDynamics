@@ -25,15 +25,11 @@ const S4_PNAME = Dict(:K => "K", :χ => "χ", :χN => "χ_N", :χC => "χ_C", :�
 
 combo_datasets(obs) = [dataset(keep(series(COMBO_SOURCES.N)), obs[1]), dataset(keep(series(COMBO_SOURCES.C)), obs[2])]
 
-# hidden drug and stress states after one day of exposure (the data start at day 1), counts reset
-function preexposed_u0(sys, model, p, X0)
-    u0 = sys_u0(sys, [X0])
-    u1 = solve(ODEProblem(model, u0, (0.0, 1.0), p), Tsit5(); reltol=1e-10, abstol=1e-10).u[end]
-    for (i, o) in enumerate(sys_obs(sys))
-        u1[o] = X0[i]
-    end
-    u1
-end
+# The data start at day 0 (the seeding, 50 cells per line); exposure starts then, so the hidden drug and
+# stress states start at 0 and the starting counts follow the seeding rule (zoo_data.jl x0_info): nominal,
+# or estimated where day 1 is more than 3-fold off it. (This replaces the earlier start at day 1 with
+# hidden states simulated from the candidates' starting guesses.)
+combo_x0() = [x0_info(series(COMBO_SOURCES.N)), x0_info(series(COMBO_SOURCES.C))]
 
 function stage4_cands(c3, c3b, βC2)
     LN3, LC3 = freeze_line(c3.sys.lines[1], c3.params), freeze_line(c3.sys.lines[2], c3.params)
@@ -41,7 +37,7 @@ function stage4_cands(c3, c3b, βC2)
     a3 = [[freeze_slot(a, c3.params) for a in row] for row in c3.sys.alpha]
     a3b = [[freeze_slot(a, c3b.params) for a in row] for row in c3b.sys.alpha]
     K3, K3b = LN3.s.K.v, freeze_slot(c3b.sys.lines[1].s.K, c3b.params).v
-    X0 = [combo.yN[1], combo.yC[1]]
+    X0 = [series(COMBO_SOURCES.N).nom, series(COMBO_SOURCES.C).nom]; X0info = combo_x0()
     ymax = maximum(vcat(combo.yN, combo.yC))
     cands = NamedTuple[]
     βC3 = LC3.s.β.v
@@ -66,30 +62,18 @@ function stage4_cands(c3, c3b, βC2)
         p0s = [[start(k) for k in free], [k == :K ? 1.5Kv : k in (:εN, :εC) ? 0.5 : 1.0 for k in free],
                [k == :K ? 0.7Kv : k in (:εN, :εC) ? 2.0 : -0.5 for k in free]]
         p0s = [[clamp(x, lo + 1e-3 * (hi - lo), hi - 1e-3 * (hi - lo)) for (x, (lo, hi)) in zip(p, bounds)] for p in p0s]
-        u0 = preexposed_u0(sys, model, isempty(free) ? Float64[] : p0s[1], X0)
+        u0 = sys_u0(sys, [X0])
         push!(cands, (name=name, label=label, family=isempty(free) ? "Combination, inherited" : "Combination, refitted", sys=sys, model=model,
-                      u0=u0, pnames=[S4_PNAME[k] for k in free], bounds=bounds, p0s=p0s, slots=free, crowd=crowd, reskill=reskill, βC2=βC2))
+                      u0=u0, pnames=[S4_PNAME[k] for k in free], bounds=bounds, p0s=p0s, slots=free, crowd=crowd, reskill=reskill, βC2=βC2,
+                      x0_fields(sys, X0info)...))
     end
     cands
 end
 
-function fit_stage4(cands, ds; maxtime=300.0)
+function fit_stage4(cands, ds)
     rows = Vector{Any}(undef, length(cands))
     Threads.@threads :dynamic for i in eachindex(cands)
-        c = cands[i]
-        if isempty(c.pnames)
-            f = predict_candidate(c.name, c.label, c.model, ds, c.u0)
-            rows[i] = merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[]))
-            continue
-        end
-        best = (params=fill(NaN, length(c.pnames)), bic=Inf, sse=Inf)
-        for p0 in c.p0s
-            f = bs_fit(c.model, ds, c.u0, p0, c.bounds; maxtime=maxtime, tag=c.name)
-            f.bic < best.bic && (best = f)
-        end
-        isfinite(best.bic) && (f = bs_fit(c.model, ds, c.u0, best.params, c.bounds; maxtime=maxtime, tag=c.name); f.bic < best.bic && (best = f))
-        se = isfinite(best.bic) ? (try param_se(c.model, ds, c.u0, best.params) catch; fill(NaN, length(c.pnames)) end) : fill(NaN, length(c.pnames))
-        rows[i] = merge(c, (params=best.params, bic=best.bic, sse=best.sse, se=se))
+        rows[i] = fit_cand(cands[i], ds)                # bootstrap_tools.jl (estimated starting values included)
     end
     order_rule(sort!([r for r in rows if isfinite(r.bic)]; by=r -> r.bic))
 end

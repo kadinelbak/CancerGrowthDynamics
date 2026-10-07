@@ -1,8 +1,10 @@
 # The held-out treated-coculture test (validation.toml [heldout], the same code as the Validation
 # page) on any zoo run, e.g. a sensitivity variant fitted with ZOO_OUT:
 #   ZOO_OUT=<dir> [STAGES_TOML=… SOURCES_TOML=… DATA_TABLE=…] julia -t 8 --project=. run_heldout.jl
-# Reads <dir>/zoo_state.jls (default outputs/zoo_fits) and writes <dir>/heldout_ce1.csv: the prediction
-# of Ce1 from crowding fitted to Ce0 with the Stage 2b kills, the in-sample fit and the untreated reference.
+# Reads <dir>/zoo_state.jls (default outputs/zoo_fits) and writes <dir>/heldout_ce1.csv (the same file
+# zoo_analyses.jl writes for the main run): the prediction of Ce1 from crowding fitted (weighted) to Ce0
+# with the Stage 2b kills and nominal Ce1 starting values, the in-sample fit, the untreated reference and
+# a paired bootstrap of the RMSE difference over the Ce1 trajectories.
 include(joinpath(@__DIR__, "zoo_common.jl")); include(joinpath(@__DIR__, "zoo_models.jl")); include(joinpath(@__DIR__, "bootstrap_tools.jl"))
 using Serialization, Statistics
 const GPE = GrowthParameterEstimation
@@ -12,13 +14,9 @@ const groups = state.groups
 gid(id) = groups[findfirst(g -> g.id == id, groups)]
 include(joinpath(@__DIR__, "zoo_heldout.jl"))
 r = heldout_ce1()
+write_heldout_csv(r, RUN_DIR)
 m1 = mean(reduce(vcat, [d.y for d in g3.datasets[CE1]]))
-p = r.ce1[1]
-rows = [(row="prediction (crowding from Ce0, kills from Stage 2b)", rmse=p.pred.rmse, nrmse=p.pred.rmse / m1, n=nobs(g3.datasets[CE1]),
-         params=join(["$(n)=$(v)" for (n, v) in zip(c3.pnames[HO_RI], p.params)], "; ")),
-        (row="in-sample (Stage 3a fitted with Ce1)", rmse=r.ce1_full.rmse, nrmse=r.ce1_full.rmse / m1, n=nobs(g3.datasets[CE1]), params=""),
-        (row="untreated reference (same crowding, no drug)", rmse=r.ce1_baseline_rmse, nrmse=r.ce1_baseline_rmse / m1, n=nobs(g3.datasets[CE1]), params="")]
-CSV.write(joinpath(RUN_DIR, "heldout_ce1.csv"), DataFrame(rows))
-println("Stage 3a model $(c3.name): held-out Ce1 RMSE $(round(p.pred.rmse; digits=1)) (nRMSE $(round(p.pred.rmse / m1; digits=3))); ",
-        "in-sample $(round(r.ce1_full.rmse; digits=1)); untreated reference $(round(r.ce1_baseline_rmse; digits=1))")
-println("Wrote $(joinpath(RUN_DIR, "heldout_ce1.csv"))")
+p = r.ce1[1]; b = r.ce1_boot
+println("Stage 3a model $(c3.name): held-out Ce1 RMSE $(round(p.pred.rmse; digits=1)) cells (nRMSE $(round(p.pred.rmse / m1; digits=3)), ",
+        "weighted RMSE $(round(p.pred.wrmse; digits=3))); in-sample $(round(r.ce1_full.rmse; digits=1)); untreated reference $(round(r.ce1_baseline_rmse; digits=1))")
+println("RMSE difference prediction − reference $(round(b.diff; digits=1)) cells (95% paired bootstrap $(round(b.lo; digits=1)) – $(round(b.hi; digits=1))); Ce1 starts: $(r.ce1_u0_note)")

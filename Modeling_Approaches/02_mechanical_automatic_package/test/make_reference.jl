@@ -6,7 +6,9 @@ using Serialization, TOML, CSV, DataFrames
 const PK = normpath(joinpath(@__DIR__, ".."))
 include(joinpath(PK, "zoo_common.jl")); include(joinpath(PK, "zoo_models.jl"))
 state = deserialize(joinpath(PK, "outputs", "zoo_fits", "zoo_state.jls"))
-ref = Dict{String,Any}("made" => string(now()), "groups" => Dict{String,Any}())
+# configuration fingerprint: a reference only applies to the configuration and data it was made with
+include(joinpath(@__DIR__, "regression_fingerprint.jl"))
+ref = Dict{String,Any}("made" => string(now()), "groups" => Dict{String,Any}(), "fingerprint" => config_fingerprint())
 for g in state.groups
     r = state.results[g.id].res; nb = min(3, size(r.bic, 1))
     ref["groups"][g.id] = Dict("carried" => g.cands[1].name,

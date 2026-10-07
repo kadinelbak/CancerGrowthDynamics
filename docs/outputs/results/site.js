@@ -261,7 +261,8 @@ function zooSystem(sim, p) {
   // One mechanism module (mirrors zoo_models.jl: module_effect!): delay kernel + action.
   // o: one before the module's first hidden state (hidden state j is u[o + j]).
   const width = M => (ZOO_NCELL[M.action] || 0) + (ZOO_NKER[M.kernel] || 0) + (ZOO_NAUX[M.action] || 0);
-  function mod(du, u, o, M, w, X, V, r, K) {
+  // ks: Norton–Simon factor on the damaged-cell transfer β·E·V (1 = no coupling), as in zoo_models.jl
+  function mod(du, u, o, M, w, X, V, r, K, ks = 1) {
     const s = M.s, nc = ZOO_NCELL[M.action] || 0, nk = ZOO_NKER[M.kernel] || 0;
     w *= sv(s['ε']);
     const ko = o + nc;
@@ -282,8 +283,8 @@ function zooSystem(sim, p) {
     const a = M.action;
     if (a === 'loss') loss += sv(s.d0) * w + sv(s['β']) * E;
     else if (a === 'hill') { const h = sv(s.h), ec = s.EC50 ? sv(s.EC50) : EC50; loss += E > 0 ? sv(s['β']) * Math.pow(E, h) / (Math.pow(ec, h) + Math.pow(E, h)) : 0; }
-    else if (a === 'damage') { const d = sv(s['δ']), Dm = Math.max(u[o + 1], 0); du[o + 1] = sv(s['β']) * E * V - d * Dm; out = d * Dm; }
-    else if (a === 'transit') { const tau = sv(s['τ']), D1 = Math.max(u[o + 1], 0), D2 = Math.max(u[o + 2], 0); du[o + 1] = sv(s['β']) * E * V - tau * D1; du[o + 2] = tau * (D1 - D2); out = tau * D2; }
+    else if (a === 'damage') { const d = sv(s['δ']), Dm = Math.max(u[o + 1], 0); du[o + 1] = ks * sv(s['β']) * E * V - d * Dm; out = d * Dm; }
+    else if (a === 'transit') { const tau = sv(s['τ']), D1 = Math.max(u[o + 1], 0), D2 = Math.max(u[o + 2], 0); du[o + 1] = ks * sv(s['β']) * E * V - tau * D1; du[o + 2] = tau * (D1 - D2); out = tau * D2; }
     else if (a === 'capacity') Keff = K / (1 + sv(s.c) * E);
     else if (a === 'fade') { reff = r / (1 + sv(s.c) * E); loss += sv(s.d0) * w; }
     else if (a === 'rho') { const f = w / uR; reff = r * (1 + (sv(s['ρr']) - 1) * f); Keff = K * (1 + (sv(s['ρK']) - 1) * f); }
@@ -307,7 +308,9 @@ function zooSystem(sim, p) {
     off = o;
     for (const M of mods) {
       const w = M.input === 'D' ? env.D : env.R;
-      const [re, Ke, lo, ou] = mod(du, u, off, M, w, X, V, r, K);
+      const gx = Math.max(crowd / K, 0), ks = L.ns && M.input === 'D' && (M.action === 'damage' || M.action === 'transit')
+        ? (L.growth === 'theta' ? Math.max(1 - Math.pow(gx, th), 0) : Math.max(1 - gx, 0)) : 1;
+      const [re, Ke, lo, ou] = mod(du, u, off, M, w, X, V, r, K, ks);
       reff *= re / r; Keff *= Ke / K;
       if (M.input === 'D') dloss += lo * (1 + chi * env.R / uR); else loss += lo;
       out += ou; off += width(M);

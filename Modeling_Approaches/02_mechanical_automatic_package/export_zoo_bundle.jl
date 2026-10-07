@@ -140,10 +140,10 @@ zoo_main_panel(g) = g.kind in (:s3, :s3b) ? 2 : 1
 const ZOO_GROUP_TEXT = Dict(
     :s1 => "Grown alone at 30k in 10% FBS. The selected growth law (fewest terms within 3 BIC) and its r, K (and θ) are carried into every later stage.",
     :s1b => "Grown alone at 0.5% FBS. Growth is carried over from Stage 1; only the low-resource mechanism is fitted, and every mechanism acts through states driven by u_R, never through time.",
-    :s2 => "Cisplatin at 0.62, 1.0 and 1.47 µM, fitted jointly. Growth is carried over from Stage 1; delays and accumulation come from drug-effect or damaged-cell states driven by D, never from time. EC50 fixed at 1 µM.",
+    :s2 => "Cisplatin at 0.62, 1.0 and 1.47 µM, fitted jointly. Growth is carried over from Stage 1; delays and accumulation come from drug-effect or damaged-cell states driven by D, never from time. A Hill kill uses each line's measured IC50 as EC50 (1 and 8.34 µM); with the Norton–Simon option the kill is scaled by the line's growth factor, so crowded cells die less.",
     :s3 => "Untreated (Ce0) and 1 µM treated (Ce1) cocultures at three ratios, all fitted at once with one shared carrying capacity K. Each line keeps its Stage 2 drug mechanism.",
     :s3b => "Low-resource cocultures (0.5% FBS, runs 1 and 2, three ratios), all fitted at once with one shared carrying capacity K. Each line keeps its Stage 1b low-resource mechanism.",
-    :s4 => "The combination culture: low resource (0.5% FBS) plus 1 µM cisplatin, 1:1 at 30k. Each line carries both its Stage 3 drug model and its Stage 3b low-resource mechanism; everything is inherited and candidates add at most a drug × low-resource interaction χ, a refitted K or low-resource strengths. Day 1 is taken as day 0 (the day-0 value is a nominal seeding count).")
+    :s4 => "The combination culture: low resource (0.5% FBS) plus 1 µM cisplatin, 1:1 at 30k. Each line carries both its Stage 3 drug model and its Stage 3b low-resource mechanism; everything is inherited and candidates add at most a drug × low-resource interaction χ, a refitted K or low-resource strengths. The starting counts are estimated, because day 1 is more than 3-fold above the nominal seeding of 50 cells per line.")
 
 function zoo_entry(g, r, j, band; curve=true)
     c = g.cands[j]; tmax = g.kind == :s1b ? 20.0 : XMAX
@@ -153,7 +153,7 @@ function zoo_entry(g, r, j, band; curve=true)
     params = [begin
                   l, m, h = hasb ? qs(r.pars[j][:, i]) : (NaN, NaN, NaN)
                   (name=n, tex=ptex(n), value=c.params[i], lo=l, hi=h, removable=hasb && removable(l, h, c.bounds[i]),
-                   atbound=isapprox(c.params[i], c.bounds[i][2]; rtol=1e-3))
+                   atbound=at_bound(c.params[i], c.bounds[i]))
               end for (i, n) in enumerate(c.pnames)]
     lowest = hasb ? pct(r.winner, j) : NaN; chosen = hasb ? pct(r.pick, j) : NaN
     e = Dict{String,Any}("role" => j == 1 ? "optimal" : "candidate", "name" => c.name, "label" => c.label, "family" => c.family, "k" => length(c.params),
@@ -228,17 +228,24 @@ function selection_note(g)
         (i.useB ? "B is within $(Int(RULE_BIC)) BIC with no more parameters, so both lines share it." : "B is not within $(Int(RULE_BIC)) BIC with no more parameters, so each line keeps its own model.")
 end
 
-# Per-point residual scales of the fit (stages.toml [selection] residual_weighting), attached to each plotted
-# series so the Explorer's in-browser SSE and BIC are on the same scale as the fits. A series is matched to the
-# fitted dataset with the same state and the same days; unweighted fits add nothing.
-function with_weights(g, series)
-    any(d -> hasproperty(d, :w), g.datasets) || return series
+# Align each plotted series with the fitted dataset of the same state, so the Explorer's in-browser SSE and BIC
+# use exactly the fitted points: points the fit does not use (QC exclusions) move to the excluded markers, day 0
+# (the seeding, which is the initial condition) is not plotted as data, and weighted fits attach each point's
+# residual scale w.
+function align_series(g, series)
+    weighted = any(d -> hasproperty(d, :w), g.datasets)
     map(series) do s
-        j = findfirst(d -> d.state_index == s.state && length(d.x) == length(s.x) && all(abs.(d.x .- s.x) .< 1e-9), g.datasets)
-        j === nothing && (@warn "no fitted dataset matches series $(s.name) of $(g.id); its points are unweighted in the Explorer"; return s)
-        merge(s, (w=collect(Float64, dweights(g.datasets[j])),))
+        j = findfirst(d -> d.state_index == s.state, g.datasets)
+        j === nothing && (@warn "no fitted dataset for series $(s.name) of $(g.id)"; return s)
+        D = g.datasets[j]; pos = Dict(zip(D.x, eachindex(D.x))); wv = collect(Float64, dweights(D))
+        used = [haskey(pos, x) for x in s.x]; other = .!used .& (s.x .> 0)
+        out = merge(s, (x=s.x[used], y=s.y[used], xbad=vcat(s.xbad, s.x[other]), ybad=vcat(s.ybad, s.y[other])))
+        weighted ? merge(out, (w=[wv[pos[t]] for t in out.x],)) : out
     end
 end
+
+# a parameter on either end of its search range (within 0.1% of the range): its interval is not data-driven
+at_bound(v, (lo, hi)) = isfinite(v) && (abs(v - lo) <= 1e-3 * (hi - lo) || abs(v - hi) <= 1e-3 * (hi - lo))
 
 function export_zoo_bundle(groups, results; B=BOOT_B)
     out = Any[]
@@ -248,7 +255,7 @@ function export_zoo_bundle(groups, results; B=BOOT_B)
                                     "dbic" => c.bic - g.cands[1].bic, "lowest" => size(r.bic, 1) > 0 ? pct(r.winner, j) : NaN,
                                     "pick" => size(r.bic, 1) > 0 ? pct(r.pick, j) : NaN, "compartments" => ncompartments(c.sys.lines[1].kernel, c.sys.lines[1].action))
                    for (j, c) in enumerate(g.cands)]
-        series = with_weights(g, zoo_series(g))
+        series = align_series(g, zoo_series(g))
         push!(out, Dict{String,Any}("id" => g.id, "stage" => stage_label(g.stage), "title" => g.title, "kind" => string(g.kind), "text" => ZOO_GROUP_TEXT[g.kind],
             "series" => series, "panels" => zoo_panels(g), "mainPanel" => zoo_main_panel(g),
             "optimal" => zoo_entry(g, r, 1, results[g.id].band), "candidates" => length(g.cands), "ranking" => ranking, "selectionNote" => selection_note(g),

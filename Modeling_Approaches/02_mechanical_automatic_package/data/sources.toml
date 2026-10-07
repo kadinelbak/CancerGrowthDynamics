@@ -75,8 +75,7 @@ fbs = 0.5
 schedule = "const_0"
 file = "New Datasets/ALL A2780-cis LR data.xlsx"
 sheet = "1 - mono A2780cis 30k"
-time_origin = 1
-time_origin_reason = "day-0 value is an outlier (user, 2026-10-01); day 1 is taken as t = 0"
+# day 0 is the nominal seeding; this series' starting value is estimated if day 1 is > 3-fold off it (user, 2026-10-07)
 qc = ["exact_duplicate", "transient_drop"]
 
 # ── treated monocultures, three doses (Stage 2b) ──────────────────────────────
@@ -521,8 +520,7 @@ seeding = 30000
 fbs = 0.5
 schedule = "const_1"
 file = "New Datasets/Validation/ALL A2780 LR + cis(A2780 30k 1-1).csv"
-time_origin = 1
-time_origin_reason = "day-0 value is an outlier (user, 2026-10-01); day 1 is taken as t = 0"
+# day 0 is the nominal seeding; this series' starting value is estimated if day 1 is > 3-fold off it (user, 2026-10-07)
 qc = ["exact_duplicate", "transient_drop"]
 
 [[source]]
@@ -537,8 +535,7 @@ seeding = 30000
 fbs = 0.5
 schedule = "const_1"
 file = "New Datasets/Validation/ALL A2780 LR + cis(A2780cis 30k 1-1).csv"
-time_origin = 1
-time_origin_reason = "day-0 value is an outlier (user, 2026-10-01); day 1 is taken as t = 0"
+# day 0 is the nominal seeding; this series' starting value is estimated if day 1 is > 3-fold off it (user, 2026-10-07)
 qc = ["exact_duplicate", "transient_drop"]
 
 # ── intermittent dosing monocultures (validation only; never fitted) ─────────

@@ -1,8 +1,0 @@
-=== 30-day control with fasting: 12 threads; 15 decisions, look-ahead 7; checkpoint has [:main, :robust, :sweeps, :checks] ===
-  washout B k_off=0.5 [115s]
-  washout B k_off=2.0 [152s]
-  washout A k_off=0.5 [357s]
-  washout A k_off=2.0 [474s]
-  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
-Wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package\outputs\control_30d\fasting_outcomes.csv
-EXIT 0

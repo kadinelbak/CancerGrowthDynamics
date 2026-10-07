@@ -97,7 +97,7 @@ function build() {
        <h1>Staged growth-model fitting</h1><p class="sub" style="margin-top:18px">The optimal model at every stage, redrawn from the latest full run</p>
        <p class="sub" style="margin-top:10px">Run ${esc(RES.generated)} · ${RES.replicates} bootstrap replicates per fit</p></div>${foot()}`, 'dark title');
   const stages = [...new Map(RES.groups.map(g => [g.stage, g])).keys()];
-  add(`<div class="eyebrow">How models were chosen</div><h2>Five stages, each building on the last</h2>
+  add(`<div class="eyebrow">How models were chosen</div><h2>Six stages, each building on the last</h2>
        <ul class="bul"><li>Stages: ${stages.map(esc).join(' → ')}.</li>
        <li><b>No time-based terms</b>: delays and drug accumulation come from compartments, second-order effect states or damaged-cell states driven by the dose, so every model works with any dose schedule (needed for optimal control).</li>
        <li><b>Optimal</b>: the fewest free parameters among the candidates within 3 BIC of the lowest, carried into later stages. At most 3 compartments per cell line.</li>
