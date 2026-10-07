@@ -236,7 +236,8 @@ expand_blocks(Ub, b) = reduce(vcat, [fill(Ub[j], b[j]) for j in eachindex(b)])  
 function discrete_solve(x0, P::Plant, Δ, H, levels, W::Weights; min_gap=0.0, cum=0.0, Uinit=nothing)
     blk = as_blocks(H); H = length(blk)
     (all(==(1), blk) || (min_gap <= 0 && cum <= 0)) || error("dose gaps and budgets need single-interval blocks")
-    step(x, u, k) = (c = 0.0; for _ in 1:blk[k]; x = F(x, u, P, Δ); c += stage_cost(x, u, P, W); end; (x, c))
+    # `local`: a closure would otherwise share the warm-start block's `c` (Julia captures same-named outer locals)
+    step(x, u, k) = (local cb = 0.0; for _ in 1:blk[k]; x = F(x, u, P, Δ); cb += stage_cost(x, u, P, W); end; (x, cb))
     na = length(levels); best = Ref(Inf); bestU = zeros(H); U = zeros(H)
     gap_steps = ceil(Int, min_gap / Δ - 1e-9)
     allowed(u, k, last, used) = !(u > 0 && gap_steps > 0 && k - last <= gap_steps) && !(cum > 0 && used + u * Δ > cum + 1e-12)
@@ -253,8 +254,8 @@ function discrete_solve(x0, P::Plant, Δ, H, levels, W::Weights; min_gap=0.0, cu
     X = [Vector{Vector{Float64}}(undef, na) for _ in 1:H]; cst = [zeros(na) for _ in 1:H]; ord = [collect(1:na) for _ in 1:H]
     function dfs(x, k, cost, last, used)
         if k > H
-            c = cost + terminal_cost(x, P, W)
-            c < best[] && (best[] = c; bestU .= U)
+            local cl = cost + terminal_cost(x, P, W)
+            cl < best[] && (best[] = cl; bestU .= U)
             return
         end
         for a in 1:na
@@ -309,7 +310,16 @@ function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:c
         bk = shrink ? cut_blocks(blk, n_dec - k + 1) : blk; Hk = length(bk)
         rem = cum > 0 ? max(cum - used, 0.0) : 0.0
         if mode == :continuous
-            sol = sqp_solve(xm, Uwarm[1:Hk], Pm, Δ, W; cum=cum > 0 ? max(rem, 1e-9) : 0.0)
+            # the time-to-progression step makes the cost non-convex, so SQP (a local method) starts from the
+            # cheaper of its shifted warm start and the exact measured-dose plan over the same look-ahead
+            # (blocked as in discrete mode); SQP never increases the cost, so the continuous plan is never worse
+            U0 = Uwarm[1:Hk]
+            if cum <= 0
+                bd = shrink ? cut_blocks(as_blocks(H), n_dec - k + 1) : as_blocks(H)
+                Ud = expand_blocks(discrete_solve(xm, Pm, Δ, bd, Float64.(CFG["dose"]["levels_data"]), W).U, bd)
+                total_cost(xm, Ud, Pm, Δ, W) < total_cost(xm, U0, Pm, Δ, W) && (U0 = Ud)
+            end
+            sol = sqp_solve(xm, U0, Pm, Δ, W; cum=cum > 0 ? max(rem, 1e-9) : 0.0)
             push!(iters, sol.iters)
         else
             sol = discrete_solve(xm, Pm, Δ, bk, levels, W; min_gap=min_gap, cum=cum > 0 ? rem : 0.0, Uinit=Uwarm[1:Hk])

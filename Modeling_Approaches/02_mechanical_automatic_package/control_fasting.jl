@@ -183,6 +183,8 @@ terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (progression_cost(x[FP.iN], 
                                                      W.qT * (x[FP.iT] / W.Btox)^2 + W.qW * wloss(x, FP, W)^2) +
     W.qRT * max(x[FP.iC], zero(x[FP.iC])) / W.K
 
+# blocked (dose, fast) plan → one row per interval: the dose is held over the block, a fast only in its first interval
+expand_blocks2(Ub, b) = reduce(vcat, [[Ub[j, 1] (i == 1 ? Ub[j, 2] : 0.0)] for j in eachindex(b) for i in 1:b[j]])
 function total_cost2(x0, U, FP, Δ, W)
     x = copy(x0); J = 0.0
     for k in axes(U, 1)
@@ -292,13 +294,13 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
     buf = RK4Buf(nx); tmp = zeros(nx)
     # one block from x into y: returns the block's cost and the fasting run/gap after it
     function block!(y, x, u, v, k, run, gap)
-        c = 0.0; copyto!(tmp, x)
+        local cb = 0.0; copyto!(tmp, x)          # `local`: not the warm-start block's `c` (closure capture)
         for j in 1:blk[k]
             vj = j == 1 ? v : 0.0
-            F2!(y, tmp, (u, vj), FP, Δ, buf); copyto!(tmp, y); c += stage_cost2(y, (u, vj), FP, W)
+            F2!(y, tmp, (u, vj), FP, Δ, buf); copyto!(tmp, y); cb += stage_cost2(y, (u, vj), FP, W)
             run, gap = vj > 0 ? (run + 1, 0) : (0, gap + 1)
         end
-        c, run, gap
+        cb, run, gap
     end
     X = [[zeros(nx) for _ in 1:na] for _ in 1:H]; cst = [zeros(na) for _ in 1:H]; ord = [collect(1:na) for _ in 1:H]
     best = Ref(Inf); bestU = zeros(H, 2); U = zeros(H, 2)
@@ -314,8 +316,8 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
     RG = [zeros(Int, na, 2) for _ in 1:H]            # fasting run/gap after each child block
     function dfs(x, k, cost, run, gap)
         if k > H
-            c = cost + terminal_cost2(x, FP, W)
-            c < best[] && (best[] = c; bestU .= U)
+            local cl = cost + terminal_cost2(x, FP, W)
+            cl < best[] && (best[] = cl; bestU .= U)
             return
         end
         for a in 1:na
@@ -351,8 +353,17 @@ function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mod
     for k in 1:n_dec
         observe!(xm, x, Pm, Pp, noise, k)
         bk = shrink ? cut_blocks(blk, n_dec - k + 1) : blk; Hk = length(bk)
-        sol = mode == :discrete ? discrete_solve2(xm, Pm, Δ, bk, W; run0=run, gap0=gap, Uinit=Uwarm[1:Hk, :], kw...) :
-                                  sqp_solve2(xm, Uwarm[1:Hk, :], Pm, Δ, W)
+        if mode == :discrete
+            sol = discrete_solve2(xm, Pm, Δ, bk, W; run0=run, gap0=gap, Uinit=Uwarm[1:Hk, :], kw...)
+        else
+            # SQP is local and the progression step makes the cost non-convex: start from the cheaper of the
+            # shifted warm start and the exact measured-level plan (blocked as in discrete mode), so the
+            # continuous plan is never worse than it (SQP does not increase the cost)
+            bd = shrink ? cut_blocks(as_blocks(H), n_dec - k + 1) : as_blocks(H)
+            U0 = Uwarm[1:Hk, :]; Ud = expand_blocks2(discrete_solve2(xm, Pm, Δ, bd, W; run0=run, gap0=gap).U, bd)
+            total_cost2(xm, Ud, Pm, Δ, W) < total_cost2(xm, U0, Pm, Δ, W) && (U0 = Ud)
+            sol = sqp_solve2(xm, U0, Pm, Δ, W)
+        end
         w = sol.U[1, :]; applied[k, :] = w
         run = w[2] > 0 ? run + 1 : 0; gap = w[2] > 0 ? 0 : gap + 1
         x = F2(x, w, Pp, Δ); xm = F2(xm, w, Pm, Δ)

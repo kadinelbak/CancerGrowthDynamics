@@ -99,6 +99,9 @@ end
                 best = min(best, J)
             end
             @test discrete_solve2(x0, FP, Δ, blk, W).J ≈ best rtol = 1e-10
+            @test expand_blocks2([1.0 1.0; 0.62 1.0], blk) == [1.0 1.0; 0.62 1.0; 0.62 0.0]       # blocked plan → intervals
+            sb = discrete_solve2(x0, FP, Δ, blk, W)
+            @test total_cost2(x0, expand_blocks2(sb.U, blk), FP, Δ, W) ≈ sb.J rtol = 1e-10
         end
 
         @testset "scenario $scen: SQP respects bounds and does not increase the cost" begin

@@ -171,8 +171,9 @@ end
             @test sol.J <= total_cost(x0, U0, P, Δ, W) + 1e-9
             cl = closed_loop(P, P, x0, Δ, 4, 4, W; mode=:continuous)
             @test all(0 .<= cl.U .<= W.umax + 1e-12)
-            # over [0, 1.47] µM the measured doses are a subset, so a converged SQP must not be worse than the exact discrete optimum
-            H = 4; s4 = sqp_solve(x0, fill(0.5, H), P, Δ, W); d4 = discrete_solve(x0, P, Δ, H, LEVELS, W)
+            # over [0, 1.47] µM the measured doses are a subset; the time-to-progression step makes the cost non-convex,
+            # so SQP (local) is started at the exact discrete optimum, as the continuous closed loop does, and must not end above it
+            H = 4; d4 = discrete_solve(x0, P, Δ, H, LEVELS, W); s4 = sqp_solve(x0, d4.U, P, Δ, W)
             @test s4.J <= d4.J * (1 + 1e-6) + 1e-9
             # first-order optimality: the projected gradient vanishes at the SQP solution (normal medium only: the
             # low-resource plant has a kink in ε(u) at u = 1 µM, where SQP may stop at a non-smooth point)
