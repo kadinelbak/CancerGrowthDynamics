@@ -43,7 +43,7 @@ scheme = "leave one ratio out"
 group = "s3"
 train = { condition = "Ce0" }
 predict = { condition = "Ce1" }
-refit = ["K", "α_NC", "α_CN", "d_N"]
+refit = ["K", "α_NC", "α_CN", "d_N", "d_C"]   # crowding and coculture death terms, refitted on Ce0 (those the carried model has)
 drug_from = "s2"
 # reference without any drug model: the same Ce0-fitted growth and crowding (each line's carried
 # untreated logistic law, shared K), with no drug term (user, 2026-10-01: "normal logistic")

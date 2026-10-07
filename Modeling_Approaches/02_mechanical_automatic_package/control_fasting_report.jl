@@ -121,8 +121,23 @@ function model_section()
     # each line's cisplatin module (Hill or linear kill, whichever Stage 2b selected) and its low-resource modules
     drug(ms) = only(filter(m -> m.input_D, ms))
     hillN = drug(mN); hillC = drug(mC); hill = hillN.action == :hill
-    capN = only(filter(m -> !m.input_D && m.action == :capacity, mN)); lossC = only(filter(m -> !m.input_D && m.action == :loss, mC))
     PB = fast_plant(:B)
+    # each line's low-resource module, whatever Stage 2a selected: one row per parameter it uses
+    kerneldesc = Dict(:none => "immediate", :comp1 => "effect compartment", :chain2 => "2-compartment chain", :chain3 => "3-compartment chain",
+                      :second => "second-order delay", :auc => "cumulative exposure (no fading)")
+    function lrrows(ms, X, line)
+        rows = String[]
+        for m in filter(m -> !m.input_D, ms)
+            what = "$(line) low-resource module: $(kerneldesc[m.kernel]) → $(m.action == :capacity ? "lowers K" : "extra death")"
+            m.action == :capacity && push!(rows, prow("c_$X", m.c, "—", "DATA · Stage 1b", what * " (capacity reduction per unit effect)"))
+            m.action == :loss && m.d0 != 0 && push!(rows, prow("d_$X^{LR}", m.d0, "/day", "DATA · Stage 1b", what * " (immediate death per unit u_R)"))
+            m.action == :loss && m.β != 0 && push!(rows, prow("d_$X^{acc}", m.β, "/day", "DATA · Stage 1b", what * " (death per unit accumulated effect)"))
+            m.kernel_chain > 0 && push!(rows, prow("k_$X^R", m.k, "/day", "DATA · Stage 1b", what * " (transit rate)"))
+            m.kernel == :second && push!(rows, prow("\\omega_$X^R,\\ \\zeta_$X^R", "$(fmt(m.ω)), $(fmt(m.ζ))", "/day, —", "DATA · Stage 1b", what * " (natural frequency, damping)"))
+        end
+        rows
+    end
+    chiN, chiC = spec[1].chi, spec[2].chi
     kname = hill ? "maximum" : "per unit drug effect"
     nsnote = spec[1].ns ? "; scaled by the Norton–Simon growth factor" : ""
     prow(sym, val, unit, src, note) = trow([td("\\($sym\\)"), tn(val isa Number ? fmt(val) : val), td(unit), td(src), td(hesc(note))])
@@ -136,11 +151,10 @@ function model_section()
              (hill ? prow("h_N,\\ h_C", "$(fmt(hillN.h)), $(fmt(hillC.h))", "—", "DATA · Stage 2", "Hill slopes") : ""),
              prow("k_N,\\ k_C", "$(fmt(hillN.k)), $(fmt(hillC.k))", "/day", "DATA · Stage 2", "drug-effect transit rates"),
              (hill ? prow("EC_{50,N},\\ EC_{50,C}", "$(fmt(hillN.ec50)), $(fmt(hillC.ec50))", "µM", "DATA (fixed)", "measured IC50 of each line") : ""),
-             prow("c_N", capN.c, "—", "DATA · Stage 1b", "A2780 capacity reduction per unit low resource"),
-             prow("d_C^{LR}", lossC.d0, "/day", "DATA · Stage 1b", "immediate A2780cis death in low resource"),
-             prow("d_C^{acc}", lossC.β, "/day", "DATA · Stage 1b (flat profile: poorly identified)", "A2780cis death from accumulated stress"),
-             prow("k_C^R", lossC.k, "/day", "DATA · Stage 1b (one-sided)", "stress-compartment transit rate"),
-             prow("\\varepsilon_N^{S4},\\ \\varepsilon_C^{S4}", "$(fmt(FP.ε[1])), $(fmt(FP.ε[2]))", "—", "DATA · Stage 4", "low-resource strength with 1 µM cisplatin"),
+             lrrows(mN, "N", "A2780")..., lrrows(mC, "C", "A2780cis")...,
+             (length(FP.ε) == 2 ? prow("\\varepsilon_N^{S4},\\ \\varepsilon_C^{S4}", "$(fmt(FP.ε[1])), $(fmt(FP.ε[2]))", "—", "DATA · Stage 4", "low-resource strength with 1 µM cisplatin") : ""),
+             (chiN != 0 || chiC != 0 ? prow("\\chi", chiN == chiC ? fmt(chiN) : "$(fmt(chiN)), $(fmt(chiC))", "—", "DATA · Stage 4",
+                                             "drug × low-resource interaction: the cisplatin kill is × (1 + χ) in 0.5% FBS") : ""),
              prow("u_R", U_R, "—", "DATA", "low-resource level at 0.5% FBS"),
              prow("s_B,\\ d_B", "$(fmt(t.s_B)), $(fmt(t.d_B))", "—, /day", "ASSUMPTION, LITERATURE", "drug burden (de Pillis & Radunskaya 2001)"),
              prow("a_H,\\ r_H", "$(fmt(t.a_H)), $(fmt(t.r_H))", "—, /day", "LITERATURE", "healthy-tissue kill and regrowth (de Pillis & Radunskaya 2001)"),
@@ -154,11 +168,10 @@ function model_section()
     """<h2>The model the controller uses $(tip("Every equation the controller simulates, in the order the states appear. The cell equations are generated from the plant itself, the same way the zoo pages write them, so what is shown is what is simulated.", :none))</h2>
 <div class='intro'><p>Two controls, each held constant over a 2-day interval between media changes: the cisplatin concentration \\(u\\) (µM) and fasting \\(v\\) (1 = the interval is run in 0.5% FBS, 0 = fed, 10% FBS). Fasting enters the cells through the fitted low-resource level \\(u_R = $(U_R)\\,v\\), and the host through the weight and protection states. When \\(v = 0\\) the model is exactly the 14-day control model; with \\(u = 1\\) µM and \\(v = 1\\) it is exactly the fitted Stage 4 model (both checked below).</p>
 <h3>Cells (scenario A; generated from the plant, with \\(D = u\\))</h3>
-$(join([eqt(e, i == 1 ? "A2780 (sensitive). The cisplatin kill is the drug term (as selected in Stage 2b$(ns_on(S.lines[1]) ? ", scaled by the Norton–Simon growth factor" : "")), the low-resource module divides the capacity K by (1 + c_N·ε_N(u)·u_R): fasting lowers how many sensitive cells the culture can hold." : "A2780cis (resistant). The cisplatin kill is the drug term (β_C from $(stage3_betaC().source) in scenario A). The low-resource module adds an immediate death d_C^LR·ε_C(u)·u_R and a delayed death d_C^acc·S_{C,3} from the stress chain.") for (i, e) in enumerate(celltex[1:2])]))
+$(join([eqt(e, i == 1 ? "A2780 (sensitive). The cisplatin kill is the drug term (as selected in Stage 2b$(ns_on(S.lines[1]) ? ", scaled by the Norton–Simon growth factor" : "")), the low-resource module is the one Stage 2a selected for A2780 (its equations and values below): fasting acts through u_R." : "A2780cis (resistant). The cisplatin kill is the drug term (β_C from $(stage3_betaC().source) in scenario A). The low-resource module is the one Stage 2a selected for A2780cis (its equations and values below).") for (i, e) in enumerate(celltex[1:2])]))
 $(length(celltex) > 2 ? join([eq(e) for e in celltex[3:end]]) : "")
 $(eqt(raw"\frac{dA_{X,1}}{dt}=k_X\,(u-A_{X,1}),\quad \frac{dA_{X,j}}{dt}=k_X\,(A_{X,j-1}-A_{X,j}),\ j=2,3,\qquad E_X=A_{X,3}", "Drug-effect chain of each line (Stage 2): the kill follows the dose with a delay of about 3/k_X days."))
-$(eqt(raw"\frac{dS_{C,1}}{dt}=k_C^R\left(\varepsilon_C(u)\,u_R-S_{C,1}\right),\quad \frac{dS_{C,j}}{dt}=k_C^R\,(S_{C,j-1}-S_{C,j}),\ j=2,3", "Stress chain of A2780cis in low resource (Stage 1b): starvation damage builds up over days and fades after refeeding at the same rate."))
-$(eqt(raw"\varepsilon_X(u)=1+\left(\varepsilon_X^{S4}-1\right)\min\!\left(\frac{u}{1\,\mu\mathrm{M}},\,1\right)", "Drug × low-resource interaction. Low resource alone was fitted with strength 1 (Stages 1b/3b); low resource with 1 µM cisplatin with ε^S4 (Stage 4). The plant reproduces both measured conditions and interpolates linearly in the dose between them (capped above 1 µM). The alternative, ε^S4 at every dose, predicts the low-resource cocultures much worse (checks below)."))
+$(isempty(FP.iε) ? eqt("\\text{drug losses}\\times\\left(1+\\chi\\,u_R/0.955\\right),\\quad \\chi=$(fmt(FP.spec[1].chi))", "Drug × low-resource interaction (Stage 4): the carried model multiplies each line's cisplatin kill by (1 + χ) in 0.5% FBS and leaves it unchanged in 10% FBS, so it reproduces both measured conditions; no interpolation in the dose is needed.") : eqt(raw"\varepsilon_X(u)=1+\left(\varepsilon_X^{S4}-1\right)\min\!\left(\frac{u}{1\,\mu\mathrm{M}},\,1\right)", "Drug × low-resource interaction. Low resource alone was fitted with strength 1 (Stages 1b/3b); low resource with 1 µM cisplatin with ε^S4 (Stage 4). The plant reproduces both measured conditions and interpolates linearly in the dose between them (capped above 1 µM). The alternative, ε^S4 at every dose, predicts the low-resource cocultures much worse (checks below)."))
 <h3>Host</h3>
 $(eqt(raw"\frac{dB}{dt}=s_B\,u-d_B\,B", "Systemic drug burden (de Pillis & Radunskaya 2001). s_B maps 1 µM in the medium to 1 unit of burden (assumption)."))
 $(eqt(raw"\frac{dT}{dt}=a_H\,\left(1-p_H\,P\right)\left(1-e^{-B}\right)(1-T)-r_H\,T\,(1-T)", "Toxicity burden T = fraction of healthy tissue lost (de Pillis & Radunskaya 2001), with the fasting protection factor (1 − p_H·P): while protected, the same drug burden does less damage to healthy tissue. This is differential stress resistance (Raffaghello et al. 2008; de Groot et al. 2020 saw less chemotherapy-induced DNA damage in T cells). p_H is an assumption and is swept down to 0 (no protection)."))
@@ -335,7 +348,9 @@ end
 
 function washout_section()
     haskey(FC, :washout) || return ""
-    k0 = only(filter(M -> !M.input_D && M.kernel_chain == 3, fast_plant(:A).spec[2].mods)).k
+    # the fitted fade of A2780cis low-resource stress after refeeding: the chain's own rate, or none (cumulative exposure)
+    mC0 = only(filter(M -> !M.input_D, fast_plant(:A).spec[2].mods))
+    k0 = mC0.kernel_chain > 0 ? mC0.k : 0.0
     rows = String[]
     for scen in (:A, :B)
         m = main_of(scen, "50:50")

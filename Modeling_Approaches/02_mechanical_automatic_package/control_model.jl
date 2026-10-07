@@ -51,37 +51,41 @@ end
 # modules: test_control_fasting.jl). Only the module types of the carried models are supported;
 # line_specs stops with an error on anything else rather than silently differing.
 struct ModSpec
-    input_D::Bool; kernel_chain::Int; k::Float64; o::Int     # chain length (0 = immediate), rate, first hidden index − 1
+    input_D::Bool; kernel_chain::Int; k::Float64; o::Int     # chain length (comp1 = 1, chain2 = 2, chain3 = 3; 0 = none/auc/second), rate, first hidden index − 1
     action::Symbol; β::Float64; h::Float64; c::Float64; d0::Float64; ec50::Float64
     ε::Float64; εj::Int                                       # fixed strength, or index into the free strengths (0 = fixed)
+    kernel::Symbol; ω::Float64; ζ::Float64                    # delay kernel (zoo_models.jl KERNELS) and second-order ω, ζ
 end
 struct LineSpec
     ix::Int; other::Int; α::Float64; logistic::Bool; r::Float64; K::Float64; θ::Float64; d::Float64
     mods::Vector{ModSpec}
     ns::Bool                    # Norton–Simon: drug losses × growth factor (zoo_models.jl growth_factor)
+    chi::Float64                # drug × low-resource interaction χ: drug losses × (1 + χ·u_R/U_R) (zoo line_rhs_multi!)
 end
+const FAST_KERNELS = (:none, :comp1, :chain2, :chain3, :second, :auc)
 # iε: positions in p of free low-resource strengths (control_fasting.jl); none in normal medium
 function line_specs(S, p, iε)
     out = LineSpec[]
     for (j, l) in enumerate(S.envs[1].lines)
         L = S.lines[l]; xi = S.xi[1][j]; off = S.hb[1][j]
-        (hasproperty(L, :chi) && sv(L.chi, p, Float64) != 0) && error("χ interaction not supported in the fast plant")
         L.growth in (:logistic, :theta) || error("growth law $(L.growth) not supported in the fast plant")
         mods = ModSpec[]
         for M in modules(L)
             ncell(M.action) == 0 && naux(M.action) == 0 || error("action $(M.action) not supported in the fast plant")
-            M.kernel in (:none, :chain3) || error("kernel $(M.kernel) not supported in the fast plant")
+            M.kernel in FAST_KERNELS || error("kernel $(M.kernel) not supported in the fast plant")
             M.action in (:hill, :capacity, :loss) || error("action $(M.action) not supported in the fast plant")
             nk = nker(M.kernel); gs(k) = hasproperty(M.s, k) ? sv(getfield(M.s, k), p, Float64) : 0.0
             εs = M.s.ε; εj = εs.i > 0 ? findfirst(==(εs.i), iε) : 0
             εs.i > 0 && εj === nothing && error("unexpected free slot")
-            push!(mods, ModSpec(M.input == :D, nk, nk > 0 ? gs(:k) : 0.0, off, M.action, gs(:β), gs(:h), gs(:c), gs(:d0), ec50_of(M.s, p, Float64),
-                                εs.i > 0 ? NaN : εs.v, εj))
+            ch = M.kernel in (:comp1, :chain2, :chain3) ? nk : 0
+            push!(mods, ModSpec(M.input == :D, ch, ch > 0 ? gs(:k) : 0.0, off, M.action, gs(:β), gs(:h), gs(:c), gs(:d0), ec50_of(M.s, p, Float64),
+                                εs.i > 0 ? NaN : εs.v, εj, M.kernel, gs(:ω), gs(:ζ)))
             off += mwidth(M)
         end
         m = 3 - j
         push!(out, LineSpec(xi + 1, S.xi[1][m] + 1, sv(S.alpha[l][S.envs[1].lines[m]], p, Float64), L.growth == :logistic,
-                            sv(L.s.r, p, Float64), sv(L.s.K, p, Float64), sv(L.s.θ, p, Float64), sv(L.s.d, p, Float64), mods, ns_on(L)))
+                            sv(L.s.r, p, Float64), sv(L.s.K, p, Float64), sv(L.s.θ, p, Float64), sv(L.s.d, p, Float64), mods, ns_on(L),
+                            hasproperty(L, :chi) ? sv(L.chi, p, Float64) : 0.0))
     end
     out
 end
@@ -95,13 +99,22 @@ function spec_cells_rhs!(du, x, u, uR, f, spec, εv, koff, v)
         for M in L.mods
             ε = M.εj == 0 ? T(M.ε) : 1 + (εv[M.εj] - 1) * f
             wi = (M.input_D ? T(u) : T(uR)) * ε
-            E = wi
-            if M.kernel_chain == 3
-                o = M.o
-                # low-resource stress chains may fade faster after refeeding (sensitivity only; default = fitted rate)
+            E = wi; o = M.o
+            if M.kernel_chain > 0                    # effect compartment / transit chain of n compartments at rate k
+                # low-resource stress may fade faster after refeeding (sensitivity only; default = fitted rate)
                 k = (M.input_D || isnan(koff)) ? T(M.k) : M.k * v + koff * (1 - v)
-                du[o+1] = k * (wi - x[o+1]); du[o+2] = k * (x[o+1] - x[o+2]); du[o+3] = k * (x[o+2] - x[o+3])
-                E = max(x[o+3], z)
+                du[o+1] = k * (wi - x[o+1])
+                for i in 2:M.kernel_chain
+                    du[o+i] = k * (x[o+i-1] - x[o+i])
+                end
+                E = max(x[o+M.kernel_chain], z)
+            elseif M.kernel == :auc                  # cumulative exposure: never fades in the fitted model; the
+                fade = (M.input_D || isnan(koff)) ? z : koff * (1 - v)       # refeeding sensitivity adds a fade when fed
+                du[o+1] = wi - fade * x[o+1]
+                E = max(x[o+1], z)
+            elseif M.kernel == :second               # second-order (damped oscillator) delay
+                du[o+1] = x[o+2]; du[o+2] = M.ω^2 * (wi - x[o+1]) - 2M.ζ * M.ω * x[o+2]
+                E = max(x[o+1], z)
             end
             if M.action == :hill
                 lo = E > 0 ? M.β * E^M.h / (T(M.ec50)^M.h + E^M.h) : z
@@ -114,6 +127,7 @@ function spec_cells_rhs!(du, x, u, uR, f, spec, εv, koff, v)
             end
         end
         q = max(crowd / Keff, z)
+        dloss *= 1 + L.chi * T(uR) / T(U_R)        # drug × low-resource interaction (0 unless Stage 4 carries χ)
         loss += L.ns ? dloss * (L.logistic ? max(1 - q, z) : max(1 - q^L.θ, z)) : dloss
         du[L.ix] = L.r * X * (L.logistic ? 1 - q : 1 - q^L.θ) - loss * X
     end

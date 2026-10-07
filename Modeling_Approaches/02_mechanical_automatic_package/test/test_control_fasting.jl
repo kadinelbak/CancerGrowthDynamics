@@ -46,7 +46,7 @@ end
             for _ in 1:5
                 x = random_state2(FP, rng); w = [rand(rng) * 1.47, Float64(rand(rng, 0:1))]
                 sol = solve(ODEProblem((du, y, p, t) -> fast_rhs!(du, y, w, FP), x, (0.0, Δ)), Tsit5(); reltol=1e-11, abstol=1e-11)
-                @test maximum(abs.(F2(x, w, FP, Δ) .- sol.u[end]) ./ max.(abs.(sol.u[end]), 1.0)) < 1e-5   # 1e-5: the Norton–Simon factor max(1 − x, 0) has a kink at capacity, where RK4 loses its smooth-case order
+                @test maximum(abs.(F2(x, w, FP, Δ) .- sol.u[end]) ./ max.(abs.(sol.u[end]), 1.0)) < 5e-5   # 5e-5: the Norton–Simon kink at capacity and the lightly damped second-order low-resource delay (ζ at 0.05) cost RK4 accuracy
             end
             x = random_state2(FP, rng); y = zeros(FP.nx)
             @test F2!(y, x, (1.0, 1.0), FP, Δ, RK4Buf(FP.nx)) ≈ F2(x, [1.0, 1.0], FP, Δ)
@@ -145,9 +145,12 @@ end
         fast_rhs!(d1, x, [0.7, 1.0], FP); fast_rhs!(d2, x, [0.7, 1.0], FPk)
         @test d1 == d2                                                            # fasting: identical
         x1 = F2(x, [0.0, 0.0], FP, Δ); x2 = F2(x, [0.0, 0.0], FPk, Δ)
-        S = [M for M in FP.spec[2].mods if !M.input_D && M.kernel_chain == 3]
-        o = only(S).o
-        @test sum(x2[o+1:o+3]) < sum(x1[o+1:o+3])                                 # refeeding: total stress (d/dt = −k·S_3) fades faster
+        M = only(M for M in FP.spec[2].mods if !M.input_D)                      # A2780cis low-resource module (any kernel)
+        n = M.kernel_chain > 0 ? M.kernel_chain : (M.kernel in (:auc, :second) ? 1 : 0)
+        if n > 0
+            o = M.o
+            @test sum(x2[o+1:o+n]) < sum(x1[o+1:o+n])                             # refeeding: stress fades faster
+        end
     end
 
     @testset "Stage 4 is reproduced at 1 µM + low resource" begin

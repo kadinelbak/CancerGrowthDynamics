@@ -29,9 +29,9 @@ default_host() = (k_W=Float64(HCFG["k_W"]), r_W=Float64(HCFG["r_W"]), k_P=Float6
 
 struct FPlant{TT<:NamedTuple,HT<:NamedTuple}
     name::String
-    base::Plant                 # sys with the low-resource modules; p = [scenario params; ε_N, ε_C]
-    iε::Vector{Int}             # positions of ε_N, ε_C in base.p
-    ε::Vector{Float64}          # Stage 4 (or bootstrap) ε_N, ε_C
+    base::Plant                 # sys with the low-resource modules; p = [scenario params; Stage 4 params]
+    iε::Vector{Int}             # positions in base.p of the low-resource strengths Stage 4 refits (none if it carries χ instead)
+    ε::Vector{Float64}          # their Stage 4 (or bootstrap) values
     eps_mode::Symbol            # :interp or :stage4
     u_ref::Float64
     nx::Int; iN::Int; iC::Int; iB::Int; iT::Int; iP::Int; iW::Int
@@ -47,21 +47,29 @@ function fast_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox
                     eps_mode=Symbol(FCFG["eps_mode"]), koff=NaN)
     P0 = scenario_plant(scen; b=b, tox=tox)
     P0 === nothing && return nothing
+    # Stage 4 adds each line's low-resource module and whatever it refits: low-resource strengths ε (free ε slots
+    # of the modules) and/or a drug × low-resource interaction χ (the line's chi slot); its parameters are
+    # appended to the scenario's
     c4 = zgroup("s4").cands[1]
-    ε = b === nothing ? copy(c4.params) : ZOO_STATE.results["s4"].res.pars[1][b, :]
-    any(isnan, ε) && return nothing
+    hasproperty(c4, :slots) && :K in c4.slots && error("a Stage 4 model that refits K is not supported by the control plant")
+    p4 = b === nothing ? copy(c4.params) : ZOO_STATE.results["s4"].res.pars[1][b, :]
+    any(isnan, p4) && return nothing
     np = length(P0.p)
+    shift(sl) = sl.i > 0 ? Slot(sl.i + np, sl.v) : sl
     lines = map(1:2) do j
         L4 = c4.sys.lines[j]
-        merge(P0.sys.lines[j], (extra=[merge(M, (s=shift_slots(M.s, np),)) for M in L4.extra],))
+        L = merge(P0.sys.lines[j], (extra=[merge(M, (s=shift_slots(M.s, np),)) for M in L4.extra],))
+        hasproperty(L4, :chi) ? merge(L, (chi=shift(L4.chi),)) : L
     end
-    p = vcat(P0.p, ε)
+    p = vcat(P0.p, p4)
+    iε = Int[np + M.s.ε.i for j in 1:2 for M in c4.sys.lines[j].extra if M.s.ε.i > 0]
+    ε = p[iε]
     base = make_plant(P0.name, lines, P0.sys.alpha, p; uR=0.0, tox=tox, fast=false)     # the FPlant has its own spec
     n = base.sys.n
     name = (scen == :A ? "A: Stage 3 coculture model as selected" : "B: monoculture drug response for both lines") *
            " + fitted low-resource modules"
-    FPlant(name, base, [np + 1, np + 2], ε, eps_mode, Float64(FCFG["eps_u_ref"]),
-           n + 4, base.iN, base.iC, n + 1, n + 2, n + 3, n + 4, base.K, tox, host, line_specs(base, [np + 1, np + 2]), Float64(koff))
+    FPlant(name, base, iε, ε, eps_mode, Float64(FCFG["eps_u_ref"]),
+           n + 4, base.iN, base.iC, n + 1, n + 2, n + 3, n + 4, base.K, tox, host, line_specs(base, iε), Float64(koff))
 end
 
 # The 14-day controller's low-resource environment (control_model.jl Plant interface): the same plant
