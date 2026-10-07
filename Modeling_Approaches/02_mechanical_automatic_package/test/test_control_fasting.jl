@@ -90,6 +90,17 @@ end
             @test s2.J ≈ best rtol = 1e-10
         end
 
+        @testset "scenario $scen: blocked search equals brute force (a fast only in a block's first interval)" begin
+            x0 = x0_fast(FP, 300.0, 300.0); blk = [1, 2]; best = Inf
+            levels = [(u, v) for v in (0.0, 1.0) for u in Float64.(CFG["dose"]["levels_data"])]
+            for a in levels, b in levels
+                a[2] > 0 && b[2] > 0 && continue                                          # max 1 consecutive, min gap 1
+                U = [a[1] a[2]; b[1] b[2]; b[1] 0.0]; J = total_cost2(x0, U, FP, Δ, W)      # block 2: dose held, fed in its 2nd interval
+                best = min(best, J)
+            end
+            @test discrete_solve2(x0, FP, Δ, blk, W).J ≈ best rtol = 1e-10
+        end
+
         @testset "scenario $scen: SQP respects bounds and does not increase the cost" begin
             x0 = x0_fast(FP, 300.0, 300.0); U0 = [0.5 0.2; 0.5 0.2; 0.5 0.2; 0.5 0.2]
             s = sqp_solve2(x0, U0, FP, Δ, W)

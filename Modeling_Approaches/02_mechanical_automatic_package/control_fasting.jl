@@ -159,24 +159,29 @@ struct Weights2
     qB::Float64; qR::Float64; qT::Float64; qW::Float64; ru::Float64; rv::Float64; tf::Float64
     μC::Float64; μT::Float64; μW::Float64; δ::Float64
     Bc::Float64; Btox::Float64; Wmin::Float64; umax::Float64; K::Float64
+    qP::Float64; Bp::Float64; sP::Float64; qRT::Float64      # time to progression (control_mpc.jl)
 end
 # bc_frac: B_cancer as a fraction of K (0 = no soft burden penalty); tf: terminal factor (both swept)
 function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Float64(HCFG["W_min"]), w=nothing, rv=Float64(FCFG["rv"]),
-                  bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]))
+                  bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
+                  prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]))
     c = CFG["weights"]
-    qB, qR, qT, ru = w === nothing ? (c["qB"], c["qR"], c["qT"], c["ru"]) : Tuple(w)
+    qB, qR, qT, ru, qP, qRT = objective_weights(w)
+    Bp, sP = progression_scale(FP.K; prog_frac=prog_frac)
     Weights2(qB, qR, qT, HCFG["qW"], ru, rv, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
-             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K)
+             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
 function stage_cost2(x, w, FP::FPlant, W::Weights2)
     N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
-    burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.qW * wloss(x, FP, W)^2 +
+    progression_cost(N, C, W) + burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.qW * wloss(x, FP, W)^2 +
         W.ru * (w[1] / W.umax)^2 + W.rv * w[2]^2 +
         relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ) +
         relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ)
 end
-terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (burden_cost(x[FP.iN], x[FP.iC], W) + W.qT * (x[FP.iT] / W.Btox)^2 + W.qW * wloss(x, FP, W)^2)
+terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (progression_cost(x[FP.iN], x[FP.iC], W) + burden_cost(x[FP.iN], x[FP.iC], W) +
+                                                     W.qT * (x[FP.iT] / W.Btox)^2 + W.qW * wloss(x, FP, W)^2) +
+    W.qRT * max(x[FP.iC], zero(x[FP.iC])) / W.K
 
 function total_cost2(x0, U, FP, Δ, W)
     x = copy(x0); J = 0.0
@@ -189,15 +194,15 @@ end
 # The stage cost split into its terms, summed over the intervals of an applied schedule (no terminal
 # term), as cost_terms in control_mpc.jl plus the host terms of fasting: total = Σ_k stage_cost2.
 function cost_terms2(FP::FPlant, x0, U, Δ, W::Weights2)
-    x = copy(x0); z = zeros(9)
+    x = copy(x0); z = zeros(10)
     for k in axes(U, 1)
         w = U[k, :]; x = F2(x, w, FP, Δ); N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
         z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (w[1] / W.umax)^2,
                relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ), relaxed_barrier(1 - T / W.Btox, W.μT, W.δ),
-               W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ)]
+               W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ), progression_cost(N, C, W)]
     end
     (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6],
-     weight=z[7], fasting=z[8], barrier_weight=z[9], total=sum(z))
+     weight=z[7], fasting=z[8], barrier_weight=z[9], progression=z[10], total=sum(z))
 end
 
 # adjoint (vector–Jacobian) gradient and Gauss–Newton Hessian of J over the stacked controls
@@ -276,11 +281,25 @@ end
 # interval) and expands the children of each node cheapest-first.
 # run = consecutive fasting intervals ending at k−1; gap = fed intervals since the last fast.
 admissible(v, run, gap, maxrun, mingap) = v == 0 || (run < maxrun && (run > 0 || gap >= mingap))
+# H: an Int (single intervals) or the look-ahead blocks (control_mpc.jl). In a block the dose holds for
+# every interval and a fast applies to the block's FIRST interval only (fed afterwards), so the fasting
+# rules (48-h fasts, refeeding between) still hold; the cost is summed over every interval.
 function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CFG["dose"]["levels_data"]),
                          vlevels=Float64.(FCFG["levels"]), maxrun=Int(FCFG["max_consecutive_intervals"]),
                          mingap=Int(FCFG["min_gap_intervals"]), run0=0, gap0=10^6, Uinit=nothing)
+    blk = as_blocks(H); H = length(blk)
     acts = [(u, v) for v in vlevels for u in ulevels]; na = length(acts); nx = length(x0)
-    buf = RK4Buf(nx)
+    buf = RK4Buf(nx); tmp = zeros(nx)
+    # one block from x into y: returns the block's cost and the fasting run/gap after it
+    function block!(y, x, u, v, k, run, gap)
+        c = 0.0; copyto!(tmp, x)
+        for j in 1:blk[k]
+            vj = j == 1 ? v : 0.0
+            F2!(y, tmp, (u, vj), FP, Δ, buf); copyto!(tmp, y); c += stage_cost2(y, (u, vj), FP, W)
+            run, gap = vj > 0 ? (run + 1, 0) : (0, gap + 1)
+        end
+        c, run, gap
+    end
     X = [[zeros(nx) for _ in 1:na] for _ in 1:H]; cst = [zeros(na) for _ in 1:H]; ord = [collect(1:na) for _ in 1:H]
     best = Ref(Inf); bestU = zeros(H, 2); U = zeros(H, 2)
     if Uinit !== nothing                      # upper bound from the warm-start plan, if it obeys the rules
@@ -288,11 +307,11 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
         for k in 1:H
             u, v = Uinit[k, 1], Uinit[k, 2]
             admissible(v, run, gap, maxrun, mingap) || (ok = false; break)
-            F2!(y, x, (u, v), FP, Δ, buf); x, y = y, x; c += stage_cost2(x, (u, v), FP, W)
-            run, gap = v > 0 ? (run + 1, 0) : (0, gap + 1)
+            ck, run, gap = block!(y, x, u, v, k, run, gap); x, y = y, x; c += ck
         end
         ok && (best[] = c + terminal_cost2(x, FP, W); bestU .= Uinit)
     end
+    RG = [zeros(Int, na, 2) for _ in 1:H]            # fasting run/gap after each child block
     function dfs(x, k, cost, run, gap)
         if k > H
             c = cost + terminal_cost2(x, FP, W)
@@ -302,7 +321,8 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
         for a in 1:na
             u, v = acts[a]
             if admissible(v, run, gap, maxrun, mingap)
-                F2!(X[k][a], x, (u, v), FP, Δ, buf); cst[k][a] = cost + stage_cost2(X[k][a], (u, v), FP, W)
+                ck, r2, g2 = block!(X[k][a], x, u, v, k, run, gap); cst[k][a] = cost + ck
+                RG[k][a, 1] = r2; RG[k][a, 2] = min(g2, 10^6)
             else
                 cst[k][a] = Inf
             end
@@ -311,7 +331,7 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
         for a in ord[k]
             cst[k][a] >= best[] && break
             u, v = acts[a]; U[k, 1] = u; U[k, 2] = v
-            dfs(X[k][a], k + 1, cst[k][a], v > 0 ? run + 1 : 0, v > 0 ? 0 : gap + 1)
+            dfs(X[k][a], k + 1, cst[k][a], RG[k][a, 1], RG[k][a, 2])
         end
     end
     dfs(copy(x0), 1, 0.0, run0, gap0)
@@ -323,18 +343,20 @@ end
 # so the schedule is the first decisions of a continuing policy. The planner observes only N and C
 # (× noise[k, :] when given; control_mpc.jl: observe!) and reconstructs the drug-effect and stress chains,
 # B, T, P and W by simulating its own model under the applied doses and fasting.
+# H: an Int (single intervals) or the look-ahead blocks (discrete mode); continuous mode plans every interval.
 function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mode=:discrete, shrink=false, noise=nothing, kw...)
+    blk = mode == :continuous ? fill(1, sum(as_blocks(H))) : as_blocks(H); nb = length(blk)
     x = copy(x0); xm = copy(x0); applied = zeros(n_dec, 2); run = 0; gap = 10^6
-    Uwarm = repeat([mode == :discrete ? 0.0 : 0.5  0.0], H)
+    Uwarm = repeat([mode == :discrete ? 0.0 : 0.5  0.0], nb)
     for k in 1:n_dec
         observe!(xm, x, Pm, Pp, noise, k)
-        Hk = shrink ? min(H, n_dec - k + 1) : H
-        sol = mode == :discrete ? discrete_solve2(xm, Pm, Δ, Hk, W; run0=run, gap0=gap, Uinit=Uwarm[1:Hk, :], kw...) :
+        bk = shrink ? cut_blocks(blk, n_dec - k + 1) : blk; Hk = length(bk)
+        sol = mode == :discrete ? discrete_solve2(xm, Pm, Δ, bk, W; run0=run, gap0=gap, Uinit=Uwarm[1:Hk, :], kw...) :
                                   sqp_solve2(xm, Uwarm[1:Hk, :], Pm, Δ, W)
         w = sol.U[1, :]; applied[k, :] = w
         run = w[2] > 0 ? run + 1 : 0; gap = w[2] > 0 ? 0 : gap + 1
         x = F2(x, w, Pp, Δ); xm = F2(xm, w, Pm, Δ)
-        Uwarm = vcat(sol.U[2:end, :], repeat([sol.U[end, 1] 0.0], H - Hk + 1))[1:H, :]     # shift; pad fed
+        Uwarm = vcat(sol.U[2:end, :], repeat([sol.U[end, 1] 0.0], nb - Hk + 1))[1:nb, :]     # shift; pad fed (a bound only)
     end
     (U=applied, x=x)
 end
@@ -372,7 +394,9 @@ function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2)
     Pr = [x[FP.iP] for x in xs]; Wt = [x[FP.iW] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)     # days with N + C ≥ B_cancer
+    tp = time_to_progression(ts, tot, W.Bp)
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
+     ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days,
      max_total=maximum(tot), max_tox=maximum(T), min_weight=minimum(Wt), cum_dose=sum(U[:, 1]) * Δ, fast_days=sum(U[:, 2]) * Δ,
      cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin, days_over=days_over,
      ts=ts, N=N, C=C, T=T, P=Pr, W=Wt)

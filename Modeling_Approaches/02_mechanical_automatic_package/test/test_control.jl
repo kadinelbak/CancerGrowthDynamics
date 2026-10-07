@@ -112,9 +112,9 @@ end
             @test maximum(abs.(g .- gfd) ./ max.(abs.(gfd), 1e-6)) < 1e-4
         end
 
-        @testset "scenario $scen: cost is linear in the burden, with the resistance premium" begin
+        @testset "scenario $scen: cost is linear in the burden, with the resistance premium (no progression term)" begin
             x = x0_for(P, 1000.0, 500.0); x2 = x0_for(P, 2000.0, 1000.0)
-            c(x) = stage_cost(x, 0.0, P, default_weights(P; w=[1.0, 1.0, 0.0, 0.0])) - relaxed_barrier(1 - (x[P.iN] + x[P.iC]) / W.Bc, W.μC, W.δ) - relaxed_barrier(1.0, W.μT, W.δ)
+            c(x) = stage_cost(x, 0.0, P, default_weights(P; w=[1.0, 1.0, 0.0, 0.0, 0.0, 0.0])) - relaxed_barrier(1 - (x[P.iN] + x[P.iC]) / W.Bc, W.μC, W.δ) - relaxed_barrier(1.0, W.μT, W.δ)
             @test isapprox(c(x2), 2c(x); rtol=1e-12)                                   # doubling every count doubles the burden cost
             @test isapprox(c(x), (1000 + 2 * 500) / P.K; rtol=1e-12)                    # qR = 1: a resistant cell counts twice
         end
@@ -134,6 +134,26 @@ end
             x0 = x0_for(P, 50.0, 50.0); U = [0.0, 1.47, 0.62, 1.0, 0.0]
             xs = rollout(x0, U, P, Δ)
             @test isapprox(cost_terms(P, x0, U, Δ, W).total, sum(stage_cost(xs[k+1], U[k], P, W) for k in eachindex(U)); rtol=1e-12)
+        end
+
+        @testset "scenario $scen: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end" begin
+            below = x0_for(P, 0.25W.Bp, 0.25W.Bp); above = x0_for(P, W.Bp, W.Bp)   # 2 B_prog: 40 step widths above
+            @test progression_cost(below[P.iN], below[P.iC], W) < 1e-6 * W.qP              # ≈ 0 well under the threshold
+            @test progression_cost(above[P.iN], above[P.iC], W) > (1 - 1e-6) * W.qP        # ≈ qP well above it
+            at = x0_for(P, 0.5W.Bp, 0.5W.Bp)
+            @test isapprox(progression_cost(at[P.iN], at[P.iC], W), W.qP / 2; rtol=1e-12)   # half way at the threshold
+            W0 = with_fields(W; qRT=0.0)
+            @test isapprox(terminal_cost(above, P, W) - terminal_cost(above, P, W0), W.qRT * above[P.iC] / W.K; rtol=1e-12)
+            @test W.Bp == CFG["progression"]["threshold_fraction_of_K"] * P.K
+        end
+
+        @testset "scenario $scen: blocked (move-blocking) search equals brute force over blocked plans" begin
+            x0 = x0_for(P, 300.0, 300.0); blk = [1, 2]
+            sol = discrete_solve(x0, P, Δ, blk, LEVELS, W)
+            brute = minimum(total_cost(x0, expand_blocks([a, b], blk), P, Δ, W) for a in LEVELS, b in LEVELS)
+            @test isapprox(sol.J, brute; rtol=1e-10)
+            @test isapprox(total_cost(x0, expand_blocks(sol.U, blk), P, Δ, W), sol.J; rtol=1e-10)   # the cost counts every interval
+            @test discrete_solve(x0, P, Δ, [1, 1], LEVELS, W).J ≈ discrete_solve(x0, P, Δ, 2, LEVELS, W).J   # single blocks = no blocking
         end
 
         @testset "scenario $scen: discrete search equals brute force" begin
@@ -173,6 +193,30 @@ end
         @test closed_loop(P, P, x0, Δ, n, H, W; mode=:discrete, levels=LEVELS, noise=ones(n, 2)).U == cl.U   # noise factors of 1 = exact counts
         # the fixed look-ahead keeps planning past the end: the last decision sees H intervals, the old shrinking one only 1
         @test closed_loop(P, P, x0, Δ, n, H, W; mode=:discrete, levels=LEVELS, shrink=true).U[1:n-H+1] == cl.U[1:n-H+1]
+    end
+
+    @testset "blocked look-ahead: the closed loop equals replaying its own schedule" begin
+        P = scenario_plant(:A); W = default_weights(P); s = nominal_seeding("50:50"); x0 = x0_for(P, s.N0, s.C0)
+        n, blk = 3, [1, 2]
+        cl = closed_loop(P, P, x0, Δ, n, blk, W; mode=:discrete, levels=LEVELS)
+        xs = rollout(x0, cl.U, P, Δ)
+        @test xs[end] == cl.x
+        @test all(discrete_solve(xs[k], P, Δ, blk, LEVELS, W).U[1] == cl.U[k] for k in 1:n)   # each decision = first move of the blocked plan
+        @test cut_blocks([1, 1, 2, 2, 4, 4], 5) == [1, 1, 2, 1] && cut_blocks([1, 2], 10) == [1, 2]
+        @test Int.(CFG["schedule"]["lookahead_blocks"])[1] == 1                         # the applied dose is decided at full resolution
+    end
+
+    @testset "time to progression on a trajectory" begin
+        ts = collect(0.0:1.0:10.0); hi, lo = 9.0, 1.0
+        # above on days 1–2 only (reversed within 3 days): not progression; above from day 4 to the end: progression on day 4
+        tp = time_to_progression(ts, [lo, hi, hi, lo, hi, hi, hi, hi, hi, hi, hi], 4.0; sustain=3.0)
+        @test tp.first == 1.0 && tp.loss == 4.0 && tp.days == 9.0
+        # above on days 1–6, then one dip: progression on day 1 (the spell lasted ≥ 3 days), the dip does not restart it
+        @test time_to_progression(ts, [lo, hi, hi, hi, hi, hi, hi, lo, hi, hi, hi], 4.0; sustain=3.0).loss == 1.0
+        @test isnan(time_to_progression(ts, [lo, hi, hi, lo, lo, lo, lo, lo, lo, lo, lo], 4.0; sustain=3.0).loss)   # reversed: not progressed
+        @test time_to_progression(ts, [lo, lo, lo, lo, lo, lo, lo, lo, lo, hi, hi], 4.0; sustain=3.0).loss == 9.0  # runs to the end
+        @test isnan(time_to_progression(ts, fill(lo, 11), 4.0).first)
+        @test time_to_progression(ts, fill(hi, 11), 4.0).loss == 0.0
     end
 
     @testset "measurement noise: log-normal, mean 1, the configured CV, paired by draw" begin

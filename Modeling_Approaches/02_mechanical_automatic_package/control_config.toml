@@ -10,6 +10,12 @@
 [schedule]
 decision_interval_days = 2.0     # DATA: media are changed about every 2 days, so a new dose can start at each change
 horizon_days = 14.0              # DATA: the experiments run 14 days; also the look-ahead of every decision
+# Look-ahead of every decision as blocks of decision intervals, one dose (and at most one fast, in the
+# block's first interval) per block: "move blocking" (Cagienard et al. 2007, Automatica 43:1121). Blocks
+# [1,1,2,2,4,4] plan 14 intervals = 28 days with 6 decisions, so the exact search stays affordable; the
+# first block is always one interval, so the dose that is applied is decided at full resolution.
+lookahead_blocks = [1, 1, 2, 2, 4, 4]    # ASSUMPTION (user, 2026-10-07: a longer look-ahead): 28 days
+lookahead_sweep = [[1, 1, 1], [1, 1, 1, 1, 1, 1, 1], [1, 1, 2, 2, 4, 4], [1, 1, 2, 2, 4, 4, 8]]   # ASSUMPTION: 6, 14 (the old one), 28 and 44 days
 closed_loop_days = 14.0          # DATA: closed-loop simulations cover the experimental window
 extrapolation_days = 28.0        # ASSUMPTION: longer runs extrapolate beyond the data (flagged in the report)
 long_days = 120.0                # ASSUMPTION: the long dose + fasting run (run_control_fasting.jl) lasts this long; days after 14 are beyond the data
@@ -76,23 +82,43 @@ noise_seed = 20261006            # ASSUMPTION (reproducibility): draw b uses see
 open_loop_draws = 200            # ASSUMPTION (runtime): bootstrap parameter sets on which every fixed schedule is replayed
 closed_loop_draws = 40           # ASSUMPTION (runtime): bootstrap sets with closed-loop MPC; the paired comparison uses these same draws for every policy
 
+[progression]
+# Control goal since 2026-10-07 (user): TIME TO PROGRESSION. Progression = N + C at or above B_prog. The stage
+# cost adds qP·σ((N + C − B_prog)/s), a smooth step (logistic, width s) that is ≈ 0 below the threshold and ≈ qP
+# above it, so the summed cost counts the intervals spent progressed: the controller keeps the burden under
+# B_prog as long as it can, treating hard when the culture nears the threshold and holding off otherwise
+# (adaptive therapy maximises the same quantity: Zhang et al. 2017, Nat Commun 8:1816; Gatenby et al. 2009,
+# Cancer Res 69:4894). At the end of the look-ahead qRT·C/K prices the resistant cells left behind, which drive
+# the next, untreatable progression. Reported outcomes: the first day at B_prog and the time to progression (the
+# start of the first spell above B_prog that lasts sustain_days or to the end of the run).
+threshold_fraction_of_K = 0.8    # ASSUMPTION (user: "80% confluence"): B_prog = 0.8 K, the same level as B_cancer
+step_width_fraction_of_K = 0.02  # ASSUMPTION (numerical): width s of the smooth step, 2% of K (σ goes from 0.12 to 0.88 over ±4% of K)
+qP = 10.0                        # ASSUMPTION: cost of one decision interval spent progressed; dominates the other terms (swept)
+qRT = 10.0                       # ASSUMPTION: terminal cost of the resistant cells, qRT·C/K at the end of the look-ahead (swept 0 / 10 / 30)
+sustain_days = 10.0              # ASSUMPTION (reporting): time to progression = start of the first spell at or above B_prog lasting ≥ this many days (or to the end of the run); shorter excursions that treatment reverses do not count
+
 [weights]
-# Control goal (user decision 2026-10-02): keep the total tumour burden low AND hold resistance back.
+# Control goal 2026-10-02 to 2026-10-07: keep the total tumour burden low AND hold resistance back. Since
+# 2026-10-07 the goal is time to progression ([progression]); qB and qR remain as small tie-breakers, and the
+# previous objective is the sweep entry with qP = qRT = 0.
 #   ℓ = qB·(N + C)/K + qR·C/K + qT·(T/B_tox)² + ru·(u/u_max)² + soft penalties;  terminal ×terminal_factor
 # The burden terms are LINEAR in the cell counts: every cell costs the same however large the tumour is
 # (a squared term made a cell in a small low-resource culture almost free, so the drug never paid off there).
 # qR is the extra cost of a resistant cell: with qR = 1 a resistant cell counts as two cells, because
 # further cisplatin cannot remove it. On top: a soft burden penalty (relaxed barrier above B_cancer) and
 # a relaxed barrier at the toxicity limit B_tox.
-qB = 1.0                         # ASSUMPTION: weight of the total burden (N + C)/K
-qR = 1.0                         # ASSUMPTION: resistance premium; a resistant cell counts as (qB + qR)/qB cells; swept 0 / 1 / 3
+qB = 0.1                         # ASSUMPTION: weight of the total burden (N + C)/K; a tie-breaker under the time-to-progression goal (1 before 2026-10-07)
+qR = 0.0                         # ASSUMPTION: per-interval resistance premium; resistance now enters through the terminal qRT ([progression]); 1 before 2026-10-07
 qT = 1.0                         # ASSUMPTION: weight of toxicity (T/B_tox)²; swept 1 / 3
 ru = 0.1                         # ASSUMPTION: weight of the dose (u/u_max)², a small cost of drug use; swept 0.1 / 1
-terminal_factor = 5.0            # ASSUMPTION: terminal cost = this × (burden + resistance + toxicity terms) at the end of the look-ahead; swept 1 / 5 / 10
+terminal_factor = 5.0            # ASSUMPTION: terminal cost = this × (progression + burden + resistance + toxicity terms) at the end of the look-ahead, plus qRT·C/K ([progression]); swept 1 / 5 / 10
 mu_cancer = 0.05                 # ASSUMPTION: weight μ of the soft burden penalty (relaxed log barrier at B_cancer)
 mu_tox = 0.05                    # ASSUMPTION: weight μ of the relaxed log barrier at B_tox
 barrier_delta = 0.02             # ASSUMPTION: relaxed-barrier switch point δ (Feller & Ebenbauer 2017): quadratic penalty below z = δ
-sweep = [[1.0, 1.0, 1.0, 0.1], [1.0, 0.0, 1.0, 0.1], [1.0, 3.0, 1.0, 0.1], [3.0, 1.0, 1.0, 0.1], [1.0, 1.0, 3.0, 0.1], [1.0, 1.0, 1.0, 1.0]]   # ASSUMPTION: weight sets [qB, qR, qT, ru] for the sensitivity sweep
+# objective weights [qB, qR, qT, ru, qP, qRT] (sensitivity of the 50:50 MPC): the default, the 2026-10-02 objective
+# (burden + resistance, no progression term), no terminal resistant cost, a 3× terminal resistant cost, a
+# weaker progression weight, toxicity ×3 and drug cost ×10
+sweep = [[0.1, 0.0, 1.0, 0.1, 10.0, 10.0], [1.0, 1.0, 1.0, 0.1, 0.0, 0.0], [0.1, 0.0, 1.0, 0.1, 10.0, 0.0], [0.1, 0.0, 1.0, 0.1, 10.0, 30.0], [0.1, 0.0, 1.0, 0.1, 3.0, 10.0], [0.1, 0.0, 3.0, 0.1, 10.0, 10.0], [0.1, 0.0, 1.0, 1.0, 10.0, 10.0]]   # ASSUMPTION
 
 [sqp]
 max_iter = 40                    # ASSUMPTION (numerical setting)

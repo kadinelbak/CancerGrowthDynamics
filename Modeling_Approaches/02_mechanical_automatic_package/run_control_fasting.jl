@@ -7,7 +7,8 @@
 #               by the ratio), not a measured day-0 count
 #   policies    8 fixed schedules (5 fed, 3 with fasting), MPC dose only (fed), MPC dose + fasting (measured
 #               levels, exact search), MPC demonstration (continuous u ≤ u_max_demo, v ∈ [0, 1], SQP);
-#               every MPC looks a FIXED 14 days ahead at every decision, also near the end of the run
+#               every MPC looks a FIXED look-ahead ahead (control_config lookahead_blocks: 28 days in 6 blocked
+#               decisions) at every decision, also near the end of the run; objective: time to progression
 #   checks      the plant against both measured low-resource conditions (RMSE in cells)
 #   sweeps      protection p_H, weight-loss rate k_W, weight limit W_min, fasting cost, interaction mode,
 #               look-ahead, weights, soft burden penalty (B_cancer) and terminal factor
@@ -20,7 +21,8 @@ include(joinpath(@__DIR__, "control_fasting.jl"))
 const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["long_days"])))
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const NRUN = round(Int, DAYS / Δ0)                                   # one decision per 2-day interval
-const NDEC = round(Int, CFG["schedule"]["horizon_days"] / Δ0)       # fixed 7-interval (14-day) look-ahead
+const LOOK = Int.(CFG["schedule"]["lookahead_blocks"])              # fixed look-ahead blocks (move blocking)
+const LOOK_DAYS = round(Int, sum(LOOK) * Δ0)
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
 const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), "control_$(round(Int, DAYS))d"); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
 const FCK = joinpath(FOUT, "fasting_state.jls")
@@ -34,7 +36,12 @@ ratios = [merge((ratio=r,), nominal_seeding(r)) for r in ("25:75", "50:50", "75:
 const MPC2 = "MPC, dose + fasting (measured levels)"
 const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
-println("=== $(round(Int, DAYS))-day control with fasting: $(Threads.nthreads()) threads; $NRUN decisions, fixed look-ahead $NDEC; checkpoint has $(collect(keys(fck))) ==="); flush(stdout)
+println("=== $(round(Int, DAYS))-day control with fasting: $(Threads.nthreads()) threads; $NRUN decisions, fixed look-ahead $LOOK_DAYS days (blocks $LOOK); checkpoint has $(collect(keys(fck))) ==="); flush(stdout)
+# label of an objective-weight vector [qB, qR, qT, ru, qP, qRT] (control_config.toml [weights] sweep)
+wlabel(w) = length(w) == 6 && w[5] == 0 && w[6] == 0 ? "previous objective (burden + resistance): qB=$(w[1]) qR=$(w[2])" :
+    "qP=$(w[5]) qRT=$(w[6]) qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])"
+blabel(b) = "$(round(Int, sum(b) * Δ0)) days ($(length(b)) decisions$(all(==(1), b) ? "" : ", blocks $(join(b, "/"))"))"
+
 
 # ── checks against the two measured low-resource conditions ──────────────────
 # Every RMSE is in cells (unweighted). The controller's plant (fed the nominal seeding, constant low resource,
@@ -95,7 +102,7 @@ if !haskey(fck, :checks)
             out[:interp].rmse, out[:stage4].rmse, out[:interp].n, out[:s3b_n], out[:interp].rmse_common, out[:s3b_rmse], out[:stage4_maxrel]); flush(stdout)
 end
 
-function run_all2(FP, x0; n=NRUN, H=NDEC)
+function run_all2(FP, x0; n=NRUN, H=LOOK)
     W = weights2(FP); Wd = weights2(FP; umax=UMAX_DEMO)
     out = Dict{String,Any}()
     for (name, pol) in baseline_policies2(FP, W)
@@ -127,7 +134,7 @@ main_of(scen, ratio) = only(filter(m -> m.scen == scen && m.ratio == ratio, fck[
 if !haskey(fck, :sweeps)
     r = ratios[2]; tasks = Any[]
     # Wo: the weights the outcomes are scored with (bound counts always at the default B_cancer)
-    mpc(FP, W; Wo=W, H=NDEC, kw...) = (x0 = x0_fast(FP, r.N0, r.C0); cl = closed_loop2(FP, FP, x0, Δ0, NRUN, H, W; kw...); (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, Wo)))
+    mpc(FP, W; Wo=W, H=LOOK, kw...) = (x0 = x0_fast(FP, r.N0, r.C0); cl = closed_loop2(FP, FP, x0, Δ0, NRUN, H, W; kw...); (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, Wo)))
     h0 = default_host()
     bc0 = Float64(CFG["cancer"]["B_cancer_fraction_of_K"]); tf0 = Float64(CFG["weights"]["terminal_factor"])
     # soft burden penalty, one setting at a time (the full B_cancer × terminal grid is in the 14-day report)
@@ -147,11 +154,12 @@ if !haskey(fck, :sweeps)
         end
         push!(tasks, (kind="drug × low resource", scen=scen, label="ε = Stage 4 value at every dose", f=() -> (FP = fast_plant(scen; eps_mode=:stage4); mpc(FP, weights2(FP)))))
         push!(tasks, (kind="fasting rules", scen=scen, label="fasts up to 4 days (2 intervals)", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP); maxrun=2))))
-        for Hh in (3, 5)
-            push!(tasks, (kind="look-ahead", scen=scen, label="$(Hh) decisions ($(round(Int, Hh * Δ0)) days)", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP); H=Hh))))
+        for b in CFG["schedule"]["lookahead_sweep"]
+            bb = Int.(b); bb == LOOK && continue
+            push!(tasks, (kind="look-ahead", scen=scen, label=blabel(bb), f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP); H=bb))))
         end
-        for w in ([1.0, 3.0, 1.0, 0.1], [3.0, 1.0, 1.0, 0.1], [1.0, 1.0, 3.0, 0.1])
-            push!(tasks, (kind="weights", scen=scen, label="qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; w=w)))))
+        for w in CFG["weights"]["sweep"][2:end]          # the first entry is the default
+            push!(tasks, (kind="weights", scen=scen, label=wlabel(w), f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; w=Float64.(w)); Wo=weights2(FP)))))
         end
         for (bc, tf) in pen
             lab = (bc > 0 ? "B_cancer = $(bc) K" : "no burden penalty") * ", terminal ×$(tf)"
@@ -176,7 +184,8 @@ if !haskey(fck, :robust)
     pols = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off",
             "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", MPC1, MPC2]
     summ(o) = (N=o.N, C=o.C, T=o.T, W=o.W, cum=o.cum_dose, fast=o.fast_days, cv=o.cancer_violation, tv=o.tox_violation, wv=o.weight_violation, dover=o.days_over,
-               Nf=o.N_final, Cf=o.C_final, tot=o.total_final, rf=o.resistant_fraction, minW=o.min_weight, maxT=o.max_tox)
+               Nf=o.N_final, Cf=o.C_final, tot=o.total_final, rf=o.resistant_fraction, minW=o.min_weight, maxT=o.max_tox,
+               ttp=o.ttp, ttp_first=o.ttp_first, dprog=o.days_progressed)
     for scen in (:A, :B)
         m = main_of(scen, "50:50"); FP0 = fast_plant(scen); W0 = weights2(FP0)
         draws = Vector{Any}(undef, BOOT_N)
@@ -191,7 +200,7 @@ if !haskey(fck, :robust)
                 d[pn] = o === nothing ? nothing : summ(o)
             end
             if b <= NCL
-                c = try closed_loop2(FP0, FPb, m.x0, Δ0, NRUN, NDEC, W0; noise=obs_noise(b, NRUN)) catch; nothing end
+                c = try closed_loop2(FP0, FPb, m.x0, Δ0, NRUN, LOOK, W0; noise=obs_noise(b, NRUN)) catch; nothing end
                 d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes2(FPb, m.x0, c.U, Δ0, W0)), (U=c.U,))
             end
             draws[b] = d
@@ -215,7 +224,7 @@ if !haskey(fck, :washout)
         T = tasks[i]; t = time(); m = main_of(T.scen, "50:50")
         FP = fast_plant(T.scen; koff=T.koff); W = weights2(FP)
         replay = Dict(pn => outcomes2(FP, m.x0, m.policies[pn].U, Δ0, W) for pn in ("Fasting only, 48 h every 6 days", "Constant 1 µM", MPC1, MPC2))
-        cl = closed_loop2(FP, FP, m.x0, Δ0, NRUN, NDEC, W)
+        cl = closed_loop2(FP, FP, m.x0, Δ0, NRUN, LOOK, W)
         out[i] = (scen=T.scen, koff=T.koff, replay=replay, U=cl.U, o=outcomes2(FP, m.x0, cl.U, Δ0, W))
         @printf("  washout %s k_off=%.1f [%.0fs]\n", T.scen, T.koff, time() - t); flush(stdout)
     end
@@ -229,7 +238,8 @@ for m in fck[:main], (pn, v) in m.policies
     push!(rows, (scenario=string(m.scen), ratio=m.ratio, policy=pn, dose_uM=join(round.(v.U[:, 1]; digits=3), " "), fasting=join(round.(v.U[:, 2]; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction, max_total=o.max_total,
                  max_toxicity=o.max_tox, min_weight=o.min_weight, cumulative_dose_uM_days=o.cum_dose, fasting_days=o.fast_days,
-                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation, weight_bound_violated=o.weight_violation))
+                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation, weight_bound_violated=o.weight_violation,
+                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed))
 end
 CSV.write(joinpath(FOUT, "fasting_outcomes.csv"), DataFrame(rows))
 println("Wrote $(joinpath(FOUT, "fasting_outcomes.csv"))")

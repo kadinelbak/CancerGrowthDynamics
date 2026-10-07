@@ -8,7 +8,10 @@
 #                 (control_config.toml [initial]: 100 cells split by the ratio), not a measured day-0 count
 #   policies      no treatment, constant 1 µM, maximum measured dose, periodic, threshold adaptive,
 #                 MPC data-supported (measured doses only), MPC demonstration (continuous, up to u_max_demo)
-#                 MPC uses a FIXED 14-day look-ahead at every decision, also at the end of the run
+#                 MPC uses a FIXED look-ahead at every decision, also at the end of the run: control_config
+#                 lookahead_blocks (move blocking; [1,1,2,2,4,4] = 28 days in 6 decisions)
+#   objective     time to progression (control_config [progression]): intervals at N + C ≥ 0.8 K cost qP,
+#                 resistant cells at the end of the look-ahead cost qRT·C/K
 #   sweeps        weights, soft burden penalty (B_cancer) × terminal factor, toxicity (r_H, s_B, B_tox),
 #                 horizon, decision interval, integration step, 28-day extrapolation
 #   robustness    every schedule re-simulated on the open-loop bootstrap draws; closed-loop MPC (observes
@@ -29,7 +32,8 @@ cck = (isfile(CKP) && get(ENV, "REDO", "0") != "1") ? deserialize(CKP) : Dict{Sy
 savec() = serialize(CKP, cck)
 
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
-const NDEC = round(Int, CFG["schedule"]["horizon_days"] / Δ0)    # look-ahead (decisions), the same at every decision
+const LOOK = Int.(CFG["schedule"]["lookahead_blocks"])            # look-ahead blocks (intervals per decision), the same at every decision
+const LOOK_DAYS = round(Int, sum(LOOK) * Δ0)
 const NRUN = round(Int, DAYS / Δ0)                                  # decisions over the whole run
 const LEVELS = Float64.(CFG["dose"]["levels_data"])
 const UMAX_DATA = Float64(CFG["dose"]["u_max_data"]); const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
@@ -43,9 +47,14 @@ ratios_normal = [merge((ratio=r,), nominal_seeding(r)) for r in ("25:75", "50:50
 ratios_lr = ratios_normal
 plant_for(env, scen; b=nothing, tox=default_tox()) = env == :normal ? scenario_plant(scen; b=b, tox=tox) : lr_plant(scen; b=b, tox=tox)
 ratios_for(env) = env == :normal ? ratios_normal : ratios_lr
-println("=== optimal control: $(Threads.nthreads()) threads; Δ = $Δ0 d, $NRUN decisions ($DAYS days, fixed look-ahead $NDEC); checkpoint has $(collect(keys(cck))) ==="); flush(stdout)
+println("=== optimal control: $(Threads.nthreads()) threads; Δ = $Δ0 d, $NRUN decisions ($DAYS days, fixed look-ahead $LOOK_DAYS days, blocks $LOOK); checkpoint has $(collect(keys(cck))) ==="); flush(stdout)
+# label of an objective-weight vector [qB, qR, qT, ru, qP, qRT] (control_config.toml [weights] sweep)
+wlabel(w) = length(w) == 6 && w[5] == 0 && w[6] == 0 ? "previous objective (burden + resistance): qB=$(w[1]) qR=$(w[2])" :
+    "qP=$(w[5]) qRT=$(w[6]) qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])"
+blabel(b) = "$(round(Int, sum(b) * Δ0)) days ($(length(b)) decisions$(all(==(1), b) ? "" : ", blocks $(join(b, "/"))"))"
 
-function run_all_policies(P, x0; Δ=Δ0, n=NRUN, H=NDEC)
+
+function run_all_policies(P, x0; Δ=Δ0, n=NRUN, H=LOOK)
     W = default_weights(P); Wd = default_weights(P; umax=UMAX_DEMO)
     out = Dict{String,Any}()
     for (name, pol) in baseline_policies(P, W)
@@ -73,7 +82,7 @@ end
 
 # ── sweeps (normal medium, 50:50, data-supported MPC) ─────────────────────────
 # Wo: the weights the outcomes are scored with (bound counts always at the default B_cancer)
-function mpc_outcome(P, x0, W; Wo=W, Δ=Δ0, n=NRUN, H=NDEC, mode=:discrete)
+function mpc_outcome(P, x0, W; Wo=W, Δ=Δ0, n=NRUN, H=LOOK, mode=:discrete)
     cl = closed_loop(P, P, x0, Δ, n, H, W; mode=mode, levels=LEVELS)
     (U=cl.U, o=outcomes(P, x0, cl.U, Δ, Wo))
 end
@@ -83,7 +92,7 @@ if !haskey(cck, :sweeps)
     for scen in (:A, :B)
         P = plant_for(:normal, scen); x0 = x0_for(P, r.N0, r.C0); W0 = default_weights(P)
         for w in CFG["weights"]["sweep"]
-            push!(tasks, (kind="weights", scen=scen, label="qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])", f=() -> mpc_outcome(P, x0, default_weights(P; w=Float64.(w)))))
+            push!(tasks, (kind="weights", scen=scen, label=wlabel(w), f=() -> mpc_outcome(P, x0, default_weights(P; w=Float64.(w)); Wo=W0)))
         end
         # soft burden penalty: where it starts (0 = none) × the terminal weight; scored against the default B_cancer
         for bc in CFG["cancer"]["B_cancer_sweep"], tf in CFG["cancer"]["terminal_factor_sweep"]
@@ -102,13 +111,15 @@ if !haskey(cck, :sweeps)
         for v in CFG["toxicity"]["B_tox_sweep"]
             push!(tasks, (kind="toxicity", scen=scen, label="B_tox = $v", f=() -> mpc_outcome(P, x0, default_weights(P; Btox=Float64(v)))))
         end
-        for Hh in (1, 2, 4, NDEC)
-            push!(tasks, (kind="horizon", scen=scen, label="$(Hh) decisions ($(Hh * Δ0) days)", f=() -> mpc_outcome(P, x0, default_weights(P); H=Hh)))
+        for b in CFG["schedule"]["lookahead_sweep"]
+            bb = Int.(b)
+            push!(tasks, (kind="horizon", scen=scen, label=blabel(bb), f=() -> mpc_outcome(P, x0, default_weights(P); H=bb)))
         end
-        push!(tasks, (kind="interval", scen=scen, label="decide every 1 day (7-day horizon)", f=() -> mpc_outcome(P, x0, default_weights(P); Δ=1.0, n=2NRUN, H=7)))
-        push!(tasks, (kind="interval", scen=scen, label="decide every 2 days (14-day horizon)", f=() -> mpc_outcome(P, x0, default_weights(P))))
+        # decide every day with the same 28-day look-ahead (blocks in 1-day intervals)
+        push!(tasks, (kind="interval", scen=scen, label="decide every 1 day ($(LOOK_DAYS)-day look-ahead)", f=() -> mpc_outcome(P, x0, default_weights(P); Δ=1.0, n=2NRUN, H=[1, 1, 2, 4, 4, 8, 8])))
+        push!(tasks, (kind="interval", scen=scen, label="decide every 2 days ($(LOOK_DAYS)-day look-ahead)", f=() -> mpc_outcome(P, x0, default_weights(P))))
         # the 28-day extrapolation row belongs to the 14-day report; longer reports are extrapolations throughout
-        NRUN == NDEC && push!(tasks, (kind="extrapolation", scen=scen, label="28 days, receding 14-day horizon (beyond the data)", f=() -> mpc_outcome(P, x0, default_weights(P); n=14, H=NDEC)))
+        DAYS == Float64(CFG["schedule"]["closed_loop_days"]) && push!(tasks, (kind="extrapolation", scen=scen, label="28 days, receding $(LOOK_DAYS)-day look-ahead (beyond the data)", f=() -> mpc_outcome(P, x0, default_weights(P); n=14)))
     end
     out = Vector{Any}(undef, length(tasks))
     Threads.@threads :dynamic for i in eachindex(tasks)
@@ -144,13 +155,14 @@ if !haskey(cck, :robust)
         pols = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)", "MPC, measured doses only"]
         nb = env == :normal ? BOOT_N : min(BOOT_N, size(ZOO_STATE.results["s4"].res.pars[1], 1))
         draws = Vector{Any}(undef, nb)
-        summ(o) = (N=o.N, C=o.C, T=o.T, cum=o.cum_dose, cv=o.cancer_violation, tv=o.tox_violation, dover=o.days_over, Nf=o.N_final, Cf=o.C_final, tot=o.total_final, rf=o.resistant_fraction, maxT=o.max_tox)
+        summ(o) = (N=o.N, C=o.C, T=o.T, cum=o.cum_dose, cv=o.cancer_violation, tv=o.tox_violation, dover=o.days_over, Nf=o.N_final, Cf=o.C_final, tot=o.total_final, rf=o.resistant_fraction, maxT=o.max_tox,
+                   ttp=o.ttp, ttp_first=o.ttp_first, dprog=o.days_progressed)
         Threads.@threads :dynamic for b in 1:nb
             Pb = try plant_for(env, scen; b=b) catch; nothing end
             if Pb === nothing
                 draws[b] = nothing; continue
             end
-            Wb = default_weights(Pb); Wb = Weights(Wb.qB, Wb.qR, Wb.qT, Wb.ru, Wb.tf, Wb.μC, Wb.μT, Wb.δ, W0.Bc, Wb.Btox, Wb.umax, Wb.K)   # same bound as the nominal plan
+            Wb = with_fields(default_weights(Pb); Bc=W0.Bc, Bp=W0.Bp)   # the same thresholds as the nominal plan
             noise = obs_noise(b, NRUN)
             d = Dict{String,Any}("b" => b)
             for pn in pols
@@ -161,7 +173,7 @@ if !haskey(cck, :robust)
                 d[pn] = o === nothing ? nothing : summ(o)
             end
             if b <= NCL
-                c = try closed_loop(P0, Pb, m.x0, Δ0, NRUN, NDEC, W0; mode=:discrete, levels=LEVELS, noise=noise) catch; nothing end
+                c = try closed_loop(P0, Pb, m.x0, Δ0, NRUN, LOOK, W0; mode=:discrete, levels=LEVELS, noise=noise) catch; nothing end
                 d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes(Pb, m.x0, c.U, Δ0, Wb)), (U=c.U,))
             end
             draws[b] = d
@@ -181,7 +193,8 @@ for m in cck[:main], (pn, v) in m.policies
     push!(rows, (environment=string(m.env), scenario=string(m.scen), ratio=m.ratio, policy=pn, schedule_uM=join(round.(v.U; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction,
                  max_total=o.max_total, max_toxicity=o.max_tox, cumulative_dose_uM_days=o.cum_dose,
-                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation))
+                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation,
+                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed))
 end
 CSV.write(joinpath(COUT, "control_outcomes.csv"), DataFrame(rows))
 println("Wrote $(joinpath(COUT, "control_outcomes.csv"))")
