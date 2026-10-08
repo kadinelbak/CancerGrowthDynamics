@@ -22,11 +22,12 @@ tag_label(s, tag) = tag == "schedule" ? "$(constant_dose(s["schedule"])) µM" : 
     for lo in VAL["leave_out"]
         @test [tag_label(s, lo["tag"]) for s in dataset_tags(lo["group"])] == old[(lo["group"], lo["scheme"])]
     end
-    # every dataset's tags give back its own series (same values, same order)
+    # every dataset's tags give back its own series (same values, same order): the fitted points, i.e. without
+    # QC exclusions and without day 0, which is the seeding / initial condition since 2026-10-07 (zoo_data.jl keep)
     for g in state.groups
         g.kind == :s4 && continue
         for (d, s) in zip(g.datasets, dataset_tags(g.id))
-            S = series(s["id"]); @test d.x == S.x[.!S.bad] && d.y == S.y[.!S.bad]
+            k = keep(series(s["id"])); @test d.x == k.x && d.y == k.y
         end
     end
 end
