@@ -1,0 +1,2 @@
+exported 2026-10-07T21:26:47.125 from C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package\outputs\zoo_fits\zoo_state.jls (modified 2026-10-07T22:35:03.938 UTC)
+Stage 3a carried model: cc_full_noC; held-out RMSE over all 84 exported points = 1132.1824266894141 (nRMSE 0.9037190512665352)

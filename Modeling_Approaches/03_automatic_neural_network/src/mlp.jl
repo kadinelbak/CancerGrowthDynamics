@@ -37,4 +37,4 @@ struct MLPEnsemble
     members::Vector{MLP1}
 end
 (e::MLPEnsemble)(X) = mean(m(X) for m in e.members)
-fit_mlp_ensemble(X, y; n = 5, kw...) = MLPEnsemble([fit_mlp1(X, y; rng = StableRNG(100 + i), kw...) for i in 1:n])
+fit_mlp_ensemble(X, y; n = 5, seed0 = 100, kw...) = MLPEnsemble([fit_mlp1(X, y; rng = StableRNG(seed0 + i), kw...) for i in 1:n])

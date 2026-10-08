@@ -1,17 +1,17 @@
-fold,model,rmse,n
-hold out on→off intermittent,no drug,0.2988295385307548,50
-hold out on→off intermittent,Hill (mechanistic),0.15749034896788705,50
-hold out on→off intermittent,UDE (NN kill),0.1754315101488398,50
-hold out on→off intermittent,pure neural ODE,0.192761415017414,50
-hold out off→on intermittent,no drug,0.4786557601542064,52
-hold out off→on intermittent,Hill (mechanistic),0.29219474875397483,52
-hold out off→on intermittent,UDE (NN kill),0.22597493071538297,52
-hold out off→on intermittent,pure neural ODE,0.19106422385332097,52
-hold out 1 uM monoculture,no drug,0.7496799813729423,52
-hold out 1 uM monoculture,Hill (mechanistic),0.17084477774111245,52
-hold out 1 uM monoculture,UDE (NN kill),0.2810057273064403,52
-hold out 1 uM monoculture,pure neural ODE,0.687474905759759,52
-hold out all 20k wells,no drug,0.6273050961100849,176
-hold out all 20k wells,Hill (mechanistic),0.23519193462226742,176
-hold out all 20k wells,UDE (NN kill),0.2629510306392863,176
-hold out all 20k wells,pure neural ODE,0.2451236194017061,176
+fold,model,rmse,rmse_sd_over_seeds,seeds,n
+hold out on→off intermittent,no drug,0.2532966524865018,0.0,1,54
+hold out on→off intermittent,Hill (mechanistic),0.23479743209289655,0.0,1,54
+hold out on→off intermittent,pure neural ODE,0.1967697191426291,0.016947273709771418,5,54
+hold out on→off intermittent,UDE (NN kill),0.2318419647017218,0.004854001263865405,5,54
+hold out off→on intermittent,no drug,0.42758622515896955,0.0,1,56
+hold out off→on intermittent,Hill (mechanistic),0.38533363927548103,0.0,1,56
+hold out off→on intermittent,pure neural ODE,0.3555084942256771,0.0585241595014138,5,56
+hold out off→on intermittent,UDE (NN kill),0.4146627668362218,0.013557324226748794,5,56
+hold out 1 uM monoculture,no drug,0.2033798905544953,0.0,1,56
+hold out 1 uM monoculture,Hill (mechanistic),0.2833701098342507,0.0,1,56
+hold out 1 uM monoculture,pure neural ODE,0.2565151475930846,0.02835482026154741,5,56
+hold out 1 uM monoculture,UDE (NN kill),0.21698697274455783,0.003050028903145148,5,56
+hold out all 20k wells,no drug,0.6830337010337761,0.0,1,190
+hold out all 20k wells,Hill (mechanistic),0.4386518742401811,0.0,1,190
+hold out all 20k wells,pure neural ODE,0.707727351392841,0.22202084816223164,5,190
+hold out all 20k wells,UDE (NN kill),0.436884711018969,0.002062093734645704,5,190

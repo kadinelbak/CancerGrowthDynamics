@@ -9,7 +9,13 @@
 #   LR workbooks (no raw images): low-resource runs 1 and 2, 30k sheets only.
 #   New Datasets monoculture CSVs and ce0/ce1 workbooks duplicate the raw data and are not loaded.
 #   Both 20k and 30k seeding are used (user, 2026-09-29); seeding density is a covariate.
-#   Not used: 40k wells, TykNu, New Datasets/Validation (LR + cisplatin), day 0 (a seeding value).
+#   Not used: 40k wells, TykNu, New Datasets/Validation (LR + cisplatin).
+#   Day 0 is NOT a measurement (user, 2026-10-07). Every series starts at t = 0 from its nominal seeding,
+#   100 cells per 30k well and 66.7 per 20k well, times the line's share in a coculture (25:75 -> 25 and 75).
+#   The starting value is estimated (a free parameter) only for a series whose first kept count (normally
+#   day 1, at day d) is more than 3^d times above or below that nominal value (same rule and bounds as
+#   02_mechanical_automatic_package/zoo_data.jl x0_info). Day-0 rows of the source files are never loaded.
+#   Intermittent values are cell counts already normalised to cell size (user, 2026-10-01).
 #
 # Splits
 #   :train                   used for fitting
@@ -46,12 +52,22 @@ Base.@kwdef struct Trajectory
     group::String           # well id; co-culture partners share it
     s_frac::Float64         # sensitive fraction of the seeded well
     seeding::Int            # 20 or 30 (k cells)
-    units::Symbol           # :count or :area
     schedule::Schedule
     days::Vector{Float64}
     mean::Vector{Float64}
     sd::Vector{Float64}
     sem::Vector{Float64}
+    n0::Float64 = NaN       # nominal starting value (cells at t = 0); set by set_start
+    n0_free::Bool = false   # true: the starting value is estimated (first count > 3^d-fold off n0)
+end
+
+"Copy of `tr` with some fields replaced."
+function retraj(tr::Trajectory; kw...)
+    f = Dict{Symbol, Any}(n => getfield(tr, n) for n in fieldnames(Trajectory))
+    for (k, v) in kw
+        f[k] = v
+    end
+    return Trajectory(; f...)
 end
 
 treated(tr::Trajectory) = any(>(0), tr.schedule.doses)
@@ -174,7 +190,7 @@ function trajectory_from_wells(spec, wd)
     sem = [length(wd[d]) > 1 ? sd[i] / sqrt(length(wd[d])) : 0.0 for (i, d) in enumerate(days)]
     return Trajectory(; id = spec.id, source = spec.source, plate = spec.plate, split = spec.split, role = spec.role,
         line = spec.line, resource = :normal, culture = spec.culture, group = spec.group, s_frac = spec.s_frac,
-        seeding = spec.seeding, units = spec.source == :intermittent ? :area : :count, schedule = spec.schedule,
+        seeding = spec.seeding, schedule = spec.schedule,
         days, mean = mu, sd, sem)
 end
 
@@ -200,7 +216,7 @@ function load_lr()
         seeding in (20, 30) || continue
         series(name) = (s = sort(g[g.series .== name, [:day, :value]], :day); Dict(zip(Float64.(s.day), Float64.(s.value))))
         mu_d, sd_d, sem_d = series("Mean Cells"), series("SD Cells"), series("SEM Cells")
-        days = sort([d for d in keys(mu_d) if d >= 1])          # day 0 is the seeding value, not a measurement
+        days = sort([d for d in keys(mu_d) if d >= 1])          # day 0 is a nominal seeding, not a measurement
         line = cell == "A2780cis" ? :R : :S
         if mono
             s_frac, group = line == :S ? 1.0 : 0.0, "lr$(run)_mono_$(cell)_$(seeding)k"
@@ -210,7 +226,7 @@ function load_lr()
         end
         push!(out, Trajectory(; id = "lr$(run)_$(cell)_$(mono ? "mono" : "$(m[5])-$(m[6])")_$(seeding)k", source = :lr,
             plate = "LR run $(run)", split = :train, role = mono ? :drug : :competition, line, resource = :low,
-            culture = mono ? :mono : :co, group, s_frac, seeding, units = :count, schedule = Schedule(0.0),
+            culture = mono ? :mono : :co, group, s_frac, seeding, schedule = Schedule(0.0),
             days, mean = [mu_d[d] for d in days], sd = [get(sd_d, d, 0.0) for d in days],
             sem = [get(sem_d, d, 0.0) for d in days]))
     end
@@ -222,10 +238,7 @@ function keep_points(tr::Trajectory, keep::AbstractVector{Bool}, rule)
     for i in findall(!, keep)
         push!(EXCLUDED_POINTS, (tr.id, tr.days[i], tr.mean[i], rule))
     end
-    return Trajectory(; id = tr.id, source = tr.source, plate = tr.plate, split = tr.split, role = tr.role, line = tr.line,
-        resource = tr.resource, culture = tr.culture, group = tr.group, s_frac = tr.s_frac, seeding = tr.seeding,
-        units = tr.units, schedule = tr.schedule, days = tr.days[keep], mean = tr.mean[keep], sd = tr.sd[keep],
-        sem = tr.sem[keep])
+    return retraj(tr; days = tr.days[keep], mean = tr.mean[keep], sd = tr.sd[keep], sem = tr.sem[keep])
 end
 
 "Local dip at interior index i: log y_i minus the mean of its neighbours' logs (nearest remaining days)."
@@ -319,13 +332,32 @@ function qc_days_8_9(tr::Trajectory)
     return all(keep) ? tr : keep_points(tr, keep, "day 8-9 drop (below the day-7 to day-10 line)")
 end
 
-"Load every 20k and 30k trajectory, apply QC in order (plate days → single points → day 8-9 drops), check the hold-out."
+# Starting values (user, 2026-10-07): nominal seeding, estimated only when the first count is far off.
+const SEED_TOTAL = Dict(30 => 100.0, 20 => 200.0 / 3)   # nominal cells per well at t = 0 (30k, 20k seeding)
+const X0_FOLD = 3.0
+
+"Nominal starting value of a series: the well's nominal seeding times the line's share."
+nominal_n0(tr::Trajectory) = SEED_TOTAL[tr.seeding] * (tr.line == :S ? tr.s_frac : 1 - tr.s_frac)
+
+"Bounds of an estimated starting value (as zoo_data.jl x0_info): [n0/10, 3·max(n0, first count)]."
+n0_bounds(tr::Trajectory) = (tr.n0 / 10, 3 * max(tr.n0, tr.mean[1]))
+
+"Set the nominal starting value and whether it is estimated (first kept count more than 3^d-fold off)."
+function set_start(tr::Trajectory)
+    n0 = nominal_n0(tr)
+    isempty(tr.days) && return retraj(tr; n0, n0_free = false)
+    f = X0_FOLD^tr.days[1]
+    return retraj(tr; n0, n0_free = tr.mean[1] > f * n0 || tr.mean[1] < n0 / f)
+end
+
+"Load every 20k and 30k trajectory, apply QC in order (plate days → single points → day 8-9 drops), set starting values, check the hold-out."
 function load_all()
     empty!(EXCLUDED_POINTS); empty!(EXCLUDED_WELLS)
     trajs = vcat(load_raw(), load_lr())
     trajs = qc_plate_days(trajs)
     trajs = [qc_series_points(t) for t in trajs]
     trajs = [qc_days_8_9(t) for t in trajs]
+    trajs = [set_start(t) for t in trajs]
     for tr in trajs
         if tr.split != :train
             @assert tr.role == :validation "validation trajectory $(tr.id) leaked into a training role"
@@ -333,7 +365,8 @@ function load_all()
         tr.split == :train && @assert tr.source != :ce1 "$(tr.id) must be held out"
         tr.split == :train && tr.role == :competition && @assert !treated(tr) "$(tr.id): treated data in competition role"
         @assert tr.seeding in (20, 30)
-        @assert all(>=(1.0), tr.days)
+        @assert all(>=(1.0), tr.days) "$(tr.id): day 0 is not a measurement"
+        @assert isfinite(tr.n0) && tr.n0 > 0
     end
     @assert length(unique(t.id for t in trajs)) == length(trajs) "duplicate trajectory ids"
     return trajs
@@ -361,8 +394,8 @@ function long_table(trajs)
         push!(rows, (; traj_id = tr.id, source = String(tr.source), plate = tr.plate, split = String(tr.split),
             role = String(tr.role), line = String(tr.line), resource = String(tr.resource),
             culture = String(tr.culture), group = tr.group, s_frac = tr.s_frac, seeding_k = tr.seeding,
-            units = String(tr.units), schedule = describe(tr.schedule), dose = dose_at(tr.schedule, d),
-            day = d, mean = tr.mean[i], sd = tr.sd[i], sem = tr.sem[i]))
+            schedule = describe(tr.schedule), dose = dose_at(tr.schedule, d), n0_nominal = tr.n0,
+            n0_estimated = tr.n0_free, day = d, mean = tr.mean[i], sd = tr.sd[i], sem = tr.sem[i]))
     end
     return rows
 end
@@ -379,28 +412,54 @@ function exposure(s::Schedule, gamma, t)
     return v
 end
 
-"Cumulative dose (uM * day) up to t."
-cumdose(s::Schedule, t) = sum(d * max(0.0, min(t, i < length(s.starts) ? s.starts[i + 1] : Inf) - st)
-                              for (i, (st, d)) in enumerate(zip(s.starts, s.doses)))
-since_switch(s::Schedule, t) = t - s.starts[max(searchsortedlast(s.starts, t), 1)]
+# ---------------- the mechanistic zoo's tidy table (for the three-way comparison) ----------------
+const TIDY_CSV = joinpath(REPO_ROOT, "Modeling_Approaches", "02_mechanical_automatic_package", "data", "measurements.csv")
+const TIDY_SCHEDULES = Dict("const_0" => Schedule(0.0), "const_0_62" => Schedule(0.62), "const_1" => Schedule(1.0),
+                            "const_1_47" => Schedule(1.47), "on0_off7" => Schedule([0.0, 7.0], [1.0, 0.0]),
+                            "off0_on7" => Schedule([0.0, 7.0], [0.0, 1.0]))
 
 """
-Global area -> count factor for intermittent data: ratio of intermittent untreated-first
-(off-on) day-7 value to untreated monoculture day-7 value, per line, averaged.
-Only used for the next-day feature scale; the ODE models profile a per-trajectory offset instead.
+The 30k normal-medium series of the mechanistic zoo's tidy table (02_mechanical_automatic_package/data/
+measurements.csv): untreated and treated monocultures (role :drug), Ce0 cocultures (:competition) and Ce1
+cocultures (held out). Points the zoo's QC excluded and the day-0 rows (nominal seeding) are dropped; no
+NN-track QC is applied, so the training and held-out points are exactly the zoo's. Ids follow the NN-track
+naming (e.g. `ce1_25S75R_30k_S`) so they can be matched to load_all().
 """
-function area_per_count(trajs)
-    ratios = Float64[]
-    for line in (:S, :R)
-        a = filter(t -> t.source == :intermittent && t.line == line && t.seeding == 30 && t.schedule.doses[1] == 0.0, trajs)
-        c = filter(t -> t.source == :mono && t.line == line && t.seeding == 30 && !treated(t), trajs)
-        (length(a) == 1 && length(c) == 1) || continue
-        i, j = findfirst(==(7.0), a[1].days), findfirst(==(7.0), c[1].days)
-        (i === nothing || j === nothing) && continue
-        push!(ratios, a[1].mean[i] / c[1].mean[j])
+function load_tidy(; path = TIDY_CSV, intermittent = false)
+    df = CSV.read(path, DataFrame; stringtype = String, types = Dict(:ratio => String, :exclude_reason => String))
+    keep = [:untreated, :treated, :Ce0, :Ce1]
+    intermittent && push!(keep, :intermittent)
+    out = Trajectory[]
+    for g in groupby(df, :source_id)
+        r = g[1, :]
+        cond = Symbol(r.condition)
+        (cond in keep && r.seeding == 30000 && r.fbs == 10.0) || continue
+        d = sort(g[(g.t .> 0) .& .!g.excluded, :], :t)
+        line = r.line == "A2780cis" ? :R : :S
+        sched = TIDY_SCHEDULES[r.schedule]
+        if r.culture == "co"
+            m = match(r"^(\d+)S(\d+)R$", r.ratio)
+            a, b = parse(Int, m[1]), parse(Int, m[2])
+            ce = cond == :Ce0 ? "ce0" : "ce1"
+            group = "$(ce)_$(a)S$(b)R_30k"; id = "$(group)_$(line)"; sf = a / (a + b)
+            src = Symbol(ce); role = cond == :Ce1 ? :validation : :competition
+            split = cond == :Ce1 ? :validation_treated_co : :train
+        else
+            nm = line == :S ? "A2780" : "A2780cis"
+            if cond == :intermittent
+                id = "int_$(nm)_$(r.schedule == "on0_off7" ? "on-off" : "off-on")_30k"; src = :intermittent
+            else
+                id = "mono_$(nm)_$(sched.doses[1])uM_30k"; src = :mono
+            end
+            group = id; sf = line == :S ? 1.0 : 0.0; role = :drug; split = :train
+        end
+        sdv = Float64[coalesce(x, 0.0) for x in d.sd]; semv = Float64[coalesce(x, 0.0) for x in d.sem]
+        tr = Trajectory(; id, source = src, plate = "tidy $(r.experiment)", split, role, line, resource = :normal,
+            culture = r.culture == "co" ? :co : :mono, group, s_frac = sf, seeding = 30, schedule = sched,
+            days = Float64.(d.day), mean = Float64.(d.value), sd = sdv, sem = semv)
+        push!(out, set_start(tr))
     end
-    return isempty(ratios) ? 1.0 : mean(ratios)
+    sort!(out; by = t -> t.id)
+    @assert count(t -> t.source == :ce1, out) == 6 && count(t -> t.source == :ce0, out) == 6 && count(t -> t.source == :mono, out) == 8
+    return out
 end
-
-"Observed values on the count scale."
-count_scale(tr::Trajectory, apc) = tr.units == :area ? tr.mean ./ apc : tr.mean

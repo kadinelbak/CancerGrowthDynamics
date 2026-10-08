@@ -8,14 +8,17 @@ using .NNTrack, DataFrames, CSV, Plots, Statistics, StableRNGs, EvoTrees, Forwar
 const N = NNTrack
 const FAST = get(ENV, "NN_FAST", "0") == "1"
 const ITERS = FAST ? (adam_steps = 40, lbfgs_iters = 40) : (adam_steps = 300, lbfgs_iters = 300)
+# ablation retrains: 3 seeds per variant (runtime, 2026-10-07: the full rerun shared the machine with the
+# mechanistic refit); the full model's 5-seed fits are in Stage 2
+const NSEEDS = FAST ? 2 : parse(Int, get(ENV, "NN_ABL_SEEDS", "3"))
+t_start = time()
 
 trajs = N.load_all()
-apc = N.area_per_count(trajs); N._APC[] = apc
 out = N.outdir("importance")
 gr()
 
 # ================= A. next-day models =================
-X, y, meta = N.nextday_rows(trajs, apc)
+X, y, meta = N.nextday_rows(trajs)
 tr = meta.split .== :train; va = .!tr
 trees = N.fit_trees(X[:, tr], y[tr])
 mlp = N.fit_mlp_ensemble(X[:, tr], y[tr]; n = 5, hidden = 12, lambda = 3e-3, steps = 2500)
@@ -44,7 +47,7 @@ println(imp)
 p1 = bar(imp.feature, imp.trees_mean_abs_shap; orientation = :h, yflip = true, legend = false,
          title = "Boosted trees: mean |SHAP| (Δlog N per day)", xlabel = "mean |SHAP|", titlefontsize = 9)
 sp = []
-for f in (:logN, :exposure, :dose, :day)
+for f in (:logN, :exposure, :dose, :dprev)
     j = findfirst(==(f), N.FEATURES)
     push!(sp, scatter(X[j, tr], S[:, j]; ms = 2, alpha = 0.5, marker_z = X[findfirst(==(:line_R), N.FEATURES), tr],
                       color = cgrad([:crimson, :royalblue]), colorbar = false, legend = false,
@@ -55,9 +58,9 @@ savefig(plot(p1, sp...; layout = @layout([a{0.35w} grid(2, 2)]), size = (1400, 6
 # ================= B. UDE kill term =================
 models = N.load_models(joinpath(N.OUT_ROOT, "ude", "models.json"))
 ude = models["UDE (NN kill)"]
-drug = N.make_units(N.training(trajs; role = :drug), apc)
-comp = N.make_units(N.training(trajs; role = :competition), apc)
-val = N.make_units(N.validation(trajs), apc)
+drug = N.make_units(N.training(trajs; role = :drug))
+comp = N.make_units(N.training(trajs; role = :competition))
+val = N.make_units(N.validation(trajs))
 
 # gradient sensitivity at visited states: E|∂kill/∂x| · sd(x), and the line effect
 sens = DataFrame(member = Int[], input = String[], sensitivity = Float64[])
@@ -89,30 +92,39 @@ for (line, c, lab) in [(-1.0, :crimson, "A2780 (S)"), (1.0, :royalblue, "A2780ci
 end
 savefig(pd, joinpath(out, "ude_partial_dependence.png"))
 
-# input-ablation retrain
+# input-ablation retrain, NSEEDS seeds per variant
 variants = ["full" => (1.0, 1.0, 1.0), "without density ρ" => (1.0, 0.0, 1.0), "without line" => (1.0, 1.0, 0.0)]
-abl = DataFrame(variant = String[], weighted_sse = Float64[], val_treated_co_rmse = Float64[])
-npts = sum(sum(!isnan, yy) for u in drug for yy in u.y)
-# KILL_MASK is global, so variants run sequentially; each fit is single-threaded
-for (i, (name, mask)) in enumerate(variants)
+abl_seed = DataFrame(variant = String[], seed = Int[], weighted_sse = Float64[], val_treated_co_rmse = Float64[])
+# KILL_MASK is global, so variants run one after another; the seeds of a variant run in parallel
+for (name, mask) in variants
     N.KILL_MASK[] = mask
-    θ0 = vcat(ude[1].θ[1:N.NB], N.init_theta(:nn)[N.NB + 1:end])
-    f = N.fit_drug_model(:nn, drug; θinit = θ0, ITERS...)
-    m = N.calibrate(:nn, f.θ, comp)
-    sse = sum(N.unit_sse(:nn, f.θ, ones(4), u, l0) for (u, l0) in zip(drug, f.l0s))
-    r2 = reduce(vcat, [N.forward_residuals(m, u) for u in val if u.members[1].split == :validation_treated_co])
-    push!(abl, (name, sse, N.rmse(r2.obs .- r2.pred)))
-    @info "ablation" name sse
+    fs = N.fit_seeds(:nn, drug; n = NSEEDS, θwarm = ude[1].θ, ITERS...)
+    for (i, f) in enumerate(fs)
+        m = N.calibrate(:nn, f.θ, comp)
+        sse = sum(N.unit_sse(:nn, f.θ, ones(4), u, l0) for (u, l0) in zip(drug, f.l0s))
+        r2 = reduce(vcat, [N.forward_residuals(m, u; nominal = true) for u in val])
+        push!(abl_seed, (name, i, sse, N.rmse(r2.obs .- r2.pred)))
+    end
+    @info "ablation" name
 end
 N.KILL_MASK[] = (1.0, 1.0, 1.0)
-abl.delta_sse = abl.weighted_sse .- abl.weighted_sse[1]
+sdz(x) = length(x) > 1 ? std(x) : 0.0
+abl = combine(groupby(abl_seed, :variant; sort = false), :weighted_sse => mean => :weighted_sse, :weighted_sse => sdz => :weighted_sse_sd,
+              :weighted_sse => minimum => :weighted_sse_best_seed, :val_treated_co_rmse => mean => :val_treated_co_rmse,
+              :val_treated_co_rmse => sdz => :val_treated_co_rmse_sd, :seed => length => :seeds)
+abl.delta_sse_best_seed = abl.weighted_sse_best_seed .- abl.weighted_sse_best_seed[1]
+CSV.write(joinpath(out, "ude_ablation_per_seed.csv"), abl_seed)
 CSV.write(joinpath(out, "ude_ablation.csv"), abl)
 println(sens_summary); println(abl)
 
+runtime = round((time() - t_start) / 60; digits = 1)
 N.write_report(joinpath(out, "report.html"), "Stage 4 — feature importance",
-    [("Next-day models", N.para("Permutation importance is the rise in one-step RMSE (log scale) when a feature is shuffled: on training rows (in-sample) and on the held-out validation rows. TreeSHAP is exact for the boosted trees.") *
-        N.html_table(imp) * N.figure("nextday_shap.png", "TreeSHAP ranking and dependence plots")),
-     ("UDE kill term: gradient sensitivity", N.para("Mean |∂kill/∂input| × sd(input) over the states the fitted model visits; for line, the mean |kill<sub>R</sub> − kill<sub>S</sub>| at the same state. Averaged over ensemble members.") * N.html_table(sens_summary)),
-     ("UDE kill term: partial dependence", N.figure("ude_partial_dependence.png", "Kill rate averaged over the other input")),
-     ("UDE kill term: input ablation (retrained)", N.para("Each variant removes one NN input and is retrained from scratch. Δ weighted SSE on training (a χ², so ~2 per unit of log-likelihood) is the in-sample cost; validation RMSE is the out-of-sample cost.") * N.html_table(abl))])
+    [("Next-day models", N.para("Permutation importance is the rise in one-step RMSE (log scale) when a feature is shuffled: on training rows (in-sample) and on the held-out validation rows. TreeSHAP is exact for the boosted trees. No clock-time features are used (see Stage 1). Runtime of this stage: $(runtime) min.") *
+        N.html_table(imp; tip = ("Rise in RMSE when a feature is shuffled (permutation) and mean |SHAP| of the boosted trees. A larger value = the model relies more on that feature; near 0 or negative = not used.", "Neither: larger means more important, not better.")) *
+        N.figure("nextday_shap.png", "TreeSHAP ranking and dependence plots"; tip = ("Mean |SHAP| per feature and how each feature's value moves the prediction.", :none))),
+     ("UDE kill term: gradient sensitivity", N.para("Mean |∂kill/∂input| × sd(input) over the states the fitted model visits; for line, the mean |kill<sub>R</sub> − kill<sub>S</sub>| at the same state. Mean and sd over the $(length(ude)) seeds.") *
+        N.html_table(sens_summary; tip = ("Sensitivity of the learned kill rate to each input, mean and SD over seeds.", "Neither: larger means the kill depends more on that input.")) ),
+     ("UDE kill term: partial dependence", N.figure("ude_partial_dependence.png", "Kill rate averaged over the other input (mean over seeds)"; tip = ("Kill rate as one input varies, averaged over the visited values of the other.", :none))),
+     ("UDE kill term: input ablation (retrained)", N.para("Each variant removes one NN input and is retrained from $(NSEEDS) seeds. Δ weighted SSE (best seed) on training (a χ², so ~2 per unit of log-likelihood) is the in-sample cost; validation RMSE (mean ± SD over seeds, from the nominal seeding) is the out-of-sample cost.") *
+        N.html_table(abl; tip = ("Training fit and held-out error when one input is removed from the kill network. If removing an input does not raise the validation RMSE, the data do not show it is needed.", :lower)))])
 println("wrote ", joinpath(out, "report.html"))

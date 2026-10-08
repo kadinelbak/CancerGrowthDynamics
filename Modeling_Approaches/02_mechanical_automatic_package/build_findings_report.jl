@@ -33,7 +33,8 @@ pval(g, n) = (r = par[(par.group .== g) .& (par.param .== n), :]; nrow(r) == 0 ?
 function glance()
     rows = String[]
     for r in eachrow(sel[sel.optimal .== true, :])
-        push!(rows, tr([h(stage_label(r.stage)), h(r.label), string(r.k), f1(r.bic), f0(r.pct_chosen) * "%"]))
+        line = endswith(r.group, "-a2780") ? " (A2780)" : endswith(r.group, "-a2780cis") ? " (A2780cis)" : ""
+        push!(rows, tr([h(stage_label(r.stage)) * line, h(r.label), string(r.k), f1(r.bic), f0(r.pct_chosen) * "%"]))
     end
     "<h2>Carried model at each stage $(tip("The model each stage carries forward: the fewest free parameters among the candidates within 3 BIC of the lowest. 'Chosen in' is how often the same rule picks it when the data are resampled (bootstrap generated from the carried model).", :none))</h2>" *
     table([th("Stage", "Fitting stage (thesis numbering).", :none), th("Carried model", "Selected model.", :none),
@@ -62,11 +63,12 @@ function transport()
     s4 = sel[sel.group .== "s4", :]
     if nrow(s4) > 0
         inh = s4[s4.candidate .== "s4_inherited", :]; c4 = s4[s4.optimal .== true, :]
-        nrow(inh) > 0 && push!(items, "<li><b>Low resource + cisplatin (Stage 4).</b> The model assembled from the earlier stages, with nothing refitted, is $(@sprintf("%+.1f", inh.bic[1] - c4.bic[1])) BIC worse than the carried <code>$(h(c4.candidate[1]))</code> ($(h(c4.params[1]))). The drug and low-resource mechanisms fitted separately do not combine additively.</li>")
+        nrow(inh) > 0 && push!(items, "<li><b>Low resource + cisplatin (Stage 4).</b> The model assembled from the earlier stages, with nothing refitted, is $(@sprintf("%+.1f", inh.bic[1] - c4.bic[1])) BIC worse than the carried <code>$(h(c4.candidate[1]))</code> ($(h(join([(kv = split(x, "="); length(kv) == 2 ? kv[1] * " = " * g3(parse(Float64, kv[2])) : x) for x in split(c4.params[1], "; ")], ", ")))). The drug and low-resource mechanisms fitted separately do not combine additively.</li>")
     end
     if x0t !== nothing && nrow(x0t) > 0
         lr = x0t[occursin.("lowres", x0t.series) .| occursin.("combination", x0t.series), :]
-        nrow(lr) > 0 && push!(items, "<li><b>Seeding scale of the low-resource experiments.</b> Every low-resource and combination series starts $(@sprintf("%.1f", minimum(lr.fold)))–$(@sprintf("%.1f", maximum(lr.fold)))-fold above its nominal seeding (its first count is far beyond one day of growth), so those plates were seeded or imaged at a different effective density. Their starting values are estimated; their capacity and low-resource effects should be compared with the normal-medium experiments with this in mind.</li>")
+        lo = lr[lr.fold .> 0.11, :]; atb = lr[lr.fold .<= 0.11, :]
+        nrow(lr) > 0 && push!(items, "<li><b>Seeding scale of the low-resource experiments.</b> $(nrow(lo)) of the $(nrow(lr)) low-resource and combination series start $(@sprintf("%.1f", minimum(lo.fold)))–$(@sprintf("%.1f", maximum(lo.fold)))-fold above their nominal seeding (median $(@sprintf("%.1f", median(lo.fold)))): their first counts are far beyond one day of growth, so those plates were seeded or imaged at a different effective density. Their starting values are estimated; their capacity and low-resource effects should be compared with the normal-medium experiments with this in mind.$(nrow(atb) > 0 ? " The start of " * join(h.(atb.series), ", ") * " sits at its lower bound (0.1 × nominal): the model does not fit that series' early counts." : "")</li>")
     end
     "<h2>What did not carry over between conditions $(tip("Places where a mechanism fitted in a simpler condition fails in a more complex one. These are results, not fitting problems.", :none))</h2><div class='intro'><ul>" * join(items) * "</ul></div>"
 end
@@ -87,13 +89,22 @@ function validation()
     parts = String[]
     if hel !== nothing
         rows = [tr([h(r.row), f0(r.rmse), @sprintf("%.2f", r.nrmse)]) for r in eachrow(hel)]
+        pr = hel[startswith.(hel.row, "prediction ("), :]; rf = hel[startswith.(hel.row, "untreated reference"), :]; df = hel[startswith.(hel.row, "prediction minus"), :]
+        verdict = (nrow(pr) == 1 && nrow(rf) == 1) ? (pr.rmse[1] > rf.rmse[1] ?
+            "<p><b>Transferring the monoculture drug response makes the prediction worse than ignoring the drug</b> ($(f0(pr.rmse[1])) vs $(f0(rf.rmse[1])) cells$(nrow(df) == 1 && isfinite(df.diff_lo[1]) ? "; difference 95% CI $(f0(df.diff_lo[1])) to $(f0(df.diff_hi[1])) over the 6 trajectories" : "")): the monoculture kills, which include a kill of A2780cis, do not describe the treated cocultures, where the fitted model has none.</p>" :
+            "<p>The transferred monoculture drug response improves on ignoring the drug ($(f0(pr.rmse[1])) vs $(f0(rf.rmse[1])) cells).</p>") : ""
+        push!(parts, verdict)
         push!(parts, "<h3>Held-out treated cocultures (Ce1) $(tip("Ce1 predicted from crowding fitted to the untreated cocultures and the monoculture kills, with no refit. Ce1 also informed the choice of weighting and drug model, so this is a selection metric rather than an independent test.", :none))</h3>" *
               table([th("Prediction", "What is compared.", :none), th("RMSE (cells)", "Root-mean-square error.", :lower), th("nRMSE", "RMSE ÷ mean of the held-out data.", :lower)], rows))
     end
-    for f in filter(f -> occursin("intermittent", f) && endswith(f, ".csv"), readdir(joinpath(OUTD, "zoo_analyses")))
-        df = readcsv(joinpath(OUTD, "zoo_analyses", f))
-        push!(parts, "<h3>Intermittent dosing (untouched validation) $(tip("Drug switched on or off at day 7; predicted with no refit and the scale fixed at 1. These data informed no modelling choice.", :none))</h3>" *
-              table([th(string(n), string(n), :none) for n in names(df)], [tr([x isa Number ? g3(x) : h(x) for x in r]) for r in eachrow(df)]))
+    an = joinpath(OUTD, "zoo_analyses", "analyses_state.jls")
+    I = isfile(an) ? get(deserialize(an), :intermittent, nothing) : nothing
+    if I !== nothing
+        rows = [tr([h(L), h(string(sc)), f0(I[L].sc_rmse[sc]), @sprintf("%.2f", I[L].sc_nrmse[sc])]) for L in sort(collect(keys(I))) for sc in sort(collect(keys(I[L].sc_rmse)))]
+        push!(parts, "<h3>Intermittent dosing (untouched validation) $(tip("Monocultures with the drug switched on or off at day 7, predicted from the Stage 1 + 2b model with no refit, the scale fixed at 1 and the nominal seeding. These data informed no modelling choice.", :none))</h3>" *
+              table([th("Line", "Cell line.", :none), th("Schedule", "on0_off7: 1 µM for days 0–7; off0_on7: 1 µM from day 7.", :none),
+                     th("RMSE (cells)", "Error of the no-refit prediction.", :lower), th("nRMSE", "RMSE ÷ mean of the data.", :lower)], rows) *
+              "<p>Washout test (a hypothesis test, not validation): equal build-up and fade rates are kept for $(join(["$L (ΔBIC $(@sprintf("%+.1f", I[L].bic_koff - I[L].bic_equal)) for a separate fade rate)" for L in sort(collect(keys(I)))], ", ")).</p>")
     end
     "<h2>Validation $(tip("How well the models predict data they were not fitted to.", :none))</h2>" * join(parts)
 end

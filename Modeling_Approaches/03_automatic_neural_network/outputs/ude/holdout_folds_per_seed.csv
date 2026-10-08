@@ -1,0 +1,49 @@
+fold,model,seed,rmse,n
+hold out on→off intermittent,no drug,1,0.2532966524865018,54
+hold out on→off intermittent,Hill (mechanistic),1,0.23479743209289655,54
+hold out on→off intermittent,pure neural ODE,1,0.20342680897550633,54
+hold out on→off intermittent,pure neural ODE,2,0.17804899783065212,54
+hold out on→off intermittent,pure neural ODE,3,0.1794087828743747,54
+hold out on→off intermittent,pure neural ODE,4,0.21462472410019362,54
+hold out on→off intermittent,pure neural ODE,5,0.20833928193241882,54
+hold out on→off intermittent,UDE (NN kill),1,0.22909929467843673,54
+hold out on→off intermittent,UDE (NN kill),2,0.228808993055711,54
+hold out on→off intermittent,UDE (NN kill),3,0.2309060282405818,54
+hold out on→off intermittent,UDE (NN kill),4,0.22999556482109543,54
+hold out on→off intermittent,UDE (NN kill),5,0.2403999427127842,54
+hold out off→on intermittent,no drug,1,0.42758622515896955,56
+hold out off→on intermittent,Hill (mechanistic),1,0.38533363927548103,56
+hold out off→on intermittent,pure neural ODE,1,0.3372136699185737,56
+hold out off→on intermittent,pure neural ODE,2,0.3758900983014412,56
+hold out off→on intermittent,pure neural ODE,3,0.320835342137195,56
+hold out off→on intermittent,pure neural ODE,4,0.4466917174199781,56
+hold out off→on intermittent,pure neural ODE,5,0.29691164335119763,56
+hold out off→on intermittent,UDE (NN kill),1,0.4252691989555921,56
+hold out off→on intermittent,UDE (NN kill),2,0.39844758375684824,56
+hold out off→on intermittent,UDE (NN kill),3,0.41302462289980274,56
+hold out off→on intermittent,UDE (NN kill),4,0.4311476554513478,56
+hold out off→on intermittent,UDE (NN kill),5,0.4054247731175181,56
+hold out 1 uM monoculture,no drug,1,0.2033798905544953,56
+hold out 1 uM monoculture,Hill (mechanistic),1,0.2833701098342507,56
+hold out 1 uM monoculture,pure neural ODE,1,0.22179815240842732,56
+hold out 1 uM monoculture,pure neural ODE,2,0.2841803544599468,56
+hold out 1 uM monoculture,pure neural ODE,3,0.2695139295209355,56
+hold out 1 uM monoculture,pure neural ODE,4,0.2765492387158903,56
+hold out 1 uM monoculture,pure neural ODE,5,0.230534062860223,56
+hold out 1 uM monoculture,UDE (NN kill),1,0.21797112109961475,56
+hold out 1 uM monoculture,UDE (NN kill),2,0.214953924808502,56
+hold out 1 uM monoculture,UDE (NN kill),3,0.2188816307828485,56
+hold out 1 uM monoculture,UDE (NN kill),4,0.22031652543261085,56
+hold out 1 uM monoculture,UDE (NN kill),5,0.21281166159921303,56
+hold out all 20k wells,no drug,1,0.6830337010337761,190
+hold out all 20k wells,Hill (mechanistic),1,0.4386518742401811,190
+hold out all 20k wells,pure neural ODE,1,0.7049047684023089,190
+hold out all 20k wells,pure neural ODE,2,0.5022154506182726,190
+hold out all 20k wells,pure neural ODE,3,0.5806870041793848,190
+hold out all 20k wells,pure neural ODE,4,1.0785803782597947,190
+hold out all 20k wells,pure neural ODE,5,0.6722491555044449,190
+hold out all 20k wells,UDE (NN kill),1,0.43716575142404523,190
+hold out all 20k wells,UDE (NN kill),2,0.4357329095554967,190
+hold out all 20k wells,UDE (NN kill),3,0.43878638627944555,190
+hold out all 20k wells,UDE (NN kill),4,0.43876252898767976,190
+hold out all 20k wells,UDE (NN kill),5,0.4339759788481777,190

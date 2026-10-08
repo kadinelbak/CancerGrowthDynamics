@@ -1,0 +1,19 @@
+item,model,value,note
+"forward fit, train: drug units",closed form (optimal),0.2947104249619753,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: untreated co-culture",closed form (optimal),0.5701167831178856,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: drug units",UDE (NN kill),0.29240477984418617,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: untreated co-culture",UDE (NN kill),0.5641791226043246,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: drug units",UDE (NN kill + NN resource),0.2914903113908533,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: untreated co-culture",UDE (NN kill + NN resource),0.5616975750879091,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: drug units",pure neural ODE,0.2635353452333745,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: untreated co-culture",pure neural ODE,0.41158246501212636,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: drug units",no drug,0.6074022669465435,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: untreated co-culture",no drug,0.5981960225328982,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: drug units",Hill (mechanistic),0.3036416064766168,in-sample: a more flexible model always fits its own training data better
+"forward fit, train: untreated co-culture",Hill (mechanistic),0.5635024746244722,in-sample: a more flexible model always fits its own training data better
+BIC on training drug units,closed form (optimal),919.9771130967226,"fit per parameter, in-sample; lower is better"
+BIC on training drug units,Hill (mechanistic),989.9276648241139,"fit per parameter, in-sample; lower is better"
+BIC on training drug units,pure neural ODE,1523.586815240482,"fit per parameter, in-sample; lower is better"
+BIC on training drug units,UDE (NN kill),1536.4893095056004,"fit per parameter, in-sample; lower is better"
+BIC on training drug units,UDE (NN kill + NN resource),2202.856925385109,"fit per parameter, in-sample; lower is better"
+BIC on training drug units,no drug,4485.2881876480915,"fit per parameter, in-sample; lower is better"

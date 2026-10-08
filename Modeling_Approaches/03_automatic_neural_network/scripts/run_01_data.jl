@@ -40,14 +40,22 @@ inventory = DataFrame(
             "New Datasets/Validation (LR + cisplatin)"],
     status = ["USED (rebuilt from per-image data)", "USED (rebuilt from per-image data)", "USED (rebuilt from per-image data)",
               "USED (rebuilt by well column)", "USED as held-out validation (rebuilt by well column)", "USED (no raw images exist)",
-              "not loaded: identical to the raw monoculture day means (max rel. diff < 1e-6); day 0 = 100 is a normalisation",
+              "not loaded: identical to the raw monoculture day means (max rel. diff < 1e-6); their day 0 (≈100) is the nominal seeding, not a measurement",
               "not loaded: identical to the column-4-6 rebuild, except ce0 75S25R resistant (~20% lower, different threshold) and one day-6 value",
               "not loaded: split by imaging tile instead of well column, so each 'density' mixes 20k and 30k wells; the same raw files are re-split correctly by column above",
               "excluded (out of scope)",
               "excluded (user decision)"],
     note = ["A2780cis runs to day 18 (days 16, 18 are extra vs New Datasets); wells: row A = 20k, B = 30k", "3 wells × 6 tiles per day; rows A/C = 20k, B/D = 30k", "rows A/C = 20k, B/D = 30k", "3 wells per ratio and density", "3 wells per ratio and density",
-            "day 0 is the seeding value, dropped", "", "", "", "", ""])
+            "workbook day 0 is a nominal seeding and is not loaded; every LR series' day-1 count is > 3-fold above nominal, so its starting value is estimated", "", "", "", "", ""])
 CSV.write(joinpath(out, "inventory.csv"), inventory)
+
+# ---- starting values (user, 2026-10-07): nominal seeding, estimated only where the first count is > 3^d-fold off ----
+starts = DataFrame(traj_id = [t.id for t in trajs], split = [String(t.split) for t in trajs], seeding_k = [t.seeding for t in trajs],
+                   nominal_start = [t.n0 for t in trajs], first_day = [t.days[1] for t in trajs], first_count = [t.mean[1] for t in trajs],
+                   ratio_first_to_nominal = [t.mean[1] / t.n0 for t in trajs],
+                   start = [t.n0_free ? (t.split == :train ? "estimated (training)" : "nominal (held out: never estimated from held-out data)") : "nominal" for t in trajs])
+CSV.write(joinpath(out, "starting_values.csv"), starts)
+nest = count(t -> t.n0_free && t.split == :train, trajs)
 
 # ---- plots: one panel per trajectory, same cell-count axis, shared key; excluded points by rule ----
 gr()
@@ -96,15 +104,18 @@ dens = dropmissing(filter(r -> isfinite(r.ratio_30k_over_20k), dens))
 CSV.write(joinpath(out, "density_ratio.csv"), dens)
 
 N.write_report(joinpath(out, "report.html"), "Stage 0 — data audit and harmonised data",
-    [("Inventory: every data source in the repo", N.para("All 20k and 30k A2780 / A2780cis data in the repo is used. Where raw per-image files exist, day means are rebuilt from per-well values so bad wells can be caught. Pre-averaged files that duplicate the raw data are not loaded twice.") * N.html_table(inventory)),
+    [("Inventory: every data source in the repo", N.para("All 20k and 30k A2780 / A2780cis data in the repo is used. Where raw per-image files exist, day means are rebuilt from per-well values so bad wells can be caught. Pre-averaged files that duplicate the raw data are not loaded twice.") * N.html_table(inventory; tip = ("Every data file considered and whether it is used.", :none))),
      ("Quality control, in order", N.para("""
         <b>1. Well level (raw sources):</b> a well-day is dropped if that well jumps > 2-fold against its own previous/next day while the other wells move < 1.5-fold (a single bad image set). Wells that are consistently high or low (seeding differences) are kept. $(nrow(N.EXCLUDED_WELLS)) well-days removed; see <code>excluded_well_days.csv</code>.<br>
         <b>2. Plate-wide artefact days:</b> on each plate/experiment with ≥ 3 series, a day is removed for every series when the median dip against neighbouring days is below $(N.PLATE_DIP) (log), re-checked after each removal so two-day dips are found.<br>
         <b>3. Single points:</b> a last point > 2.5-fold off trend (only if the point before is on trend), and interior points > 2-fold above or below both neighbours (at most two per series).<br>
         <b>4. Day 8-9 drops:</b> in every series, day 8 and/or 9 is removed only when it lies more than $(-N.USER_DIP) (log) below the line joining the nearest remaining days before day 8 and after day 9.""") *
-        N.html_table(rules) * N.html_table(N.EXCLUDED_WELLS)),
-     ("Splits", N.para("ce1 treated co-culture is held out; the loader asserts it never appears in training. Untreated co-culture is used only for competition coefficients.") * N.html_table(summary)),
-     ("20k vs 30k", N.para("Ratio of 30k to 20k day means for the same condition at days 1, 7 and 14. Seeding ratio is 1.5; a ratio falling towards 1 by day 14 means both densities approach the same carrying capacity (the model's initial condition carries density; K and rates are shared unless the fits say otherwise).") * N.html_table(dens)),
-     ("Trajectories (open circles = excluded points, coloured by rule)", join(N.figure(f, cap) for (cap, f) in figs)),
-     ("Assumptions", N.para("Intermittent: <code>T</code> = 1 uM days 1–7 then off; <code>UT</code> = off then 1 uM days 8–14 (Understanding.md, Well Layouts). Treated monoculture folders IC25 / IC50 / IC75 = 1.47 / 1.0 / 0.62 uM (identical to the New Datasets files named with those doses). Co-culture ratios are sensitive:resistant at seeding; column 4 = 75/25, 5 = 50/50, 6 = 25/75."))])
+        N.html_table(rules; tip = ("Points removed by each quality-control rule.", :none)) *
+        N.html_table(N.EXCLUDED_WELLS; tip = ("Single well-days removed by the well-level rule (value = that well's count).", :none))),
+     ("Starting values (day 0)", N.para("Day 0 is not a measurement (user, 2026-10-07). Every series starts at t = 0 from its nominal seeding: 100 cells per 30k well, 66.7 per 20k well, times the line's share in a coculture (25:75 → 25 and 75). The starting value is estimated (a free parameter) only for a series whose first kept count (day d, normally 1) is more than 3<sup>d</sup>-fold above or below nominal — the rule of the mechanistic zoo (<code>zoo_data.jl</code> <code>x0_info</code>, bounds [n0/10, 3·max(n0, first count)]). $(nest) training series have an estimated start (every low-resource series: their day-1 counts are 3–12× nominal). Held-out series always start from the nominal seeding, as in the zoo's validation.") *
+        N.html_table(starts; tip = ("Nominal starting value, the first measured count and their ratio for every series; 'estimated' marks the series whose start is a free parameter.", :none))),
+     ("Splits", N.para("ce1 treated co-culture is held out; the loader asserts it never appears in training. Untreated co-culture is used only for competition coefficients.") * N.html_table(summary; tip = ("Number of trajectories and points per split and source.", :none))),
+     ("20k vs 30k", N.para("Ratio of 30k to 20k day means for the same condition at days 1, 7 and 14. Seeding ratio is 1.5; a ratio falling towards 1 by day 14 means both densities approach the same carrying capacity (the model's initial condition carries density; K and rates are shared unless the fits say otherwise).") * N.html_table(dens; tip = ("30k ÷ 20k day means for the same condition; 1.5 = proportional to seeding.", :none))),
+     ("Trajectories (open circles = excluded points, coloured by rule)", join(N.figure(f, cap; tip = ("Measured day means per trajectory (cells, log axis); open circles = points removed by quality control.", :none)) for (cap, f) in figs)),
+     ("Assumptions", N.para("Intermittent: <code>T</code> = 1 uM days 1–7 then off; <code>UT</code> = off then 1 uM days 8–14 (Understanding.md, Well Layouts). Treated monoculture folders IC25 / IC50 / IC75 = 1.47 / 1.0 / 0.62 uM (identical to the New Datasets files named with those doses). Co-culture ratios are sensitive:resistant at seeding; columns 1/4 = 75/25, 2/5 = 50/50, 3/6 = 25/75 (20k/30k). Day 0 is not a measurement: every series starts from its nominal seeding (100 per 30k well, 66.7 per 20k well, split by ratio), estimated only where the first count is more than 3<sup>d</sup>-fold off (see Starting values). Intermittent values are cell counts (already normalised to cell size)."))])
 println("wrote ", joinpath(out, "report.html"))

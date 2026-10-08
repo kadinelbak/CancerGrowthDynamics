@@ -1,19 +1,24 @@
 # Stage 1: next-day prediction benchmark.
-# Target: Δlog N from day t to t+1. Rows start at day 2 (day 0 is a normalisation, not a measurement,
-# and day 1 is needed as the lag). Co-culture partners are rolled out jointly.
+# Target: Δlog N from day t to t+1. A row needs measured counts on days t-1, t and t+1 (day 0 is a nominal
+# seeding, not a measurement, so the first row is day 2). Co-culture partners are rolled out jointly.
+#
+# Features are autonomous (user rule: no clock time, the models drive optimal control). Removed on
+# 2026-10-07: `day` (clock time), `since_switch` (time since the last dose change = clock time under a
+# constant dose) and `cumdose` (∫u dt: under a constant dose it is dose × day, a treatment clock that never
+# saturates). The dose history enters through `exposure`, the filtered dose dv/dt = γ(u − v), which is a
+# state of the input that saturates and can be restarted from any state.
 
-const FEATURES = [:logN, :dprev, :day, :dose, :exposure, :cumdose, :since_switch,
+const FEATURES = [:logN, :dprev, :dose, :exposure,
                   :line_R, :low_resource, :s_frac, :seeding, :coculture, :log_well]
 const GAMMA_FEATURE = 0.24
 
-_obs_dict(tr, apc) = Dict(zip(tr.days, log.(max.(count_scale(tr, apc), 1.0))))
+_obs_dict(tr) = Dict(zip(tr.days, log.(max.(tr.mean, 1.0))))
 
-"Feature vector for trajectory `tr` at day t given (possibly predicted) log counts."
+"Feature vector for trajectory `tr` at day t given (possibly predicted) log counts. `t` only selects the dose."
 function feature_row(tr::Trajectory, t, logN, logNprev, log_well)
     s = tr.schedule
-    return Float64[logN, logN - logNprev, t, dose_at(s, t), exposure(s, GAMMA_FEATURE, t), cumdose(s, t),
-                   since_switch(s, t), tr.line == :R, tr.resource == :low, tr.s_frac, tr.seeding,
-                   tr.culture == :co, log_well]
+    return Float64[logN, logN - logNprev, dose_at(s, t), exposure(s, GAMMA_FEATURE, t),
+                   tr.line == :R, tr.resource == :low, tr.s_frac, tr.seeding, tr.culture == :co, log_well]
 end
 
 "Group trajectories into wells (co-culture partners together)."
@@ -26,13 +31,13 @@ function _well_log(members, obs, t)
 end
 
 "One-step rows: (X features x rows, y, meta DataFrame)."
-function nextday_rows(trajs, apc)
+function nextday_rows(trajs)
     X = Vector{Vector{Float64}}(); y = Float64[]
     meta = DataFrame(traj_id = String[], group = String[], split = Symbol[], day = Float64[])
     for members in wells(trajs)
-        obs = [_obs_dict(tr, apc) for tr in members]
+        obs = [_obs_dict(tr) for tr in members]
         for (i, tr) in enumerate(members), t in tr.days
-            (t >= 2 && haskey(obs[i], t - 1) && haskey(obs[i], t + 1)) || continue
+            (t >= 1 && haskey(obs[i], t - 1) && haskey(obs[i], t + 1)) || continue
             lw = _well_log(members, obs, t)
             lw === nothing && continue
             push!(X, feature_row(tr, t, obs[i][t], obs[i][t - 1], lw))
@@ -60,9 +65,9 @@ struct TreeModel
 end
 _tree_table(X) = (; (f => X[i, :] for (i, f) in enumerate(FEATURES))...)
 (t::TreeModel)(X) = EvoTrees.predict(t.m, _tree_table(X))
-function fit_trees(X, y)
+function fit_trees(X, y; seed = 11)
     cfg = EvoTreeRegressor(; nrounds = 250, eta = 0.04, max_depth = 3, lambda = 1.0, min_weight = 5.0,
-                             rowsample = 0.8, colsample = 0.9, seed = 11)
+                             rowsample = 0.8, colsample = 0.9, seed)
     data = merge(_tree_table(X), (; target = y))
     return TreeModel(EvoTrees.fit(cfg, data; target_name = :target, feature_names = FEATURES, verbosity = 0))
 end
@@ -73,20 +78,23 @@ end
 (m::Fixed)(X) = m.f(X)
 
 const DPREV = findfirst(==(:dprev), FEATURES)
+# (name, fitter(X, y, seed), stochastic?) — stochastic models are refitted with NEXTDAY_SEEDS seeds and
+# their scores reported as mean ± SD over seeds; the MLP ensemble averages 5 nets per seed.
+const NEXTDAY_SEEDS = parse(Int, get(ENV, "NN_SEEDS", "5"))
 const NEXTDAY_MODELS = [
-    "zero (no change)" => (X, y) -> Fixed(X -> zeros(size(X, 2))),
-    "persistence" => (X, y) -> Fixed(X -> X[DPREV, :]),
-    "ridge" => (X, y) -> fit_ridge(X, y),
-    "boosted trees" => (X, y) -> fit_trees(X, y),
-    "MLP ensemble" => (X, y) -> fit_mlp_ensemble(X, y; n = 5, hidden = 12, lambda = 3e-3, steps = 2500),
+    ("zero (no change)", (X, y, s) -> Fixed(X -> zeros(size(X, 2))), false),
+    ("persistence", (X, y, s) -> Fixed(X -> X[DPREV, :]), false),
+    ("ridge", (X, y, s) -> fit_ridge(X, y), false),
+    ("boosted trees", (X, y, s) -> fit_trees(X, y; seed = 10 + s), true),
+    ("MLP ensemble", (X, y, s) -> fit_mlp_ensemble(X, y; n = 5, hidden = 12, lambda = 3e-3, steps = 2500, seed0 = 100 * s), true),
 ]
 
 """
 Joint recursive rollout of one well from start day t0 for up to `H` days.
 Returns Dict((traj index, horizon) => (pred, obs)).
 """
-function rollout_well(model, members, apc, t0; H = 7)
-    obs = [_obs_dict(tr, apc) for tr in members]
+function rollout_well(model, members, t0; H = 7)
+    obs = [_obs_dict(tr) for tr in members]
     all(haskey(o, t0) && haskey(o, t0 - 1) for o in obs) || return Dict()
     cur = [o[t0] for o in obs]; prev = [o[t0 - 1] for o in obs]
     out = Dict{Tuple{Int, Int}, Tuple{Float64, Float64}}()
@@ -103,12 +111,12 @@ function rollout_well(model, members, apc, t0; H = 7)
     return out
 end
 
-function rollout_errors(model, members, apc; H = 7)
+function rollout_errors(model, members; H = 7)
     errs = [Float64[] for _ in 1:H]
     days = sort(unique(vcat((tr.days for tr in members)...)))
     for t0 in days
-        t0 >= 2 || continue
-        for ((i, h), (p, o)) in rollout_well(model, members, apc, t0; H)
+        t0 >= 1 || continue
+        for ((i, h), (p, o)) in rollout_well(model, members, t0; H)
             push!(errs[h], p - o)
         end
     end
@@ -116,59 +124,62 @@ function rollout_errors(model, members, apc; H = 7)
 end
 
 """
-Leave-one-well-out CV on training wells + a final fit on all training rows evaluated on
-the held-out validation wells. Returns (onestep, rollout, oof) DataFrames.
+Leave-one-well-out CV on training wells + a final fit on all training rows evaluated on the held-out
+validation wells. Stochastic models are refitted for every seed; one-step and rollout RMSEs are given per
+seed, and `onestep`/`rollout` hold the mean and SD over seeds. Returns (onestep, rollout, oof, ...).
 """
-function run_nextday(trajs; H = 7)
-    apc = area_per_count(trajs)
+function run_nextday(trajs; H = 7, seeds = NEXTDAY_SEEDS)
     train = training(trajs)
-    X, y, meta = nextday_rows(trajs, apc)
+    X, y, meta = nextday_rows(trajs)
     is_train = meta.split .== :train
     train_wells = wells(train)
-    onestep = DataFrame(model = String[], split = String[], rmse = Float64[], mae = Float64[], n = Int[])
-    rollout = DataFrame(model = String[], split = String[], horizon = Int[], rmse = Float64[], n = Int[])
+    per_seed = DataFrame(model = String[], seed = Int[], split = String[], rmse = Float64[], mae = Float64[], n = Int[])
+    roll_seed = DataFrame(model = String[], seed = Int[], split = String[], horizon = Int[], rmse = Float64[], n = Int[])
     oof = copy(meta); oof.y = y
-    for (name, fitter) in NEXTDAY_MODELS
+    for (name, fitter, stochastic) in NEXTDAY_MODELS, seed in (stochastic ? (1:seeds) : (1:1))
         pred = fill(NaN, length(y))
         rerr = [Float64[] for _ in 1:H]
         Threads.@threads for w in train_wells
             g = w[1].group
             tr_idx = is_train .& (meta.group .!= g)
-            m = fitter(X[:, tr_idx], y[tr_idx])
+            m = fitter(X[:, tr_idx], y[tr_idx], seed)
             te = findall(meta.group .== g)
             isempty(te) || (pred[te] = m(X[:, te]))
-            e = rollout_errors(m, w, apc; H)
+            e = rollout_errors(m, w; H)
             lock(_LOCK) do
                 for h in 1:H
                     append!(rerr[h], e[h])
                 end
             end
         end
-        full = fitter(X[:, is_train], y[is_train])
+        full = fitter(X[:, is_train], y[is_train], seed)
         va = findall(.!is_train)
         pred[va] = full(X[:, va])
-        oof[!, Symbol(name)] = pred
+        seed == 1 && (oof[!, Symbol(name)] = pred)
         for (split, idx) in [("train (LOWO CV)", findall(is_train)),
                              ("validation_treated_co", findall(meta.split .== :validation_treated_co))]
             r = pred[idx] .- y[idx]
-            push!(onestep, (name, split, sqrt(mean(r .^ 2)), mean(abs.(r)), length(r)))
+            push!(per_seed, (name, seed, split, sqrt(mean(r .^ 2)), mean(abs.(r)), length(r)))
         end
         for h in 1:H
-            push!(rollout, (name, "train (LOWO CV)", h, sqrt(mean(rerr[h] .^ 2)), length(rerr[h])))
+            push!(roll_seed, (name, seed, "train (LOWO CV)", h, sqrt(mean(rerr[h] .^ 2)), length(rerr[h])))
         end
-        for split in (:validation_treated_co,)
-            ve = [Float64[] for _ in 1:H]
-            for w in wells(filter(t -> t.split == split, trajs))
-                e = rollout_errors(full, w, apc; H)
-                foreach(h -> append!(ve[h], e[h]), 1:H)
-            end
-            for h in 1:H
-                push!(rollout, (name, String(split), h, sqrt(mean(ve[h] .^ 2)), length(ve[h])))
-            end
+        ve = [Float64[] for _ in 1:H]
+        for w in wells(filter(t -> t.split == :validation_treated_co, trajs))
+            e = rollout_errors(full, w; H)
+            foreach(h -> append!(ve[h], e[h]), 1:H)
         end
-        @info "next-day model done" name
+        for h in 1:H
+            push!(roll_seed, (name, seed, "validation_treated_co", h, sqrt(mean(ve[h] .^ 2)), length(ve[h])))
+        end
+        @info "next-day model done" name seed
     end
-    return (; onestep, rollout, oof, X, y, meta, apc)
+    sdz(x) = length(x) > 1 ? std(x) : 0.0
+    onestep = combine(groupby(per_seed, [:model, :split]), :rmse => mean => :rmse, :rmse => sdz => :rmse_sd_over_seeds,
+                      :mae => mean => :mae, :seed => length => :seeds, :n => first => :n)
+    rollout = combine(groupby(roll_seed, [:model, :split, :horizon]), :rmse => mean => :rmse, :rmse => sdz => :rmse_sd_over_seeds,
+                      :seed => length => :seeds, :n => first => :n)
+    return (; onestep, rollout, per_seed, roll_seed, oof, X, y, meta)
 end
 
 const _LOCK = ReentrantLock()

@@ -5,10 +5,10 @@ using .NNTrack, DataFrames, CSV, Plots, Statistics, JSON3
 const N = NNTrack
 const FAST = get(ENV, "NN_FAST", "0") == "1"
 
+t_start = time()
 trajs = N.load_all()
-apc = N.area_per_count(trajs)
 out = N.outdir("control")
-drug = N.make_units(N.training(trajs; role = :drug), apc)
+drug = N.make_units(N.training(trajs; role = :drug))
 
 ude_all = N.load_models(joinpath(N.OUT_ROOT, "ude", "models.json"))
 sym = JSON3.read(read(joinpath(N.OUT_ROOT, "symbolic", "symbolic_models.json"), String))
@@ -99,8 +99,9 @@ end
 savefig(plot(ps...; layout = (length(scenarios), 2), size = (1300, 420 * length(scenarios)), margin = 5Plots.mm), joinpath(out, "control.png"))
 
 N.write_report(joinpath(out, "report.html"), "Stage 5 — optimal dose scheduling",
-    [("Set-up", N.para("Same problem as OptimalControlOne: 13 daily doses, mean dose fixed at $(target) uM by the same shift-and-clamp projection, minimise total cells at day 13. Model: recovered closed form ($(formula)), $(length(primary))-member bootstrap ensemble; objective = mean + 0.5·sd of log final total across members (robust). Optimiser: multistart L-BFGS with exact gradients; BlackBoxOptim cross-check. Each schedule is also scored under the UDE and Hill ensembles.")),
-     ("Results", N.para("<code>rel_to_constant</code> = final total relative to constant 1 uM (closed form). <code>support</code> flags doses or exposure patterns the training data never covered; treat those predictions as extrapolation.") * N.html_table(rows)),
-     ("Optimiser agreement", N.html_table(check)),
-     ("Schedules and trajectories", N.figure("control.png", "Optimal schedules and predicted trajectories (thin lines = ensemble members)"))])
+    [("Set-up", N.para("Same problem as OptimalControlOne: 13 daily doses, mean dose fixed at $(target) uM by the same shift-and-clamp projection, minimise total cells at day 13. Model: recovered closed form ($(formula)), $(length(primary))-member bootstrap ensemble; objective = mean + 0.5·sd of log final total across members (robust). Optimiser: multistart L-BFGS with exact gradients; BlackBoxOptim cross-check. Each schedule is also scored under the UDE (mean over $(length(families[2].second)) seeds) and Hill ensembles. All models are autonomous, so a schedule can be planned from any state. Runtime: $(round((time() - t_start) / 60; digits = 1)) min.")),
+     ("Results", N.para("<code>rel_to_constant</code> = final total relative to constant 1 uM (closed form). <code>support</code> flags doses or exposure patterns the training data never covered; treat those predictions as extrapolation.") *
+        N.html_table(rows; tip = ("Predicted total cells at day 13 under each schedule (closed form, UDE, Hill); rel_to_constant < 1 = fewer cells than constant 1 uM.", "Lower total cells (and lower rel_to_constant) is better; 'within training support' is more trustworthy."))),
+     ("Optimiser agreement", N.html_table(check; tip = ("Objective reached by the gradient optimiser and by BlackBoxOptim, and the largest dose difference between their schedules. Close agreement = the optimum is found reliably.", "Closer agreement (smaller max_dose_diff, similar objectives) is better."))),
+     ("Schedules and trajectories", N.figure("control.png", "Optimal schedules and predicted trajectories (thin lines = ensemble members)"; tip = ("Left: dose schedules. Right: predicted total (and resistant) cells under each schedule.", "Lower predicted cells at day 13 is better.")))])
 println("wrote ", joinpath(out, "report.html"))

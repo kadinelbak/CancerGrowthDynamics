@@ -1,0 +1,9 @@
+model,training,rmse_cells,rmse_cells_per_seed,nrmse,log_rmse
+"Hill kill (NN track, mechanistic)","full NN-track set (20k + 30k, intermittent, low resource)",605.385320443517,605,0.4832244650198808,0.4788696729365057
+"Hill kill (NN track, mechanistic)",matched (zoo's 30k monocultures + Ce0),653.6524036654083,654,0.5217517214305268,0.6673551927792987
+"closed form (NN track, mechanistic)","full NN-track set (20k + 30k, intermittent, low resource)",576.6810903490687,577,0.46031246870481407,0.4272807882725167
+"closed form (NN track, mechanistic)",matched (zoo's 30k monocultures + Ce0),633.3516151628523,633,0.5055474341239855,0.6371590418981831
+UDE (NN kill),"full NN-track set (20k + 30k, intermittent, low resource)",597.0845210224351,597 ± 5,0.4765986859928126,0.41823864161850766
+UDE (NN kill),matched (zoo's 30k monocultures + Ce0),640.0509872085337,640 ± 4,0.5108949382067931,0.6368904203920853
+pure neural ODE (autonomous),"full NN-track set (20k + 30k, intermittent, low resource)",602.051242125238,605 ± 46,0.4805631712004264,0.6150423560455874
+pure neural ODE (autonomous),matched (zoo's 30k monocultures + Ce0),511.2232716219132,530 ± 23,0.40806339961172033,0.3479234782292585

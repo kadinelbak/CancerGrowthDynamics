@@ -1,25 +1,79 @@
 steps_requested = ["final"]
-continued_from = "2026-10-06T16:24:01.807"
+continued_from = "2026-10-07T23:10:43.514"
 threads = 20
-finished = "2026-10-06T16:30:51.418"
-started = "2026-10-06T16:30:45.633"
+finished = "2026-10-07T23:11:23.527"
+started = "2026-10-07T23:11:17.725"
 resume = false
-time_limit_hits = 83
+time_limit_hits = 0
 julia = "1.12.7"
 
 [steps.checks]
 log = "outputs/logs/checks.log"
 ok = true
-seconds = 28.7
-finished = "2026-10-06T11:44:47.728"
+commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
+uncommitted_changes = true
+seconds = 47.4
+finished = "2026-10-07T00:26:22.593"
 
     [steps.checks.env]
+
+[steps.data]
+log = "outputs/logs/data.log"
+ok = true
+commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
+uncommitted_changes = true
+seconds = 21.3
+finished = "2026-10-07T00:25:32.980"
+
+    [steps.data.env]
+
+[steps.fits]
+log = "outputs/logs/fits.log"
+ok = true
+commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
+uncommitted_changes = true
+seconds = 65354.2
+finished = "2026-10-07T18:35:36.882"
+
+    [steps.fits.env]
+
+[steps.findings]
+log = "outputs/logs/findings.log"
+ok = true
+commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+uncommitted_changes = true
+seconds = 30.8
+finished = "2026-10-07T23:11:16.195"
+
+    [steps.findings.env]
+
+[steps.final]
+log = "outputs/logs/final.log"
+ok = true
+commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+uncommitted_changes = true
+seconds = 2.9
+finished = "2026-10-07T23:11:22.508"
+
+    [steps.final.env]
+
+[steps.report_long]
+log = "outputs/logs/report_long.log"
+ok = true
+commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+uncommitted_changes = true
+seconds = 38.8
+finished = "2026-10-07T23:10:41.999"
+
+    [steps.report_long.env]
 
 [steps.control_long]
 log = "outputs/logs/control_long.log"
 ok = true
-seconds = 1090.8
-finished = "2026-10-06T16:12:19.615"
+commit = "a323f3a55bf0442eab9ff7686a1249d9345b6f2d"
+uncommitted_changes = true
+seconds = 7048.5
+finished = "2026-10-07T21:04:06.576"
 
     [steps.control_long.env]
     REDO = "1"
@@ -27,56 +81,31 @@ finished = "2026-10-06T16:12:19.615"
 [steps.analyses]
 log = "outputs/logs/analyses.log"
 ok = true
-seconds = 61.3
-finished = "2026-10-06T16:15:42.504"
+commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
+uncommitted_changes = true
+seconds = 397.6
+finished = "2026-10-07T18:44:24.192"
 
     [steps.analyses.env]
-
-[steps.report_long]
-log = "outputs/logs/report_long.log"
-ok = true
-seconds = 39.4
-finished = "2026-10-06T16:17:06.505"
-
-    [steps.report_long.env]
-
-[steps.data]
-log = "outputs/logs/data.log"
-ok = true
-seconds = 12.2
-finished = "2026-10-06T11:44:18.058"
-
-    [steps.data.env]
-
-[steps.fits]
-log = "outputs/logs/fits.log"
-ok = true
-seconds = 13816.1
-finished = "2026-10-06T15:35:03.822"
-
-    [steps.fits.env]
+    REDO = "1"
 
 [steps.report14]
 log = "outputs/logs/report14.log"
 ok = true
-seconds = 37.0
-finished = "2026-10-06T16:16:23.327"
+commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+uncommitted_changes = true
+seconds = 37.2
+finished = "2026-10-07T23:09:59.862"
 
     [steps.report14.env]
-
-[steps.final]
-log = "outputs/logs/final.log"
-ok = true
-seconds = 2.6
-finished = "2026-10-06T16:30:50.466"
-
-    [steps.final.env]
 
 [steps.control14]
 log = "outputs/logs/control14.log"
 ok = true
-seconds = 769.2
-finished = "2026-10-06T15:53:27.650"
+commit = "a323f3a55bf0442eab9ff7686a1249d9345b6f2d"
+uncommitted_changes = true
+seconds = 757.2
+finished = "2026-10-07T19:05:52.385"
 
     [steps.control14.env]
     REDO = "1"
@@ -84,8 +113,10 @@ finished = "2026-10-06T15:53:27.650"
 [steps.tests]
 log = "outputs/logs/tests.log"
 ok = true
-seconds = 360.1
-finished = "2026-10-06T16:30:04.049"
+commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+uncommitted_changes = true
+seconds = 577.2
+finished = "2026-10-07T21:35:37.499"
 
     [steps.tests.env]
 
@@ -106,7 +137,7 @@ finished = "2026-10-06T16:30:04.049"
 "New Datasets/ce0_25S75R.xlsx" = "ceda0f49c589c8b9000f272468860bd41a900e58a90357f66b21fdbfe698e525"
 "New Datasets/A2780_IC50_1um_30k.csv" = "32ecd43bd8195dc666c58099e8e017584a975897c4f8cfefa52094b8e28fcaa8"
 "New Datasets/ce1_75S25R.xlsx" = "b1744ef0cf1ec2b48481016dbe2a27e22f2843e3d8592d4471e1f030fb9cac92"
-"PKG/data/measurements.csv" = "1d4052fbfbe340869346effbddbe506279c545fd5a51d41ea94ead5cf89e42ed"
+"PKG/data/measurements.csv" = "0cb45cb654e30efbb2118e94839388a75da02553103c738196532ffa57f83d0f"
 "New Datasets/A2780_Untreated_30k 1.csv" = "1abfe292d21b1640ce517a8d7ce25ee223baa1b465107e8877992706fdb8492c"
 "New Datasets/ALL A2780-cis LR data.xlsx" = "3b6f30647260d2f40f94fc29962a6e7d87477662000f2323d62ed40f743805b0"
 "New Datasets/Validation/ALL A2780 LR + cis(A2780cis 30k 1-1).csv" = "a6bfeb5c97fd54624d8ad2beae4d3988a938464a651279a9d1a0d87bbca29efa"
@@ -121,5 +152,5 @@ version = "0.4.1"
 
 [git]
 branch = "reproducible-pipeline"
-commit = "f89b0ad250eff26f62b8e8bbcd1750963f51438b"
+commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
 uncommitted_changes = true

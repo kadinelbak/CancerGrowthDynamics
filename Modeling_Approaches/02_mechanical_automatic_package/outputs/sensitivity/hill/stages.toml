@@ -1,0 +1,277 @@
+# The fitting stages of the model zoo, run in this order by run_zoo_fits.jl.
+# Ids are internal (s1, s1b, s2, s3, s3b, s4); pages show the thesis names 1, 2a, 2b, 3a, 3b, 4
+# (stage_names.jl). Each stage selects its data by tag (data/sources.toml), inherits the carried
+# models of earlier stages, fits its candidates and carries one model forward by the selection rule.
+#
+# kind
+#   growth       per line: growth laws (no input)
+#   mechanism    per line: growth from `inherits.growth` + every mechanism of `catalogue` (zoo_models.jl)
+#                driven by `input` (D = cisplatin, R = low resource)
+#   coculture    both lines per well, one shared K: each line's mechanism from `inherits.mechanism`,
+#                candidates name which coculture parameters are refitted
+#   combination  both lines with two mechanism modules each (zoo_stage4.jl)
+# data         tag selector; a list value matches any of its entries. Environments are the distinct
+#              (condition, ratio, run) combinations in sources.toml order.
+# joint_rule   paired-line rule for per-line stages (zoo_selection.jl): "shared" = one structure for both
+#              lines chosen on the joint BIC; "ab" = a shared structure is tested and kept only if it wins.
+# kill_growth_coupled (optional, drug stages and coculture candidates): Norton–Simon, the drug kill is
+#              multiplied by the line's growth factor (1 − x, or 1 − x^θ); off unless set.
+# [selection] options: residual_weighting = "none" | "sd" | "power" (weight_power), bootstrap_generator =
+#              "most_complex" | "selected" (README, "Sensitivity runs").
+
+[lines.A2780]
+sym = "N"
+ec50 = 1.0              # µM, measured cisplatin IC50 of A2780 (the Hill kill's EC50)
+
+[lines.A2780cis]
+sym = "C"
+ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-10-02; was 1 µM for both lines before)
+
+[selection]
+rule_bic = 3.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC)
+# Residual weights (review, 2026-10-07): one pooled variance model for every series, scale = max(y, 50)^0.55
+# (the log-log slope of replicate SD against the mean count over all series; 50 cells = a noise floor). This
+# replaces the per-point 3-well SDs, which have 2 degrees of freedom each and, with per-series floors, made
+# weights between series differ up to 3500-fold. Raw squared error would let the large late counts dominate.
+residual_weighting = "power"
+weight_power = 0.55
+# Bootstrap replicates are generated from the carried model, so its intervals are centred on its estimates;
+# replicates from the most complex candidate biased the selection frequencies against simpler models.
+bootstrap_generator = "selected"
+
+[coculture]
+# bounds of refitted coculture parameters; K is bounded relative to the data maximum
+bounds = { K = [0.5, 20.0], "αNC" = [0.0, 5.0], "αCN" = [0.0, 5.0], "βN" = [0.0, 10.0], "βC" = [0.0, 10.0], dN = [0.0, 3.0], dC = [0.0, 3.0], "εN" = [0.0, 5.0], "εC" = [0.0, 5.0] }
+
+# ── 1 · untreated monocultures ────────────────────────────────────────────────
+[[stage]]
+id = "s1"
+kind = "growth"
+stage_label = "1 Untreated monoculture"
+title = "Stage 1 · {line} untreated"
+data = { condition = "untreated", culture = "mono" }
+# K bounds and starts are multiples of the series maximum
+  [[stage.candidate]]
+  name = "logistic"
+  label = "Logistic"
+  growth = "logistic"
+  free = ["r", "K"]
+  bounds = [[1e-4, 5.0], [0.5, 20.0]]
+  starts = [[0.6, 1.05], [0.3, 1.3], [1.0, 1.0]]
+  [[stage.candidate]]
+  name = "theta_logistic"
+  label = "Theta logistic"
+  growth = "theta"
+  free = ["r", "K", "θ"]
+  bounds = [[1e-4, 10.0], [0.5, 20.0], [0.05, 10.0]]
+  starts = [[0.6, 1.05, 1.0], [0.4, 1.1, 3.0], [1.0, 1.0, 0.5]]
+  [[stage.candidate]]
+  name = "gompertz"
+  label = "Gompertz"
+  growth = "gompertz"
+  free = ["r", "K"]
+  bounds = [[1e-4, 5.0], [0.5, 20.0]]
+  starts = [[0.3, 1.05], [0.15, 1.3], [0.6, 1.0]]
+
+# ── 2a · low-resource monocultures ────────────────────────────────────────────
+[[stage]]
+id = "s1b"
+kind = "mechanism"
+stage_label = "1b Low-resource monoculture"
+title = "Stage 1b · {line} low resource"
+data = { condition = "low_resource", culture = "mono" }
+input = "R"
+catalogue = "LR_ZOO"
+inherits = { growth = "s1" }
+joint_rule = "ab"
+plot_tmax = 20.0
+
+# ── 2b · treated monocultures, all doses jointly ─────────────────────────────
+[[stage]]
+id = "s2"
+only = ["chain3_hill"]   # variant: Hill kill forced in Stage 2b
+kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
+kind = "mechanism"
+stage_label = "2 Treated monoculture"
+title = "Stage 2 · {line} treated (3 doses jointly)"
+data = { condition = "treated", culture = "mono" }
+input = "D"
+catalogue = "DRUG_ZOO"
+inherits = { growth = "s1" }
+joint_rule = "shared"
+
+# ── 3a · untreated (Ce0) and treated (Ce1) cocultures, shared K ──────────────
+[[stage]]
+id = "s3"
+kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
+kind = "coculture"
+stage_label = "3 Ce0 + Ce1 coculture"
+title = "Stage 3 · Ce0 + Ce1 coculture (shared K)"
+line = "coculture"
+data = { culture = "co", condition = ["Ce0", "Ce1"] }
+input = "D"
+inherits = { growth = "s1", mechanism = "s2" }
+# The resistant kill β_C may be refitted down to 0, and the "no resistant cisplatin term" candidates
+# (fixed βC = 0) compete under the selection rule (user, 2026-10-06; replaces the 2026-10-01 floor of
+# 0.5 × Stage 2b). Every sensitivity variant put β_C on whatever floor it had. In monoculture (Stage 2b)
+# the A2780cis kill stays: dropping it costs +59 weighted BIC there.
+betaC_floor = 0.0
+  [[stage.candidate]]
+  name = "cc_K"
+  label = "Shared K, one-for-one crowding, drug mechanisms from Stage 2"
+  free = ["K"]
+  [[stage.candidate]]
+  name = "cc_K_alpha"
+  label = "Shared K + asymmetric crowding, drug mechanisms from Stage 2"
+  free = ["K", "αNC", "αCN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_betaN"
+  label = "Shared K + crowding, sensitive kill strength refitted"
+  free = ["K", "αNC", "αCN", "βN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_beta"
+  label = "Shared K + crowding, both kill strengths refitted (resistant kill may reach 0)"
+  free = ["K", "αNC", "αCN", "βN", "βC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death"
+  label = "Shared K + crowding + coculture death"
+  free = ["K", "αNC", "αCN", "dN", "dC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_deathN_betaN"
+  label = "Shared K + crowding + sensitive death, sensitive kill refitted"
+  free = ["K", "αNC", "αCN", "dN", "βN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_deathN_beta"
+  label = "Shared K + crowding + sensitive death, both kill strengths refitted (resistant kill may reach 0)"
+  free = ["K", "αNC", "αCN", "dN", "βN", "βC"]
+  [[stage.candidate]]
+  name = "cc_full"
+  label = "Shared K + crowding + death, both kill strengths refitted (resistant kill may reach 0)"
+  free = ["K", "αNC", "αCN", "dN", "dC", "βN", "βC"]
+
+  [[stage.candidate]]
+  name = "cc_K_alpha_betaN_noC"
+  label = "Shared K + crowding, sensitive kill refitted, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN", "βN"]
+  fixed = { "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_noC"
+  label = "Shared K + crowding, sensitive kill from Stage 2, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN"]
+  fixed = { "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_deathN_betaN_noC"
+  label = "Shared K + crowding + sensitive death, sensitive kill refitted, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN", "dN", "βN"]
+  fixed = { "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_full_noC"
+  label = "Shared K + crowding + death, sensitive kill refitted, no resistant cisplatin term"
+  free = ["K", "αNC", "αCN", "dN", "dC", "βN"]
+  fixed = { "βC" = 0.0 }
+
+# ── 3b · low-resource cocultures, shared K ───────────────────────────────────
+[[stage]]
+id = "s3b"
+kind = "coculture"
+stage_label = "3b Low-resource coculture"
+title = "Stage 3b · low-resource coculture"
+line = "LR coculture"
+data = { culture = "co", condition = "low_resource" }
+input = "R"
+inherits = { growth = "s1", mechanism = "s1b" }
+# fixed: values of parameters that are not refitted; fixed_from: take K, αNC, αCN from that stage's
+# carried model; noinput: switch the low-resource effect off (a "no effect" comparison)
+  [[stage.candidate]]
+  name = "lrcc_K"
+  label = "Shared K, one-for-one crowding, low-resource mechanisms from Stage 1b"
+  free = ["K"]
+  [[stage.candidate]]
+  name = "lrcc_K_alpha"
+  label = "Shared K + asymmetric crowding, low-resource mechanisms from Stage 1b"
+  free = ["K", "αNC", "αCN"]
+  [[stage.candidate]]
+  name = "lrcc_K_alphaCN"
+  label = "Shared K, resistant crowded by sensitive only (α_NC = 0)"
+  free = ["K", "αCN"]
+  fixed = { "αNC" = 0.0 }
+  [[stage.candidate]]
+  name = "lrcc_K_alpha_eps"
+  label = "Shared K + crowding, low-resource strength refitted per line"
+  free = ["K", "αNC", "αCN", "εN", "εC"]
+  [[stage.candidate]]
+  name = "lrcc_eps"
+  label = "K and α from Stage 3, low-resource strength refitted per line"
+  free = ["εN", "εC"]
+  fixed_from = "s3"
+  [[stage.candidate]]
+  name = "lrcc_K_alpha_noLR"
+  label = "Shared K + asymmetric crowding, no low-resource effect"
+  free = ["K", "αNC", "αCN"]
+  noinput = true
+  [[stage.candidate]]
+  name = "lrcc_K_alphaCN_noLR"
+  label = "Shared K, α_NC = 0, no low-resource effect"
+  free = ["K", "αCN"]
+  fixed = { "αNC" = 0.0 }
+  noinput = true
+
+# ── 4 · low resource + cisplatin coculture (both mechanisms per line) ────────
+[[stage]]
+id = "s4"
+kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
+kind = "combination"
+stage_label = "4 Low resource + cisplatin coculture"
+title = "Stage 4 · low resource + cisplatin coculture (1:1)"
+line = "combination"
+data = { condition = "combination" }
+inherits = { drug = "s3", lowres = "s3b", resistant_kill = "s2" }
+# crowd: crowding (K, α) from the drug stage (s3) or the low-resource stage (s3b); reskill: reset the
+# resistant kill to its Stage 2b value (only offered when Stage 3a refitted β_C)
+  [[stage.candidate]]
+  name = "s4_inherited"
+  label = "Everything inherited: Stage 3 drug model and crowding + Stage 3b low-resource mechanisms"
+  crowd = "s3"
+  free = []
+  [[stage.candidate]]
+  name = "s4_inherited_3bcrowd"
+  label = "Everything inherited, crowding from Stage 3b (shared K, one-for-one)"
+  crowd = "s3b"
+  free = []
+  [[stage.candidate]]
+  name = "s4_reskill"
+  label = "Everything inherited + resistant kill at its Stage 2 value"
+  crowd = "s3"
+  reskill = true
+  free = []
+  [[stage.candidate]]
+  name = "s4_chi"
+  label = "+ drug × low-resource interaction χ (shared by both lines)"
+  crowd = "s3"
+  free = ["χ"]
+  [[stage.candidate]]
+  name = "s4_K"
+  label = "+ shared carrying capacity K refitted"
+  crowd = "s3"
+  free = ["K"]
+  [[stage.candidate]]
+  name = "s4_reskill_chi"
+  label = "Resistant kill at its Stage 2 value + shared interaction χ"
+  crowd = "s3"
+  reskill = true
+  free = ["χ"]
+  [[stage.candidate]]
+  name = "s4_chi_lines"
+  label = "+ interaction χ per line"
+  crowd = "s3"
+  free = ["χN", "χC"]
+  [[stage.candidate]]
+  name = "s4_eps"
+  label = "+ low-resource strength per line (ε_N, ε_C)"
+  crowd = "s3"
+  free = ["εN", "εC"]
+  [[stage.candidate]]
+  name = "s4_chi_K"
+  label = "+ shared interaction χ and K"
+  crowd = "s3"
+  free = ["χ", "K"]

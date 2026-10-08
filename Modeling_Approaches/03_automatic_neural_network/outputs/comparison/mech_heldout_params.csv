@@ -1,0 +1,6 @@
+group,model,params,estimated_starts,names
+s1-a2780,logistic,2,0,"r_N, K_N"
+s1-a2780cis,theta_logistic,3,0,"r_C, K_C, θ_C"
+s2-a2780,chain3_loss,2,2,"β_N, k_N"
+s2-a2780cis,chain3_loss,2,0,"β_C, k_C"
+s3 held-out refit (Ce0),cc_full_noC,5,0,"K, α_NC, α_CN, d_N, d_C"

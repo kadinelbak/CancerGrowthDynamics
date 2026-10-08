@@ -22,13 +22,13 @@ const LIBRARY = vcat(
 function visited_states(model::UDEModel, units)
     pts = Dict(-1.0 => NTuple{2, Float64}[], 1.0 => NTuple{2, Float64}[])
     for u in units
+        l0 = start_values(model, u)
         S0 = R0 = 0.0
-        for tr in u.members
-            tr.line == :S ? (S0 = exp(u.logN0[1])) : (R0 = exp(u.logN0[1]))
+        for (i, tr) in enumerate(u.members)
+            tr.line == :S ? (S0 = exp(l0[i])) : (R0 = exp(l0[i]))
         end
-        γ = exp(model.θ[10])
-        ts = collect(u.t0:0.25:maximum(u.tobs))
-        xs = simulate_well(model.kind, model.θ, model.a, u.low, u.sched, u.t0, S0, R0, exposure(u.sched, γ, u.t0), ts; d20 = is20k(u))
+        ts = collect(0.0:0.25:maximum(u.tobs))
+        xs = simulate_well(model.kind, model.θ, model.a, u.low, u.sched, 0.0, S0, R0, 0.0, ts; d20 = is20k(u))
         KS, KR = exp(model.θ[2]), exp(model.θ[4])
         for x in xs
             x[3] > 1e-3 || continue

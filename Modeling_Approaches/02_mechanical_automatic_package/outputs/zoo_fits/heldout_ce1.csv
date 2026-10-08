@@ -1,4 +1,5 @@
-row,rmse,nrmse,n,params
-"prediction (crowding from Ce0, kills from Stage 2b)",711.143766841608,0.6064623229976326,90,K=4276.2334720495055; α_NC=0.6891546353527582; α_CN=1.499855610169708; d_N=0.16038540091655615
-in-sample (Stage 3a fitted with Ce1),351.584987646963,0.29983114284535656,90,
-"untreated reference (same crowding, no drug)",870.2535915999177,0.7421509396091914,90,
+row,rmse,nrmse,wrmse,n,params,diff_lo,diff_hi,note
+"prediction (crowding from Ce0, kills from Stage 2b)",1132.1824266894141,0.9037190512665352,17.41414573153191,84,K=4552.468382416471; α_NC=0.7448137076008907; α_CN=1.5177611370618196; d_N=0.19751551419039187; d_C=0.07718422648569812,NaN,NaN,"Ce1 starts: nominal seeding for every Ce1 series (the full fit had estimated the start of: Ce1 25S75R A2780, Ce1 50S50R A2780, Ce1 75S25R A2780)"
+in-sample (Stage 3a fitted with Ce1),366.205825511808,0.29230906027001646,5.545456412858182,84,,NaN,NaN,
+"untreated reference (same crowding, no drug)",974.7140825701013,0.7780262837430766,16.2065876005924,84,,NaN,NaN,
+prediction minus untreated reference (RMSE difference),157.4683441193131,0.12569276752345876,NaN,84,,-88.22370030297077,448.01512617814956,"95% paired bootstrap over the 6 Ce1 trajectories, B = 10000; share of draws < 0: 0.14"
