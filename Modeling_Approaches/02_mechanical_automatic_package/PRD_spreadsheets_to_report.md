@@ -12,6 +12,8 @@
 > 4. **Users supply their own EC50 values** (per line, per treatment).
 > 5. The output folder (`runs/`, §5.6) is **git-ignored**; a user never needs to know about it beyond "your
 >    results are in this folder".
+> 6. **The A2780 study keeps its own configuration and publish step** (§9). The generic pipeline must never
+>    change its numbers or its website.
 
 ---
 
@@ -253,8 +255,19 @@ the A2780 study does, to stay identical to the reference):
   treatments (and `resource` treatments if the user marks them `controllable = yes` in `Treatments`); the plant is
   the carried model of the richest stage available: coculture if present, else **each line's monoculture model
   summed** (no interaction; stated in the report).
-- Objective default: total burden + time-to-progression terms as today, with per-line weights from the `Lines`
-  sheet (`control_weight`, default 1; lines labelled resistant get the current resistant-cost weight by default).
+- **Objective = a literature-based preset, chosen by the user** in the `Study` sheet (`control_objective`
+  dropdown). Each preset's weights are labelled LITERATURE or ASSUMPTION and can be overridden in
+  `studies/<name>/control.toml`. Each preset is documented in the report with its citation:
+  - `burden` (default when no line is labelled resistant): minimise integrated + terminal total burden with a
+    quadratic dose penalty and the host-toxicity constraint (Swan 1990, *Math Biosci* 101:237; de Pillis &
+    Radunskaya 2001, the toxicity model already in `control_config.toml`).
+  - `time_to_progression` (default when any line is labelled resistant): the current A2780 objective (total
+    burden + time-to-progression + terminal resistant cost), following adaptive-therapy reasoning (Gatenby et al.
+    2009, *Cancer Res* 69:4894; Zhang et al. 2017, *Nat Commun* 8:1816).
+  - `custom`: per-line weights (`control_weight` in `Lines`) and term weights set by the user.
+
+  Presets must not change the A2780 study, which keeps its own `control_config.toml`. Before relying on a
+  citation, the implementer checks it and fixes the reference if it is wrong.
 - Dose levels per drug default to the measured doses + 0; `u_max` defaults to the highest measured dose; anything
   above is "demonstration / extrapolated" as today.
 - Search cost grows with the number of controlled treatments: blocked search stays exact for one or two controls;
@@ -357,7 +370,7 @@ Branch `study-pipeline` from `main`.
 | M1 | Results folder + study folder | `studies/a2780/` holds today's configs (explicit `stages.toml`); `cgd run studies/a2780` writes to `results/`; `publish` reproduces today's `docs/`. **Regression 31/31.** |
 | M2 | Tagging: `init`, `tags.xlsx`, compiler to TOML, reader layouts (§5.1–5.3), validator (§5.9) | A2780 raw files → `init` → tags that compile to a `sources.toml` semantically equal to today's (test diffs them); acceptance test 5 passes. |
 | M3 | De-hard-code names and constants (N = 2 path still) | Grep test enforcing; **regression 31/31**. |
-| M4 | Auto stage plan + skipping; EC50 handling (§5.6) | TykNu runs end to end (acceptance 2); auto plan for A2780 matches its explicit `stages.toml` (or differences documented and approved by owner). |
+| M4 | Auto stage plan + skipping; EC50 handling (§5.6) | TykNu runs end to end (acceptance 2). For information only, report how the auto plan for A2780 differs from its explicit `stages.toml`; A2780 always uses its own. |
 | M5 | N lines / N treatments: monoculture + combination | Acceptance test 3. **Regression 31/31.** |
 | M6 | N-line coculture | Acceptance test 4. **Regression 31/31.** |
 | M7 | Generalised control (§5.7) + scorecard (§5.10) + generic report | Control and scorecard render for A2780, TykNu and synthetic studies. |
@@ -378,10 +391,10 @@ Branch `study-pipeline` from `main`.
 | QC thresholds tuned to A2780 count scale | Scale `floor` by `reference_count`; report exclusion rate per series. |
 | Long runs killed by sleep or tool limits | `--detached` + keep-awake; `--resume`. |
 
-## 9. Remaining open questions for the owner
+## 9. Resolved questions (owner, 2026-10-10)
 
-1. Combination candidates: are independent-action, Bliss and the current χ interaction the right three to start
-   with?
-2. Default control objective for a study with no line labelled "resistant": total burden only?
-3. Should the A2780 study keep its explicit `stages.toml` permanently, or switch to the auto plan once M4 shows
-   they match?
+1. **Combination candidates:** independent action, Bliss and the current χ interaction. Confirmed.
+2. **Control objective:** literature-based presets as defaults, which the user can override (§5.7).
+3. **The A2780 study keeps its own configuration permanently:** its explicit `stages.toml`,
+   `validation.toml`, `control_config.toml` and publish step. The auto stage plan is never applied to it.
+   M4's "auto plan matches" check is informational only.
