@@ -1,0 +1,6 @@
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+held-out Ce1: 90 points, RMSE 565.1; wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\scripts\..\outputs\comparison
+
+real	0m39.592s
+user	0m0.046s
+sys	0m0.000s

@@ -1,0 +1,157 @@
+=== Autonomous model zoo: 20 threads, B = 0 ===
+
+=== Stage s1: 1 Untreated monoculture ===
+  A2780     logistic             k=2 BIC=   -8.65  r_N = 0.7795, K_N = 4005.1
+  A2780     theta_logistic       k=3 BIC=   -9.77  r_N = 1.17, K_N = 4096.0, θ_N = 0.4589
+  A2780     gompertz             k=2 BIC=   -6.91  r_N = 0.363, K_N = 4266.3
+  A2780cis  theta_logistic       k=3 BIC=   36.16  r_C = 0.4586, K_C = 3854.6, θ_C = 3.52
+  A2780cis  logistic             k=2 BIC=   39.30  r_C = 0.6032, K_C = 4045.1
+  A2780cis  gompertz             k=2 BIC=   50.88  r_C = 0.2594, K_C = 4705.3
+
+=== Stage s1b: 1b Low-resource monoculture ===
+  A2780     lr_imm_capacity      k=1 BIC=   -3.96  c_N = 0.3708
+  A2780     lr_rho               k=2 BIC=   -4.96  ρ_r = 1.195, ρ_K = 0.7189
+  A2780     lr_auc_capacity      k=1 BIC=   -3.55  c_N = 0.03594
+  A2780     lr_chain3_capacity   k=2 BIC=   -3.00  c_N = 0.4105, k_N^R = 0.6594
+  A2780     lr_second_capacity   k=3 BIC=   -2.93  c_N = 0.2681, ω_N^R = 0.3564, ζ_N^R = 0.05
+  A2780     lr_chain2_capacity   k=2 BIC=   -2.77  c_N = 0.4131, k_N^R = 0.4576
+  A2780     lr_toxin_clear       k=2 BIC=   -2.70  γ_N = 0.05748, κ_N = 0.7288
+  A2780     lr_comp_capacity     k=2 BIC=   -2.42  c_N = 0.4232, k_N^R = 0.2349
+  A2780     lr_auc_loss          k=1 BIC=   -2.14  d_N^LR = 0.01956
+  A2780     lr_chain3_loss       k=2 BIC=   -1.63  d_N^LR = 0.2437, k_N^R = 0.5031
+  A2780     lr_chain2_loss       k=2 BIC=   -0.94  d_N^LR = 0.2661, k_N^R = 0.2885
+  A2780     lr_second_loss       k=3 BIC=   -0.79  d_N^LR = 0.1295, ω_N^R = 0.3226, ζ_N^R = 0.05
+  A2780     lr_toxin             k=1 BIC=   -0.67  γ_N = 0.01007
+  A2780     lr_resource          k=2 BIC=    0.18  c_N = 0.1053, d_N^LR = 0.03357
+  A2780     lr_comp_loss         k=2 BIC=    0.26  d_N^LR = 0.5328, k_N^R = 0.04652
+  A2780     lr_auc_damage        k=2 BIC=    0.36  d_N^LR = 0.02024, δ_N^R = 3.158
+  A2780     lr_imm_plus_chain3_loss k=3 BIC=    0.93  d_N^LR = 2.894e-13, d_N^acc = 0.2437, k_N^R = 0.5031
+  A2780     lr_second_damage     k=4 BIC=    1.05  d_N^LR = 0.1407, δ_N^R = 0.9312, ω_N^R = 0.3681, ζ_N^R = 0.05
+  A2780     lr_chain2_damage     k=3 BIC=    1.39  d_N^LR = 0.2533, δ_N^R = 1.524, k_N^R = 0.3471
+  A2780     lr_imm_plus_chain2_loss k=3 BIC=    1.62  d_N^LR = 2.01e-13, d_N^acc = 0.2661, k_N^R = 0.2885
+  A2780     lr_comp_transit      k=3 BIC=    2.42  d_N^LR = 0.3298, k_N^R = 0.1063, τ_N^R = 1.931
+  A2780     lr_comp_damage       k=3 BIC=    2.55  d_N^LR = 0.3635, δ_N^R = 1.337, k_N^R = 0.08744
+  A2780     lr_imm_plus_comp1_loss k=3 BIC=    2.83  d_N^LR = 6.136e-14, d_N^acc = 0.5328, k_N^R = 0.04652
+  A2780     lr_imm_loss          k=1 BIC=    6.07  d_N^LR = 0.1495
+  A2780     lr_transit           k=2 BIC=    6.81  d_N^LR = 0.1732, τ_N^R = 0.9172
+  A2780     lr_imm_damage        k=2 BIC=    7.24  d_N^LR = 0.1691, δ_N^R = 0.5608
+  A2780     lr_chain2_fade       k=3 BIC=    7.36  c_N = 1000.0, k_N^R = 0.005913, d_N^LR = 0.04761
+  A2780     lr_comp_fade         k=3 BIC=   11.16  c_N = 8.132, k_N^R = 0.001, d_N^LR = 0.1382
+  A2780     lr_sep_r             k=1 BIC=   17.88  r_N^LR = 0.6791
+  A2780cis  lr_imm_plus_chain3_loss k=3 BIC=  -22.36  d_C^LR = 0.4703, d_C^acc = 6.769, k_C^R = 0.1892
+  A2780cis  lr_imm_plus_chain2_loss k=3 BIC=  -20.45  d_C^LR = 0.4445, d_C^acc = 50, k_C^R = 0.02943
+  A2780cis  lr_imm_plus_comp1_loss k=3 BIC=  -13.59  d_C^LR = 0.3418, d_C^acc = 50, k_C^R = 0.002266
+  A2780cis  lr_transit           k=2 BIC=   -4.32  d_C^LR = 1.787, τ_C^R = 0.5572
+  A2780cis  lr_chain2_fade       k=3 BIC=   -4.24  c_C = 1000.0, k_C^R = 0.01467, d_C^LR = 0.4696
+  A2780cis  lr_imm_damage        k=2 BIC=   -4.19  d_C^LR = 1.019, δ_C^R = 0.5142
+  A2780cis  lr_comp_loss         k=2 BIC=   -2.57  d_C^LR = 0.9448, k_C^R = 0.6016
+  A2780cis  lr_resource          k=2 BIC=   -1.70  c_C = 1.173, d_C^LR = 0.4289
+  A2780cis  lr_comp_transit      k=3 BIC=   -1.42  d_C^LR = 2.113, k_C^R = 20, τ_C^R = 0.5313
+  A2780cis  lr_comp_damage       k=3 BIC=   -1.40  d_C^LR = 1.029, δ_C^R = 0.5232, k_C^R = 20
+  A2780cis  lr_chain2_damage     k=3 BIC=   -0.91  d_C^LR = 1.039, δ_C^R = 0.5322, k_C^R = 20
+  A2780cis  lr_second_loss       k=3 BIC=    0.05  d_C^LR = 0.9344, ω_C^R = 6.226, ζ_C^R = 5
+  A2780cis  lr_second_damage     k=4 BIC=    0.71  d_C^LR = 1.019, δ_C^R = 0.5177, ω_C^R = 13.02, ζ_C^R = 0.05
+  A2780cis  lr_comp_fade         k=3 BIC=    0.96  c_C = 405.3, k_C^R = 0.001, d_C^LR = 0.4444
+  A2780cis  lr_chain2_loss       k=2 BIC=    1.04  d_C^LR = 0.8159, k_C^R = 2.135
+  A2780cis  lr_chain3_loss       k=2 BIC=    1.83  d_C^LR = 0.7738, k_C^R = 4.494
+  A2780cis  lr_auc_damage        k=2 BIC=    2.02  d_C^LR = 4.856, δ_C^R = 0.2735
+  A2780cis  lr_toxin_clear       k=2 BIC=    3.29  γ_C = 0.5388, κ_C = 0.1385
+  A2780cis  lr_toxin             k=1 BIC=    3.81  γ_C = 0.3987
+  A2780cis  lr_imm_loss          k=1 BIC=    3.89  d_C^LR = 0.6881
+  A2780cis  lr_auc_loss          k=1 BIC=    4.50  d_C^LR = 0.2574
+  A2780cis  lr_auc_capacity      k=1 BIC=    8.29  c_C = 5.004
+  A2780cis  lr_comp_capacity     k=2 BIC=   10.73  c_C = 1000.0, k_C^R = 0.005081
+  A2780cis  lr_chain2_capacity   k=2 BIC=   12.54  c_C = 148.2, k_C^R = 0.1497
+  A2780cis  lr_second_capacity   k=3 BIC=   14.27  c_C = 75.36, ω_C^R = 0.877, ζ_C^R = 5
+  A2780cis  lr_chain3_capacity   k=2 BIC=   14.37  c_C = 55.93, k_C^R = 0.5439
+  A2780cis  lr_rho               k=2 BIC=   16.91  ρ_r = 1.705e-07, ρ_K = 0.001
+  A2780cis  lr_imm_capacity      k=1 BIC=   18.00  c_C = 25.09
+  A2780cis  lr_sep_r             k=1 BIC=   37.78  r_C^LR = 0.0001
+Stage s1b: per line (A) (A per line -26.31, k=4; B shared lr_imm_plus_chain3_loss -21.43, k=6; ΔBIC +4.89)
+
+=== Stage s2: 2 Treated monoculture ===
+  A2780     chain3_hill          k=3 BIC=   66.49  β_N = 1.127, h_N = 4.096, k_N = 0.7636
+  A2780     chain2_hill          k=3 BIC=   67.41  β_N = 1.196, h_N = 3.91, k_N = 0.4815
+  A2780     comp_hill            k=3 BIC=   70.24  β_N = 1.501, h_N = 3.41, k_N = 0.1773
+  A2780     second_hill          k=4 BIC=   71.19  β_N = 1.217, h_N = 3.857, ω_N = 0.4922, ζ_N = 1.049
+  A2780     second_loss          k=3 BIC=  106.71  β_N = 0.3357, ω_N = 0.3329, ζ_N = 0.05
+  A2780     chain3_loss          k=2 BIC=  106.71  β_N = 0.6246, k_N = 0.6047
+  A2780     second_damage        k=4 BIC=  109.29  β_N = 0.3666, δ_N = 0.9104, ω_N = 0.388, ζ_N = 0.07131
+  A2780     chain2_loss          k=2 BIC=  109.36  β_N = 0.6771, k_N = 0.3516
+  A2780     imm_plus_chain3_loss k=3 BIC=  110.52  d_N^0 = 1.572e-14, β_N = 0.6246, k_N = 0.6047
+  A2780     chain2_damage        k=3 BIC=  111.83  β_N = 0.6351, δ_N = 1.233, k_N = 0.4528
+  A2780     imm_plus_chain2_loss k=3 BIC=  113.16  d_N^0 = 1.627e-14, β_N = 0.6771, k_N = 0.3516
+  A2780     auc_loss             k=1 BIC=  113.71  β_N = 0.06271
+  A2780     comp_loss            k=2 BIC=  114.61  β_N = 1.088, k_N = 0.07583
+  A2780     comp_damage          k=3 BIC=  116.53  β_N = 0.7828, δ_N = 0.9869, k_N = 0.148
+  A2780     auc_damage           k=2 BIC=  117.60  β_N = 0.06377, δ_N = 10
+  A2780     imm_plus_comp1_loss  k=3 BIC=  118.42  d_N^0 = 2.384e-15, β_N = 1.088, k_N = 0.07583
+  A2780     imm_damage           k=2 BIC=  135.08  β_N = 0.4982, δ_N = 0.1124
+  A2780     imm_hill             k=2 BIC=  137.00  β_N = 0.7098, h_N = 5.218
+  A2780     imm_loss             k=1 BIC=  145.00  β_N = 0.4054
+  A2780     auc_hill             k=2 BIC=  175.13  β_N = 0.6629, h_N = 0.8454
+  A2780cis  auc_hill             k=2 BIC=   86.18  β_C = 0.2962, h_C = 3.266
+  A2780cis  second_hill          k=4 BIC=   83.57  β_C = 3.489, h_C = 2.026, ω_C = 0.3166, ζ_C = 0.05
+  A2780cis  chain3_hill          k=3 BIC=   84.92  β_C = 8.434, h_C = 1.848, k_C = 0.5753
+  A2780cis  chain2_damage        k=3 BIC=   85.97  β_C = 25.72, δ_C = 0.001, k_C = 0.02215
+  A2780cis  chain2_hill          k=3 BIC=   86.23  β_C = 9.939, h_C = 1.9, k_C = 0.3639
+  A2780cis  chain3_loss          k=2 BIC=   87.10  β_C = 0.2252, k_C = 0.4036
+  A2780cis  auc_loss             k=1 BIC=   87.80  β_C = 0.01504
+  A2780cis  comp_hill            k=3 BIC=   88.61  β_C = 16.38, h_C = 1.989, k_C = 0.1275
+  A2780cis  chain2_loss          k=2 BIC=   88.73  β_C = 0.2763, k_C = 0.2026
+  A2780cis  auc_damage           k=2 BIC=   88.91  β_C = 0.02805, δ_C = 0.05055
+  A2780cis  second_loss          k=3 BIC=   89.53  β_C = 0.09767, ω_C = 0.2729, ζ_C = 0.05
+  A2780cis  second_damage        k=4 BIC=   89.66  β_C = 0.5508, δ_C = 0.001, ω_C = 0.1533, ζ_C = 0.05
+  A2780cis  imm_plus_chain3_loss k=3 BIC=   90.91  d_C^0 = 3.843e-15, β_C = 0.2252, k_C = 0.4036
+  A2780cis  comp_loss            k=2 BIC=   91.62  β_C = 15.1, k_C = 0.001
+  A2780cis  imm_plus_chain2_loss k=3 BIC=   92.54  d_C^0 = 3.022e-15, β_C = 0.2763, k_C = 0.2026
+  A2780cis  comp_damage          k=3 BIC=   92.75  β_C = 28.1, δ_C = 0.05123, k_C = 0.001
+  A2780cis  imm_plus_comp1_loss  k=3 BIC=   95.42  d_C^0 = 1.886e-14, β_C = 15.1, k_C = 0.001
+  A2780cis  imm_loss             k=1 BIC=  105.65  β_C = 0.06792
+  A2780cis  imm_hill             k=2 BIC=  106.92  β_C = 3.044, h_C = 1.897
+  A2780cis  imm_damage           k=2 BIC=  108.07  β_C = 0.07958, δ_C = 0.5063
+Stage s2 shared structure: chain3_hill (joint BIC 151.41, k=6)
+
+=== Stage s3: 3 Ce0 + Ce1 coculture ===
+  coculture cc_K_alpha_deathN_beta k=6 BIC=  423.63  K = 4298.7, α_NC = 0.9627, α_CN = 1.399, d_N = 0.07599, β_N = 0.4958, β_C = 4.217
+  coculture cc_full              k=7 BIC=  423.33  K = 4600.8, α_NC = 0.9486, α_CN = 1.46, d_N = 0.1071, d_C = 0.02482, β_N = 0.5038, β_C = 4.217
+  coculture cc_K_alpha_beta      k=5 BIC=  433.11  K = 3881.6, α_NC = 1.148, α_CN = 1.185, β_N = 0.5475, β_C = 4.217
+  coculture cc_K_alpha_deathN_betaN k=5 BIC=  441.70  K = 4381.0, α_NC = 0.9701, α_CN = 1.394, d_N = 0.0736, β_N = 0.6077
+  coculture cc_K_alpha_betaN     k=4 BIC=  448.81  K = 3962.2, α_NC = 1.149, α_CN = 1.186, β_N = 0.6728
+  coculture cc_K_alpha           k=3 BIC=  484.21  K = 3980.1, α_NC = 1.092, α_CN = 1.172
+  coculture cc_K_alpha_death     k=5 BIC=  491.50  K = 4266.2, α_NC = 1.062, α_CN = 1.234, d_N = 0.0373, d_C = 0.02018
+  coculture cc_K                 k=1 BIC=  580.62  K = 3018.6
+
+=== Stage s3b: 3b Low-resource coculture ===
+  LR coculture lrcc_eps             k=2 BIC=  383.86  ε_N = 0.227, ε_C = 0.4412
+  LR coculture lrcc_K_alpha_eps     k=5 BIC=  392.26  K = 3992.9, α_NC = 2.601e-13, α_CN = 0.2225, ε_N = 8.729e-11, ε_C = 0.4917
+  LR coculture lrcc_K               k=1 BIC=  425.67  K = 5430.9
+  LR coculture lrcc_K_alphaCN       k=2 BIC=  429.82  K = 5406.5, α_CN = 5.118e-10
+  LR coculture lrcc_K_alpha         k=3 BIC=  434.88  K = 5406.5, α_NC = 9.907e-16, α_CN = 1.92e-11
+  LR coculture lrcc_K_alphaCN_noLR  k=2 BIC=  452.98  K = 2593.1, α_CN = 2.152
+  LR coculture lrcc_K_alpha_noLR    k=3 BIC=  458.04  K = 2593.1, α_NC = 2.83e-06, α_CN = 2.152
+
+=== Stage s4: 4 Low resource + cisplatin coculture ===
+  combination s4_eps               k=2 BIC=   50.95  ε_N^R = 9.354, ε_C^R = 0.3541
+  combination s4_chi               k=1 BIC=   73.41  χ = 3.273
+  combination s4_chi_lines         k=2 BIC=   73.43  χ_N = 10, χ_C = 0.07632
+  combination s4_reskill_chi       k=1 BIC=   75.96  χ = 2.882
+  combination s4_chi_K             k=2 BIC=   76.26  χ = 3.966, K = 5162.9
+  combination s4_K                 k=1 BIC=   87.09  K = 1969.7
+  combination s4_inherited         k=0 BIC=   99.75  
+  combination s4_inherited_3bcrowd k=0 BIC=   99.75  
+  combination s4_reskill           k=0 BIC=  100.03  
+  s1-a2780     optimal logistic                 k=2  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s1-a2780cis  optimal theta_logistic           k=3  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s1b-a2780    optimal lr_imm_capacity          k=1  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s1b-a2780cis optimal lr_imm_plus_chain3_loss  k=3  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s2-a2780     optimal chain3_hill              k=3  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s2-a2780cis  optimal chain3_hill              k=3  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s3           optimal cc_K_alpha_deathN_beta   k=6  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s3b          optimal lrcc_eps                 k=2  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  s4           optimal s4_eps                   k=2  chosen in   NaN% of replicates (lowest BIC in   NaN%)  [0s]
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+Fits that reached their time limit: 0 (the run is reproducible)
+Wrote outputs/sensitivity/V6_sd\report.html
+
+Done.

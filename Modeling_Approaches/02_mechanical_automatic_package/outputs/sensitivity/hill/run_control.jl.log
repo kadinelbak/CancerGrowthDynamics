@@ -1,0 +1,20 @@
+=== optimal control: 16 threads; Δ = 2.0 d, 7 decisions (14.0 days, fixed look-ahead 28 days, blocks [1, 1, 2, 2, 4, 4]); checkpoint has Symbol[] ===
+  lowres  B 25:75 done [27s]
+  lowres  B 50:50 done [27s]
+  lowres  B 75:25 done [28s]
+  normal  A 25:75 done [38s]
+  normal  A 50:50 done [41s]
+  normal  A 75:25 done [42s]
+  lowres  A 50:50 done [43s]
+  lowres  A 25:75 done [43s]
+  lowres  A 75:25 done [43s]
+  normal  B 25:75 done [43s]
+  normal  B 50:50 done [45s]
+  normal  B 75:25 done [49s]
+  sweeps done
+  robustness normal  A: 0 draws, 0 closed-loop
+  robustness normal  B: 0 draws, 0 closed-loop
+  robustness lowres  A: 0 draws, 0 closed-loop
+  robustness lowres  B: 0 draws, 0 closed-loop
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+Wrote outputs/sensitivity/hill\control\control_outcomes.csv

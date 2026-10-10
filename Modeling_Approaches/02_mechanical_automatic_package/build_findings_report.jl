@@ -94,7 +94,7 @@ function validation()
             "<p><b>Transferring the monoculture drug response makes the prediction worse than ignoring the drug</b> ($(f0(pr.rmse[1])) vs $(f0(rf.rmse[1])) cells$(nrow(df) == 1 && isfinite(df.diff_lo[1]) ? "; difference 95% CI $(f0(df.diff_lo[1])) to $(f0(df.diff_hi[1])) over the 6 trajectories" : "")): the monoculture kills, which include a kill of A2780cis, do not describe the treated cocultures, where the fitted model has none.</p>" :
             "<p>The transferred monoculture drug response improves on ignoring the drug ($(f0(pr.rmse[1])) vs $(f0(rf.rmse[1])) cells).</p>") : ""
         push!(parts, verdict)
-        push!(parts, "<h3>Held-out treated cocultures (Ce1) $(tip("Ce1 predicted from crowding fitted to the untreated cocultures and the monoculture kills, with no refit. Ce1 also informed the choice of weighting and drug model, so this is a selection metric rather than an independent test.", :none))</h3>" *
+        push!(parts, "<h3>Held-out treated cocultures (Ce1) $(tip("Ce1 predicted from crowding fitted to the untreated cocultures and the monoculture kills, with no refit.", :none; warn=:ce1_selection))</h3>" *
               table([th("Prediction", "What is compared.", :none), th("RMSE (cells)", "Root-mean-square error.", :lower), th("nRMSE", "RMSE ÷ mean of the held-out data.", :lower)], rows))
     end
     an = joinpath(OUTD, "zoo_analyses", "analyses_state.jls")
@@ -104,7 +104,7 @@ function validation()
         push!(parts, "<h3>Intermittent dosing (untouched validation) $(tip("Monocultures with the drug switched on or off at day 7, predicted from the Stage 1 + 2b model with no refit, the scale fixed at 1 and the nominal seeding. These data informed no modelling choice.", :none))</h3>" *
               table([th("Line", "Cell line.", :none), th("Schedule", "on0_off7: 1 µM for days 0–7; off0_on7: 1 µM from day 7.", :none),
                      th("RMSE (cells)", "Error of the no-refit prediction.", :lower), th("nRMSE", "RMSE ÷ mean of the data.", :lower)], rows) *
-              "<p>Washout test (a hypothesis test, not validation): equal build-up and fade rates are kept for $(join(["$L (ΔBIC $(@sprintf("%+.1f", I[L].bic_koff - I[L].bic_equal)) for a separate fade rate)" for L in sort(collect(keys(I)))], ", ")).</p>")
+              "<p>Washout test $(warn(:hypothesis_test)): equal build-up and fade rates are kept for $(join(["$L (ΔBIC $(@sprintf("%+.1f", I[L].bic_koff - I[L].bic_equal)) for a separate fade rate)" for L in sort(collect(keys(I)))], ", ")).</p>")
     end
     "<h2>Validation $(tip("How well the models predict data they were not fitted to.", :none))</h2>" * join(parts)
 end
@@ -130,7 +130,7 @@ function control()
     end
     c14 !== nothing && push!(out, block(c14, "14 days, dose only", "MPC, measured doses only"))
     cl !== nothing && push!(out, block(cl, "$LONG days, dose + fasting", "MPC, dose + fasting (measured levels)"))
-    "<h2>Optimal control against the best fixed policies $(tip("The controller minimises a weighted cost (total burden, resistant cells counted double, toxicity, dose, soft burden penalty), not the burden alone; a fixed schedule can beat it on one metric.", :none))</h2>" * join(out)
+    "<h2>Optimal control against the best fixed policies $(tip("The controller maximises the time to progression (N + C kept under 0.8 K) and prices the resistant cells it leaves, traded against toxicity, dose and a soft burden penalty, so a fixed schedule can beat it on a single end-of-run metric.", :none))</h2>" * join(out)
 end
 
 # ── 6. drug-response shape ────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ function register()
 end
 
 function limits()
-    """<h2>Limitations and the experiments that would resolve them $(tip("Read these before using any result.", :none))</h2><div class='intro'><ul>
+    """<h2>Limitations and the experiments that would resolve them $(tip("Every limitation in full; the ⚠ buttons in the chapters show the one that applies there.", :none))</h2><div class='intro'><ul>
 <li>One biological run per condition (two for low resource); residuals are correlated day to day (shared imaging artefacts), so intervals are conditional and probably too narrow.</li>
 <li>The treated cocultures informed the choice of weighting and drug model; the intermittent-dosing data are the only untouched validation set.</li>
 <li>The cocultures were treated at one dose only; the coculture dose response and the resistant kill in coculture rest on that single dose. <b>Experiment:</b> a coculture dose series (e.g. 0.25, 0.5, 2, 4 µM).</li>

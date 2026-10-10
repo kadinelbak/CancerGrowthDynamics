@@ -16,7 +16,7 @@ include(joinpath(PK, "run_zoo_fits.jl"))
 using Test, TOML
 ref = TOML.parsefile(REF)
 const RT = 1e-6
-close_to(a, b) = isapprox(a, b; rtol=RT, atol=1e-8)
+close_to(a, b) = isapprox(a, b; rtol=RT, atol=1e-8, nans=true)   # NaN = "not reached" (e.g. never progressed) matches NaN
 
 using CSV, DataFrames
 @testset "regression against the reference run" begin

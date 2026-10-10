@@ -1,0 +1,22 @@
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+ERROR: LoadError: No finite multistart fit completed
+Stacktrace:
+ [1] error(s::String)
+   @ Base .\error.jl:44
+ [2] run_joint_multistart(model::Function, dataset_specs::Vector{@NamedTuple{x::Vector{Float64}, y::Vector{Float64}, state_index::Int64}}, u0::Vector{Float64}, starts::Vector{Vector{Float64}}; refine_optimizer::Nothing, kwargs::@Kwargs{bounds::Vector{Tuple{Float64, Float64}}, optimizer::Symbol, maxiters::Int64, maxtime::Float64, reltol::Float64, abstol::Float64, initial_time::Float64})
+   @ GrowthParameterEstimation.Fitting C:\Users\elbak\.julia\packages\GrowthParameterEstimation\6Hky4\src\fitting.jl:1409
+ [3] run_joint_multistart
+   @ C:\Users\elbak\.julia\packages\GrowthParameterEstimation\6Hky4\src\fitting.jl:1363 [inlined]
+ [4] #gfit#186
+   @ C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package\zoo_heldout.jl:10 [inlined]
+ [5] heldout_ce1()
+   @ Main C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package\zoo_heldout.jl:45
+ [6] top-level scope
+   @ C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package\run_heldout.jl:14
+ [7] include(mod::Module, _path::String)
+   @ Base .\Base.jl:306
+ [8] exec_options(opts::Base.JLOptions)
+   @ Base .\client.jl:317
+ [9] _start()
+   @ Base .\client.jl:550
+in expression starting at C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package\run_heldout.jl:14

@@ -1,12 +1,17 @@
 # Minimal static HTML report writer (same spirit as the 02 reports: tables + figures).
 # Every table and figure carries an "i" tip that says how to read it and which direction is better
 # (the same component as 02_mechanical_automatic_package/info_tips.jl). `html_table` and `figure` require
-# `tip = (text, better)`, where better is :lower, :higher, :none (descriptive) or a phrase.
+# `tip = (text, better)`, where better is :lower, :higher, :none (descriptive) or a phrase; a third element
+# `(text, better, warning)` adds an amber ⚠ caveat button beside the i.
 
 const INFO_TIPS_HEAD = raw"""
 <style>
 .ii{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin:0 4px;padding:0;border-radius:50%;border:1.5px solid #176b87;background:#fff;color:#176b87;font:italic 700 11px/1 Georgia,serif;cursor:help;vertical-align:middle;flex:none}
 .ii:hover,.ii:focus-visible,.ii[aria-expanded=true]{background:#176b87;color:#fff;outline:none}
+#ii-pop.ww-pop{background:#3a2606;border-left:5px solid #f59e0b}
+.ww{display:inline-flex;align-items:center;justify-content:center;width:19px;height:17px;margin:0 4px 0 0;padding:0;border:1.5px solid #b45309;border-radius:4px;background:#fff6d9;color:#b45309;font:700 11px/1 system-ui,sans-serif;cursor:help;vertical-align:middle;flex:none}
+.ww:hover,.ww:focus-visible,.ww[aria-expanded=true]{background:#b45309;color:#fff;outline:none}
+.tipbtns{display:inline-flex;align-items:center;vertical-align:middle}.tipwrap>.tipbtns{position:absolute;top:8px;right:8px;z-index:2}
 #ii-pop{position:fixed;z-index:9999;max-width:min(400px,calc(100vw - 24px));background:#17212b;color:#f4f7f8;font:13px/1.45 system-ui,sans-serif;font-style:normal;font-weight:400;text-align:left;padding:10px 12px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none;white-space:normal}
 </style>
 <script>
@@ -15,8 +20,11 @@ const INFO_TIPS_HEAD = raw"""
   var pop = null, cur = null, pinned = false;
   function place(b) {
     if (!pop) { pop = document.createElement('div'); pop.id = 'ii-pop'; pop.setAttribute('role', 'tooltip'); document.body.appendChild(pop); }
-    pop.textContent = b.getAttribute('data-tip');
-    var bt = b.getAttribute('data-better');
+    var wt = b.getAttribute('data-warn');
+    pop.className = wt ? 'ww-pop' : '';
+    if (wt) { pop.textContent = ''; var hd = document.createElement('div'); hd.style.cssText = 'font-weight:700;color:#ffd479;margin-bottom:4px'; hd.textContent = '⚠ Caution'; pop.appendChild(hd); pop.appendChild(document.createTextNode(wt)); }
+    else pop.textContent = b.getAttribute('data-tip');
+    var bt = wt ? null : b.getAttribute('data-better');
     if (bt) { var d = document.createElement('div'); d.style.cssText = 'margin-top:6px;font-weight:700;color:#ffd479'; d.textContent = 'What is better: ' + bt; pop.appendChild(d); }
     pop.style.display = 'block';
     var r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
@@ -28,13 +36,13 @@ const INFO_TIPS_HEAD = raw"""
   }
   function hide() { if (pop) pop.style.display = 'none'; if (cur) cur.setAttribute('aria-expanded', 'false'); cur = null; pinned = false; }
   document.addEventListener('click', function (e) {
-    var b = e.target.closest ? e.target.closest('.ii') : null;
+    var b = e.target.closest ? e.target.closest('.ii, .ww') : null;
     if (b) { e.preventDefault(); e.stopPropagation(); if (cur === b && pinned) hide(); else { place(b); pinned = true; } }
     else if (!(pop && pop.contains(e.target))) hide();
   }, true);
-  document.addEventListener('mouseover', function (e) { var b = e.target.closest ? e.target.closest('.ii') : null; if (b && !pinned) place(b); });
-  document.addEventListener('mouseout', function (e) { var b = e.target.closest ? e.target.closest('.ii') : null; if (b && !pinned && !b.contains(e.relatedTarget)) hide(); });
-  document.addEventListener('focusin', function (e) { var b = e.target.closest ? e.target.closest('.ii') : null; if (b) place(b); });
+  document.addEventListener('mouseover', function (e) { var b = e.target.closest ? e.target.closest('.ii, .ww') : null; if (b && !pinned) place(b); });
+  document.addEventListener('mouseout', function (e) { var b = e.target.closest ? e.target.closest('.ii, .ww') : null; if (b && !pinned && !b.contains(e.relatedTarget)) hide(); });
+  document.addEventListener('focusin', function (e) { var b = e.target.closest ? e.target.closest('.ii, .ww') : null; if (b) place(b); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
   window.addEventListener('scroll', function () { if (!pinned) hide(); else if (cur) place(cur); }, true);
 })();
@@ -48,6 +56,11 @@ better_text(b::Symbol) = BETTER_TEXT[b]
 better_text(b::AbstractString) = b
 "The \"i\" button: `text` explains the item, `better` says which direction is better."
 tip(text, better) = "<button type=\"button\" class=\"ii\" aria-label=\"How to read this\" data-tip=\"$(tip_esc(text))\" data-better=\"$(tip_esc(better_text(better)))\">i</button>"
+"The amber ⚠ button next to the i: a caveat shown on click (the same component as info_tips.jl `warn`)."
+warn_btn(text::AbstractString) = "<button type=\"button\" class=\"ww\" aria-label=\"Caution\" data-warn=\"$(tip_esc(text))\">&#9888;</button>"
+warn_btn(ws::AbstractVector) = join(warn_btn.(ws))
+"Tip with a caveat: a 3-tuple `tip = (text, better, warning)` in `html_table` / `figure` adds the ⚠."
+tip(text, better, warning) = "<span class='tipbtns'>$(tip(text, better))$(warn_btn(warning))</span>"
 
 const OUT_ROOT = get(ENV, "NN_OUT", normpath(joinpath(@__DIR__, "..", "outputs")))
 outdir(stage) = mkpath(joinpath(OUT_ROOT, stage))

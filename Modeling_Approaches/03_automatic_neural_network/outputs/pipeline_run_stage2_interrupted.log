@@ -1,0 +1,26 @@
+start 2026-10-07T01:36:49 from step 3, 6 threads
+== scripts/run_03_ude.jl 2026-10-07T01:36:49
+[0.5 min] phase 1: 17 mechanistic fits
+[12.1 min] phase 2: 55 neural fits
+[25.2 min] done 4 pure neural ODE seed 4
+[26.0 min] done 1 UDE (NN kill) seed 3
+[26.9 min] done 3 UDE (NN kill) seed 2
+[34.9 min] done 2 pure neural ODE seed 5
+[35.5 min] done 1 pure neural ODE seed 1
+[38.0 min] done 4 pure neural ODE seed 5
+[40.0 min] done 1 UDE (NN kill) seed 4
+[41.0 min] done 3 UDE (NN kill) seed 3
+[42.9 min] done main UDE (NN kill + NN resource) seed 1
+[53.5 min] done 1 UDE (NN kill) seed 5
+[54.6 min] done main UDE (NN kill) seed 1
+[54.9 min] done 3 UDE (NN kill) seed 4
+[56.9 min] done 3 pure neural ODE seed 1
+[58.1 min] done 1 pure neural ODE seed 2
+[66.7 min] done 2 UDE (NN kill) seed 1
+[69.2 min] done 3 UDE (NN kill) seed 5
+[440.2 min] done main UDE (NN kill + NN resource) seed 2
+[441.0 min] done main UDE (NN kill) seed 2
+[482.0 min] done 4 UDE (NN kill) seed 1
+[486.1 min] done 2 UDE (NN kill) seed 2
+[490.8 min] done 4 UDE (NN kill) seed 2
+[491.4 min] done 3 pure neural ODE seed 2

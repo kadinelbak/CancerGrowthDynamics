@@ -674,13 +674,13 @@ const BETTER = Dict{String,Any}(
     "In-sample nRMSE" => :lower,
     "Ratio" => "Closer to 1 is better: unseen data are predicted about as well as the fitted data.")
 hcell(h::AbstractString) = "<th>$h</th>"
-hcell(h::Tuple) = "<th>$(h[1])$(tip(h[2], header_better(BETTER, h)))</th>"
+hcell(h::Tuple) = "<th>$(h[1])$(tip(h[2], header_better(BETTER, h); warn=length(h) > 3 ? h[4] : nothing))</th>"   # (label, text[, better[, warning]])
 table(head, rows) = "<div class='tscroll'><table><tr>" * join(hcell.(head)) * "</tr>" * join(rows) * "</table></div>"
 trow(cells; cls="") = "<tr$(isempty(cls) ? "" : " class='$cls'")>" * join(cells) * "</tr>"
 td(x) = "<td>$x</td>"; tn(x) = "<td class='num'>$x</td>"
 pct(v::Vector{Int}, j) = isempty(v) ? NaN : 100 * count(==(j), v) / length(v)
 pctfmt(x) = isfinite(x) ? @sprintf("%.0f%%", x) : "—"
-withtip(html, text, better) = "<div class='tipwrap'>$(tip(text, better))$html</div>"
+# withtip(html, text, better; warn=...) lives in info_tips.jl
 
 # shared tip texts
 const T_RMSE = "Root-mean-square error between prediction and data, in cells. Lower is better."
@@ -718,7 +718,7 @@ function write_bootstrap()
             lo, hi = c.bounds[i]
             atb = (isfinite(h) && hi - h < 1e-3 * (hi - lo)) || (isfinite(l) && l - lo < 1e-3 * (hi - lo))
             push!(prow, trow([td(pl(n)), tn(fmt(c.params[i])), tn(f3(m)), tn(isfinite(l) ? "$(fmt(l)) – $(fmt(h))" : "—"),
-                            tn(isfinite(pl2) ? "$(fmt(pl2)) – $(fmt(ph2))" : "—"), td(atb ? "<span class='flag'>block interval reaches a bound</span>" : "")]))
+                            tn(isfinite(pl2) ? "$(fmt(pl2)) – $(fmt(ph2))" : "—"), td(atb ? "<span class='flag'>reaches a bound</span> $(warn(:at_bound))" : "")]))
             push!(csvp, (group=g.id, model=c.name, param=n, estimate=c.params[i], block_median=m, block_lo=l, block_hi=h, iid_lo=pl2, iid_hi=ph2))
         end
         for j in eachindex(g.cands)
@@ -742,7 +742,7 @@ function write_bootstrap()
                    ("Estimate", "Value fitted to the real data."),
                    ("Block median", "Median of the values refitted to the bootstrap data sets."),
                    ("95% block bootstrap", "95% of the bootstrap refits fall in this range. Residuals are resampled in 3-day blocks, which keeps day-to-day correlation: this is the interval to use."),
-                   ("95% within-trajectory bootstrap (iid)", "Same idea, but each day's standardised residual (residual ÷ its weight scale) is resampled independently within its trajectory, the scheme of GrowthParameterEstimation.bootstrap_joint_fit, with the same residual weights as the fit. It ignores correlation between neighbouring days, so it is usually narrower (over-confident)."),
+                   ("95% within-trajectory bootstrap (iid)", "Same idea, but each day's standardised residual (residual ÷ its weight scale) is resampled independently within its trajectory, the scheme of GrowthParameterEstimation.bootstrap_joint_fit, with the same residual weights as the fit.", nothing, :bootstrap_narrow),
                    ("", "Flags an interval that runs into the search limit: the data do not bound the parameter on that side.", "Better: no flag, i.e. the data bound the parameter.")], prow) *
             "<p class='muted'>Residual lag-1 autocorrelation of the optimal fit: $(isempty(acf) ? "—" : join([@sprintf("%.2f", a) for a in acf], ", ")) (mean $(isempty(acf) ? "—" : @sprintf("%.2f", mean(acf))))$(tip("Correlation between each day's standardised fit error (residual ÷ its weight scale) and the next day's, one value per trajectory. 0 = independent errors; positive = errors come in runs, so treating days as independent overstates certainty. That is why whole 3-day blocks are resampled.", "Closer to 0 is better (independent errors).")). Positive values mean neighbouring days are correlated, which is why whole 3-day blocks of residuals are resampled.</p></section>")
     end
@@ -809,7 +809,7 @@ function write_sensitivity()
             push!(rows, trow([td(pl(s.param)), tn(fmt(s.value)), tn(@sprintf("%.2f", s.si)),
                             td(@sprintf("<svg viewBox='0 0 120 12' style='width:120px;margin:0'><rect width='%.1f' height='10' fill='#176b87'/></svg>", 120 * (isfinite(s.si) ? s.si : 0) / maxsi)),
                             tn(prange(p)), td(status),
-                            td(p.at_bound ? "<span class='flag'>at a search bound</span>" : p.near_bound ? "<span class='flag'>at the edge of its search range</span>" : "inside bounds")]))
+                            td(p.at_bound ? "<span class='flag'>at a search bound</span> $(warn(:at_bound))" : p.near_bound ? "<span class='flag'>at the edge of its search range</span> $(warn("Near its search limit: the limit may need widening, or the term may not be supported by the data."))" : "inside bounds")]))
         end
         thr = isempty(pr) ? NaN : pr[1].threshold
         plots = join([withtip(profile_svg("$(s.param)", p.profile, p.estimate, p.threshold), T_PROFILE, "Better: a deep, narrow valley, i.e. a well-determined parameter.")
@@ -861,12 +861,12 @@ function write_sensitivity()
 
     page("sensitivity", "Sensitivity analysis — compartment models", "sensitivity", """
 <div class='intro'><p>Three views of how the fitted models depend on their parameters:</p><ul>
-<li><b>Global sensitivity (Sobol indices)</b>: every parameter varied together, each drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, and the variance of an output split between parameters. This is the view that matters for optimal control: which uncertain parameters actually change the predicted outcome. Two caveats: correlations between parameters in the bootstrap are ignored, so combinations the data rule out are sampled too; and a parameter pinned at a bound (its interval collapses, so it is varied by only ±1%) or held fixed shows an index of about 0 by construction, not because it is unimportant.</li>
+<li><b>Global sensitivity (Sobol indices)</b>: every parameter varied together, each drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, and the variance of an output split between parameters. This is the view that matters for optimal control: which uncertain parameters actually change the predicted outcome. $(warn(["Correlations between parameters in the bootstrap are ignored, so combinations the data rule out are sampled too.", "A parameter pinned at a bound (its interval collapses, so it is varied by only ±1%) or held fixed shows an index of about 0 by construction, not because it is unimportant."]))</li>
 <li><b>Local sensitivity</b>: the index of <code>GrowthParameterEstimation.parameter_sensitivity_analysis</code>, each fitted parameter moved ±10% with the others held: \\(SI = \\max|\\Delta \\hat y| / \\max(\\hat y, 1) / 0.1\\) over every observed trajectory. (The package function handles one-state models, so the same formula is applied here to the multi-state compartment models.)</li>
 <li><b>Profile likelihood</b>: each parameter fixed at 0.5× to 2× its estimate and the others refitted with <code>run_joint_multistart</code> (3 starts, the same residual weights as the fit), to see whether the data pin it down. The profile is \\(d(\\theta) = n\\ln(SSE_w(\\theta)/SSE_{w,min})\\) and a value is inside the 95% range while \\(d\\) stays below the small-sample threshold \\(n\\ln(1 + F_{1,n-k;0.95}/(n-k))\\) ($(isempty(pr_all) ? "—" : @sprintf("%.2f–%.2f", extrema(p.threshold for p in pr_all)...)) for these fits, against 3.84 for large n); the range ends are interpolated between grid points. Estimates on a search bound are flagged and not profiled ($(nb == 0 ? "no estimate sits at or near a search limit" : "$(nb) estimate(s) sit at or near a search limit, $(nab) of them on it")).</li></ul>
 <p class='note'>$(nflat) of $(length(pr_all) - nab) profiled parameters are not pinned on both sides within 0.5–2× of their estimate$(nab > 0 ? "; $(nab) more sit on a search bound" : ""). $lead</p></div>
 
-<h2>Global sensitivity: the treated coculture, all parameters $(tip("The Stage 3 model of the 50:50 coculture at 1 µM cisplatin, started from the nominal seeding, with every free parameter of the carried Stage 3 model and every parameter it inherits unchanged from the carried Stage 1 and Stage 2 models varied together (the list is built from the current models). Each is drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, ignoring correlations; a parameter pinned at a bound or fixed shows ≈ 0 by construction. $(GSA_N) × (k + 2) model runs (Saltelli sampling). Outputs are the predicted counts on day 14.", :none))</h2>
+<h2>Global sensitivity: the treated coculture, all parameters $(tip("The Stage 3 model of the 50:50 coculture at 1 µM cisplatin, started from the nominal seeding, with every free parameter of the carried Stage 3 model and every parameter it inherits unchanged from the carried Stage 1 and Stage 2 models varied together (the list is built from the current models). Each is drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, $(GSA_N) × (k + 2) model runs (Saltelli sampling). Outputs are the predicted counts on day 14.", :none; warn=["Drawn independently: correlations between parameters are ignored.", "A parameter pinned at a bound or fixed shows ≈ 0 by construction."]))</h2>
 <div class='grid'>$fullcharts</div>
 <div class='grid'><div>$(table([("Parameter", "Every varied parameter of the treated-coculture model."), ("Range varied", "Uniform range used for the draws: the parameter's marginal 95% block-bootstrap percentile interval (±1% of the estimate if that interval collapses at a bound)."), ("Fitted in", "The stage whose data determine this parameter.")], rangerows))</div>
 <div>$(table([("Output", "What is predicted: day-14 counts in the 50:50 treated coculture."), ("Mean", "Average of the output across all parameter draws."), ("SD", "Standard deviation across the draws: how much the output varies over the plausible parameter ranges. Sobol indices split this variance.")], outstat))</div></div>
@@ -914,8 +914,8 @@ $(table([("Line", "Cell line."), ("Schedule", "The dose schedule of the trajecto
          ("Start (cells)", "Starting count at day 0 used for the prediction: the nominal seeding, not a fitted value."), ("Points", "Number of measurements scored."),
          ("RMSE (cells)", "Error of the no-refit prediction, in cells. " * T_RMSE), ("nRMSE", T_NRMSE)], prow))
 <div class='grid'>$(join(plots))</div>
-<h3>Washout hypothesis test (not a validation)</h3>
-<p>Separately, these data test the one untested assumption that matters for scheduling: after the drug is removed, the drug effect decays at the same rate \\(k\\) as it built up. A separate washout rate \\(k_{off}\\) of the first effect compartment while the dose is 0 is <i>fitted to these data</i> (one parameter, everything else fixed), so this part is a hypothesis test, not a validation. BICs use the weighted SSE with the same residual weights as the fits; the extra rate is kept only if it lowers the BIC by more than 3.</p>
+<h3>Washout hypothesis test $(warn(:hypothesis_test))</h3>
+<p>Separately, these data test the one untested assumption that matters for scheduling: after the drug is removed, the drug effect decays at the same rate \\(k\\) as it built up. A separate washout rate \\(k_{off}\\) of the first effect compartment while the dose is 0 is <i>fitted to these data</i> (one parameter, everything else fixed). BICs use the weighted SSE with the same residual weights as the fits; the extra rate is kept only if it lowers the BIC by more than 3.</p>
 $(table([("Line", "Cell line; each row uses both intermittent trajectories of that line."),
          ("BIC, equal rates", "BIC of the no-refit prediction (decay rate = build-up rate, the model as fitted; no free parameters)."),
          ("Best k_off (/day)", "Separate decay rate after the drug is removed that fits best."), ("BIC with k_off", "BIC with that one extra parameter."),
@@ -961,8 +961,7 @@ function write_validation()
 <li><b>Forecast.</b> Each fit is refitted to the first 70% of days (weighted) and predicts the remaining days.</li></ul>
 <p>Scores: RMSE in cells (raw, for interpretation); nRMSE = RMSE / mean of the held-out data; weighted RMSE = \\(\\sqrt{SSE_w/n}\\), the residuals divided by their weight scales as in the fits (no units; it weighs small and large counts the way the fits do). The ratio held-out / in-sample (raw RMSE) compares with the full fit on the same points (1 = no loss from holding the data out). Every refit stops on an iteration cap (no time limit), so the scores are reproducible.</p></div>
 $(intermittent_html())
-<h2>Held-out treated cocultures (Ce1)</h2>
-<p class='note'><b>Not a fully independent test.</b> The Ce1 cocultures were used when choosing the modelling setup: the residual weighting scheme and the drug model were compared partly on how well each variant predicted Ce1. The Ce1 data are not used in the fit that makes this prediction, but the score below is optimistic compared with data never looked at; the intermittent-dosing data above are the untouched validation set.</p>
+<h2>Held-out treated cocultures (Ce1) $(tip("The treated cocultures predicted with no refit from the untreated cocultures and the monoculture drug fits.", :none; warn=:ce1_selection))</h2>
 $(table([("Prediction", "First row: the test (crowding fitted without Ce1, drug from the monocultures, nominal Ce1 starting values). In-sample reference: the Stage 3 fit that saw Ce1, the best case. Untreated-growth reference: the same Ce0 fit with no drug term, which any useful drug model must beat."),
          ("Crowding fitted to Ce0", "Carrying capacity and crowding coefficients (and the sensitive death rate if the model has one) refitted to the untreated cocultures only, with the same residual weights as the carried fits."),
          ("RMSE (cells)", T_RMSE), ("nRMSE", T_NRMSE),

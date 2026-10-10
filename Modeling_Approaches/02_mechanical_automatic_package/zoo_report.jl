@@ -4,7 +4,7 @@
 
 hesc(s) = replace(string(s), "&" => "&amp;", "<" => "&lt;", ">" => "&gt;", "'" => "&#39;")
 include(joinpath(@__DIR__, "info_tips.jl"))   # tip(), INFO_TIPS_HEAD: the "i" buttons
-thtip(label, text, better) = "<th>$label$(tip(text, better))</th>"
+thtip(label, text, better; warn=nothing) = "<th>$label$(tip(text, better; warn=warn))</th>"
 const ZT_BIC = "Bayesian information criterion, n·ln(SSE/n) + k·ln(n): the fit error penalised for the number of parameters. Lower is better; differences under about 2 are negligible, above 10 decisive."
 const ZT_BAND = "Points: measured mean cells (grey × = excluded outlier; in cocultures solid/filled = untreated Ce0, dashed/open = treated Ce1). Line: the carried model fitted to the data. Shaded band: where 95% of the curves refitted to the bootstrap data sets lie, i.e. the uncertainty of the fitted curve."
 
@@ -103,7 +103,7 @@ function write_zoo_report(groups, results)
         ymax = g.kind == :s1b ? ceil(maximum(maximum(s.y) for s in series) * 1.2; sigdigits=2) : YMAX
         plots = join(["<div class='tipwrap'>$(tip(ZT_BAND, "Better: the line runs through the points and the shaded band is narrow."))" * zoo_band_svg(isempty(pt) ? "$(g.title): optimal fit" * (hasb ? " with 95% bootstrap band" : "") : pt,
                                    [s for s in series if s.panel == pn], ts, sol.u, band, tmax, ymax) * "</div>" for (pn, pt) in enumerate(panels)])
-        extra = g.kind == :s1b ? "<p class='muted'>Long-term check of the optimal model$(tip("The carried model simulated far beyond the experiment, to check it behaves sensibly, e.g. whether low resource alone would eventually kill the culture.", :none)): $(fmt(c.x30)) cells at day 30, $(fmt(c.x200)) at day 200 ($(c.extinct ? "dies out" : "does not die out")).</p>" : ""
+        extra = g.kind == :s1b ? "<p class='muted'>Long-term check of the optimal model$(tip("The carried model simulated to day 30 and day 200, to check it behaves sensibly, e.g. whether low resource alone would eventually kill the culture.", :none; warn="Far beyond the 14 days of data: a qualitative check of the equations, not a prediction.")): $(fmt(c.x30)) cells at day 30, $(fmt(c.x200)) at day 200 ($(c.extinct ? "dies out" : "does not die out")).</p>" : ""
         push!(sections, "<section class='panel' id='$(g.id)'><h3>$(hesc(g.title))</h3><p class='muted'>$(hesc(ZOO_GROUP_TEXT[g.kind]))</p>" *
               "<div class='tscroll'><table><tr>" * thtip("Candidate", "Every model fitted at this stage, with its equations. The highlighted row is the model carried forward.", :none) *
               thtip("Family", "The delay mechanism the model uses: immediate, effect compartment, transit compartments, second order, accumulation, or damaged cells.", :none) *
@@ -113,7 +113,7 @@ function write_zoo_report(groups, results)
               joint_html(g) * "<h4>Optimal model: $(hesc(c.label))$(tip("The carried model's equations. N, C: sensitive (A2780) and resistant (A2780cis) counts; V: viable, non-damaged cells; A or S: delay compartments driven by the dose D or the low-resource level u_R. Parameter values are in the table below.", :none))</h4>" * join(["<div class='eq'>\\[$t\\]</div>" for t in zoo_tex(g, c)]) *
               "<div class='tscroll'><table class='params'><tr>" * thtip("Parameter", "Parameters fitted at this stage. Rows under 'Carried over / fixed' come from earlier stages and are held at their values.", :none) *
               thtip("Estimate", "Value fitted to the data.", :none) *
-              thtip("±95% (asymptotic)", "1.96 × the standard error from the curvature of the fit. It assumes independent errors, so it is usually too narrow; prefer the bootstrap interval.", "Narrower is better: the parameter is more precisely determined.") *
+              thtip("±95% (asymptotic)", "1.96 × the standard error from the curvature of the fit.", "Narrower is better: the parameter is more precisely determined."; warn="It assumes independent errors, so it is usually too narrow; prefer the bootstrap interval.") *
               thtip("95% bootstrap interval", "95% of the values refitted to the block-bootstrap data sets fall in this range. Resampling 3-day blocks keeps day-to-day correlation.", "Narrower is better: the parameter is more precisely determined.") * "</tr>$ptrs" *
               (isempty(itrs) ? "" : "<tr><th colspan='4'>Carried over / fixed</th></tr>$itrs") * "</table></div>$extra$plots</section>")
     end

@@ -1,0 +1,3 @@
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+Stage 3a model cc_K_alpha_deathN_beta: held-out Ce1 RMSE 711.1 (nRMSE 0.606); in-sample 374.6; untreated reference 870.3
+Wrote outputs/sensitivity/V3_floor75\heldout_ce1.csv

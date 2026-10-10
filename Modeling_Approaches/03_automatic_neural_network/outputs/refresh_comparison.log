@@ -1,0 +1,61 @@
+  Activating project at `C:\Research\CancerGrowthDynamics\Modeling_Approaches\02_mechanical_automatic_package`
+held-out Ce1: 84 points, RMSE 1132.2; wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\scripts\..\outputs\comparison
+[ Info: matched fits: no drug, Hill, closed form
+[ Info: matched fits: UDE and pure neural ODE, 5 seeds each
+┌ Info: matched fits done
+└   minutes = 6.9
+6×13 DataFrame
+ Row │ model                              kind                    parameters  seeds  rmse_cells  rmse_cells_per_seed  nrmse     log_rmse  log_rmse_per_seed  d_rmse_vs_best  d_rmse_ci95   d_logrmse_vs_best  d_logrmse_ci95
+     │ String                             String                  String      Int64  Float64     String               Float64   Float64   String             Float64         String        Float64            String
+─────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ mechanistic zoo (carried model)    mechanistic (zoo)       14              1    1132.18   —                    0.903719  1.46859   —                         620.959  [+467, +749]           1.12067   [+0.756, +1.400]
+   2 │ Hill kill (NN track, mechanistic)  mechanistic (NN track)  13              1     653.652  654                  0.521752  0.667355  0.667                     142.429  [+108, +200]           0.319432  [+0.117, +0.514]
+   3 │ closed form (NN track, mechanist…  mechanistic (NN track)  12              1     633.352  633                  0.505547  0.637159  0.637                     122.128  [+78, +191]            0.289236  [+0.081, +0.478]
+   4 │ UDE (NN kill)                      neural                  121             5     640.051  640 ± 4              0.510895  0.63689   0.638 ± 0.051             128.828  [+75, +200]            0.288967  [+0.081, +0.472]
+   5 │ pure neural ODE (autonomous)       neural                  131             5     511.223  530 ± 23             0.408063  0.347923  0.377 ± 0.034               0.0    best                   0.0       best
+   6 │ no drug (reference)                reference               7               1    1002.15   1002                 0.799925  0.777289  0.777                     490.926  [+62, +774]            0.429366  [+0.115, +0.682]
+6×8 DataFrame
+ Row │ traj_id           mean_obs  mechanistic zoo (carried model)  Hill kill (NN track, mechanistic)  closed form (NN track, mechanistic)  UDE (NN kill)  pure neural ODE (autonomous)  no drug (reference)
+     │ String            Float64   Float64                          Float64                            Float64                              Float64        Float64                       Float64
+─────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ ce1_25S75R_30k_R  2137.85                          1550.34                             880.597                              843.217        838.75                        783.355             1751.06
+   2 │ ce1_25S75R_30k_S   568.624                          585.436                            477.243                              482.847        481.177                       290.089              566.101
+   3 │ ce1_50S50R_30k_R  1413.1                           1110.54                             668.41                               586.208        576.642                       514.214             1312.76
+   4 │ ce1_50S50R_30k_S  1025.59                           983.573                            600.307                              630.106        646.316                       371.056              267.863
+   5 │ ce1_75S25R_30k_R   800.671                          713.775                            487.942                              414.191        383.244                       266.006              823.389
+   6 │ ce1_75S25R_30k_S  1571.0                           1494.84                             717.725                              741.903        791.103                       630.429              407.53
+8×6 DataFrame
+ Row │ model                              training                           rmse_cells  rmse_cells_per_seed  nrmse     log_rmse
+     │ String                             String                             Float64     String               Float64   Float64
+─────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ Hill kill (NN track, mechanistic)  full NN-track set (20k + 30k, in…     605.385  605                  0.483224  0.47887
+   2 │ Hill kill (NN track, mechanistic)  matched (zoo's 30k monocultures …     653.652  654                  0.521752  0.667355
+   3 │ closed form (NN track, mechanist…  full NN-track set (20k + 30k, in…     576.681  577                  0.460312  0.427281
+   4 │ closed form (NN track, mechanist…  matched (zoo's 30k monocultures …     633.352  633                  0.505547  0.637159
+   5 │ UDE (NN kill)                      full NN-track set (20k + 30k, in…     597.085  597 ± 5              0.476599  0.418239
+   6 │ UDE (NN kill)                      matched (zoo's 30k monocultures …     640.051  640 ± 4              0.510895  0.63689
+   7 │ pure neural ODE (autonomous)       full NN-track set (20k + 30k, in…     602.051  605 ± 46             0.480563  0.615042
+   8 │ pure neural ODE (autonomous)       matched (zoo's 30k monocultures …     511.223  530 ± 23             0.408063  0.347923
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\comparison\report.html in 7.2 min
+8×10 DataFrame
+ Row │ test                               why_it_matters                     metric        best_neural                   neural      neural_sd   best_mechanistic                   mechanistic  difference    winner
+     │ String                             String                             String        String                        Float64     Float64     String                             Float64      Float64       String
+─────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ Next-day prediction, held-out tr…  short-term forecasting             log RMSE      pure neural ODE                 0.224547  0.0         Hill (mechanistic)                    0.250144    0.025597    neural
+   2 │ Forward prediction, held-out ce1…  out-of-sample test on the NN tra…  log RMSE      UDE (NN kill)                   0.389658  0.00324618  closed form (optimal)                 0.394439    0.00478123  tie
+   3 │ Hold-out: hold out on→off interm…  unseen schedule: drug first, the…  log RMSE      pure neural ODE                 0.19677   0.0169473   Hill (mechanistic)                    0.234797    0.0380277   neural
+   4 │ Hold-out: hold out off→on interm…  unseen schedule: drug added late   log RMSE      pure neural ODE                 0.355508  0.0585242   Hill (mechanistic)                    0.385334    0.0298251   tie
+   5 │ Hold-out: hold out 1 uM monocult…  unseen dose (interpolation)        log RMSE      UDE (NN kill)                   0.216987  0.00305003  no drug                               0.20338    -0.0136071   tie
+   6 │ Hold-out: hold out all 20k wells   unseen seeding density             log RMSE      UDE (NN kill)                   0.436885  0.00206209  Hill (mechanistic)                    0.438652    0.00176716  tie
+   7 │ Stage 6 three-way: held-out 30k …  same points, same training data,…  RMSE (cells)  pure neural ODE (autonomous)  511.223     0.0         closed form (NN track, mechanist…   633.352     122.128       neural
+   8 │ Stage 6 three-way: held-out 30k …  same points, same training data,…  log RMSE      pure neural ODE (autonomous)    0.347923  0.0         closed form (NN track, mechanist…     0.637159    0.289236    neural
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\verdict\report.html
+published data
+published nextday
+published ude
+published symbolic
+published importance
+published control
+published comparison
+published learning_curve
+published verdict

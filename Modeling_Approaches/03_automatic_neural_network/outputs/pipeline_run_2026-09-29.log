@@ -1,0 +1,276 @@
+┌ Info: next-day model done
+└   name = "zero (no change)"
+┌ Info: next-day model done
+└   name = "persistence"
+┌ Info: next-day model done
+└   name = "ridge"
+┌ Info: next-day model done
+└   name = "boosted trees"
+┌ Info: next-day model done
+└   name = "MLP ensemble"
+10×5 DataFrame
+ Row │ model             split                  rmse      mae       n
+     │ String            String                 Float64   Float64   Int64
+─────┼────────────────────────────────────────────────────────────────────
+   1 │ zero (no change)  train (LOWO CV)        0.421749  0.327667    528
+   2 │ zero (no change)  validation_treated_co  0.376831  0.32956     128
+   3 │ persistence       train (LOWO CV)        0.373539  0.276168    528
+   4 │ persistence       validation_treated_co  0.390977  0.300867    128
+   5 │ ridge             train (LOWO CV)        0.298599  0.228789    528
+   6 │ ridge             validation_treated_co  0.354122  0.276637    128
+   7 │ boosted trees     train (LOWO CV)        0.222731  0.158729    528
+   8 │ boosted trees     validation_treated_co  0.244907  0.19539     128
+   9 │ MLP ensemble      train (LOWO CV)        0.190879  0.127503    528
+  10 │ MLP ensemble      validation_treated_co  0.294239  0.231976    128
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\nextday\report.html
+[ Info: fitting no-drug and Hill ensembles
+[ Info: fitting NN (UDE) ensemble
+[ Info: fitting pure neural ODE
+┌ Info: competition
+│   Dict((k => (v[1]).a for (k, v) = models)) =
+│    Dict{String, Vector{Float64}} with 4 entries:
+│      "UDE (NN kill)"      => [1.0957, 1.19017, 0.0469375, 0.271396]
+│      "pure neural ODE"    => [1.0, 1.0, 1.0, 1.0]
+│      "no drug"            => [0.0132475, 1.62697, 0.0245132, 0.445891]
+└      "Hill (mechanistic)" => [0.892067, 1.24705, 0.0490747, 0.298089]
+12×5 DataFrame
+ Row │ model               set                                forward_rmse  nextday_rmse  n
+     │ String              String                             Float64       Float64       Int64
+─────┼──────────────────────────────────────────────────────────────────────────────────────────
+   1 │ UDE (NN kill)       train: drug units                      0.204445      0.163972    352
+   2 │ UDE (NN kill)       train: untreated co-culture            0.562455      0.285549    324
+   3 │ UDE (NN kill)       VALIDATION: ce1 treated co-cultu…      0.331243      0.24357     151
+   4 │ pure neural ODE     train: drug units                      0.159933      0.141146    352
+   5 │ pure neural ODE     train: untreated co-culture            0.601821      0.296763    324
+   6 │ pure neural ODE     VALIDATION: ce1 treated co-cultu…      0.368086      0.238576    151
+   7 │ no drug             train: drug units                      0.585575      0.316721    352
+   8 │ no drug             train: untreated co-culture            0.617579      0.351098    324
+   9 │ no drug             VALIDATION: ce1 treated co-cultu…      0.829362      0.276968    151
+  10 │ Hill (mechanistic)  train: drug units                      0.223767      0.168926    352
+  11 │ Hill (mechanistic)  train: untreated co-culture            0.7336        0.294784    324
+  12 │ Hill (mechanistic)  VALIDATION: ce1 treated co-cultu…      0.35281       0.243216    151
+16×4 DataFrame
+ Row │ fold                          model               rmse      n
+     │ String                        String              Float64   Int64
+─────┼───────────────────────────────────────────────────────────────────
+   1 │ hold out on→off intermittent  no drug             0.29883      50
+   2 │ hold out on→off intermittent  Hill (mechanistic)  0.15749      50
+   3 │ hold out on→off intermittent  UDE (NN kill)       0.175432     50
+   4 │ hold out on→off intermittent  pure neural ODE     0.192761     50
+   5 │ hold out off→on intermittent  no drug             0.478656     52
+   6 │ hold out off→on intermittent  Hill (mechanistic)  0.292195     52
+   7 │ hold out off→on intermittent  UDE (NN kill)       0.225975     52
+   8 │ hold out off→on intermittent  pure neural ODE     0.191064     52
+   9 │ hold out 1 uM monoculture     no drug             0.74968      52
+  10 │ hold out 1 uM monoculture     Hill (mechanistic)  0.170845     52
+  11 │ hold out 1 uM monoculture     UDE (NN kill)       0.281006     52
+  12 │ hold out 1 uM monoculture     pure neural ODE     0.687475     52
+  13 │ hold out all 20k wells        no drug             0.627305    176
+  14 │ hold out all 20k wells        Hill (mechanistic)  0.235192    176
+  15 │ hold out all 20k wells        UDE (NN kill)       0.262951    176
+  16 │ hold out all 20k wells        pure neural ODE     0.245124    176
+4×4 DataFrame
+ Row │ model               kill_params  weighted_sse  bic
+     │ String              Int64        Float64       Float64
+─────┼─────────────────────────────────────────────────────────
+   1 │ no drug                       0      3696.92   3773.15
+   2 │ Hill (mechanistic)            5       224.775   330.321
+   3 │ UDE (NN kill)               113       191.592   930.409
+   4 │ pure neural ODE             129       174.925  1007.56
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\ude\report.html
+┌ Info: screened
+│   rs.formula = "1.5·H(v; 1.5, 2)"
+│   rr.formula = "0"
+└   screen.bic_drug[end] = 518.3807531598793
+┌ Info: screened
+│   rs.formula = "1.5·H(v; 1.5, 2)"
+│   rr.formula = "0.0945·v²"
+└   screen.bic_drug[end] = 477.4095335211798
+┌ Info: screened
+│   rs.formula = "1.5·H(v; 1.5, 2)"
+│   rr.formula = "0.0554·v³ + 0.0608·v·ρ"
+└   screen.bic_drug[end] = 484.2101165201276
+┌ Info: screened
+│   rs.formula = "1.5·H(v; 1.5, 2)"
+│   rr.formula = "0.0652·v³ + 0.149·v·ρ + -0.0967·v²·ρ"
+└   screen.bic_drug[end] = 472.5536865156482
+┌ Info: screened
+│   rs.formula = "0.75·v + -0.6·v·ρ"
+│   rr.formula = "0"
+└   screen.bic_drug[end] = 362.44124889836746
+┌ Info: screened
+│   rs.formula = "0.75·v + -0.6·v·ρ"
+│   rr.formula = "0.0945·v²"
+└   screen.bic_drug[end] = 316.4893955009289
+┌ Info: screened
+│   rs.formula = "0.75·v + -0.6·v·ρ"
+│   rr.formula = "0.0554·v³ + 0.0608·v·ρ"
+└   screen.bic_drug[end] = 321.11299579975076
+┌ Info: screened
+│   rs.formula = "0.75·v + -0.6·v·ρ"
+│   rr.formula = "0.0652·v³ + 0.149·v·ρ + -0.0967·v²·ρ"
+└   screen.bic_drug[end] = 319.37460896549635
+┌ Info: screened
+│   rs.formula = "0.457·v + 0.218·v³ + -0.531·v²·ρ"
+│   rr.formula = "0"
+└   screen.bic_drug[end] = 345.8663888140024
+┌ Info: screened
+│   rs.formula = "0.457·v + 0.218·v³ + -0.531·v²·ρ"
+│   rr.formula = "0.0945·v²"
+└   screen.bic_drug[end] = 299.2942337664596
+┌ Info: screened
+│   rs.formula = "0.457·v + 0.218·v³ + -0.531·v²·ρ"
+│   rr.formula = "0.0554·v³ + 0.0608·v·ρ"
+└   screen.bic_drug[end] = 303.40639882298797
+┌ Info: screened
+│   rs.formula = "0.457·v + 0.218·v³ + -0.531·v²·ρ"
+│   rr.formula = "0.0652·v³ + 0.149·v·ρ + -0.0967·v²·ρ"
+└   screen.bic_drug[end] = 305.5011161723339
+12×4 DataFrame
+ Row │ kill_S                            kill_R                             kill_params  bic_drug
+     │ String                            String                             Int64        Float64
+─────┼────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ 0.457·v + 0.218·v³ + -0.531·v²·ρ  0.0945·v²                                    4   299.294
+   2 │ 0.457·v + 0.218·v³ + -0.531·v²·ρ  0.0554·v³ + 0.0608·v·ρ                       5   303.406
+   3 │ 0.457·v + 0.218·v³ + -0.531·v²·ρ  0.0652·v³ + 0.149·v·ρ + -0.0967·…            6   305.501
+   4 │ 0.75·v + -0.6·v·ρ                 0.0945·v²                                    3   316.489
+   5 │ 0.75·v + -0.6·v·ρ                 0.0652·v³ + 0.149·v·ρ + -0.0967·…            5   319.375
+   6 │ 0.75·v + -0.6·v·ρ                 0.0554·v³ + 0.0608·v·ρ                       4   321.113
+   7 │ 0.457·v + 0.218·v³ + -0.531·v²·ρ  0                                            3   345.866
+   8 │ 0.75·v + -0.6·v·ρ                 0                                            2   362.441
+   9 │ 1.5·H(v; 1.5, 2)                  0.0652·v³ + 0.149·v·ρ + -0.0967·…            4   472.554
+  10 │ 1.5·H(v; 1.5, 2)                  0.0945·v²                                    2   477.41
+  11 │ 1.5·H(v; 1.5, 2)                  0.0554·v³ + 0.0608·v·ρ                       3   484.21
+  12 │ 1.5·H(v; 1.5, 2)                  0                                            1   518.381
+5×3 DataFrame
+ Row │ model                  kill_params  bic_drug
+     │ String                 Int64        Float64
+─────┼──────────────────────────────────────────────
+   1 │ closed form (optimal)            4   299.292
+   2 │ Hill (mechanistic)               5   330.321
+   3 │ UDE (NN kill)                  113   930.409
+   4 │ pure neural ODE                129  1007.56
+   5 │ no drug                          0  3773.15
+3×4 DataFrame
+ Row │ model                  train: drug units  train: untreated co-culture  VALIDATION: ce1 treated co-culture
+     │ String                 Float64?           Float64?                     Float64?
+─────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ closed form (optimal)           0.208394                     0.597589                            0.352368
+   2 │ UDE (NN kill)                   0.204445                     0.562455                            0.331243
+   3 │ Hill (mechanistic)              0.223767                     0.7336                              0.35281
+4×6 DataFrame
+ Row │ line    term    estimate   lo          hi         includes_zero
+     │ String  String  Float64    Float64     Float64    Bool
+─────┼─────────────────────────────────────────────────────────────────
+   1 │ S       v        0.41123    0.395501    0.483607          false
+   2 │ S       v³       0.220825   0.204816    0.221922          false
+   3 │ S       v²·ρ    -0.503154  -0.593522   -0.446918          false
+   4 │ R       v²       0.104195   0.0869221   0.110038          false
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\symbolic\report.html
+┌ Info: ablation
+│   name = "full"
+└   sse = 193.49523630122343
+┌ Info: ablation
+│   name = "without density ρ"
+└   sse = 205.34944357194644
+┌ Info: ablation
+│   name = "without line"
+└   sse = 250.40204453126603
+13×6 DataFrame
+ Row │ feature       trees_train  trees_validation  mlp_train    mlp_validation  trees_mean_abs_shap
+     │ String        Float64      Float64           Float64      Float64         Float64
+─────┼───────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ dprev         0.129052          0.05459      0.101478        0.051913             0.113902
+   2 │ log_well      0.100826          0.104256     0.0689009       0.00331214           0.0652859
+   3 │ logN          0.0452406         0.0122805    0.0552891       0.00753695           0.0562985
+   4 │ day           0.0485318         0.0163338    0.0888745       0.0161721            0.0547967
+   5 │ low_resource  0.0242087         0.0          0.243769        0.0                  0.0428401
+   6 │ since_switch  0.00930775        0.00601807   0.0248306      -0.00363347           0.01654
+   7 │ line_R        0.00851237       -0.0011021    0.148955       -0.0259849            0.0145803
+   8 │ dose          0.00409704        0.0          0.0150406       0.0                  0.0098753
+   9 │ s_frac        0.00265839        0.000216093  0.0829983      -0.00198302           0.00967116
+  10 │ exposure      0.00392873        1.55048e-6   0.0238159      -0.00911429           0.00963258
+  11 │ cumdose       0.000198842       0.000171416  0.00774183     -0.00150129           0.000722898
+  12 │ seeding       1.03761e-5       -2.24908e-5   0.000897092    -0.000211643          0.00042207
+  13 │ coculture     0.000122393       0.0          0.0096703       0.0                  0.000252312
+3×3 DataFrame
+ Row │ input          mean       sd
+     │ String         Float64    Float64
+─────┼─────────────────────────────────────
+   1 │ exposure v     0.12975    0.0170017
+   2 │ density ρ      0.0836469  0.0322543
+   3 │ line (S vs R)  0.249406   0.0359918
+3×4 DataFrame
+ Row │ variant            weighted_sse  val_treated_co_rmse  delta_sse
+     │ String             Float64       Float64              Float64
+─────┼─────────────────────────────────────────────────────────────────
+   1 │ full                    193.495             0.406616     0.0
+   2 │ without density ρ       205.349             0.421556    11.8542
+   3 │ without line            250.402             0.390938    56.9068
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\importance\report.html
+┌ Info: optimising
+│   sc.name = "A2780 monoculture"
+└   sname = "bounds [0.62, 1.47] (as OptimalControlOne)"
+┌ Info: optimising
+│   sc.name = "A2780 monoculture"
+└   sname = "bounds [0, 1.47] (drug holidays allowed)"
+┌ Info: optimising
+│   sc.name = "50:50 co-culture"
+└   sname = "bounds [0.62, 1.47] (as OptimalControlOne)"
+┌ Info: optimising
+│   sc.name = "50:50 co-culture"
+└   sname = "bounds [0, 1.47] (drug holidays allowed)"
+┌ Info: optimising
+│   sc.name = "25S:75R co-culture"
+└   sname = "bounds [0.62, 1.47] (as OptimalControlOne)"
+┌ Info: optimising
+│   sc.name = "25S:75R co-culture"
+└   sname = "bounds [0, 1.47] (drug holidays allowed)"
+6×5 DataFrame
+ Row │ scenario            setting                            gradient_obj  bbo_obj  max_dose_diff
+     │ String              String                             Float64       Float64  Float64
+─────┼─────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…       7.11291  7.21668       0.743553
+   2 │ A2780 monoculture   bounds [0, 1.47] (drug holidays …       6.47913  6.82059       1.44633
+   3 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…       7.92575  7.94034       0.132019
+   4 │ 50:50 co-culture    bounds [0, 1.47] (drug holidays …       7.835    7.87163       0.987509
+   5 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…       7.98717  8.00311       0.569236
+   6 │ 25S:75R co-culture  bounds [0, 1.47] (drug holidays …       7.93346  7.95838       0.682312
+33×11 DataFrame
+ Row │ scenario            setting                            schedule                           mean_dose  total_closed  total_closed_sd  R_frac_closed  total_ude  total_hill  support                            rel_to_constant
+     │ String              String                             String                             Float64    Float64       Float64          Float64        Float64    Float64     String                             Float64
+─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  OPTIMAL (closed form)               1.0          1205.19           46.9741      2.51002e-7  1100.21     1030.49    2 dose changes (training has ≤ 1)        0.62611
+   2 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  optimal under UDE                   1.0          1205.19           46.9741      2.51002e-7  1100.21     1030.49    2 dose changes (training has ≤ 1)        0.62611
+   3 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  constant 1 uM                       1.0          1924.88           39.9732      1.40118e-7  1844.53     1788.06    within training support                  1.0
+   4 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  front-loaded (max first)            1.0          1736.12           67.5842      4.90856e-7  1595.66     2087.67    within training support                  0.901937
+   5 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  back-loaded (max last)              1.0          1812.81           94.959       5.84773e-8  1902.08     1310.23    within training support                  0.941777
+   6 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  1 uM on d0-6, off after (as data)   0.538462     3422.22           47.5087      4.09032e-8  3306.36     3660.77    within training support                  1.77789
+   7 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  off d0-6, 1 uM after (as data)      0.461538     3055.79           24.3073      4.26083e-9  3188.45     2878.45    within training support                  1.58752
+   8 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  constant 1.47 uM                    1.47           33.1216          3.94499     5.90575e-5    41.8072     63.5264  within training support                  0.0172071
+   9 │ A2780 monoculture   bounds [0.62, 1.47] (as OptimalC…  no drug                             0.0          3949.38           42.01        1.98917e-9  3912.14     3862.63    within training support                  2.05175
+  10 │ A2780 monoculture   bounds [0, 1.47] (drug holidays …  OPTIMAL (closed form)               1.0           626.491          51.5634      4.34989e-6   651.293    1056.02    2 dose changes (training has ≤ 1)        0.32547
+  11 │ A2780 monoculture   bounds [0, 1.47] (drug holidays …  optimal under UDE                   1.0           700.347          30.9919      6.23869e-7   651.581     601.421   3 dose changes (training has ≤ 1)        0.363839
+  12 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  OPTIMAL (closed form)               1.0          2747.56           40.5707      0.856369    2854.52     2566.33    within training support                  0.881432
+  13 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  optimal under UDE                   1.0          2748.26           39.8432      0.852525    2854.5      2547.35    within training support                  0.881657
+  14 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  constant 1 uM                       1.0          3117.15           43.5482      0.908415    3157.4      3083.85    within training support                  1.0
+  15 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  front-loaded (max first)            1.0          3296.15           52.237       0.949338    3292.14     3339.79    within training support                  1.05742
+  16 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  back-loaded (max last)              1.0          2893.1            38.2626      0.862698    2966.43     2759.16    within training support                  0.928124
+  17 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  1 uM on d0-6, off after (as data)   0.538462     3540.61           59.0483      0.873028    3532.41     3590.68    within training support                  1.13585
+  18 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  off d0-6, 1 uM after (as data)      0.461538     3038.34           24.0554      0.50136     3079.5      3063.41    within training support                  0.974716
+  19 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  constant 1.47 uM                    1.47         2691.36           72.7959      0.990883    2703.48     2647.33    within training support                  0.863403
+  20 │ 50:50 co-culture    bounds [0.62, 1.47] (as OptimalC…  no drug                             0.0          3648.5            24.4103      0.316127    3671.31     3637.4     within training support                  1.17046
+  21 │ 50:50 co-culture    bounds [0, 1.47] (drug holidays …  OPTIMAL (closed form)               1.0          2499.87           56.1539      0.82864     2518.78     2559.94    2 dose changes (training has ≤ 1)        0.801974
+  22 │ 50:50 co-culture    bounds [0, 1.47] (drug holidays …  optimal under UDE                   1.0          2499.87           56.1539      0.82864     2518.78     2559.94    2 dose changes (training has ≤ 1)        0.801974
+  23 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  OPTIMAL (closed form)               1.0          2917.83           51.0777      0.948676    3111.25     2837.48    within training support                  0.910193
+  24 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  optimal under UDE                   1.0          2919.21           50.6931      0.947603    3110.74     2829.71    within training support                  0.910624
+  25 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  constant 1 uM                       1.0          3205.72           52.6623      0.966014    3295.14     3223.14    within training support                  1.0
+  26 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  front-loaded (max first)            1.0          3349.4            58.0737      0.980088    3376.59     3410.44    within training support                  1.04482
+  27 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  back-loaded (max last)              1.0          3032.93           49.7967      0.950669    3181.75     2987.05    within training support                  0.946097
+  28 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  1 uM on d0-6, off after (as data)   0.538462     3617.94           71.6228      0.956031    3626.92     3648.16    within training support                  1.12859
+  29 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  off d0-6, 1 uM after (as data)      0.461538     3237.19           44.1878      0.817845    3229.76     3270.28    within training support                  1.00981
+  30 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  constant 1.47 uM                    1.47         2727.31           71.8599      0.995637    2931.75     2681.89    within training support                  0.850763
+  31 │ 25S:75R co-culture  bounds [0.62, 1.47] (as OptimalC…  no drug                             0.0          3583.89           47.2508      0.695851    3653.29     3628.27    within training support                  1.11797
+  32 │ 25S:75R co-culture  bounds [0, 1.47] (drug holidays …  OPTIMAL (closed form)               1.0          2760.46           58.287       0.933874    2931.29     2763.62    2 dose changes (training has ≤ 1)        0.861103
+  33 │ 25S:75R co-culture  bounds [0, 1.47] (drug holidays …  optimal under UDE                   1.0          2760.46           58.287       0.933874    2931.29     2763.62    2 dose changes (training has ≤ 1)        0.861103
+wrote C:\Research\CancerGrowthDynamics\Modeling_Approaches\03_automatic_neural_network\outputs\control\report.html

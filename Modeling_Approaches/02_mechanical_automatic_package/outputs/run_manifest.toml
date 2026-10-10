@@ -1,8 +1,8 @@
-steps_requested = ["final"]
-continued_from = "2026-10-07T23:10:43.514"
-threads = 20
-finished = "2026-10-07T23:11:23.527"
-started = "2026-10-07T23:11:17.725"
+steps_requested = ["tests"]
+continued_from = "2026-10-09T19:14:52.572"
+threads = 16
+finished = "2026-10-10T15:40:24.214"
+started = "2026-10-10T15:29:59.666"
 resume = false
 time_limit_hits = 0
 julia = "1.12.7"
@@ -40,10 +40,10 @@ finished = "2026-10-07T18:35:36.882"
 [steps.findings]
 log = "outputs/logs/findings.log"
 ok = true
-commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
 uncommitted_changes = true
-seconds = 30.8
-finished = "2026-10-07T23:11:16.195"
+seconds = 38.8
+finished = "2026-10-09T16:53:06.631"
 
     [steps.findings.env]
 
@@ -60,20 +60,20 @@ finished = "2026-10-07T23:11:22.508"
 [steps.report_long]
 log = "outputs/logs/report_long.log"
 ok = true
-commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
 uncommitted_changes = true
-seconds = 38.8
-finished = "2026-10-07T23:10:41.999"
+seconds = 50.2
+finished = "2026-10-09T16:52:27.745"
 
     [steps.report_long.env]
 
 [steps.control_long]
 log = "outputs/logs/control_long.log"
 ok = true
-commit = "a323f3a55bf0442eab9ff7686a1249d9345b6f2d"
+commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
 uncommitted_changes = true
-seconds = 7048.5
-finished = "2026-10-07T21:04:06.576"
+seconds = 14822.9
+finished = "2026-10-09T16:51:37.476"
 
     [steps.control_long.env]
     REDO = "1"
@@ -92,20 +92,20 @@ finished = "2026-10-07T18:44:24.192"
 [steps.report14]
 log = "outputs/logs/report14.log"
 ok = true
-commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
 uncommitted_changes = true
-seconds = 37.2
-finished = "2026-10-07T23:09:59.862"
+seconds = 55.2
+finished = "2026-10-09T12:44:34.516"
 
     [steps.report14.env]
 
 [steps.control14]
 log = "outputs/logs/control14.log"
 ok = true
-commit = "a323f3a55bf0442eab9ff7686a1249d9345b6f2d"
+commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
 uncommitted_changes = true
-seconds = 757.2
-finished = "2026-10-07T19:05:52.385"
+seconds = 4870.8
+finished = "2026-10-09T12:43:38.060"
 
     [steps.control14.env]
     REDO = "1"
@@ -113,10 +113,10 @@ finished = "2026-10-07T19:05:52.385"
 [steps.tests]
 log = "outputs/logs/tests.log"
 ok = true
-commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
 uncommitted_changes = true
-seconds = 577.2
-finished = "2026-10-07T21:35:37.499"
+seconds = 621.4
+finished = "2026-10-10T15:40:23.038"
 
     [steps.tests.env]
 
@@ -152,5 +152,5 @@ version = "0.4.1"
 
 [git]
 branch = "reproducible-pipeline"
-commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
 uncommitted_changes = true
