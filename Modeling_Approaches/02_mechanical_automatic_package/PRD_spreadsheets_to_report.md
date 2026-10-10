@@ -14,6 +14,19 @@
 >    results are in this folder".
 > 6. **The A2780 study keeps its own configuration and publish step** (§9). The generic pipeline must never
 >    change its numbers or its website.
+> 7. **The generic pipeline is a personal project for other people to use, made outside the research lab.**
+>    It must be separable from the lab's study:
+>    - **Separate code.** Put the generic code (`cgd.jl`, the tagging, reader, validator, stage-plan, report and
+>      control code it needs) in a self-contained folder, `study_pipeline/`, that could become its own repository
+>      without edits.
+>    - **One-way dependency.** The A2780 study in this repo uses that folder. The folder never depends on the
+>      A2780 study.
+>    - **No lab data shipped.** The demo study and all test fixtures are **synthetic**. Lab spreadsheets (A2780,
+>      TykNu) are used only in tests that run inside this repo, and are skipped if the files are absent.
+>    - **No lab specifics.** No lab names, branding or A2780-specific text in the generic code, templates or
+>      report.
+>    - **Add a LICENSE file** to `study_pipeline/` (owner to choose; default MIT) and a README written for a
+>      first-time user.
 
 ---
 
