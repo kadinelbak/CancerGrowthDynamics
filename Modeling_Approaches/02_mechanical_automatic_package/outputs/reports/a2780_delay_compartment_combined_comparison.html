@@ -49,7 +49,7 @@
       <h2>Stage 1: Untreated Monoculture Growth</h2>
       <p><strong>Question:</strong> how does each cell line grow when it is alone and untreated?</p>
       <p><strong>Inherited object:</strong> each lineage gets its own growth law, written as <code>G_N</code> for A2780Naive and <code>G_C</code> for A2780cis.</p>
-      <p><strong>Math text:</strong> <code class="eqg-text">G_i(X) = r_i * X * [1 - (X / K_i)^theta_i]</code></p>
+      <p><strong>Math text:</strong> <code>G_i(X) = r_i * X * [1 - (X / K_i)^theta_i]</code></p>
       <p><strong>Meaning:</strong> <code>r_i</code> controls early growth, <code>K_i</code> is the carrying capacity, and <code>theta_i</code> controls how sharply growth slows as the population approaches carrying capacity.</p>
     </section>
 
@@ -57,7 +57,7 @@
       <h2>Stage 2: Treated Monoculture Timing</h2>
       <p><strong>Question:</strong> does cisplatin killing act immediately, gradually, after an onset, or through a visible-damage delay?</p>
       <p><strong>Inherited object:</strong> the drug-response strength <code>H_i(z)</code> and time-activation term <code>A_i(t)</code>.</p>
-      <p><strong>Math text:</strong> <code class="eqg-text">dX/dt = G_i(X) - A_i(t) * H_i(z) * X</code></p>
+      <p><strong>Math text:</strong> <code>dX/dt = G_i(X) - A_i(t) * H_i(z) * X</code></p>
       <p><strong>Meaning:</strong> <code>H_i(z)</code> is the dose effect, while <code>A_i(t)</code> lets the effect turn on over time. A rising <code>A_i(t)</code> can produce early growth followed by later decline without adding a new visible compartment.</p>
     </section>
 
@@ -65,10 +65,10 @@
       <h2>Stage 3: Untreated Coculture Competition</h2>
       <p><strong>Question:</strong> how do Naive and cis cells alter each other's growth when mixed without drug?</p>
       <p><strong>Inherited object:</strong> effective-load variables and competition coefficients.</p>
-      <p><strong>Math text:</strong> <code class="eqg-text">L_N = N + alpha_NC * C</code></p>
-      <p><strong>Math text:</strong> <code class="eqg-text">L_C = C + alpha_CN * N</code></p>
-      <p><strong>Math text:</strong> <code class="eqg-text">dN/dt = G_N(N, L_N) - d_N * N</code></p>
-      <p><strong>Math text:</strong> <code class="eqg-text">dC/dt = G_C(C, L_C) - d_C * C</code></p>
+      <p><strong>Math text:</strong> <code>L_N = N + alpha_NC * C</code></p>
+      <p><strong>Math text:</strong> <code>L_C = C + alpha_CN * N</code></p>
+      <p><strong>Math text:</strong> <code>dN/dt = G_N(N, L_N) - d_N * N</code></p>
+      <p><strong>Math text:</strong> <code>dC/dt = G_C(C, L_C) - d_C * C</code></p>
       <p><strong>Meaning:</strong> each lineage grows according to its own Stage-1 growth law, but growth is limited by effective coculture load. If cis cells decline, <code>L_N</code> falls and Naive cells can experience less competition.</p>
     </section>
 
@@ -76,8 +76,8 @@
       <h2>Stage 4A: Time-Delay-Only Treated Coculture Candidate</h2>
       <p><strong>Question:</strong> can inherited growth, inherited competition, and a time-delayed drug effect explain the treated coculture data without a damaged-visible compartment?</p>
       <p><strong>Best candidate here:</strong> <code>dual_delayed_ramp_kill | partial_5pct</code>.</p>
-      <p><strong>Math text:</strong> <code class="eqg-text">dN/dt = G_N(N, L_N) - A_N(t) * H_N(z) * N</code></p>
-      <p><strong>Math text:</strong> <code class="eqg-text">dC/dt = G_C(C, L_C) - A_C(t) * H_C(z) * C</code></p>
+      <p><strong>Math text:</strong> <code>dN/dt = G_N(N, L_N) - A_N(t) * H_N(z) * N</code></p>
+      <p><strong>Math text:</strong> <code>dC/dt = G_C(C, L_C) - A_C(t) * H_C(z) * C</code></p>
       <p><strong>Meaning:</strong> the only special treated behavior is that drug killing is time-activated. The visible population is still modeled directly, so the hump must come from growth winning early and drug effect winning later.</p>
     </section>
 
@@ -85,10 +85,10 @@
       <h2>Stage 4B: Transit / Compartment Treated Coculture Candidate</h2>
       <p><strong>Question:</strong> does the data prefer a visible-damage compartment, where cells are injured before disappearing from the measured population?</p>
       <p><strong>Best candidate here:</strong> <code>dual_transit_load_scaled | shared</code>.</p>
-      <p><strong>Math text:</strong> <code class="eqg-text">dP_i/dt = G_i_co(P_i) - M_i * A_i(t) * H_i(z) * P_i</code></p>
-      <p><strong>Math text:</strong> <code class="eqg-text">dD_i/dt = M_i * A_i(t) * H_i(z) * P_i - k_clear_i * D_i</code></p>
-      <p><strong>Math text:</strong> <code class="eqg-text">observed_i = P_i + D_i</code></p>
-      <p><strong>Math text:</strong> <code class="eqg-text">M_i = exp(beta_i * L_i / K_i)</code></p>
+      <p><strong>Math text:</strong> <code>dP_i/dt = G_i_co(P_i) - M_i * A_i(t) * H_i(z) * P_i</code></p>
+      <p><strong>Math text:</strong> <code>dD_i/dt = M_i * A_i(t) * H_i(z) * P_i - k_clear_i * D_i</code></p>
+      <p><strong>Math text:</strong> <code>observed_i = P_i + D_i</code></p>
+      <p><strong>Math text:</strong> <code>M_i = exp(beta_i * L_i / K_i)</code></p>
       <p><strong>Meaning:</strong> cells can stop proliferating or become drug-damaged before they are cleared from the measurement. The observed hump can therefore reflect delayed disappearance, not just delayed death onset.</p>
     </section>
 
@@ -124,7 +124,7 @@
   <h2>Best Time-Delay-Only Candidate</h2>
   <p><strong>Model:</strong> <code>dual_delayed_ramp_kill</code> | <strong>Pooling:</strong> <code>partial_5pct</code></p>
   <p><strong>Mechanism:</strong> Delayed ramp kill: drug pressure turns on over time, without adding a damaged-visible compartment.</p>
-  <p><strong>Math text:</strong> <code class="eqg-text">dX/dt = G_co(X) - A(t) * H(z) * X</code></p>
+  <p><strong>Math text:</strong> <code>dX/dt = G_co(X) - A(t) * H(z) * X</code></p>
   <figure>
     <img src="../images/coculture_treated/figures/delay_compartment_comparison/time_delay_grid.png" alt="Best Time-Delay-Only Candidate overlay grid">
     <figcaption>Observed data are red for Naive/sensitive component and blue for cis/resistant component. The model fit is darkorange; solid line is Naive/sensitive, dashed line is cis/resistant.</figcaption>
@@ -135,7 +135,7 @@
   <h2>Best Transit / Compartment Candidate</h2>
   <p><strong>Model:</strong> <code>dual_transit_load_scaled</code> | <strong>Pooling:</strong> <code>shared</code></p>
   <p><strong>Mechanism:</strong> Transit damage with load scaling: cells move through a damaged-visible state before clearance, and drug damage is scaled by effective load.</p>
-  <p><strong>Math text:</strong> <code class="eqg-text">dP/dt = G_co(P) - M * A(t) * H(z) * P;  dD/dt = M * A(t) * H(z) * P - k_clear * D</code></p>
+  <p><strong>Math text:</strong> <code>dP/dt = G_co(P) - M * A(t) * H(z) * P;  dD/dt = M * A(t) * H(z) * P - k_clear * D</code></p>
   <figure>
     <img src="../images/coculture_treated/figures/delay_compartment_comparison/compartment_grid.png" alt="Best Transit / Compartment Candidate overlay grid">
     <figcaption>Observed data are red for Naive/sensitive component and blue for cis/resistant component. The model fit is purple; solid line is Naive/sensitive, dashed line is cis/resistant.</figcaption>
