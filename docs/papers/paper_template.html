@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}} · Papers</title>
+  <link rel="stylesheet" href="../assets/paper-reader.css">
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+      options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'button'] },
+      chtml: { scale: 1.0 }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <script defer src="../assets/paper-glossary.js"></script>
+  <script defer src="equation-notes.js"></script>
+  <script defer src="../assets/paper-widgets.js"></script>
+  <script defer src="../assets/paper-reader.js"></script>
+</head>
+<body>
+  <div class="progress" aria-hidden="true"><div class="progress-fill"></div></div>
+  <nav class="site-tabs" aria-label="Site">
+    <a class="site-name" href="../../index.html">Cancer Growth Dynamics</a>
+    <a href="../../index.html">Reports</a>
+    <a href="../index.html" aria-current="page">Papers</a>
+  </nav>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" aria-label="Reader tools">
+      <div class="side-tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-pane="toc">Contents</button>
+        <button role="tab" aria-selected="false" data-pane="eqs">Equations</button>
+        <button role="tab" aria-selected="false" data-pane="terms">Glossary</button>
+      </div>
+      <div class="side-pane" id="pane-toc" role="tabpanel"><ol class="toc"></ol></div>
+      <div class="side-pane" id="pane-eqs" role="tabpanel" hidden>
+        <p class="side-hint">Every equation in the draft. Click one to jump to it with its explanation open.</p>
+        <ol class="eq-list"></ol>
+      </div>
+      <div class="side-pane" id="pane-terms" role="tabpanel" hidden>
+        <input class="term-search" type="search" placeholder="Search terms and symbols" aria-label="Search glossary">
+        <dl class="term-list"></dl>
+      </div>
+      <div class="side-foot">
+        <div class="where"><span class="where-section">Start</span><span class="where-time"></span></div>
+      </div>
+    </aside>
+
+    <main class="paper" id="paper">
+      <header class="hero">
+        <p class="kicker">Working draft · Honors thesis</p>
+        <h1 class="hero-title">{{TITLE}}</h1>
+        <p class="hero-sub">{{SUBTITLE}}</p>
+        <div class="hero-meta">
+          <span>Built {{BUILT}} from <i>{{SOURCE}}</i></span>
+          <span class="read-time"></span>
+        </div>
+        <div class="status-bar" aria-label="Draft status of the sections"></div>
+        <details class="how-to">
+          <summary>How to read this page</summary>
+          <ul>
+            <li>The text below is the draft exactly as written; some sections are still outlines or marked <span class="status status-pending">Pending</span>.</li>
+            <li>Press the <span class="eq-info demo" aria-hidden="true">i</span> beside any equation for a plain-language walk through it: what it says, what every symbol means, and where it sits in the A2780 / A2780cis model. Some explanations include a small interactive plot.</li>
+            <li>Words with a dotted underline have a definition; hover or tap them. Citations show the full reference the same way.</li>
+            <li>Use the sidebar to jump between sections, equations and the glossary. Keys: <kbd>[</kbd> and <kbd>]</kbd> move between sections, <kbd>/</kbd> searches the glossary, <kbd>Esc</kbd> closes pop-ups.</li>
+          </ul>
+        </details>
+      </header>
+
+      <article class="doc">
+{{BODY}}
+      </article>
+      <footer class="paper-foot">
+        <p>Research artifact, not a clinical decision tool. Equation explanations and the glossary are reader aids written for this page; they are not part of the draft.</p>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toolbar" role="toolbar" aria-label="Reading controls">
+    <button type="button" class="tb-menu" aria-controls="sidebar" aria-expanded="false" title="Contents">☰</button>
+    <button type="button" class="tb-prev" title="Previous section ( [ )">‹</button>
+    <button type="button" class="tb-next" title="Next section ( ] )">›</button>
+    <button type="button" class="tb-smaller" title="Smaller text">A−</button>
+    <button type="button" class="tb-larger" title="Larger text">A+</button>
+    <button type="button" class="tb-notes" aria-pressed="false" title="Open every equation explanation">All notes</button>
+    <button type="button" class="tb-top" title="Back to top">↑</button>
+  </div>
+
+  <div class="tip" role="tooltip" hidden></div>
+  <div class="lightbox" hidden><img alt=""><button type="button" aria-label="Close">×</button></div>
+</body>
+</html>

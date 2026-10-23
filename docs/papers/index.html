@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Papers · Cancer Growth Dynamics</title>
+  <link rel="stylesheet" href="assets/paper-reader.css">
+  <style>
+    main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 60px; }
+    h1 { margin: 14px 0 8px; font-size: 34px; }
+    .note { color: var(--muted); max-width: 820px; margin: 8px 0; }
+    .paper-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      margin-top: 22px;
+    }
+    .tag { color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+    .paper-card h2 { margin: 6px 0 4px; font-size: 24px; }
+    .paper-card .sub { color: var(--muted); margin: 0 0 12px; }
+    .paper-card ul { margin: 8px 0; padding-left: 20px; }
+    .paper-card li { margin: 4px 0; }
+    a.button {
+      display: inline-block;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-weight: 700;
+      margin-top: 12px;
+    }
+    .paper-card img { width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+    @media (max-width: 900px) {
+      .paper-card { grid-template-columns: 1fr; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="site-tabs" aria-label="Site">
+    <a class="site-name" href="../index.html">Cancer Growth Dynamics</a>
+    <a href="../index.html">Reports</a>
+    <a href="index.html" aria-current="page">Papers</a>
+  </nav>
+  <main>
+    <h1>Papers</h1>
+    <p class="note">Manuscript drafts, shown as written, with a reader built around them: every equation has an explanation behind its <b>i</b> button, key terms have definitions, and a sidebar tracks where you are. Drafts are works in progress, and some sections are still outlines.</p>
+
+    <article class="paper-card">
+      <div>
+        <span class="tag">Working draft · Honors thesis</span>
+        <h2>From Culture to Control</h2>
+        <p class="sub">Staged mechanistic modeling and optimal dosing of cisplatin-sensitive and -resistant ovarian cancer cells, and a transportability study between stages.</p>
+        <ul>
+          <li>A2780 / A2780cis growth, low resource, cisplatin and coculture, fitted stage by stage from a model zoo</li>
+          <li>Qualification: bootstrap, sensitivity, profile likelihood, Sobol indices and held-out validation</li>
+          <li>Model predictive control of the cisplatin schedule, with fasting as a second control</li>
+          <li>46 numbered equations, each with a plain-language explanation; interactive plots for growth laws, drug delays, the Hill kill, coculture dosing, BIC, barriers and fasting</li>
+        </ul>
+        <a class="button" href="from-culture-to-control/index.html">Read the paper</a>
+      </div>
+      <a href="from-culture-to-control/index.html#fig-2-3"><img src="from-culture-to-control/figure-2-3-pipeline.png" alt="Pipeline from raw images to dosing schedules in nine steps"></a>
+    </article>
+    <p class="note" style="margin-top:22px">Research artifacts, not clinical decision tools.</p>
+  </main>
+</body>
+</html>

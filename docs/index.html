@@ -87,6 +87,33 @@
       gap: 6px 16px;
     }
     .older a { color: var(--muted); }
+    .site-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 4px;
+      padding: 0 20px;
+      height: 50px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+    .site-tabs a {
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 15px;
+      border-bottom: 3px solid transparent;
+    }
+    .site-tabs a:hover { color: var(--ink); }
+    .site-tabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+    .site-tabs .site-name { color: var(--ink); padding-left: 0; margin-right: 12px; font-size: 16px; }
+    @media (max-width: 900px) {
+      .site-tabs .site-name { display: none; }
+    }
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
       h1 { font-size: 28px; }
@@ -94,6 +121,11 @@
   </style>
 </head>
 <body>
+  <nav class="site-tabs" aria-label="Site">
+    <a class="site-name" href="index.html">Cancer Growth Dynamics</a>
+    <a href="index.html" aria-current="page">Reports</a>
+    <a href="papers/index.html">Papers</a>
+  </nav>
   <header>
     <h1>Cancer Growth Dynamics Reports</h1>
     <p class="note">Shareable A2780 modeling reports and interactive simulation tools for lab review. These pages are research artifacts, not clinical decision tools.</p>
