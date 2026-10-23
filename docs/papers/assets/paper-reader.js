@@ -13,8 +13,24 @@
     get(key) { try { return localStorage.getItem(`paper:${key}`); } catch { return null; } },
     set(key, value) { try { localStorage.setItem(`paper:${key}`, value); } catch { /* private mode */ } },
   };
+  // Shrink any formula wider than the space it sits in, so every symbol stays visible without scrollbars.
+  function fitMath(root = document) {
+    root.querySelectorAll('mjx-container').forEach((c) => {
+      c.style.fontSize = '';
+      const math = c.firstElementChild;
+      if (!math) return;
+      const display = c.getAttribute('display') === 'true';
+      const host = display ? c.parentElement : c.closest('p, li, td, th, dd, dt, h5, .tip, .readout, figcaption') || c.parentElement;
+      let avail = host.clientWidth - (display ? 0 : 4);
+      if (host.tagName === 'DT') avail = Math.max(120, (host.closest('.note')?.clientWidth || 600) * 0.45);
+      const width = math.getBoundingClientRect().width;
+      if (avail > 0 && width > avail) c.style.fontSize = `${Math.max(30, Math.floor((avail / width) * 98))}%`;
+    });
+  }
   const typeset = (nodes) => {
-    if (window.MathJax?.typesetPromise) return MathJax.typesetPromise(nodes).catch(() => {});
+    if (window.MathJax?.typesetPromise) {
+      return MathJax.typesetPromise(nodes).then(() => nodes.forEach((n) => fitMath(n))).catch(() => {});
+    }
     return Promise.resolve();
   };
   const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -492,6 +508,13 @@
 
   // ---------- Start ----------
   onScroll();
+  const whenTypeset = () => (window.MathJax?.startup?.promise
+    ? MathJax.startup.promise.then(() => fitMath(document))
+    : setTimeout(whenTypeset, 200));
+  whenTypeset();
+  let fitTimer;
+  addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => fitMath(document), 150); });
+  [$('.tb-smaller'), $('.tb-larger')].forEach((b) => b.addEventListener('click', () => setTimeout(() => fitMath(document), 50)));
   const hashKey = location.hash.startsWith('#eq-') && eqTargets.find((t) => `#${t.el.id}` === location.hash);
   if (hashKey) setTimeout(() => goToEquation(hashKey.key), 300);
 })();

@@ -219,15 +219,10 @@ kbd {
 .eq:hover, .eq.open { background: var(--panel); border-left-color: var(--accent); }
 .eq.flash { animation: flash 1.6s ease-out; }
 @keyframes flash { from { background: #fff3c4; } to { background: var(--panel); } }
-.eq-body { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
-.eq-body mjx-container[display="true"] { margin: .4em 0 !important; }
-.doc mjx-container:not([display="true"]), .note mjx-container:not([display="true"]) {
-  display: inline-block;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  vertical-align: middle;
-}
+.eq-body { min-width: 0; padding: 4px 0; }
+.eq-body mjx-container[display="true"] { margin: .4em 0 !important; overflow: visible !important; }
+/* Math is never clipped or scrolled; paper-reader.js shrinks any formula wider than its line. */
+.doc mjx-container, .note mjx-container, .tip mjx-container { overflow: visible !important; max-width: none; }
 .eq-side { display: flex; align-items: center; gap: 8px; font-family: Arial, Helvetica, sans-serif; }
 .eq-num { color: var(--muted); text-decoration: none; font-size: 15px; white-space: nowrap; }
 .eq-num:hover { color: var(--accent); }
@@ -375,6 +370,10 @@ a.cite:hover { color: var(--accent); }
   .site-tabs .site-name { display: none; }
   .note .terms { grid-template-columns: 1fr; }
   .note .terms dt { text-align: left; margin-top: 6px; }
+}
+@media (max-width: 600px) {
+  .eq { grid-template-columns: 1fr; gap: 0; padding: 6px 8px; }
+  .eq-side { justify-content: flex-end; }
 }
 @media print {
   .site-tabs, .sidebar, .toolbar, .progress, .eq-info, .how-to { display: none !important; }
