@@ -1,3 +1,5 @@
+include("site_copy.jl")
+
 @testset "Low-resource modeling plan report contract" begin
     package_root = normpath(joinpath(@__DIR__, ".."))
     report_path = joinpath(package_root, "outputs", "reports", "a2780_low_resource_modeling_plan.html")
@@ -10,7 +12,7 @@
         matched = match(Regex("<section id=\"" * id * "\">([\\s\\S]*?)</section>"), report)
         matched === nothing ? "" : matched.captures[1]
     end
-    @test report == read(docs_report_path, String)
+    @test strip_site_chrome(report) == strip_site_chrome(read(docs_report_path, String))
     @test occursin("A2780 Low-Resource Modeling Plan", report)
     @test occursin("Untreated Monoculture", report)
     @test occursin("Treated Monoculture", report)
