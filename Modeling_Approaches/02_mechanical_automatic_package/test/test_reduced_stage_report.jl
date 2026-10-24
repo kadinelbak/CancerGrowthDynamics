@@ -1,3 +1,5 @@
+include("site_copy.jl")
+
 @testset "Reduced-stage comparison report contract" begin
     package_root = normpath(joinpath(@__DIR__, ".."))
     report_path = joinpath(package_root, "outputs", "reports", "a2780_reduced_stage_comparison.html")
@@ -6,7 +8,7 @@
     @test isfile(report_path)
     @test isfile(docs_report_path)
     report = read(report_path, String)
-    @test report == read(docs_report_path, String)
+    @test strip_site_chrome(report) == strip_site_chrome(read(docs_report_path, String))
     @test occursin("Reduced-stage treated coculture comparison", report)
     @test occursin("Stage 1 &rarr; Stage 3 &rarr; Stage 4", report)
     @test occursin("Stage 1 &rarr; Stage 2 &rarr; Stage 4", report)
