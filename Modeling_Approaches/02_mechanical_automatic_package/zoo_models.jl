@@ -31,16 +31,19 @@
 #   :resource  R consumed at c·E·R·X/1000 (R(0) = 1); growth × R, death β(1 − R)
 #   :toxin     W made at E·X/1000, cleared at κ; death γ·W
 
-const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d, :EC50)
+const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d, :EC50, :λ)
 # EC50 has no default: every line sets its own (a Hill line without one is an error, see build_system)
 const SLOT_DEFAULT = (r=NaN, K=NaN, θ=1.0, k=1.0, ω=1.0, ζ=1.0, β=0.0, h=1.0, δ=1.0, d0=0.0, c=0.0, ρr=1.0, ρK=1.0,
-                      rLR=NaN, γ=0.0, κ=0.0, τ=1.0, ε=1.0, d=0.0, EC50=NaN)
+                      rLR=NaN, γ=0.0, κ=0.0, τ=1.0, ε=1.0, d=0.0, EC50=NaN, λ=1.0)
 
 struct Slot
     i::Int        # index into the parameter vector, 0 = fixed
     v::Float64    # fixed value
 end
 @inline sv(s::Slot, p, ::Type{T}) where {T} = s.i > 0 ? T(p[s.i]) : T(s.v)
+# coculture multiplier of the kill strength (Stage 3a: β_C,co = λ_C·β_C, β_C from Stage 2b); 1 elsewhere and
+# for lines saved before the slot existed (2026-10-23)
+@inline λ_of(s, p, ::Type{T}) where {T} = hasproperty(s, :λ) ? sv(s.λ, p, T) : one(T)
 # EC50 of a module; lines saved before EC50 became a per-line slot (2026-10-02) used EC50 = 1 µM
 @inline ec50_of(s, p, ::Type{T}) where {T} = hasproperty(s, :EC50) ? sv(s.EC50, p, T) : T(EC50)
 
@@ -142,6 +145,7 @@ function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}; ks=one(T)) whe
     s = M.s; z = zero(T)
     nc = ncell(M.action); nk = nker(M.kernel)
     w = w * sv(s.ε, p, T)
+    βe = sv(s.β, p, T) * λ_of(s, p, T)          # kill strength (× coculture multiplier λ)
     ko = o + nc
     E = w
     if M.kernel == :comp1
@@ -164,17 +168,17 @@ function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}; ks=one(T)) whe
     reff, Keff, loss, out = r, K, z, z
     a = M.action
     if a == :loss
-        loss += sv(s.d0, p, T)*w + sv(s.β, p, T)*E
+        loss += sv(s.d0, p, T)*w + βe*E
     elseif a == :hill
         h = sv(s.h, p, T)
         ec = ec50_of(s, p, T)
-        loss += E > 0 ? sv(s.β, p, T) * E^h / (ec^h + E^h) : z
+        loss += E > 0 ? βe * E^h / (ec^h + E^h) : z
     elseif a == :damage
         δ = sv(s.δ, p, T); Dm = max(u[o+1], z)
-        du[o+1] = ks*sv(s.β, p, T)*E*V - δ*Dm; out = δ*Dm
+        du[o+1] = ks*βe*E*V - δ*Dm; out = δ*Dm
     elseif a == :transit
         τ = sv(s.τ, p, T); D1 = max(u[o+1], z); D2 = max(u[o+2], z)
-        du[o+1] = ks*sv(s.β, p, T)*E*V - τ*D1; du[o+2] = τ*(D1 - D2); out = τ*D2
+        du[o+1] = ks*βe*E*V - τ*D1; du[o+2] = τ*(D1 - D2); out = τ*D2
     elseif a == :capacity
         Keff = K / (1 + sv(s.c, p, T)*E)
     elseif a == :fade
@@ -185,7 +189,7 @@ function module_effect!(du, u, o, M, p, w, X, V, r, K, ::Type{T}; ks=one(T)) whe
         reff = r + (sv(s.rLR, p, T) - r)*w/U_R
     elseif a == :resource
         R = max(u[ao+1], z)
-        du[ao+1] = -sv(s.c, p, T)*E*R*X/1000; reff = r*R; loss += sv(s.β, p, T)*(1 - R)
+        du[ao+1] = -sv(s.c, p, T)*E*R*X/1000; reff = r*R; loss += βe*(1 - R)
     elseif a == :toxin
         W = max(u[ao+1], z)
         du[ao+1] = E*X/1000 - sv(s.κ, p, T)*W; loss += sv(s.γ, p, T)*W
@@ -323,11 +327,14 @@ isoff(s::Slot) = s.i == 0 && s.v == 0
 # (each a string starting with "-"), and extra state equations. V: symbol of viable cells.
 function module_tex(M, X, V)
     # a mechanism whose input or strength is fixed at 0 is written as plain growth
-    if isoff(M.s.ε) || (M.action in (:loss, :hill, :damage, :transit) && isoff(M.s.β) && isoff(M.s.d0))
+    if isoff(M.s.ε) || (M.action in (:loss, :hill, :damage, :transit) && (isoff(M.s.β) || (hasproperty(M.s, :λ) && isoff(M.s.λ))) && isoff(M.s.d0))
         M = merge(M, (kernel=:none, action=:none))
     end
     input = M.input; combo = M.s.d0.i > 0 || M.s.d0.v != 0
     nm(k) = ptex(slot_name(k, X, input; combo=combo))
+    # kill strength, with the coculture multiplier λ_X when it is not 1 (Stage 3a: β_X,co = λ_X β_X)
+    λs = hasproperty(M.s, :λ) ? M.s.λ : Slot(0, 1.0)
+    kb = λs.i == 0 && λs.v == 1 ? nm(:β) : "\\lambda_{$X}\\,$(nm(:β))"
     w = input == :D ? "D" : "u_R"
     M.s.ε.i > 0 && (w = "$(nm(:ε))\\,$w")
     Asym = input == :D ? "A_{$X}" : "S_{$X}"
@@ -349,19 +356,19 @@ function module_tex(M, X, V)
     rfun(r) = a == :fade ? "\\frac{$r}{1+$(nm(:c))$E}" : a == :rho ? "\\rho_r $r" : a == :sep_r ? nm(:rLR) : a == :resource ? "$r R_{$X}" : r
     Kfun(K) = a == :capacity ? "\\frac{$K}{1+$(nm(:c))$E}" : a == :rho ? "\\rho_K $K" : K
     if a == :loss
-        push!(losses, M.s.d0.i > 0 || M.s.d0.v != 0 ? "-\\left($(nm(:d0))$w+$(nm(:β))$E\\right)$V" : "-$(nm(:β))\\,$E\\,$V")
+        push!(losses, M.s.d0.i > 0 || M.s.d0.v != 0 ? "-\\left($(nm(:d0))$w+$kb$E\\right)$V" : "-$kb\\,$E\\,$V")
     elseif a == :hill
-        push!(losses, "-$(nm(:β))\\frac{$E^{$(nm(:h))}}{EC_{50,$X}^{$(nm(:h))}+$E^{$(nm(:h))}}\\,$V")
+        push!(losses, "-$kb\\frac{$E^{$(nm(:h))}}{EC_{50,$X}^{$(nm(:h))}+$E^{$(nm(:h))}}\\,$V")
     elseif a == :damage
         push!(losses, "-$(nm(:δ))\\,$(X)_D")
-        push!(lines, "\\frac{d$(X)_D}{dt}=$(nm(:β))\\,$E\\,$V-$(nm(:δ))\\,$(X)_D,\\quad $V=$X-$(X)_D")
+        push!(lines, "\\frac{d$(X)_D}{dt}=$kb\\,$E\\,$V-$(nm(:δ))\\,$(X)_D,\\quad $V=$X-$(X)_D")
     elseif a == :transit
         push!(losses, "-$(nm(:τ))\\,$(X)_{D2}")
-        push!(lines, "\\frac{d$(X)_{D1}}{dt}=$(nm(:β))\\,$E\\,$V-$(nm(:τ))$(X)_{D1},\\ \\frac{d$(X)_{D2}}{dt}=$(nm(:τ))\\left($(X)_{D1}-$(X)_{D2}\\right),\\quad $V=$X-$(X)_{D1}-$(X)_{D2}")
+        push!(lines, "\\frac{d$(X)_{D1}}{dt}=$kb\\,$E\\,$V-$(nm(:τ))$(X)_{D1},\\ \\frac{d$(X)_{D2}}{dt}=$(nm(:τ))\\left($(X)_{D1}-$(X)_{D2}\\right),\\quad $V=$X-$(X)_{D1}-$(X)_{D2}")
     elseif a == :fade
         (M.s.d0.i > 0 || M.s.d0.v != 0) && push!(losses, "-$(nm(:d0))\\,$w\\,$X")
     elseif a == :resource
-        push!(losses, "-$(nm(:β))\\left(1-R_{$X}\\right)$X")
+        push!(losses, "-$kb\\left(1-R_{$X}\\right)$X")
         push!(lines, "\\frac{dR_{$X}}{dt}=-$(nm(:c))\\,$E\\,R_{$X}\\frac{$X}{1000},\\ R_{$X}(0)=1")
     elseif a == :toxin
         push!(losses, "-$(nm(:γ))\\,W_{$X}\\,$X")

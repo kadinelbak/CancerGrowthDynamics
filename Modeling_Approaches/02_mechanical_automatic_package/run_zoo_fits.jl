@@ -145,7 +145,7 @@ end
 # ── cocultures: two lines per environment, one shared K ───────────────────────
 
 const CC_BOUNDS = Dict(Symbol(k) => (Float64(v[1]), Float64(v[2])) for (k, v) in STAGE_CFG["coculture"]["bounds"])
-const CC_PNAME = Dict(:K => "K", :αNC => "α_NC", :αCN => "α_CN", :βN => "β_N", :βC => "β_C",
+const CC_PNAME = Dict(:K => "K", :αNC => "α_NC", :αCN => "α_CN", :βN => "β_N", :βC => "β_C", :λC => "λ_C",
                       :dN => "d_N", :dC => "d_C", :εN => "ε_N", :εC => "ε_C")
 
 # Rebuild a line from its fitted mechanism row: mechanism values fixed, growth from Stage 1,
@@ -169,11 +169,12 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
     slot(k, v) = haskey(idx, k) ? Slot(idx[k], 0.0) : Slot(0, get(fixed, k, v))
     Kslot = slot(:K, NaN)
     lf(ks) = Dict(s => idx[k] for (k, s) in ks if haskey(idx, k))
-    fN = lf([(:βN, :β), (:dN, :d), (:εN, :ε)]); fC = lf([(:βC, :β), (:dC, :d), (:εC, :ε)])
+    # λC: coculture multiplier of the inherited resistant kill, β_C,co = λ_C·β_C (β_C from Stage 2b, PRD 2026-10-23)
+    fN = lf([(:βN, :β), (:dN, :d), (:εN, :ε)]); fC = lf([(:βC, :β), (:λC, :λ), (:dC, :d), (:εC, :ε)])
     # fixed line values from the candidate (e.g. βC = 0: no resistant cisplatin term) override the inherited ones
     fixline(ks) = Dict{Symbol,Float64}(s => Float64(fixed[k]) for (k, s) in ks if haskey(fixed, k) && !haskey(idx, k))
     xN = merge(noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}(), fixline([(:βN, :β), (:dN, :d), (:εN, :ε)]))
-    xC = merge(noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}(), fixline([(:βC, :β), (:dC, :d), (:εC, :ε)]))
+    xC = merge(noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}(), fixline([(:βC, :β), (:λC, :λ), (:dC, :d), (:εC, :ε)]))
     LN = cc_line(rows[1], growth["A2780"], Kslot, fN, xN, LINES[1].ec50)
     LC = cc_line(rows[2], growth["A2780cis"], Kslot, fC, xC, LINES[2].ec50)
     # Norton–Simon: each line's drug kill scales with its growth factor (crowded cells die less)
@@ -181,11 +182,11 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
     alpha = [[Slot(0, 1.0), slot(:αNC, 1.0)], [slot(:αCN, 1.0), Slot(0, 1.0)]]
     inh(k, row) = (i = findfirst(==(:β), row.slots); i === nothing ? 0.5 : row.params[i])
     start = Dict(:K => 1.1datasets_max, :αNC => 1.0, :αCN => 1.0, :βN => inh(:β, rows[1]), :βC => inh(:β, rows[2]),
-                 :dN => 0.05, :dC => 0.05, :εN => 1.0, :εC => 1.0)
+                 :dN => 0.05, :dC => 0.05, :εN => 1.0, :εC => 1.0, :λC => 1.0)
     alt = Dict(:K => 1.6datasets_max, :αNC => 0.5, :αCN => 1.5, :βN => 0.5start[:βN], :βC => 0.75start[:βC],
-               :dN => 0.2, :dC => 0.01, :εN => 0.5, :εC => 2.0)
+               :dN => 0.2, :dC => 0.01, :εN => 0.5, :εC => 2.0, :λC => 0.5)
     alt2 = Dict(:K => 0.8datasets_max, :αNC => 1.5, :αCN => 0.5, :βN => 2start[:βN] + 0.05, :βC => 2start[:βC] + 0.05,
-                :dN => 0.01, :dC => 0.2, :εN => 2.0, :εC => 0.5)
+                :dN => 0.01, :dC => 0.2, :εN => 2.0, :εC => 0.5, :λC => 2.0)
     bounds = [k == :K ? (CC_BOUNDS[:K][1] * datasets_max, CC_BOUNDS[:K][2] * datasets_max) :
               k == :βC ? (betaC_floor * start[:βC], CC_BOUNDS[:βC][2]) : CC_BOUNDS[k] for k in free]
     make_cand(name, label, family, [LN, LC], envs, alpha, X0, [CC_PNAME[k] for k in free], bounds,
@@ -214,7 +215,34 @@ function coculture_rows(st)
     obs = sys_obs(cands[1].sys)
     ds = reduce(vcat, [[dataset(keep(e.N), obs[2i-1]), dataset(keep(e.C), obs[2i])] for (i, e) in enumerate(E)])
     rows = order_rule(fit_stage(cands, ds, st["id"]))
-    (rows=rows, ds=ds)
+    lrt = lambda_lrt(rows, ds, Float64(get(st, "lrt_p", 0.05)))
+    if lrt !== nothing && !lrt.keep
+        rows = order_by_name(rows, lrt.partner)
+        @printf("  %s: λ_C free picked by the rule, but LRT p = %.3g ≥ %.2g against %s (λ_C = 1): carrying %s\n",
+                st["id"], lrt.name, lrt.p, lrt.alpha, lrt.partner, lrt.partner)
+    end
+    (rows=rows, ds=ds, lrt=lrt)
+end
+
+# chi-square (1 df) upper tail, P(χ²₁ > x) = erfc(√(x/2)) (Abramowitz & Stegun 7.1.26, |error| < 1.5e-7)
+function chisq1_sf(x)
+    x <= 0 && return 1.0
+    z = sqrt(x / 2); t = 1 / (1 + 0.3275911z)
+    t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * exp(-z^2)
+end
+# Likelihood-ratio test of λ_C (PRD R3): the λ_C-free candidate against its partner with the same other parameters
+# and λ_C = 1. Weighted Gaussian likelihood, so LR = n·log(SSE_w,0/SSE_w,1) on 1 df. Returns nothing when the
+# rule did not pick a λ_C candidate; otherwise the test, and keep = (p < alpha).
+function lambda_lrt(rows, ds, alpha)
+    top = rows[1]
+    :λC in top.slots || return nothing
+    others = sort([s for s in top.slots if s != :λC])
+    j = findfirst(r -> !(:λC in r.slots) && sort(r.slots) == others && length(r.x0fit) == length(top.x0fit), rows)
+    j === nothing && error("$(top.name): no λ_C = 1 partner with parameters $(others) in stages.toml")
+    n = sum(length(d.x) for d in ds)
+    stat = n * log(rows[j].sse / top.sse)
+    p = chisq1_sf(stat)
+    (name=top.name, partner=rows[j].name, stat=stat, p=p, alpha=alpha, dbic=rows[j].bic - top.bic, keep=p < alpha)
 end
 
 # ── run the stages in order ───────────────────────────────────────────────────
@@ -276,7 +304,7 @@ for st in STAGES
         CC[id] = coculture_rows(st)
         show_rows(st["line"], CC[id].rows)
         push!(groups, (id=id, stage=st["stage_label"], title=st["title"], datasets=CC[id].ds, u0=CC[id].rows[1].u0,
-                       cands=CC[id].rows, line=st["line"], kind=Symbol(id)))
+                       cands=CC[id].rows, line=st["line"], kind=Symbol(id), lrt=CC[id].lrt))
     elseif kind == "combination"
         include(joinpath(@__DIR__, "zoo_stage4.jl"))
         inh = st["inherits"]

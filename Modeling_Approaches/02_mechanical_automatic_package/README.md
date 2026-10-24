@@ -97,7 +97,7 @@ STAGES_TOML=sens/stages.toml SOURCES_TOML=sens/sources.toml DATA_TABLE=sens/meas
 | s1 | 1 | untreated monocultures | growth law per line |
 | s1b | 2a | low-resource monocultures | Stage 1 growth + every low-resource mechanism (A/B shared-structure test) |
 | s2 | 2b | treated monocultures, 3 doses jointly | Stage 1 growth + every cisplatin mechanism; one structure shared by both lines |
-| s3 | 3a | untreated (Ce0) + 1 µM (Ce1) cocultures | both lines, shared K; the resistant kill may be refitted down to 0 or dropped ("_noC" candidates, user 2026-10-06) |
+| s3 | 3a | untreated (Ce0) + 1 µM (Ce1) cocultures | both lines, shared K; the resistant kill is the Stage 2b one times a coculture multiplier, β_C,co = λ_C·β_C: λ_C = 1 (inherited) or refitted, kept free only if the 3-BIC rule and a likelihood-ratio test (p < 0.05) both favour it (PRD, user 2026-10-23; the fixed-zero "_noC" candidates no longer compete) |
 | s3b | 3b | low-resource cocultures | both lines with their Stage 2a mechanisms |
 | s4 | 4 | low resource + 1 µM coculture | both mechanisms per line, inherited; a few refitted parameters |
 
@@ -113,6 +113,7 @@ replicates. The Hill kill uses each line's measured IC50 as EC50 (A2780 1 µM, A
 | `zoo_models.jl` | the model engine: growth laws, delay kernels, actions, inputs D(t), equations as TeX |
 | `run_zoo_fits.jl` | runs the stages of `stages.toml`, bootstraps, writes `outputs/zoo_fits/` and the site bundle |
 | `zoo_analyses.jl` | package bootstrap, sensitivity (local, profile, Sobol), validation (`validation.toml`) |
+| `zoo_betaC.jl` | (included by `zoo_analyses.jl`) the resistant kill in coculture: λ_C profile likelihood and LRT, and the held-out comparison of β_C,co = 0, λ_C = 1 and λ_C refitted |
 | `run_control.jl`, `control_report.jl` | 14-day dose control (sequential MPC with a toxicity proxy) |
 | `run_control_fasting.jl`, `control_fasting_report.jl` | long (120-day, `long_days`) dose + fasting control, read off at days 14/30/60/120 |
 | `../../build_final_report.jl` | the Final Report from every chapter |

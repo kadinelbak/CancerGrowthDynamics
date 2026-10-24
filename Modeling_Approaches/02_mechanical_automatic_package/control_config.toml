@@ -81,6 +81,8 @@ noise_seed = 20261006            # ASSUMPTION (reproducibility): draw b uses see
 [robustness]
 open_loop_draws = 200            # ASSUMPTION (runtime): bootstrap parameter sets on which every fixed schedule is replayed
 closed_loop_draws = 40           # ASSUMPTION (runtime): bootstrap sets with closed-loop MPC; the paired comparison uses these same draws for every policy
+ens_plan_draws = 40              # ASSUMPTION (runtime): bootstrap plants the robust plan is optimised over (mean cost); scored on the remaining draws (PRD R6, 2026-10-23)
+robust_share = 0.8               # ASSUMPTION (user PRD 2026-10-23): a schedule is robust if it beats no treatment and constant 1 µM on at least this share of held-out draws
 
 [progression]
 # Control goal since 2026-10-07 (user): TIME TO PROGRESSION. Progression = N + C at or above B_prog. The stage

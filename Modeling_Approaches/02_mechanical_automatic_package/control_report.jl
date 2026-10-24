@@ -281,6 +281,25 @@ $(table([("Environment", "Normal medium or low resource.", :none), ("Scen.", "Sc
          ("Δ C", "Median of (closed-loop − policy) resistant cells at $DL.", "Negative favours the closed loop."), ("Closed loop fewer C", "Share of draws where the closed loop ends with fewer resistant cells.", :higher),
          ("Δ dose (µM·d)", "Median of (closed-loop − policy) cumulative dose.", "Negative means the closed loop uses less drug.")], prows))"""
 end
+# Robust plan and robustness shares (run_control.jl :ensemble, PRD R6 2026-10-23)
+function ensemble_section()
+    haskey(C, :ensemble) || return ""
+    E = C[:ensemble]; rows = String[]
+    share = Float64(get(CFG["robustness"], "robust_share", 0.8))
+    for r in ("25:75", "50:50", "75:25")
+        haskey(E, r) || continue
+        for q in sort(E[r].rows; by=q -> -q.share_beats_both)
+            push!(rows, trow([td(r), td(hesc(q.policy)), td(q.schedule_uM), tn(q.n_draws), tn(@sprintf("%.0f%%", 100q.share_beats_both)),
+                              tn(@sprintf("%.2f", q.mean_cost)), tn(dayx(q.median_ttp)), td(q.robust ? "<span class='ok'>yes</span>" : "no")]; cls=startswith(q.policy, "Robust plan") ? "win" : ""))
+        end
+    end
+    np = length(first(values(E)).plan_draws); nt = length(first(values(E)).test_draws)
+    """<h2 id='robust-plan'>Robust schedules across the resistant-kill spread $(tip("Normal medium, scenario A. The resistant kill in coculture is λ_C·β_C (Stage 3a × Stage 2b); each bootstrap plant carries its own replicate of both.", :none; warn=W_BANDS))</h2>
+<div class='intro'><p>Which schedule still works when the resistant kill is not known exactly? The <b>robust plan</b> is the one schedule of measured doses (one per 2-day interval) with the lowest <i>mean</i> cost over $np bootstrap plants, each with its own replicate of the Stage 2b resistant kill β_C and the Stage 3a multiplier λ_C (and of every other carried parameter). Every schedule is then scored on the other $nt plants, which the robust plan never saw. A schedule counts as <b>robust</b> when it costs less than both no treatment and constant 1 µM on at least $(round(Int, 100share))% of those plants (control_config.toml [robustness] robust_share). Only robust schedules should be read as recommendations. Resistant-kill estimate and held-out comparison: <a href='../zoo_analyses/resistant_kill/report.html'>Resistant kill in coculture</a>.</p></div>
+$(table([("Ratio", "Sensitive : resistant at seeding."), ("Policy", "The dosing rule."), ("Schedule (µM)", "The dose for each 2-day interval."), ("Draws", "Held-out bootstrap plants scored."),
+         ("Beats both", "Share of those plants on which the schedule's cost (the controller's objective) is below both no treatment and constant 1 µM."), ("Mean cost", "Mean objective over those plants."),
+         ("Median time to progression (day)", T_TTP), ("Robust", "Beats both on at least $(round(Int, 100share))% of the plants.")], rows))"""
+end
 const ROB_POLS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)", "MPC, measured doses only"]
 # closed loop minus each policy, draw by draw, on the draws that carry a closed-loop run
 function paired_rows(env, scen, R)
@@ -460,7 +479,7 @@ function warnings_section()
 $(LONG ? BEYOND_LONG : "")<li><b>The toxicity limit is inactive at the default settings.</b> Since \\(dT/dt=(1-T)\\big[a_H(1-e^{-B})-r_H\\,T\\big]\\), T can never exceed \\(a_H/r_H\\) = $(fmt(default_tox().a_H / default_tox().r_H)), below the bound B_tox = $(CFG["toxicity"]["B_tox"]), whatever the dose. The toxicity term in the cost still discourages dosing, but the toxicity barrier only comes close to binding in the sweep with slower host recovery (r_H = $(minimum(CFG["toxicity"]["r_H_sweep"])) /day, bound \\(a_H/r_H\\) = $(fmt(default_tox().a_H / minimum(CFG["toxicity"]["r_H_sweep"])))). The schedules are therefore not toxicity-constrained in the main runs.</li>
 <li><b>How each scenario is validated.</b> Scenario A (the Stage 3a coculture fit) passes leave-one-ratio-out validation, but it was fitted to the treated cocultures, so there is no held-out test of its drug response in coculture. Scenario B is the construction that was tested on held-out data: crowding fitted to the untreated cocultures only, then the treated cocultures predicted with no refit (<a href='../zoo_analyses/validation/report.html'>Validation</a>).</li>
 <li><b>Dose response outside 0.62–1.47 µM.</b> The monocultures were treated at three doses and the cocultures at 1 µM only. $(DRUG_HILL ? "EC50 is fixed at each line's measured IC50 ($(fmt(ecN)) µM for A2780, $(fmt(ecC)) µM for A2780cis), not estimated." : "The carried kill is linear in the drug effect, so it never saturates: it cannot show a maximum kill at high doses.") Continuous-dose control above 1.47 µM (demonstration mode) extrapolates $DRUG_CURVE.</li>
-<li><b>Resistant kill in coculture.</b> The cocultures were treated at one dose only, so how strongly cisplatin kills A2780cis in coculture rests on the monoculture fit: scenario A uses $(stage3_betaC().dropped ? "the coculture fit, which selected no cisplatin term for A2780cis in coculture (β_C = 0; the monoculture data need one, +59 BIC without it)" : stage3_betaC().free ? "the coculture refit" : "the monoculture value inherited by the coculture fit") and scenario B the monoculture drug response for both lines; every result is given for both, and the two bracket the resistant kill in coculture.</li>
+<li><b>Resistant kill in coculture.</b> The cocultures were treated at one dose only, so how strongly cisplatin kills A2780cis in coculture rests on the monoculture fit: scenario A uses $(stage3_betaC().dropped ? "the coculture fit, which selected no cisplatin term for A2780cis in coculture (β_C = 0; the monoculture data need one, +59 BIC without it)" : isfinite(stage3_betaC().λ) && stage3_betaC().free ? "the monoculture value times the coculture multiplier λ_C = $(fmt(stage3_betaC().λ)) refitted to the cocultures" : stage3_betaC().free ? "the coculture refit" : "the monoculture value inherited by the coculture fit (λ_C = 1)") and scenario B the monoculture drug response for both lines; every result is given for both, and the two bracket the resistant kill in coculture.</li>
 <li><b>Toxicity.</b> Nothing in these in-vitro data measures host toxicity. Its structure and values come from de Pillis &amp; Radunskaya (2001); the mapping from medium concentration to systemic burden (s_B) and B_cancer are assumptions. Treat toxicity-limited results as illustrative.</li>
 $(LONG ? "" : "<li><b>Beyond 14 days.</b> The 28-day runs extrapolate every stage beyond the data.</li>")
 <li><b>Low resource + drug.</b> Stage 4 is fitted to a single 1:1 culture at one dose; its low-resource strengths ε_N, ε_C are identified only for that condition. Its first observation is one day after exposure started; the hidden drug and stress states at that point are simulated once from the candidates' starting values and held fixed during fitting (a small approximation).</li>
@@ -572,7 +591,11 @@ const BETTER = Dict{String,Any}(
     "T $DL" => :lower,
     "k" => "Lower is better (fewer parameters), as long as the fit stays within 3 BIC.",
     "BIC" => :lower,
-    "ΔBIC vs carried" => "Below −3 would favour the resource-reset model; otherwise the carried model stays.")
+    "ΔBIC vs carried" => "Below −3 would favour the resource-reset model; otherwise the carried model stays.",
+    "Ratio" => :none,
+    "Beats both" => "Higher is better: the share of held-out bootstrap plants on which the schedule costs less than both no treatment and constant 1 µM.",
+    "Mean cost" => :lower,
+    "Robust" => "Better: yes (beats both comparators on at least the required share of draws).")
 const AGREE = "Better: the rows agree; the smallest step is the reference."
 hcell(h::AbstractString) = "<th>$h</th>"; hcell(h::Tuple) = "<th>$(h[1])$(tip(h[2], header_better(BETTER, h)))</th>"
 table(head, rows) = "<div class='tscroll'><table><tr>" * join(hcell.(head)) * "</tr>" * join(rows) * "</table></div>"
@@ -611,6 +634,7 @@ $(objective_section())
 $(env_section(:normal))
 $(env_section(:lowres))
 $(robust_section())
+$(ensemble_section())
 $(sweep_section())
 $(hill_section())
 $(tests_section())

@@ -1,90 +1,89 @@
-steps_requested = ["tests"]
-continued_from = "2026-10-09T19:14:52.572"
-threads = 16
-finished = "2026-10-10T15:40:24.214"
-started = "2026-10-10T15:29:59.666"
-resume = false
+steps_requested = ["tests", "final"]
+continued_from = "2026-10-24T04:32:04.416"
+threads = 4
+finished = "2026-10-24T04:48:18.906"
+started = "2026-10-24T04:40:27.376"
+resume = true
 time_limit_hits = 0
 julia = "1.12.7"
 
 [steps.checks]
 log = "outputs/logs/checks.log"
 ok = true
-commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 47.4
-finished = "2026-10-07T00:26:22.593"
+seconds = 44.3
+finished = "2026-10-23T19:12:37.414"
 
     [steps.checks.env]
 
 [steps.data]
 log = "outputs/logs/data.log"
 ok = true
-commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 21.3
-finished = "2026-10-07T00:25:32.980"
+seconds = 21.4
+finished = "2026-10-23T19:11:51.170"
 
     [steps.data.env]
-
-[steps.fits]
-log = "outputs/logs/fits.log"
-ok = true
-commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
-uncommitted_changes = true
-seconds = 65354.2
-finished = "2026-10-07T18:35:36.882"
-
-    [steps.fits.env]
-
-[steps.findings]
-log = "outputs/logs/findings.log"
-ok = true
-commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
-uncommitted_changes = true
-seconds = 38.8
-finished = "2026-10-09T16:53:06.631"
-
-    [steps.findings.env]
 
 [steps.final]
 log = "outputs/logs/final.log"
 ok = true
-commit = "02845a51fdc779c0b3164c554cd29ca2b5b8186b"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 2.9
-finished = "2026-10-07T23:11:22.508"
+seconds = 4.9
+finished = "2026-10-24T04:48:18.893"
 
     [steps.final.env]
 
 [steps.report_long]
 log = "outputs/logs/report_long.log"
 ok = true
-commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 50.2
-finished = "2026-10-09T16:52:27.745"
+seconds = 59.6
+finished = "2026-10-24T04:22:04.091"
 
     [steps.report_long.env]
+
+[steps.fits]
+log = "outputs/logs/fits.log"
+ok = true
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
+uncommitted_changes = true
+seconds = 14063.5
+finished = "2026-10-23T23:07:00.883"
+
+    [steps.fits.env]
+
+[steps.findings]
+log = "outputs/logs/findings.log"
+ok = true
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
+uncommitted_changes = true
+seconds = 43.9
+finished = "2026-10-24T04:22:47.955"
+
+    [steps.findings.env]
 
 [steps.control_long]
 log = "outputs/logs/control_long.log"
 ok = true
-commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 14822.9
-finished = "2026-10-09T16:51:37.476"
+seconds = 16988.5
+finished = "2026-10-24T04:21:04.467"
 
     [steps.control_long.env]
-    REDO = "1"
 
 [steps.analyses]
 log = "outputs/logs/analyses.log"
-ok = true
-commit = "a33993c33aba39b9fdab3202f00c19267aaeb53b"
+ok = false
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 397.6
-finished = "2026-10-07T18:44:24.192"
+seconds = 421.6
+finished = "2026-10-23T23:14:02.581"
 
     [steps.analyses.env]
     REDO = "1"
@@ -92,57 +91,56 @@ finished = "2026-10-07T18:44:24.192"
 [steps.report14]
 log = "outputs/logs/report14.log"
 ok = true
-commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 55.2
-finished = "2026-10-09T12:44:34.516"
+seconds = 54.9
+finished = "2026-10-23T23:37:55.903"
 
     [steps.report14.env]
 
 [steps.control14]
 log = "outputs/logs/control14.log"
 ok = true
-commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 4870.8
-finished = "2026-10-09T12:43:38.060"
+seconds = 119.9
+finished = "2026-10-23T23:36:59.484"
 
     [steps.control14.env]
-    REDO = "1"
 
 [steps.tests]
 log = "outputs/logs/tests.log"
 ok = true
-commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true
-seconds = 621.4
-finished = "2026-10-10T15:40:23.038"
+seconds = 462.3
+finished = "2026-10-24T04:48:12.305"
 
     [steps.tests.env]
 
 [data_sha256]
 "New Datasets/ce0_75S25R.xlsx" = "ea3ecdce265776753a6b933c8a030cf7b4596761dd9881523db8d18fc6f436bd"
-"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780cisT_dayaverages.csv" = "4a1ba7e22ec11a0171dd67443ad1b53fdbbd95a655d407c5ddab2274f18ae475"
-"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780T_dayaverages.csv" = "cffd116561cb9bc3e6c6dfd40079c22a72d8edcc243825b940b8e1c7940c6b67"
-"New Datasets/A2780cis_IC50_1um_30k.csv" = "1c247c606cbd305fd3bb3c0447d2cde17760c47223b28f83f8d8af27280fa84a"
-"New Datasets/A2780cis_IC75_0.62um_30k.csv" = "da0e81efb1a6243715381d3e29aa4aa467426f2490c11fd468c44f38d340432c"
-"New Datasets/A2780cis_Untreated_30k.csv" = "8265603b8d6124acf9c80f2b100687d31eaa629a8ab2d08e7d875af9a2706c89"
-"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780cisUT_dayaverages.csv" = "7b98548b9b5b17c0912346a05a799350f2fd5655428b56d15a871c263e4b2c5e"
-"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780UT_dayaverages.csv" = "d2a361117c46fac473f5748a8370730a88d981d365aeff19ba792628a9983708"
-"New Datasets/A2780_IC75_0.62um_30k.csv" = "29257a421a2b384db7aed0cf0dab7f185fdbd395e3b9b29b3403cea81662abb2"
+"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780cisT_dayaverages.csv" = "64ebc9c53aa88e7839fb0b3946bacba12441dcab60027e55275b01e9e95a8178"
+"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780T_dayaverages.csv" = "c3e7efa21732a0be9d5b13521c211d7358eb8f83b61afe11cc9698b96de1d43f"
+"New Datasets/A2780cis_IC50_1um_30k.csv" = "ff61695fe020a167fa7907e44fcdbf42e109804316fe53832f59ff0997d1af0c"
+"New Datasets/A2780cis_IC75_0.62um_30k.csv" = "fc32bf4b4ad476168c795c7f02a621aaecb34fec42f4c2d808e1043a2a773e7f"
+"New Datasets/A2780cis_Untreated_30k.csv" = "3e96ada180122599f02a6f60fe24c2c0c8a48d80fa9c9f0281a24290fd0de004"
+"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780cisUT_dayaverages.csv" = "348106b1e8b9af0e4a42dd73117d4806e823f4df2424e5ff31c6611cad54fe3f"
+"Processed_Datasets/Intermittent Data/30k_seeding_density/Averages/A2780UT_dayaverages.csv" = "fcf3d320af93188fd4eb281dad6b5b98c6ec3e17515399df144e8fe3fe4e364d"
+"New Datasets/A2780_IC75_0.62um_30k.csv" = "f19fb99a94c624e54ec3b9dbda27ca974e430a88724590df3874da8aa6760fd5"
 "New Datasets/ce1_50S50R.xlsx" = "ebe1e102505107f5099397e02ae0f1b99990be5f12b4f5c63cab2a40c8ffc346"
-"New Datasets/A2780cis_IC25_1.47um_30k.csv" = "afdcd37cf00bcd2d7605ce809e3bca3760b4e25b11b84a308a13e7be9355b30b"
+"New Datasets/A2780cis_IC25_1.47um_30k.csv" = "4d757c5e349517496f8e220b97e8b2b8884f4a1ed5c5cb57ab7e4ad6b3a1f8a4"
 "New Datasets/ce1_25S75R.xlsx" = "30c3d318d4ec7567a726957c29b48c89ae3e05c1443b3fef273773d6d5e56337"
 "New Datasets/ce0_50S50R.xlsx" = "a24600d4e07b854cbd42f5a23d2a4f4174ec5a1d86c0b8b4f7a48efe7bd5d9ac"
 "New Datasets/ce0_25S75R.xlsx" = "ceda0f49c589c8b9000f272468860bd41a900e58a90357f66b21fdbfe698e525"
-"New Datasets/A2780_IC50_1um_30k.csv" = "32ecd43bd8195dc666c58099e8e017584a975897c4f8cfefa52094b8e28fcaa8"
+"New Datasets/A2780_IC50_1um_30k.csv" = "1dd77b629e24f4e98b3a006ccdbfcb9152af22e1a66a195d0d02ad4fe78aedc0"
 "New Datasets/ce1_75S25R.xlsx" = "b1744ef0cf1ec2b48481016dbe2a27e22f2843e3d8592d4471e1f030fb9cac92"
 "PKG/data/measurements.csv" = "0cb45cb654e30efbb2118e94839388a75da02553103c738196532ffa57f83d0f"
-"New Datasets/A2780_Untreated_30k 1.csv" = "1abfe292d21b1640ce517a8d7ce25ee223baa1b465107e8877992706fdb8492c"
+"New Datasets/A2780_Untreated_30k 1.csv" = "d0c78fcc8f386c070c12bbee8f101eb10f248aec7e9c0adf290493d13e0cf503"
 "New Datasets/ALL A2780-cis LR data.xlsx" = "3b6f30647260d2f40f94fc29962a6e7d87477662000f2323d62ed40f743805b0"
-"New Datasets/Validation/ALL A2780 LR + cis(A2780cis 30k 1-1).csv" = "a6bfeb5c97fd54624d8ad2beae4d3988a938464a651279a9d1a0d87bbca29efa"
-"New Datasets/A2780_IC25_1.47um_30k.csv" = "12a91694746712efaa971374d6da16ff73b9cff7b1d01bca0926d55f7f4b604d"
-"New Datasets/Validation/ALL A2780 LR + cis(A2780 30k 1-1).csv" = "508c85b3ddca8de02825b7135935e83846a386e8792eca95a066af4298df522a"
+"New Datasets/Validation/ALL A2780 LR + cis(A2780cis 30k 1-1).csv" = "f27d8d521872399dcb06728cfa4fae83025d57c99526267ca598c25ccd41da33"
+"New Datasets/A2780_IC25_1.47um_30k.csv" = "677db13fa7b8e236d6ef11df673ff251f810843066a5aaea5dca6ec53f80034e"
+"New Datasets/Validation/ALL A2780 LR + cis(A2780 30k 1-1).csv" = "e18d9f2bc3de71567d2d7f9b39aeb9a52ce5343ea676e7c5fd69ef361a4e4d78"
 
 [GrowthParameterEstimation]
 repo-rev = "5eaadd4"
@@ -151,6 +149,6 @@ repo-url = "https://github.com/kadinelbak/GrowthParameterEstimation.jl.git"
 version = "0.4.1"
 
 [git]
-branch = "reproducible-pipeline"
-commit = "0ef4dd88da9504a4249fa2e839c9453424e78ab2"
+branch = "claude/project-thread-uydpzg"
+commit = "1058514c077abea4eefe12eaa5bd41fe927c8cb0"
 uncommitted_changes = true

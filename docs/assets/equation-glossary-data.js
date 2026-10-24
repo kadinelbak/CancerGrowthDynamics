@@ -3,7 +3,10 @@
 // Keys are TeX as the pop-up reads it: subscripts braced, e.g. r_{N}, \alpha_{NC}, A_{N,j}.
 window.EQ_GLOSSARY = {
 "common": {
-"t": "time (days)"
+"t": "time (days)",
+"\\lambda_{C}": "coculture multiplier of the A2780cis cisplatin kill: β_C,co = λ_C·β_C (1 = monoculture kill inherited, 0 = no kill)",
+"\\beta_{C,co}": "A2780cis cisplatin kill strength in coculture, λ_C·β_C (per µM-equivalent per day)",
+"\\beta_{C}": "A2780cis cisplatin kill strength from the monoculture fit (Stage 2b)"
 },
 "scopes": [
 {

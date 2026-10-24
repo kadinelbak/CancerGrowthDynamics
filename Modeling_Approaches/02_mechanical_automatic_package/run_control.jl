@@ -186,6 +186,82 @@ if !haskey(cck, :robust)
     cck[:robust] = rob; savec()
 end
 
+# ── robust control over the bootstrap ensemble (PRD R6, 2026-10-23) ───────────
+# The resistant kill in coculture is β_C,co = λ_C·β_C, and its spread (Stage 2b β_C × Stage 3a λ_C replicates)
+# is what decides the policy. Robust plan: one schedule of measured doses (one per decision interval) that
+# minimises the MEAN cost over the first ens_plan_draws bootstrap plants (each scored with its own weights and the
+# nominal thresholds). Every policy, the robust plan included, is then scored on the other draws (not used to
+# plan): a schedule is robust when its cost is below both no treatment and constant 1 µM in at least robust_share
+# of them. Normal medium, scenario A (the carried Stage 3 model), every ratio.
+const ENS_PLAN = Int(get(CFG["robustness"], "ens_plan_draws", 40))
+const ROBUST_SHARE = Float64(get(CFG["robustness"], "robust_share", 0.8))
+# exhaustive search over measured doses per interval, pruned on the running mean cost (costs only grow)
+function ensemble_plan(Ps, Ws, x0s, Δ, n, levels)
+    m = length(Ps); best = Ref(Inf); bestU = zeros(n); U = zeros(n)
+    function dfs(xs, k, c)
+        if k > n
+            cl = c + sum(terminal_cost(xs[i], Ps[i], Ws[i]) for i in 1:m) / m
+            cl < best[] && (best[] = cl; bestU .= U)
+            return
+        end
+        nxt = Vector{Any}(undef, length(levels)); cs = zeros(length(levels))
+        for (a, u) in enumerate(levels)
+            ys = [F(xs[i], u, Ps[i], Δ) for i in 1:m]
+            nxt[a] = ys; cs[a] = c + sum(stage_cost(ys[i], u, Ps[i], Ws[i]) for i in 1:m) / m
+        end
+        for a in sortperm(cs)
+            cs[a] >= best[] && break
+            U[k] = levels[a]; dfs(nxt[a], k + 1, cs[a])
+        end
+    end
+    dfs(x0s, 1, 0.0)
+    (U=copy(bestU), J=best[])
+end
+if !haskey(cck, :ensemble)
+    ens = Dict{Any,Any}()
+    for r in ratios_normal
+        m = only(filter(x -> x.env == :normal && x.scen == :A && x.ratio == r.ratio, cck[:main]))
+        P0 = plant_for(:normal, :A); W0 = default_weights(P0)
+        Pb = Vector{Any}(undef, BOOT_N)
+        Threads.@threads :dynamic for b in 1:BOOT_N
+            Pb[b] = try plant_for(:normal, :A; b=b) catch; nothing end
+        end
+        ok = [b for b in 1:BOOT_N if Pb[b] !== nothing]
+        plan = ok[1:min(ENS_PLAN, length(ok) ÷ 2)]; test = setdiff(ok, plan)     # at least half the draws stay unseen
+        Wb = Dict(b => with_fields(default_weights(Pb[b]); Bc=W0.Bc, Bp=W0.Bp) for b in ok)
+        t = time()
+        rp = ensemble_plan([Pb[b] for b in plan], [Wb[b] for b in plan], [copy(m.x0) for _ in plan], Δ0, NRUN, LEVELS)
+        pols = Dict{String,Vector{Float64}}(pn => m.policies[pn].U for pn in ("No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)",
+                                         "Periodic 1 µM, 2 days on / 2 off", "MPC, measured doses only"))
+        pols["Robust plan (mean over $(length(plan)) bootstrap plants)"] = rp.U
+        cost = Dict(pn => Dict{Int,Float64}() for pn in keys(pols)); ttp = Dict(pn => Dict{Int,Float64}() for pn in keys(pols))
+        lk = ReentrantLock()
+        Threads.@threads :dynamic for b in test
+            for (pn, U) in pols
+                c = try total_cost(m.x0, U, Pb[b], Δ0, Wb[b]) catch; NaN end
+                o = try outcomes(Pb[b], m.x0, U, Δ0, Wb[b]) catch; nothing end
+                lock(lk) do
+                    cost[pn][b] = c; ttp[pn][b] = o === nothing ? NaN : o.ttp
+                end
+            end
+        end
+        rows = NamedTuple[]
+        for (pn, U) in pols
+            v = [b for b in test if isfinite(cost[pn][b]) && isfinite(cost["No treatment"][b]) && isfinite(cost["Constant 1 µM"][b])]
+            beats = count(b -> cost[pn][b] < cost["No treatment"][b] && cost[pn][b] < cost["Constant 1 µM"][b], v)
+            push!(rows, (ratio=r.ratio, policy=pn, schedule_uM=join(round.(U; digits=3), " "), n_draws=length(v),
+                         share_beats_both=length(v) > 0 ? beats / length(v) : NaN,
+                         mean_cost=mean(cost[pn][b] for b in v), median_ttp=(mt = median([isnan(ttp[pn][b]) ? Inf : ttp[pn][b] for b in v]); isfinite(mt) ? mt : NaN),   # NaN = not progressed (the best)
+                         robust=length(v) > 0 && beats / length(v) >= ROBUST_SHARE))
+        end
+        ens[r.ratio] = (rows=rows, plan_draws=plan, test_draws=test, robust_U=rp.U, J=rp.J)
+        @printf("  ensemble %s: robust plan %s (%d planning, %d test draws) [%.0fs]\n", r.ratio, join(rp.U, " "), length(plan), length(test), time() - t); flush(stdout)
+    end
+    cck[:ensemble] = ens; savec()
+end
+CSV.write(joinpath(COUT, "control_robust_ensemble.csv"), DataFrame(reduce(vcat, [cck[:ensemble][r.ratio].rows for r in ratios_normal])))
+println("Wrote $(joinpath(COUT, "control_robust_ensemble.csv"))")
+
 # ── CSV of every main-run outcome ─────────────────────────────────────────────
 rows = NamedTuple[]
 for m in cck[:main], (pn, v) in m.policies

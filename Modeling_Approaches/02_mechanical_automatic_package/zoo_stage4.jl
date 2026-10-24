@@ -40,14 +40,14 @@ function stage4_cands(c3, c3b, βC2)
     X0 = [series(COMBO_SOURCES.N).nom, series(COMBO_SOURCES.C).nom]; X0info = combo_x0()
     ymax = maximum(vcat(combo.yN, combo.yC))
     cands = NamedTuple[]
-    βC3 = LC3.s.β.v
+    βC3 = LC3.s.β.v * (hasproperty(LC3.s, :λ) ? LC3.s.λ.v : 1.0)      # effective resistant kill, λ_C·β_C
     for (name, label, crowd, reskill, free) in S4_SPECS
         reskill && βC3 == βC2 && continue           # identical to the inherited candidate
         idx = Dict(k => i for (i, k) in enumerate(free))
         sl(k, v) = haskey(idx, k) ? Slot(idx[k], 0.0) : Slot(0, v)
         Kv = crowd == :S3 ? K3 : K3b
         LN = merge(LN3, (s=merge(LN3.s, (K=sl(:K, Kv),)),))
-        LC = merge(LC3, (s=merge(LC3.s, reskill ? (K=sl(:K, Kv), β=Slot(0, βC2)) : (K=sl(:K, Kv),)),))
+        LC = merge(LC3, (s=merge(LC3.s, reskill ? (K=sl(:K, Kv), β=Slot(0, βC2), λ=Slot(0, 1.0)) : (K=sl(:K, Kv),)),))
         mN = merge(MN, (s=merge(MN.s, (ε=sl(:εN, MN.s.ε.v),)),))
         mC = merge(MC, (s=merge(MC.s, (ε=sl(:εC, MC.s.ε.v),)),))
         χN = haskey(idx, :χ) ? Slot(idx[:χ], 0.0) : sl(:χN, 0.0)

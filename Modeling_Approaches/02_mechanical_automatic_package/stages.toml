@@ -41,7 +41,7 @@ bootstrap_generator = "selected"
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
-bounds = { K = [0.5, 20.0], "αNC" = [0.0, 5.0], "αCN" = [0.0, 5.0], "βN" = [0.0, 10.0], "βC" = [0.0, 10.0], dN = [0.0, 3.0], dC = [0.0, 3.0], "εN" = [0.0, 5.0], "εC" = [0.0, 5.0] }
+bounds = { K = [0.5, 20.0], "αNC" = [0.0, 5.0], "αCN" = [0.0, 5.0], "βN" = [0.0, 10.0], "βC" = [0.0, 10.0], "λC" = [0.0, 20.0], dN = [0.0, 3.0], dC = [0.0, 3.0], "εN" = [0.0, 5.0], "εC" = [0.0, 5.0] }
 
 # ── 1 · untreated monocultures ────────────────────────────────────────────────
 [[stage]]
@@ -110,64 +110,62 @@ line = "coculture"
 data = { culture = "co", condition = ["Ce0", "Ce1"] }
 input = "D"
 inherits = { growth = "s1", mechanism = "s2" }
-# The resistant kill β_C may be refitted down to 0, and the "no resistant cisplatin term" candidates
-# (fixed βC = 0) compete under the selection rule (user, 2026-10-06; replaces the 2026-10-01 floor of
-# 0.5 × Stage 2b). Every sensitivity variant put β_C on whatever floor it had. In monoculture (Stage 2b)
-# the A2780cis kill stays: dropping it costs +59 weighted BIC there.
-betaC_floor = 0.0
+# Resistant kill in coculture (PRD "Resistant-cell cisplatin kill in coculture", user 2026-10-23; reverses the
+# 2026-10-06 decision that let fixed βC = 0 candidates compete): A2780cis keeps the Stage 2b kill mechanism and
+# strength, β_C,co = λ_C·β_C with β_C from Stage 2b. Candidates without λC inherit it (λ_C = 1); candidates with
+# λC refit the multiplier (bounds 0–20, so β_C,co = 0 is reachable only as an estimate). Each λC candidate has a
+# λ_C = 1 partner with the same other parameters; λ_C free is carried only if the selection rule picks it AND the
+# likelihood-ratio test against that partner gives p < lrt_p (run_zoo_fits.jl lambda_lrt). The old fixed-zero
+# ("_noC") candidates are not fitted; β_C = 0 is kept only as the comparison scenario A (run_betaC_scenarios.jl).
+lrt_p = 0.05
   [[stage.candidate]]
   name = "cc_K"
   label = "Shared K, one-for-one crowding, drug mechanisms from Stage 2"
   free = ["K"]
   [[stage.candidate]]
+  name = "cc_K_lambda"
+  label = "Shared K, one-for-one crowding, resistant kill × λ_C"
+  free = ["K", "λC"]
+  [[stage.candidate]]
   name = "cc_K_alpha"
   label = "Shared K + asymmetric crowding, drug mechanisms from Stage 2"
   free = ["K", "αNC", "αCN"]
   [[stage.candidate]]
+  name = "cc_K_alpha_lambda"
+  label = "Shared K + crowding, resistant kill × λ_C (sensitive kill from Stage 2)"
+  free = ["K", "αNC", "αCN", "λC"]
+  [[stage.candidate]]
   name = "cc_K_alpha_betaN"
-  label = "Shared K + crowding, sensitive kill strength refitted"
+  label = "Shared K + crowding, sensitive kill refitted, resistant kill from Stage 2 (λ_C = 1)"
   free = ["K", "αNC", "αCN", "βN"]
   [[stage.candidate]]
-  name = "cc_K_alpha_beta"
-  label = "Shared K + crowding, both kill strengths refitted (resistant kill may reach 0)"
-  free = ["K", "αNC", "αCN", "βN", "βC"]
+  name = "cc_K_alpha_betaN_lambda"
+  label = "Shared K + crowding, sensitive kill refitted, resistant kill × λ_C"
+  free = ["K", "αNC", "αCN", "βN", "λC"]
   [[stage.candidate]]
   name = "cc_K_alpha_death"
   label = "Shared K + crowding + coculture death"
   free = ["K", "αNC", "αCN", "dN", "dC"]
   [[stage.candidate]]
+  name = "cc_K_alpha_death_lambda"
+  label = "Shared K + crowding + coculture death, resistant kill × λ_C"
+  free = ["K", "αNC", "αCN", "dN", "dC", "λC"]
+  [[stage.candidate]]
   name = "cc_K_alpha_deathN_betaN"
-  label = "Shared K + crowding + sensitive death, sensitive kill refitted"
+  label = "Shared K + crowding + sensitive death, sensitive kill refitted (λ_C = 1)"
   free = ["K", "αNC", "αCN", "dN", "βN"]
   [[stage.candidate]]
-  name = "cc_K_alpha_deathN_beta"
-  label = "Shared K + crowding + sensitive death, both kill strengths refitted (resistant kill may reach 0)"
-  free = ["K", "αNC", "αCN", "dN", "βN", "βC"]
+  name = "cc_K_alpha_deathN_betaN_lambda"
+  label = "Shared K + crowding + sensitive death, sensitive kill refitted, resistant kill × λ_C"
+  free = ["K", "αNC", "αCN", "dN", "βN", "λC"]
   [[stage.candidate]]
-  name = "cc_full"
-  label = "Shared K + crowding + death, both kill strengths refitted (resistant kill may reach 0)"
-  free = ["K", "αNC", "αCN", "dN", "dC", "βN", "βC"]
-
-  [[stage.candidate]]
-  name = "cc_K_alpha_betaN_noC"
-  label = "Shared K + crowding, sensitive kill refitted, no resistant cisplatin term"
-  free = ["K", "αNC", "αCN", "βN"]
-  fixed = { "βC" = 0.0 }
-  [[stage.candidate]]
-  name = "cc_K_alpha_noC"
-  label = "Shared K + crowding, sensitive kill from Stage 2, no resistant cisplatin term"
-  free = ["K", "αNC", "αCN"]
-  fixed = { "βC" = 0.0 }
-  [[stage.candidate]]
-  name = "cc_K_alpha_deathN_betaN_noC"
-  label = "Shared K + crowding + sensitive death, sensitive kill refitted, no resistant cisplatin term"
-  free = ["K", "αNC", "αCN", "dN", "βN"]
-  fixed = { "βC" = 0.0 }
-  [[stage.candidate]]
-  name = "cc_full_noC"
-  label = "Shared K + crowding + death, sensitive kill refitted, no resistant cisplatin term"
+  name = "cc_K_alpha_death_betaN"
+  label = "Shared K + crowding + death, sensitive kill refitted (λ_C = 1)"
   free = ["K", "αNC", "αCN", "dN", "dC", "βN"]
-  fixed = { "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_full_lambda"
+  label = "Shared K + crowding + death, sensitive kill refitted, resistant kill × λ_C"
+  free = ["K", "αNC", "αCN", "dN", "dC", "βN", "λC"]
 
 # ── 3b · low-resource cocultures, shared K ───────────────────────────────────
 [[stage]]

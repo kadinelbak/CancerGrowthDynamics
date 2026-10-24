@@ -280,16 +280,18 @@ function zooSystem(sim, p) {
     } else if (M.kernel === 'auc') { du[ko + 1] = w; E = Math.max(u[ko + 1], 0); }
     const ao = ko + nk;
     let reff = r, Keff = K, loss = 0, out = 0;
+    // kill strength × coculture multiplier λ (Stage 3a: β_C,co = λ_C·β_C; 1 when the slot is absent)
+    const be = sv(s['β']) * (s['λ'] ? sv(s['λ']) : 1);
     const a = M.action;
-    if (a === 'loss') loss += sv(s.d0) * w + sv(s['β']) * E;
-    else if (a === 'hill') { const h = sv(s.h), ec = s.EC50 ? sv(s.EC50) : EC50; loss += E > 0 ? sv(s['β']) * Math.pow(E, h) / (Math.pow(ec, h) + Math.pow(E, h)) : 0; }
-    else if (a === 'damage') { const d = sv(s['δ']), Dm = Math.max(u[o + 1], 0); du[o + 1] = ks * sv(s['β']) * E * V - d * Dm; out = d * Dm; }
-    else if (a === 'transit') { const tau = sv(s['τ']), D1 = Math.max(u[o + 1], 0), D2 = Math.max(u[o + 2], 0); du[o + 1] = ks * sv(s['β']) * E * V - tau * D1; du[o + 2] = tau * (D1 - D2); out = tau * D2; }
+    if (a === 'loss') loss += sv(s.d0) * w + be * E;
+    else if (a === 'hill') { const h = sv(s.h), ec = s.EC50 ? sv(s.EC50) : EC50; loss += E > 0 ? be * Math.pow(E, h) / (Math.pow(ec, h) + Math.pow(E, h)) : 0; }
+    else if (a === 'damage') { const d = sv(s['δ']), Dm = Math.max(u[o + 1], 0); du[o + 1] = ks * be * E * V - d * Dm; out = d * Dm; }
+    else if (a === 'transit') { const tau = sv(s['τ']), D1 = Math.max(u[o + 1], 0), D2 = Math.max(u[o + 2], 0); du[o + 1] = ks * be * E * V - tau * D1; du[o + 2] = tau * (D1 - D2); out = tau * D2; }
     else if (a === 'capacity') Keff = K / (1 + sv(s.c) * E);
     else if (a === 'fade') { reff = r / (1 + sv(s.c) * E); loss += sv(s.d0) * w; }
     else if (a === 'rho') { const f = w / uR; reff = r * (1 + (sv(s['ρr']) - 1) * f); Keff = K * (1 + (sv(s['ρK']) - 1) * f); }
     else if (a === 'sep_r') reff = r + (sv(s.rLR) - r) * w / uR;
-    else if (a === 'resource') { const R = Math.max(u[ao + 1], 0); du[ao + 1] = -sv(s.c) * E * R * X / 1000; reff = r * R; loss += sv(s['β']) * (1 - R); }
+    else if (a === 'resource') { const R = Math.max(u[ao + 1], 0); du[ao + 1] = -sv(s.c) * E * R * X / 1000; reff = r * R; loss += be * (1 - R); }
     else if (a === 'toxin') { const W = Math.max(u[ao + 1], 0); du[ao + 1] = E * X / 1000 - sv(s['κ']) * W; loss += sv(s['γ']) * W; }
     return [reff, Keff, loss, out];
   }

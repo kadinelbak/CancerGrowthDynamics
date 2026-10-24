@@ -33,15 +33,19 @@ const ZOO_STATE = deserialize(get(ENV, "ZOO_STATE", joinpath(@__DIR__, "outputs"
 const AN_STATE = deserialize(get(ENV, "AN_STATE", joinpath(@__DIR__, "outputs", "zoo_analyses", "analyses_state.jls")))
 zgroup(id) = ZOO_STATE.groups[findfirst(g -> g.id == id, ZOO_STATE.groups)]
 
-# resistant kill β_C of the carried Stage 3 model, and where it comes from: refitted, dropped (the
-# "no resistant cisplatin term" candidates fix it at 0) or inherited from Stage 2b
+# resistant kill of the carried Stage 3 model in coculture, β_C,co = λ_C·β_C, and where it comes from: λ_C refitted
+# on top of the Stage 2b β_C (PRD 2026-10-23), β_C refitted (older runs), dropped (older runs: fixed at 0) or
+# inherited from Stage 2b (λ_C = 1)
 function stage3_betaC()
     c3 = zgroup("s3").cands[1]; s = c3.sys.lines[2].s.β
+    l = hasproperty(c3.sys.lines[2].s, :λ) ? c3.sys.lines[2].s.λ : Slot(0, 1.0)
     dropped = s.i == 0 && hasproperty(c3, :fixedcc) && haskey(c3.fixedcc, :βC)
-    s.i > 0 ? (value=c3.params[s.i], free=true, dropped=false,
+    l.i > 0 ? (value=c3.params[l.i] * s.v, free=true, dropped=false, λ=c3.params[l.i], βmono=s.v,
+               source="Stage 3 (λ_C = $(round(c3.params[l.i]; sigdigits=3)) refitted × Stage 2b β_C = $(round(s.v; sigdigits=3)))") :
+    s.i > 0 ? (value=c3.params[s.i], free=true, dropped=false, λ=NaN, βmono=NaN,
                source="Stage 3 (refitted" * (c3.bounds[s.i][1] > 0 ? ", floor $(round(c3.bounds[s.i][1]; sigdigits=3)))" : ", no floor)")) :
-    dropped ? (value=s.v, free=false, dropped=true, source="Stage 3 (no resistant cisplatin term in coculture: selected, β_C = 0)") :
-              (value=s.v, free=false, dropped=false, source="Stage 2 (inherited)")
+    dropped ? (value=s.v, free=false, dropped=true, λ=0.0, βmono=NaN, source="Stage 3 (no resistant cisplatin term in coculture: selected, β_C = 0)") :
+              (value=s.v * l.v, free=false, dropped=false, λ=l.v, βmono=s.v, source="Stage 2 (inherited, λ_C = 1)")
 end
 
 # ── flattened cell equations ─────────────────────────────────────────────────
@@ -78,7 +82,7 @@ function line_specs(S, p, iε)
             εs = M.s.ε; εj = εs.i > 0 ? findfirst(==(εs.i), iε) : 0
             εs.i > 0 && εj === nothing && error("unexpected free slot")
             ch = M.kernel in (:comp1, :chain2, :chain3) ? nk : 0
-            push!(mods, ModSpec(M.input == :D, ch, ch > 0 ? gs(:k) : 0.0, off, M.action, gs(:β), gs(:h), gs(:c), gs(:d0), ec50_of(M.s, p, Float64),
+            push!(mods, ModSpec(M.input == :D, ch, ch > 0 ? gs(:k) : 0.0, off, M.action, gs(:β) * λ_of(M.s, p, Float64), gs(:h), gs(:c), gs(:d0), ec50_of(M.s, p, Float64),
                                 εs.i > 0 ? NaN : εs.v, εj, M.kernel, gs(:ω), gs(:ζ)))
             off += mwidth(M)
         end
@@ -195,7 +199,8 @@ function scenario_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default
     end
     if scen == :A
         p = b === nothing ? copy(c3.params) : ZOO_STATE.results["s3"].res.pars[1][b, :]
-        # an inherited resistant kill follows its own Stage 2 bootstrap draw, as h and k do
+        # an inherited resistant kill follows its own Stage 2 bootstrap draw, as h and k do; with λ_C refitted the
+        # draw is λ_C(b)·β_C(b), the Stage 3 and Stage 2b replicates b (PRD R2: β_C carried with its spread)
         b !== nothing && LC.s.β.i == 0 && !stage3_betaC().dropped && setdraw!(fixed_C, :β, "s2-a2780cis")
         name = "A: Stage 3 coculture model as selected"
     else
@@ -207,6 +212,7 @@ function scenario_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default
         ce0 = AN_STATE[:validation].ce1[1].params; n = length(ce0)
         p = b === nothing ? copy(ce0) : ZOO_STATE.results["s3"].res.pars[1][b, 1:n] .* (ce0 ./ c3.params[1:n])
         setdraw!(fixed_N, :β, "s2-a2780"); setdraw!(fixed_C, :β, "s2-a2780cis")
+        fixed_C[:λ] = 1.0          # scenario B: the monoculture kill itself, no coculture multiplier
         name = "B: monoculture drug response for both lines, crowding from untreated cocultures"
     end
     any(isnan, p) && return nothing

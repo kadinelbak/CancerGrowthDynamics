@@ -61,7 +61,8 @@ g3 = gid(HO["group"]); c3 = g3.cands[1]
 βN2 = βof(gid("$(HO["drug_from"])-a2780").cands[1]); βC2 = βof(gid("$(HO["drug_from"])-a2780cis").cands[1])
 function heldout_ce1_sys(βN, βC)
     LN, LC = c3.sys.lines
-    LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βN),)),)); LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βC),)),))
+    # λ_C = 1: the resistant kill is exactly the given βC (Stage 2b), whatever multiplier Stage 3a refitted
+    LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βN),)),)); LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βC), λ=Slot(0, 1.0))),))
     build_system([LN2, LC2], c3.sys.envs, c3.sys.alpha)
 end
 heldout_ce1_model(βN, βC) = make_system_model(heldout_ce1_sys(βN, βC))

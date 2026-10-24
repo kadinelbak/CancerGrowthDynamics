@@ -297,7 +297,7 @@ end
 # Saltelli sampling with the Saltelli (2010) S1 and Jansen ST estimators; 95% intervals from
 # resampling the draws. Not in GrowthParameterEstimation, so implemented here.
 using Random: Xoshiro
-const GSA_N = SMOKE ? 64 : 16384
+const GSA_N = SMOKE ? 64 : parse(Int, get(ENV, "GSA_N", "16384"))     # GSA_N: fewer Sobol samples on a small machine
 
 function sobol(f, lo, hi, m; N=GSA_N, seed=7, nboot=200)
     k = length(lo); rng = Xoshiro(seed)
@@ -617,7 +617,7 @@ function page(file, title, active, body)
     nav = "<nav class='topnav' aria-label='Report navigation'><a href='$(D)index.html' class='nav nav-home' aria-label='Reports home' title='Reports home'>$home</a>" *
           nl("Summary", "$(D)outputs/results/summary.html", false) * nl("Model zoo fits", "../../zoo_fits/report.html", false) *
           nl("Bootstrapping", "../bootstrap/report.html", active == "bootstrap") * nl("Sensitivity", "../sensitivity/report.html", active == "sensitivity") *
-          nl("Validation", "../validation/report.html", active == "validation") * nl("Final report", "$(D)outputs/final_report/report.html", false) * "</nav>"
+          nl("Validation", "../validation/report.html", active == "validation") * nl("Resistant kill", "../resistant_kill/report.html", active == "resistant_kill") * nl("Final report", "$(D)outputs/final_report/report.html", false) * "</nav>"
     html = """<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>$title</title>
 <script>window.MathJax={tex:{inlineMath:[['\\\\(','\\\\)']],displayMath:[['\\\\[','\\\\]']]}};</script><script defer src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>$nav<h1>$title</h1>
@@ -672,7 +672,16 @@ const BETTER = Dict{String,Any}(
     "In-sample RMSE" => :lower,
     "Held-out nRMSE" => :lower,
     "In-sample nRMSE" => :lower,
-    "Ratio" => "Closer to 1 is better: unseen data are predicted about as well as the fitted data.")
+    "Ratio" => "Closer to 1 is better: unseen data are predicted about as well as the fitted data.",
+    "λ_C" => :none,
+    "n·log(SSE ratio)" => "Lower means λ_C fits the cocultures better; below 3.84 is inside the 95% interval.",
+    "Held-out set" => :none,
+    "Fitted to" => :none,
+    "β_C,co = 0" => :lower,
+    "λ_C = 1" => :lower,
+    "λ_C refitted" => :lower,
+    "Variant" => :none,
+    "Passes" => :higher)
 hcell(h::AbstractString) = "<th>$h</th>"
 hcell(h::Tuple) = "<th>$(h[1])$(tip(h[2], header_better(BETTER, h); warn=length(h) > 3 ? h[4] : nothing))</th>"   # (label, text[, better[, warning]])
 table(head, rows) = "<div class='tscroll'><table><tr>" * join(hcell.(head)) * "</tr>" * join(rows) * "</table></div>"
@@ -923,6 +932,8 @@ $(table([("Line", "Cell line; each row uses both intermittent trajectories of th
 end
 
 # ---- validation page
+include(joinpath(@__DIR__, "zoo_betaC.jl"))     # resistant kill in coculture: λ_C profile, held-out comparison, page
+
 function write_validation()
     V = ck[:validation]
     CSV.write(joinpath(AN_DIR, "validation_blocked.csv"), DataFrame(V.rows))
@@ -982,4 +993,5 @@ end
 write_bootstrap()
 write_sensitivity()
 write_validation()
+write_resistant_kill()
 println("\nDone.")

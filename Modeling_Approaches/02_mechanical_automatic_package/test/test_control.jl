@@ -25,7 +25,7 @@ function heldout_model_B()
     c3 = zgroup("s3").cands[1]; LN, LC = c3.sys.lines
     βof(c) = c.params[findfirst(==(:β), c.slots)]
     LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βof(zgroup("s2-a2780").cands[1])),)),))
-    LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βof(zgroup("s2-a2780cis").cands[1])),)),))
+    LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βof(zgroup("s2-a2780cis").cands[1])), λ=Slot(0, 1.0))),))   # λ_C = 1: the Stage 2b kill
     make_system_model(build_system([LN2, LC2], c3.sys.envs, c3.sys.alpha)), AN_STATE[:validation].ce1[1].params
 end
 
