@@ -53,7 +53,7 @@
         <h1 class="hero-title">From Culture to Control</h1>
         <p class="hero-sub">Staged Mechanistic Modeling and Optimal Dosing of Cisplatin-Sensitive and -Resistant Ovarian Cancer Cells</p>
         <div class="hero-meta">
-          <span>Built 2026-10-23 from <i>Working Draft - equations 2.docx</i></span>
+          <span>Built 2026-10-27 from <i>Working Draft - equations 2 (Results filled).docx</i></span>
           <span class="read-time"></span>
         </div>
         <div class="status-bar" aria-label="Draft status of the sections"></div>
@@ -662,38 +662,573 @@
 <li><p>One evaluation protocol for all three: same held-out sets (Ce1, intermittent, unseen dose, unseen density), same metric and scale.</p></li>
 </ul>
 <h2 id="sec-3-results">3 Results</h2>
-<p>Results follow the same line as Methods. Sections 3.2–3.6 go stage by stage; 3.7–3.8 cover qualification across all stages, which is how the Final Report is laid out. Numbers below are from the 2026-09-30 zoo run.</p>
-<h3 data-status="Now" id="sec-3-1-sensitive-and-resistant-cells-respond-differently-to-eve">3.1 Sensitive and resistant cells respond differently to every perturbation <span class="status status-now">Now</span></h3>
-<ul>
-<li><p>Figure 3.1: grid of mean counts per condition on one shared y-axis.</p></li>
-<li><p>Describe plateaus (about 4,000 cells/image untreated), lag in A2780cis, low-resource decline, dose response, coculture ratios.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-2-the-two-lines-need-different-growth-laws">3.2 The two lines need different growth laws <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>A2780: logistic, r_N = 0.82/day, K_N = 3,950 (chosen in 68% of bootstrap replicates).</p></li>
-<li><p>A2780cis: theta-logistic, r_C = 0.47/day, K_C = 3,841, θ_C = 3.3 (94%).</p></li>
-<li><p>Table 3.1: candidates, k, BIC, ΔBIC.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-3-low-resource-acts-through-different-mechanisms-in-each-l">3.3 Low resource acts through different mechanisms in each line <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>A2780: low resource lowers carrying capacity immediately (c_N = 0.41).</p></li>
-<li><p>A2780cis: immediate loss plus a delayed loss through 3 stress compartments.</p></li>
-<li><p>A shared structure is rejected (ΔBIC +4.87): first transportability result.</p></li>
-<li><p>Long-term check: A2780 plateaus at about 2,850 cells; A2780cis dies out.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-4-cisplatin-kill-is-delayed-and-saturating-in-both-lines">3.4 Cisplatin kill is delayed and saturating in both lines <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>Shared structure: 3 transit compartments → Hill kill (joint BIC 1062.9, k = 6).</p></li>
-<li><p>β_N = 0.97 vs β_C = 0.37: resistance shows up as rate, not mechanism.</p></li>
-<li><p>Immediate-effect models are 21–59 BIC worse.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-5-coculture-shows-asymmetric-competition-and-no-resistant-">3.5 Coculture shows asymmetric competition and no resistant kill <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>Shared K, α_NC = 0.61, α_CN = 1.51, sensitive death d_N, no resistant kill (100% of replicates).</p></li>
-<li><p>Interpret: resistant cells crowd sensitive cells more than the reverse; the monoculture resistant kill does not carry into coculture.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-6-parameters-transport-only-partly">3.6 Parameters transport only partly <span class="status status-update">Update</span></h3>
-<p>This is the central result; Table 3.2 summarizes every transportability test.</p>
+<p>Results follow the same line as Methods. Sections 3.1–3.6 go stage by stage; 3.7–3.8 cover qualification across all stages; 3.9–3.10 report optimal control and 3.11 compares the mechanistic models with learned models. All numbers come from the model-zoo fits run on 2026-10-07 (reports generated 2026-10-10) and the control runs of 2026-10-10. At every stage the selected model is the one with the fewest free parameters among the candidates within 3 BIC of the lowest (Section 2.2.6). Intervals in brackets are 95% block-bootstrap intervals (200 replicates, 3-day blocks) unless stated otherwise. Cell counts are mean cells per image.</p>
+<h3 data-status="Drafted" id="sec-3-1-sensitive-and-resistant-cells-respond-differently-to-eve">3.1 Sensitive and resistant cells respond differently to every perturbation <span class="status status-drafted">Drafted</span></h3>
+<p>Every condition was imaged daily for 14 days in three wells (Table 3.1, Figure 3.1). Untreated, both lines plateaued near 4,000 cells per image (A2780 4,170 and A2780cis 3,732 on day 14), but they got there differently. A2780 grew from the first day, whereas A2780cis showed a lag: its day-1 count (80) was below the nominal seeding of 100 cells, and it reached half of its plateau about 2 days later than A2780.</p>
+<p>Cisplatin separated the two lines. A2780 responded in a dose-dependent way: 0.62 µM slowed growth slightly (3,424 cells on day 14), 1 µM held the culture near 1,800 cells from day 7 to day 13, and 1.47 µM produced a rise to 1,293 cells on day 3 followed by a steady decline to 60 cells on day 14. A2780cis kept growing at every dose and reached 3,327–4,117 cells by day 14; even at the highest measured dose its growth was only delayed. The kill therefore appears days after the drug is added, which is the first sign that the drug effect is delayed (Section 3.4).</p>
+<p>Low resource (0.5% FBS) also separated the lines, in the opposite direction. A2780 still grew, to a lower plateau (3,018 cells on day 14 at 30k), while A2780cis peaked by day 3 and then died out (12 cells by day 11). In low-resource cocultures the same pattern held: A2780 reached 2,300–3,900 cells in eight of nine series and A2780cis peaked within 2–4 days and fell to 6–99 cells in the seven series with a usable final count. Two 3:1 series repeat their day-1 value as the final count and were treated as missing.</p>
+<p>Coculture showed competition that depends on the medium and on the drug (Table 3.2). Untreated, sensitive cells dominated at every seeding ratio: even when resistant cells made up 75% of the seeding they were 46% of cells on day 14, and at 75:25 they fell to 5%. With 1 µM cisplatin the balance reversed, and resistant cells made up 45–81% of cells on day 14. In low resource resistant cells were all but eliminated whatever the seeding ratio.</p>
+<p>Day-1 counts were often well away from the nominal seeding. Starting values were therefore estimated for the 21 of 36 series whose first count differed more than 3-fold from nominal; low-resource series started 1.5–10.5 times above nominal (median 3.2).</p>
+<p>[Figure 3.1: grid of mean counts per condition on one shared y-axis.]</p>
+<p><strong>Table 3.1.</strong> Monoculture counts (mean cells per image, 3 wells) on days 1, 7 and 14. Low-resource monocultures are the 30k seeding of run 1.</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Condition</strong></th>
+<th><strong>Line</strong></th>
+<th><strong>Day 1</strong></th>
+<th><strong>Day 7</strong></th>
+<th><strong>Day 14</strong></th>
+<th><strong>Pattern</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Untreated</td>
+<td>A2780</td>
+<td>247</td>
+<td>3,463</td>
+<td>4,170</td>
+<td>Logistic rise to plateau</td>
+</tr>
+<tr class="even">
+<td>Untreated</td>
+<td>A2780cis</td>
+<td>80</td>
+<td>2,473</td>
+<td>3,732</td>
+<td>Lag, then fast rise</td>
+</tr>
+<tr class="odd">
+<td>0.62 µM cisplatin</td>
+<td>A2780</td>
+<td>508</td>
+<td>2,896</td>
+<td>3,424</td>
+<td>Slightly slowed</td>
+</tr>
+<tr class="even">
+<td>1 µM cisplatin</td>
+<td>A2780</td>
+<td>277</td>
+<td>1,784</td>
+<td>2,522</td>
+<td>Held near 1,800 to day 13</td>
+</tr>
+<tr class="odd">
+<td>1.47 µM cisplatin</td>
+<td>A2780</td>
+<td>683</td>
+<td>909</td>
+<td>60</td>
+<td>Peak 1,293 on day 3, then decline</td>
+</tr>
+<tr class="even">
+<td>0.62 µM cisplatin</td>
+<td>A2780cis</td>
+<td>119</td>
+<td>2,671</td>
+<td>3,327</td>
+<td>Unaffected</td>
+</tr>
+<tr class="odd">
+<td>1 µM cisplatin</td>
+<td>A2780cis</td>
+<td>118</td>
+<td>2,595</td>
+<td>4,117</td>
+<td>Unaffected</td>
+</tr>
+<tr class="even">
+<td>1.47 µM cisplatin</td>
+<td>A2780cis</td>
+<td>74</td>
+<td>1,882</td>
+<td>3,434</td>
+<td>Delayed growth</td>
+</tr>
+<tr class="odd">
+<td>Low resource (0.5% FBS)</td>
+<td>A2780</td>
+<td>726</td>
+<td>2,814</td>
+<td>3,018</td>
+<td>Lower plateau</td>
+</tr>
+<tr class="even">
+<td>Low resource (0.5% FBS)</td>
+<td>A2780cis</td>
+<td>513</td>
+<td>142</td>
+<td>12 (day 11)</td>
+<td>Peak day 3, then dies out</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Table 3.2.</strong> Coculture composition on day 14 (mean cells per image). Ratios are sensitive:resistant at seeding. Low-resource rows are run 1 at 30k.</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Condition</strong></th>
+<th><strong>Seeding S:R</strong></th>
+<th><strong>A2780 (S)</strong></th>
+<th><strong>A2780cis (R)</strong></th>
+<th><strong>Resistant fraction</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Untreated (Ce0)</td>
+<td>75:25</td>
+<td>3,014</td>
+<td>166</td>
+<td>0.05</td>
+</tr>
+<tr class="even">
+<td>Untreated (Ce0)</td>
+<td>50:50</td>
+<td>2,775</td>
+<td>422</td>
+<td>0.13</td>
+</tr>
+<tr class="odd">
+<td>Untreated (Ce0)</td>
+<td>25:75</td>
+<td>1,997</td>
+<td>1,685</td>
+<td>0.46</td>
+</tr>
+<tr class="even">
+<td>1 µM cisplatin (Ce1)</td>
+<td>75:25</td>
+<td>1,844</td>
+<td>1,533</td>
+<td>0.45</td>
+</tr>
+<tr class="odd">
+<td>1 µM cisplatin (Ce1)</td>
+<td>50:50</td>
+<td>1,221</td>
+<td>2,088</td>
+<td>0.63</td>
+</tr>
+<tr class="even">
+<td>1 µM cisplatin (Ce1)</td>
+<td>25:75</td>
+<td>672</td>
+<td>2,884</td>
+<td>0.81</td>
+</tr>
+<tr class="odd">
+<td>Low resource</td>
+<td>50:50</td>
+<td>3,258</td>
+<td>12</td>
+<td>&lt;0.01</td>
+</tr>
+<tr class="even">
+<td>Low resource</td>
+<td>25:75</td>
+<td>3,171</td>
+<td>14</td>
+<td>&lt;0.01</td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-2-the-two-lines-need-different-growth-laws">3.2 The two lines need different growth laws <span class="status status-drafted">Drafted</span></h3>
+<p>A2780 follows the logistic law (Table 3.3): theta-logistic fits slightly worse once its extra parameter is counted (ΔBIC +2.58) and Gompertz is clearly worse (+17.7). The logistic model was selected in 94% of bootstrap replicates, with r<sub>N</sub> = 0.817/day (0.782–0.855), a doubling time of 0.85 days, and K<sub>N</sub> = 3,941 cells (3,773–4,084).</p>
+<p>A2780cis needs the theta-logistic law: the logistic model is 8.06 BIC worse, and the theta-logistic model was selected in 89% of replicates. Its growth rate is about half that of A2780, r<sub>C</sub> = 0.448/day (0.415–0.473), a doubling time of 1.55 days, with K<sub>C</sub> = 3,798 (3,313–4,021). The shape parameter θ<sub>C</sub> = 5.49 means A2780cis grows almost exponentially until it is close to capacity and then stops abruptly, which matches the sharp plateau in Table 3.1. θ<sub>C</sub> is only bounded from below: its bootstrap interval (1.70–10.0) reaches the upper bound of the search and its profile is flat above the estimate.</p>
+<p><strong>Table 3.3.</strong> Stage 1 growth-law candidates. k is the number of fitted parameters; “Bootstrap” gives how often each model was selected by the rule / had the lowest BIC across 200 replicates.</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Line</strong></th>
+<th><strong>Candidate</strong></th>
+<th><strong>k</strong></th>
+<th><strong>BIC</strong></th>
+<th><strong>ΔBIC</strong></th>
+<th><strong>Bootstrap (selected / lowest BIC)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A2780</td>
+<td><strong>Logistic (selected)</strong></td>
+<td>2</td>
+<td>24.6</td>
+<td>0</td>
+<td>94% / 80%</td>
+</tr>
+<tr class="even">
+<td>A2780</td>
+<td>Theta-logistic</td>
+<td>3</td>
+<td>27.2</td>
+<td>+2.58</td>
+<td>6% / 20%</td>
+</tr>
+<tr class="odd">
+<td>A2780</td>
+<td>Gompertz</td>
+<td>2</td>
+<td>42.3</td>
+<td>+17.7</td>
+<td>0% / 0%</td>
+</tr>
+<tr class="even">
+<td>A2780cis</td>
+<td><strong>Theta-logistic (selected)</strong></td>
+<td>3</td>
+<td>46.5</td>
+<td>0</td>
+<td>89% / 98%</td>
+</tr>
+<tr class="odd">
+<td>A2780cis</td>
+<td>Logistic</td>
+<td>2</td>
+<td>54.5</td>
+<td>+8.06</td>
+<td>11% / 2%</td>
+</tr>
+<tr class="even">
+<td>A2780cis</td>
+<td>Gompertz</td>
+<td>2</td>
+<td>65.9</td>
+<td>+19.4</td>
+<td>0% / 0%</td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-3-low-resource-acts-through-different-mechanisms-in-each-l">3.3 Low resource acts through different mechanisms in each line <span class="status status-drafted">Drafted</span></h3>
+<p>In A2780, low resource lowers the carrying capacity through a delayed, second-order effect (Table 3.4): K<sub>eff</sub> = K<sub>N</sub>/(1 + c<sub>N</sub>S<sub>N</sub>) with c<sub>N</sub> = 0.526 (0.374–0.604), so the plateau falls by about a third. The fitted damping ζ<sub>N</sub><sup>R</sup> = 0.05 sits at its lower bound and ω<sub>N</sub><sup>R</sup> = 1.03/day, so the effect behaves like a slowly fading oscillation with a period of about 6 days; this probably absorbs the day-to-day ups and downs of the low-resource data rather than describing a real oscillation. The selection is the least stable of all stages (50% of replicates); the simplest alternatives, an immediate loss (ΔBIC +3.36) or an immediately lowered K (+4.91), are each selected in 12–14% of replicates. All of these candidates agree that A2780 survives: the selected model settles at 2,624–2,634 cells between day 30 and day 200.</p>
+<p>In A2780cis, low resource acts as a cumulative exposure that never clears: dS<sub>C</sub>/dt = u<sub>R</sub> and the loss rate is d<sub>C</sub><sup>LR</sup>S<sub>C</sub> with d<sub>C</sub><sup>LR</sup> = 0.161 (0.155–0.165), a single parameter. The loss rate therefore grows linearly in time and overtakes the growth rate r<sub>C</sub> after about 2.9 days in 0.5% FBS, after which the culture dies out. This was selected in 66% of replicates; a toxic by-product model with the same number of parameters (ΔBIC +1.92) took 21%. Both describe a stress that accumulates rather than an immediate cost.</p>
+<p>A single low-resource structure for both lines was rejected: the best shared structure (effect compartment → loss) has a summed BIC of 60.75 against 53.67 for each line's own choice with the same total number of parameters (ΔBIC +7.09). This is the first transportability result: the two lines respond to starvation through different mechanisms, not just at different rates.</p>
+<p><strong>Table 3.4.</strong> Stage 2a low-resource candidates (best five per line of 29 tested).</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Line</strong></th>
+<th><strong>Candidate</strong></th>
+<th><strong>k</strong></th>
+<th><strong>BIC</strong></th>
+<th><strong>ΔBIC</strong></th>
+<th><strong>Bootstrap (selected / lowest BIC)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A2780</td>
+<td><strong>Second-order effect → lowers K (selected)</strong></td>
+<td>3</td>
+<td>39.2</td>
+<td>0</td>
+<td>50% / 70%</td>
+</tr>
+<tr class="even">
+<td>A2780</td>
+<td>Second-order effect → loss</td>
+<td>3</td>
+<td>40.7</td>
+<td>+1.51</td>
+<td>6% / 8%</td>
+</tr>
+<tr class="odd">
+<td>A2780</td>
+<td>Immediate loss</td>
+<td>1</td>
+<td>42.5</td>
+<td>+3.36</td>
+<td>14% / 3%</td>
+</tr>
+<tr class="even">
+<td>A2780</td>
+<td>Second-order effect → damaged cells die</td>
+<td>4</td>
+<td>43.8</td>
+<td>+4.65</td>
+<td>0% / 2%</td>
+</tr>
+<tr class="odd">
+<td>A2780</td>
+<td>Immediate lowers K</td>
+<td>1</td>
+<td>44.1</td>
+<td>+4.91</td>
+<td>12% / 6%</td>
+</tr>
+<tr class="even">
+<td>A2780cis</td>
+<td><strong>Cumulative exposure → loss (selected)</strong></td>
+<td>1</td>
+<td>14.5</td>
+<td>0</td>
+<td>66% / 50%</td>
+</tr>
+<tr class="odd">
+<td>A2780cis</td>
+<td>Immediate + 3-compartment loss</td>
+<td>3</td>
+<td>14.4</td>
+<td>−0.11</td>
+<td>4% / 6%</td>
+</tr>
+<tr class="even">
+<td>A2780cis</td>
+<td>Immediate + 2-compartment loss</td>
+<td>3</td>
+<td>15.3</td>
+<td>+0.83</td>
+<td>0% / 2%</td>
+</tr>
+<tr class="odd">
+<td>A2780cis</td>
+<td>Effect compartment → loss</td>
+<td>2</td>
+<td>15.8</td>
+<td>+1.24</td>
+<td>2% / 12%</td>
+</tr>
+<tr class="even">
+<td>A2780cis</td>
+<td>Toxic by-product accumulates</td>
+<td>1</td>
+<td>16.4</td>
+<td>+1.92</td>
+<td>21% / 10%</td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-4-cisplatin-kill-is-delayed-in-both-lines-and-slower-and-w">3.4 Cisplatin kill is delayed in both lines, and slower and weaker in A2780cis <span class="status status-drafted">Drafted</span></h3>
+<p>Because A2780cis is derived from A2780 and cisplatin kills both through DNA damage, the two lines were required to share one drug mechanism with their own rates, and the selection rule was applied to the joint BIC. The selected structure is a chain of 3 transit compartments feeding a linear (Norton–Simon) kill, scaled by the free space (1 − N/K<sub>N</sub>): joint BIC 296.7 with k = 4 (Table 3.5). A Hill kill on the same chain fits equally well (joint ΔBIC +2.9) but needs two more parameters, so the saturating kill described in Section 2.2.3 is not needed at the measured doses (0.62–1.47 µM). Models where the drug acts immediately are clearly worse: ΔBIC +68.8 for A2780 and +20.7 to +25.4 for A2780cis.</p>
+<p>Resistance shows up as slower and weaker kill, not a different mechanism (Table 3.6). The mean delay through the chain (3/k) is 4.2 days for A2780 and 11.6 days for A2780cis, and the kill strength is 1.7 times higher in A2780 (β<sub>N</sub> = 0.829 vs β<sub>C</sub> = 0.485). The A2780cis kill is real in monoculture: removing it costs 31.4 BIC. It is only bounded from below, however: its bootstrap interval runs from 0.26 to 1.47 and its profile is one-sided. On its own, A2780cis would prefer a cumulative-exposure model (6.8 BIC lower), which the shared-mechanism rule rules out.</p>
+<p><strong>Table 3.5.</strong> Stage 2b shared cisplatin structures, ranked by the joint BIC of the two lines.</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Shared structure</strong></th>
+<th><strong>BIC A2780</strong></th>
+<th><strong>BIC A2780cis</strong></th>
+<th><strong>Joint BIC</strong></th>
+<th><strong>Joint k</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>3 compartments → linear kill (selected)</strong></td>
+<td>132.9</td>
+<td>163.9</td>
+<td>296.7</td>
+<td>4</td>
+</tr>
+<tr class="even">
+<td>3 compartments → Hill kill</td>
+<td>136.2</td>
+<td>163.5</td>
+<td>299.7</td>
+<td>6</td>
+</tr>
+<tr class="odd">
+<td>2 compartments → Hill kill</td>
+<td>135.4</td>
+<td>164.6</td>
+<td>300.0</td>
+<td>6</td>
+</tr>
+<tr class="even">
+<td>Second-order effect → Hill kill</td>
+<td>138.9</td>
+<td>163.9</td>
+<td>302.8</td>
+<td>8</td>
+</tr>
+<tr class="odd">
+<td>Second-order effect → linear kill</td>
+<td>134.1</td>
+<td>168.8</td>
+<td>302.9</td>
+<td>6</td>
+</tr>
+<tr class="even">
+<td>Effect compartment → Hill kill</td>
+<td>136.1</td>
+<td>167.1</td>
+<td>303.1</td>
+<td>6</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Table 3.6.</strong> Stage 2b parameters (3 compartments → linear kill, three doses fitted jointly per line).</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Parameter</strong></th>
+<th><strong>A2780</strong></th>
+<th><strong>A2780cis</strong></th>
+<th><strong>Ratio N/C</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Kill strength β (/µM/day)</td>
+<td>0.829 (0.778–0.887)</td>
+<td>0.485 (0.262–1.468)</td>
+<td>1.7</td>
+</tr>
+<tr class="even">
+<td>Transit rate k (/day)</td>
+<td>0.720 (0.632–0.790)</td>
+<td>0.259 (0.141–0.412)</td>
+<td>2.8</td>
+</tr>
+<tr class="odd">
+<td>Mean delay 3/k (days)</td>
+<td>4.2</td>
+<td>11.6</td>
+<td>0.36</td>
+</tr>
+<tr class="even">
+<td>Selected in bootstrap</td>
+<td>84%</td>
+<td>84%</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-5-coculture-shows-asymmetric-competition-and-no-resistant-">3.5 Coculture shows asymmetric competition and no resistant kill <span class="status status-drafted">Drafted</span></h3>
+<p>Untreated and 1 µM cocultures at three ratios were fitted together with one shared carrying capacity (Stage 3a, Table 3.7). The selected model adds asymmetric crowding, a death rate for each line, and a refitted sensitive kill, and has no cisplatin term for the resistant cells: 6 parameters, BIC 637.7, selected in 57% of replicates. The model without resistant death d<sub>C</sub> (ΔBIC +3.81) took the remaining 43%. Refitting the resistant kill drives it to β<sub>C</sub> ≈ 0 and costs 5.1 BIC, and no bootstrap replicate selected it. Keeping the A2780 monoculture kill unchanged, without the coculture death terms, is much worse (ΔBIC +47.8), and one-for-one crowding with everything inherited is worst (+108.7).</p>
+<p>The fitted crowding is asymmetric (Table 3.8). In the resistant growth term each sensitive cell counts as α<sub>CN</sub> = 1.47 resistant cells, while in the sensitive growth term each resistant cell counts as only α<sub>NC</sub> = 0.68 sensitive cells. In normal medium, sensitive cells therefore suppress resistant cells more than the reverse, which matches the untreated cocultures in Table 3.2, where resistant cells lose ground even from a 25:75 start. In coculture the sensitive kill is less than half its monoculture value (β<sub>N</sub> = 0.386 vs 0.829), but sensitive cells also die at d<sub>N</sub> = 0.168/day in every coculture, treated or not.</p>
+<p>The low-resource cocultures (Stage 3b) were fitted with the Stage 2a mechanisms carried over unchanged and refitted K and crowding: 3 parameters, BIC 700.6, selected in 78% of replicates. Removing the low-resource effects costs 28.5–33.4 BIC. Here the crowding reverses (α<sub>NC</sub> = 4.31, α<sub>CN</sub> = 0.08) and K rises to 5,290 (4,953–5,756). Because A2780cis dies out in every low-resource coculture, these values rest mainly on the first few days and are poorly identified: α<sub>NC</sub> reaches its upper bound and α<sub>CN</sub> is flat.</p>
+<p><strong>Table 3.7.</strong> Stage 3a coculture candidates (Ce0 + Ce1 fitted jointly; 12 tested).</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Candidate</strong></th>
+<th><strong>k</strong></th>
+<th><strong>BIC</strong></th>
+<th><strong>ΔBIC</strong></th>
+<th><strong>Bootstrap (selected / lowest BIC)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Shared K + crowding + death in both lines, sensitive kill refitted, no resistant kill (selected)</strong></td>
+<td>6</td>
+<td>637.7</td>
+<td>0</td>
+<td>57% / 76%</td>
+</tr>
+<tr class="even">
+<td>Same, sensitive death only</td>
+<td>5</td>
+<td>641.5</td>
+<td>+3.81</td>
+<td>43% / 24%</td>
+</tr>
+<tr class="odd">
+<td>Shared K + crowding + death, both kills refitted</td>
+<td>7</td>
+<td>642.8</td>
+<td>+5.12</td>
+<td>0% / 0%</td>
+</tr>
+<tr class="even">
+<td>Shared K + crowding + sensitive death, both kills refitted</td>
+<td>6</td>
+<td>646.6</td>
+<td>+8.93</td>
+<td>0% / 0%</td>
+</tr>
+<tr class="odd">
+<td>Shared K + crowding, sensitive kill from Stage 2b, no resistant kill</td>
+<td>3</td>
+<td>685.5</td>
+<td>+47.8</td>
+<td>0% / 0%</td>
+</tr>
+<tr class="even">
+<td>Shared K, one-for-one crowding, drug mechanisms from Stage 2b</td>
+<td>1</td>
+<td>746.4</td>
+<td>+108.7</td>
+<td>0% / 0%</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Table 3.8.</strong> Coculture parameters in normal medium (Stage 3a) and low resource (Stage 3b).</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Parameter</strong></th>
+<th><strong>Meaning</strong></th>
+<th><strong>Stage 3a (normal medium)</strong></th>
+<th><strong>Stage 3b (low resource)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>K</td>
+<td>Shared carrying capacity (cells)</td>
+<td>4,379 (4,218–4,912)</td>
+<td>5,290 (4,953–5,756)</td>
+</tr>
+<tr class="even">
+<td>α<sub>NC</sub></td>
+<td>Crowding of A2780 by A2780cis</td>
+<td>0.679 (0.564–0.745)</td>
+<td>4.31 (2.66–5.0, at bound)</td>
+</tr>
+<tr class="odd">
+<td>α<sub>CN</sub></td>
+<td>Crowding of A2780cis by A2780</td>
+<td>1.471 (1.466–1.711)</td>
+<td>0.082 (not identified)</td>
+</tr>
+<tr class="even">
+<td>d<sub>N</sub></td>
+<td>A2780 death in coculture (/day)</td>
+<td>0.168 (0.160–0.210)</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>d<sub>C</sub></td>
+<td>A2780cis death in coculture (/day)</td>
+<td>0.026 (0.007–0.040)</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>β<sub>N</sub></td>
+<td>A2780 kill in coculture (/µM/day)</td>
+<td>0.386 (0.331–0.406)</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>β<sub>C</sub></td>
+<td>A2780cis kill in coculture</td>
+<td>0 (not selected)</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Selected in bootstrap</td>
+<td>57%</td>
+<td>78%</td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-6-parameters-transport-only-partly">3.6 Parameters transport only partly <span class="status status-drafted">Drafted</span></h3>
+<p>This is the central result; Table 3.9 summarizes every transportability test. Growth and low-resource parameters carry from monoculture into coculture, but drug responses do not: the A2780 kill is redistributed into a smaller kill plus a coculture death rate, the A2780cis kill disappears, and the crowding coefficients change with the medium.</p>
+<p>In the combined low-resource + cisplatin coculture (Stage 4), inheriting everything is 27.6 BIC worse than adding a single drug × low-resource interaction χ = 1.15 (0.94–1.29; profile 0.97–1.44), selected in 90% of replicates. In low resource the cisplatin kill of A2780 is therefore about 2.2 times stronger (1 + χ). Because the resistant kill is zero in coculture, χ acts on A2780 only. Separate low-resource strengths per line (ε<sub>N</sub> = 7.80, ε<sub>C</sub> = 0.70), the alternative described in Section 2.2.9, are 7.96 BIC worse and were never selected.</p>
+<p><strong>Table 3.9.</strong> Transportability tests.</p>
 <div class="table-wrap"><table>
 
 <thead>
@@ -707,63 +1242,745 @@
 <tr class="odd">
 <td>One low-resource mechanism for both lines</td>
 <td>No</td>
-<td>ΔBIC +4.87</td>
+<td>Shared structure ΔBIC +7.09 at equal k</td>
 </tr>
 <tr class="even">
 <td>One cisplatin mechanism for both lines</td>
-<td>Yes</td>
-<td>Joint BIC selection</td>
+<td>Yes, with own rates</td>
+<td>Shared 3-compartment linear kill; β<sub>N</sub>/β<sub>C</sub> = 1.7, delay 4.2 vs 11.6 days</td>
 </tr>
 <tr class="odd">
-<td>Monoculture drug response in coculture</td>
+<td>A2780 monoculture kill in coculture</td>
 <td>Partly</td>
-<td>Resistant kill drops to 0; held-out Ce1 <span class="math inline">\(nRMSE\)</span> 0.59 vs 0.27 fitted</td>
+<td>β<sub>N</sub> refitted to 47% of monoculture, plus d<sub>N</sub> = 0.168/day; keeping Stage 2b kill ΔBIC +47.8</td>
+</tr>
+<tr class="even">
+<td>A2780cis monoculture kill in coculture</td>
+<td>No</td>
+<td>Refitted β<sub>C</sub> → 0; keeping it ΔBIC +5.1 (Stage 3a), +4.2 (Stage 4)</td>
+</tr>
+<tr class="odd">
+<td>Normal-medium crowding in low resource</td>
+<td>No</td>
+<td>α<sub>NC</sub> 0.68 → 4.31, α<sub>CN</sub> 1.47 → 0.08, K 4,379 → 5,290</td>
 </tr>
 <tr class="even">
 <td>Low-resource mechanisms in coculture</td>
 <td>Yes</td>
-<td>1 new parameter (Stage 3b)</td>
+<td>Carried from Stage 2a unchanged; removing them ΔBIC +28.5 to +33.4</td>
 </tr>
 <tr class="odd">
-<td>Everything inherited in LR + cisplatin</td>
+<td>Everything inherited in low resource + cisplatin</td>
 <td>No</td>
-<td>ΔBIC +70 vs refitting ε_N = 7.7, ε_C = 0.38</td>
+<td>ΔBIC +27.6 vs one new parameter χ</td>
+</tr>
+<tr class="even">
+<td>Drug × low-resource interaction</td>
+<td>Yes, one shared χ</td>
+<td>χ = 1.15 (0.94–1.29); per-line ε ΔBIC +7.96</td>
 </tr>
 </tbody>
 </table></div>
-<ul>
-<li><p>Interpret ε: with cisplatin, low resource acts about 8× more strongly on A2780 and about 0.4× as strongly on A2780cis.</p></li>
-<li><p>Drug × low-resource interaction χ is not selected.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-7-some-selections-are-stable-some-are-not">3.7 Some selections are stable, some are not <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>Figure 3.2: bootstrap selection frequency per stage (7% Stage 1b A2780cis to 100% Stages 3 and 4).</p></li>
-<li><p>4 of 23 fitted parameters not fully identifiable; d_C^acc is flat and k_C^R one-sided.</p></li>
-<li><p>Sobol: β_N, ε_N, ε_C and K dominate their outputs; d_N and α_NC drive the treated coculture.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-8-models-predict-held-out-data-with-stated-error">3.8 Models predict held-out data with stated error <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>Intermittent schedules (never fitted): drug-effect washout at the same rate as onset is supported (ΔBIC for a separate rate +2.15, +3.13).</p></li>
-<li><p>Held-out Ce1: <span class="math inline">\(nRMSE\)</span> 0.59 (monoculture drug response) vs 1.29 for no change.</p></li>
-<li><p>Blocked and forecast: held-out to in-sample ratio 1.0–2.8; worst for A2780cis treated forecasts (2.77).</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-9-model-predictive-control-delays-treatment-and-halves-the">3.9 Model-predictive control delays treatment and halves the dose <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>Normal medium, 50:50 start, scenario A: MPC treats days 6–12, ends with 3,392 cells vs 3,893 under constant 1 µM, resistant fraction 0.44 vs 0.67, cumulative dose 7.1 vs 14.0 µM·d.</p></li>
-<li><p>Scenario B: 2,590 vs 3,453 cells; resistant fraction 0.52 vs 0.96.</p></li>
-<li><p>Low resource: MPC gives no drug in both scenarios.</p></li>
-<li><p>Figure 3.3: schedules and trajectories versus comparator schedules; Table 3.3: outcomes per policy.</p></li>
-</ul>
-<h3 data-status="Update" id="sec-3-10-adding-fasting-as-a-second-control-lowers-burden-furthe">3.10 Adding fasting as a second control lowers burden further, if recovery is slow <span class="status status-update">Update</span></h3>
-<ul>
-<li><p>30 days, scenario A: 1,369 cells (2 resistant) vs 3,270 without fasting and 4,147 constant 1 µM; 4 fasting days.</p></li>
-<li><p>Depends on k_C^R, never measured: with faster recovery, 3,027 resistant cells instead of 2.</p></li>
-</ul>
-<h3 data-status="Pending" id="sec-3-11-mechanistic-and-learned-models-win-on-different-tests">3.11 Mechanistic and learned models win on different tests <span class="status status-pending">Pending</span></h3>
-<ul>
-<li><p>Table 3.4: rows = training fit, held-out prediction, unseen dose, unseen schedule, unseen density, BIC, interpretability, control suitability; columns = time-based, compartment, UDE/NN.</p></li>
-<li><p>Current verdict (NN track): 2 wins each, 2 ties on held-out tests; to be rescored on one metric.</p></li>
-</ul>
+<h3 data-status="Drafted" id="sec-3-7-some-selections-are-stable-some-are-not">3.7 Some selections are stable, some are not <span class="status status-drafted">Drafted</span></h3>
+<p>Refitting every candidate to 200 block-bootstrap replicates shows how often the same rule picks the same model (Table 3.10, Figure 3.2). Selections are stable for the growth laws (89–94%), the cisplatin chain (84%), and the Stage 4 interaction (90%). They are least stable for the A2780 low-resource module (50%) and the normal-medium coculture (57%), where the runner-up differs only in one death term.</p>
+<p>Of the 21 profiled parameters, 5 are not pinned on both sides: θ<sub>C</sub> (flat above the estimate), β<sub>C</sub> in Stage 2b and d<sub>C</sub> in Stage 3a (one-sided), and α<sub>NC</sub> and α<sub>CN</sub> in Stage 3b (one at its bound, one flat). Two more sit at a search bound (c<sub>N</sub> and ζ<sub>N</sub><sup>R</sup>). Residual lag-1 autocorrelation is low for the coculture fit (0.01) and moderate elsewhere (0.10 and 0.35 in Stage 1, 0.38 and 0.27 in Stage 2b, 0.32 in Stage 3b), which is why the bootstrap resamples 3-day blocks rather than single points.</p>
+<p>Local sensitivity ranks the coculture crowding of resistant cells highest (Table 3.11): α<sub>CN</sub> has an index of 38.3, almost twice the next parameter. Global (Sobol) analysis of the treated 50:50 coculture gives a day-14 resistant fraction of 0.73 (SD 0.086), driven mainly by d<sub>N</sub> (total index 0.30) and r<sub>N</sub> (0.26). Within stages, d<sub>N</sub> (0.58) and β<sub>N</sub> (0.20) dominate the sensitive counts in Stage 3a and d<sub>N</sub> (0.48) the resistant counts; in Stage 2b, β (0.65 for A2780, 0.61 for A2780cis) and k (0.34, 0.52) share the variance.</p>
+<p>[Figure 3.2: bootstrap selection frequency per stage.]</p>
+<p><strong>Table 3.10.</strong> Selected model at each stage, its bootstrap stability and identifiability.</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Stage</strong></th>
+<th><strong>Selected model</strong></th>
+<th><strong>k</strong></th>
+<th><strong>BIC</strong></th>
+<th><strong>Selected / lowest BIC</strong></th>
+<th><strong>Not fully identified</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1 · A2780</td>
+<td>Logistic</td>
+<td>2</td>
+<td>24.6</td>
+<td>94% / 80%</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>1 · A2780cis</td>
+<td>Theta-logistic</td>
+<td>3</td>
+<td>46.5</td>
+<td>89% / 98%</td>
+<td>θ<sub>C</sub> (flat above)</td>
+</tr>
+<tr class="odd">
+<td>2a · A2780</td>
+<td>Second-order effect → lowers K</td>
+<td>3</td>
+<td>39.2</td>
+<td>50% / 70%</td>
+<td>c<sub>N</sub>, ζ<sub>N</sub><sup>R</sup> at bound</td>
+</tr>
+<tr class="even">
+<td>2a · A2780cis</td>
+<td>Cumulative exposure → loss</td>
+<td>1</td>
+<td>14.5</td>
+<td>66% / 50%</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>2b · A2780</td>
+<td>3 compartments → linear kill</td>
+<td>2</td>
+<td>132.9</td>
+<td>84% / 63%</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>2b · A2780cis</td>
+<td>3 compartments → linear kill</td>
+<td>2</td>
+<td>163.9</td>
+<td>84% / 39%</td>
+<td>β<sub>C</sub> (one-sided)</td>
+</tr>
+<tr class="odd">
+<td>3a · Ce0 + Ce1</td>
+<td>Shared K + asymmetric crowding + death, no resistant kill</td>
+<td>6</td>
+<td>637.7</td>
+<td>57% / 76%</td>
+<td>d<sub>C</sub> (one-sided)</td>
+</tr>
+<tr class="even">
+<td>3b · low-resource coculture</td>
+<td>Shared K + asymmetric crowding, Stage 2a mechanisms</td>
+<td>3</td>
+<td>700.6</td>
+<td>78% / 80%</td>
+<td>α<sub>NC</sub> (bound), α<sub>CN</sub> (flat)</td>
+</tr>
+<tr class="odd">
+<td>4 · low resource + cisplatin</td>
+<td>+ drug × low-resource interaction χ</td>
+<td>1</td>
+<td>103.1</td>
+<td>90% / 78%</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Table 3.11.</strong> The ten largest local sensitivity indices (Section 2.2.7).</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Rank</strong></th>
+<th><strong>Parameter</strong></th>
+<th><strong>Stage</strong></th>
+<th><strong>Sensitivity index</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>α<sub>CN</sub></td>
+<td>3a</td>
+<td>38.3</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>β<sub>N</sub></td>
+<td>2b</td>
+<td>21.4</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>d<sub>C</sub><sup>LR</sup></td>
+<td>2a</td>
+<td>15.4</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>d<sub>N</sub></td>
+<td>3a</td>
+<td>10.3</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>k<sub>N</sub></td>
+<td>2b</td>
+<td>7.13</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>α<sub>NC</sub></td>
+<td>3b</td>
+<td>4.66</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>K</td>
+<td>3b</td>
+<td>4.20</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>χ</td>
+<td>4</td>
+<td>3.73</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>α<sub>NC</sub></td>
+<td>3a</td>
+<td>3.25</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>r<sub>C</sub></td>
+<td>1</td>
+<td>3.22</td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-8-models-predict-held-out-data-with-stated-error">3.8 Models predict held-out data with stated error <span class="status status-drafted">Drafted</span></h3>
+<p>Intermittent-dosing cultures (drug on then off, off then on, or both) were never used in fitting. The Stage 2b models predicted them with a normalised RMSE of 0.22–0.55 for A2780 and 0.22–0.29 for A2780cis (Table 3.12); the off→on schedule was hardest for A2780. A separate washout rate for the drug effect was not supported (ΔBIC +2.46 for A2780, +3.10 for A2780cis), so the effect fades at the same rate it builds.</p>
+<p>The treated coculture (Ce1) was the hardest test. Predicted from the untreated cocultures and the monoculture drug response alone, its RMSE was 1,132 cells (nRMSE 0.90), against 366 (0.29) when Ce1 is fitted and 975 (0.78) for an untreated reference that ignores the drug. The difference from the untreated reference, 157 cells (95% CI −88 to 448; 14% of draws below 0), means the monoculture drug response does not improve the coculture prediction, which is the reason Ce1 is fitted in Stage 3a rather than predicted.</p>
+<p>Forecasting the last part of each series from the first part raised the error by a factor of 1.1–2.5 relative to the in-sample fit, worst for the A2780cis treated forecast (2.53). Leaving one dose out of Stage 2b gave ratios of 1.24–2.04 for A2780 and 1.00–1.99 for A2780cis, worst when the highest dose was left out; leaving one seeding ratio out gave 1.17–1.54 in Stage 3a and 0.94–1.94 in Stage 3b.</p>
+<p><strong>Table 3.12.</strong> Validation on data not used for fitting. nRMSE is RMSE divided by the mean observed count; ratios are held-out RMSE divided by in-sample RMSE.</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Test</strong></th>
+<th><strong>Model</strong></th>
+<th><strong>Result</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Intermittent dosing, on→off</td>
+<td>Stage 2b, A2780 / A2780cis</td>
+<td>RMSE 354 / 464 (nRMSE 0.22 / 0.22)</td>
+</tr>
+<tr class="even">
+<td>Intermittent dosing, off→on</td>
+<td>Stage 2b, A2780 / A2780cis</td>
+<td>RMSE 1,049 / 543 (nRMSE 0.55 / 0.29)</td>
+</tr>
+<tr class="odd">
+<td>Intermittent dosing, both</td>
+<td>Stage 2b, A2780 / A2780cis</td>
+<td>RMSE 783 / 503 (nRMSE 0.44 / 0.25)</td>
+</tr>
+<tr class="even">
+<td>Separate washout rate</td>
+<td>Stage 2b</td>
+<td>ΔBIC +2.46 / +3.10 (not supported)</td>
+</tr>
+<tr class="odd">
+<td>Held-out Ce1 coculture</td>
+<td>Stage 3a from Ce0 + Stage 2b</td>
+<td>RMSE 1,132 (nRMSE 0.90) vs 366 fitted, 975 untreated reference</td>
+</tr>
+<tr class="even">
+<td>Forecast ratio</td>
+<td>Stage 1 (A2780 / A2780cis)</td>
+<td>2.05 / 1.32</td>
+</tr>
+<tr class="odd">
+<td>Forecast ratio</td>
+<td>Stage 2a (A2780 / A2780cis)</td>
+<td>2.18 / 1.11</td>
+</tr>
+<tr class="even">
+<td>Forecast ratio</td>
+<td>Stage 2b (A2780 / A2780cis)</td>
+<td>1.41 / 2.53</td>
+</tr>
+<tr class="odd">
+<td>Forecast ratio</td>
+<td>Stage 3a / 3b / 4</td>
+<td>1.29 / 1.65 / 1.32</td>
+</tr>
+<tr class="even">
+<td>Leave one dose out (1.47 / 1.0 / 0.62 µM)</td>
+<td>Stage 2b A2780</td>
+<td>2.04 / 1.55 / 1.24</td>
+</tr>
+<tr class="odd">
+<td>Leave one dose out (1.47 / 1.0 / 0.62 µM)</td>
+<td>Stage 2b A2780cis</td>
+<td>1.99 / 1.02 / 1.00</td>
+</tr>
+<tr class="even">
+<td>Leave one ratio out</td>
+<td>Stage 3a</td>
+<td>1.23 / 1.17 / 1.54</td>
+</tr>
+<tr class="odd">
+<td>Leave one ratio out</td>
+<td>Stage 3b</td>
+<td>0.94 / 1.39 / 1.94</td>
+</tr>
+<tr class="even">
+<td>Leave one run out</td>
+<td>Stage 3b</td>
+<td>1.47 / 1.21</td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-9-model-predictive-control-delays-treatment-and-uses-a-thi">3.9 Model-predictive control delays treatment and uses a third of the dose <span class="status status-drafted">Drafted</span></h3>
+<p>MPC chose the cisplatin concentration for each 2-day interval between media changes, from the measured doses (0, 0.62, 1, 1.47 µM), to maximise the time to progression (N + C reaching 0.8 K) over a 28-day look-ahead. Two scenarios bracket the uncertainty about the resistant kill: scenario A uses the selected Stage 3a model (no resistant kill), and scenario B uses each line's monoculture drug response (β<sub>C</sub> = 0.485).</p>
+<p>In normal medium from a 50:50 start, scenario A MPC gave no drug for the first 8 days and then 1 µM followed by 0.62 µM (Table 3.13, Figure 3.3). It used 4.5 µM·day of cisplatin against 14.0 for constant 1 µM, ended with 3,260 cells instead of 3,862, and held the resistant fraction at 0.20 instead of 0.75. Constant, maximum and periodic dosing all progressed at about day 10; MPC and the threshold-adaptive rule did not progress by day 14. The cost of control is a larger resistant population than no treatment at all (664 vs 417 cells): in this scenario cisplatin only helps by trimming the sensitive cells that would otherwise reach the threshold. In 40 paired closed-loop runs on bootstrap parameter sets with 10% counting noise, MPC ended with fewer total and fewer resistant cells than constant, maximum and periodic dosing in every draw, and fewer total cells than no treatment in every draw.</p>
+<p>In scenario B the drug also kills resistant cells, and MPC switched to near-maximal dosing (1.47 µM for 12 days, then 1 µM): 470 cells on day 14, almost all resistant, which matches the maximum dose. In low resource both scenarios drive the culture close to zero (49 cells under scenario A MPC, 5 under B with only 0.62 µM). Peak toxicity stayed at or below 0.077 in every run, so the 0.25 toxicity limit never constrained the schedule. Replacing the linear kill with the Hill kill gave the same picture (scenario A 3,391 cells, 416 resistant; scenario B 518, 517).</p>
+<p>[Figure 3.3: schedules and trajectories versus comparator schedules.]</p>
+<p><strong>Table 3.13.</strong> 14-day control outcomes in normal medium from a 50:50 start (best-fit parameters). Schedules are µM for the seven 2-day intervals.</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Scenario</strong></th>
+<th><strong>Policy</strong></th>
+<th><strong>N + C day 14</strong></th>
+<th><strong>C day 14</strong></th>
+<th><strong>Resistant fraction</strong></th>
+<th><strong>Dose (µM·day)</strong></th>
+<th><strong>Time to progression (day)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A</td>
+<td>No treatment</td>
+<td>3,390</td>
+<td>417</td>
+<td>0.12</td>
+<td>0</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td>A</td>
+<td>Constant 1 µM</td>
+<td>3,862</td>
+<td>2,914</td>
+<td>0.75</td>
+<td>14.0</td>
+<td>10.0</td>
+</tr>
+<tr class="odd">
+<td>A</td>
+<td>Maximum 1.47 µM</td>
+<td>4,110</td>
+<td>3,699</td>
+<td>0.90</td>
+<td>20.6</td>
+<td>10.1</td>
+</tr>
+<tr class="even">
+<td>A</td>
+<td>Periodic 1 µM, 2 on / 2 off</td>
+<td>3,572</td>
+<td>1,791</td>
+<td>0.50</td>
+<td>8.0</td>
+<td>10.0</td>
+</tr>
+<tr class="odd">
+<td>A</td>
+<td>Threshold adaptive (Zhang)</td>
+<td>3,270</td>
+<td>1,089</td>
+<td>0.33</td>
+<td>8.0</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td>A</td>
+<td><strong>MPC: 0, 0, 0, 0, 1, 0.62, 0.62</strong></td>
+<td><strong>3,260</strong></td>
+<td><strong>664</strong></td>
+<td><strong>0.20</strong></td>
+<td><strong>4.5</strong></td>
+<td><strong>not progressed</strong></td>
+</tr>
+<tr class="odd">
+<td>B</td>
+<td>No treatment</td>
+<td>3,350</td>
+<td>470</td>
+<td>0.14</td>
+<td>0</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td>B</td>
+<td>Constant 1 µM</td>
+<td>1,270</td>
+<td>1,201</td>
+<td>0.95</td>
+<td>14.0</td>
+<td>not progressed</td>
+</tr>
+<tr class="odd">
+<td>B</td>
+<td>Maximum 1.47 µM</td>
+<td>469</td>
+<td>467</td>
+<td>1.00</td>
+<td>20.6</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td>B</td>
+<td>Periodic 1 µM, 2 on / 2 off</td>
+<td>3,205</td>
+<td>2,413</td>
+<td>0.75</td>
+<td>8.0</td>
+<td>not progressed</td>
+</tr>
+<tr class="odd">
+<td>B</td>
+<td>Threshold adaptive (Zhang)</td>
+<td>2,930</td>
+<td>1,142</td>
+<td>0.39</td>
+<td>6.0</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td>B</td>
+<td><strong>MPC: 1.47 × 6, then 1</strong></td>
+<td><strong>470</strong></td>
+<td><strong>468</strong></td>
+<td><strong>1.00</strong></td>
+<td><strong>19.6</strong></td>
+<td><strong>not progressed</strong></td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-10-adding-fasting-as-a-second-control-lowers-burden-furthe">3.10 Adding fasting as a second control lowers burden further, if recovery is slow <span class="status status-drafted">Drafted</span></h3>
+<p>Over 120 days the controller could also switch the culture to low resource (fasting) for 48-hour intervals, with the host model limiting weight loss and toxicity. In scenario A, MPC with fasting fasted on days 0–2, 24–26, 60–62 and 90–92 (8 days in total), gave 62.6 µM·day of cisplatin, and ended with 2,814 cells and no resistant cells, against 2,944 (13 resistant) and 82.4 µM·day without fasting (Table 3.14). Weight stayed at or above 0.975 and toxicity at or below 0.057. Constant and maximum dosing progressed at about day 10 and ended almost entirely resistant; the threshold rule delayed progression to day 28. Fixed fasting schedules lowered the burden further (1,109 cells for constant 1 µM plus a fast every 6 days) but reached the weight limit, which MPC avoided.</p>
+<p>This benefit rests on an untested assumption. In the fitted Stage 2a model, starvation stress in A2780cis accumulates and never fades after refeeding, so each fast adds permanently to the resistant death rate. No experiment measured recovery. If the stress fades at k<sub>off</sub> = 0.5/day or 2/day, the same MPC plan ends with 4,239 or 4,288 resistant cells; re-optimising recovers 14 or 9 resistant cells but with 4 or 0 fasting days, so fasting adds little once recovery is allowed (Table 3.15). In scenario B, MPC with fasting reached 11 cells with 2 fasting days, but constant 1 µM alone already eliminated the culture.</p>
+<p>[Figure 3.4: 120-day dose + fasting schedule and k_off sweep.]</p>
+<p><strong>Table 3.14.</strong> 120-day control with cisplatin and fasting, scenario A, 50:50 start.</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Policy</strong></th>
+<th><strong>N + C day 120</strong></th>
+<th><strong>C day 120</strong></th>
+<th><strong>Dose (µM·day)</strong></th>
+<th><strong>Fasting days</strong></th>
+<th><strong>Min. weight</strong></th>
+<th><strong>Time to progression (day)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>No treatment</td>
+<td>3,476</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>1.000</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td>Constant 1 µM</td>
+<td>4,303</td>
+<td>4,245</td>
+<td>120.0</td>
+<td>0</td>
+<td>1.000</td>
+<td>10.0</td>
+</tr>
+<tr class="odd">
+<td>Maximum 1.47 µM</td>
+<td>4,331</td>
+<td>4,331</td>
+<td>176.4</td>
+<td>0</td>
+<td>1.000</td>
+<td>10.1</td>
+</tr>
+<tr class="even">
+<td>Periodic 1 µM, 2 on / 2 off</td>
+<td>3,189</td>
+<td>0</td>
+<td>60.0</td>
+<td>0</td>
+<td>1.000</td>
+<td>not progressed*</td>
+</tr>
+<tr class="odd">
+<td>Threshold adaptive (Zhang)</td>
+<td>4,256</td>
+<td>4,103</td>
+<td>114.0</td>
+<td>0</td>
+<td>1.000</td>
+<td>28.1</td>
+</tr>
+<tr class="even">
+<td>Fasting only, 48 h every 6 days</td>
+<td>2,330</td>
+<td>0</td>
+<td>0</td>
+<td>40</td>
+<td>0.947 (limit hit)</td>
+<td>not progressed</td>
+</tr>
+<tr class="odd">
+<td>Periodic 1 µM + 48-h fast each dosing interval</td>
+<td>2,302</td>
+<td>0</td>
+<td>60.0</td>
+<td>60</td>
+<td>0.907 (limit hit)</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td>Constant 1 µM + 48-h fast every 6 days</td>
+<td>1,109</td>
+<td>0</td>
+<td>120.0</td>
+<td>40</td>
+<td>0.947 (limit hit)</td>
+<td>not progressed</td>
+</tr>
+<tr class="odd">
+<td>MPC, dose only</td>
+<td>2,944</td>
+<td>13</td>
+<td>82.4</td>
+<td>0</td>
+<td>1.000</td>
+<td>not progressed</td>
+</tr>
+<tr class="even">
+<td><strong>MPC, dose + fasting</strong></td>
+<td><strong>2,814</strong></td>
+<td><strong>0</strong></td>
+<td><strong>62.6</strong></td>
+<td><strong>8</strong></td>
+<td><strong>0.975</strong></td>
+<td><strong>not progressed</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><em>Periodic dosing spent 7 days above 0.8 K but was below it at day 120</em></p>
+<p><strong>Table 3.15.</strong> Sensitivity of the 120-day result to recovery after refeeding (k<sub>off</sub>).</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Scenario</strong></th>
+<th><strong>k<sub>off</sub> (/day)</strong></th>
+<th><strong>C day 120, MPC plan replayed</strong></th>
+<th><strong>C day 120, re-optimised</strong></th>
+<th><strong>N + C, re-optimised</strong></th>
+<th><strong>Fasting days</strong></th>
+<th><strong>Dose (µM·day)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A</td>
+<td>0 (fitted)</td>
+<td>0</td>
+<td>0</td>
+<td>2,814</td>
+<td>8</td>
+<td>62.6</td>
+</tr>
+<tr class="even">
+<td>A</td>
+<td>0.5</td>
+<td>4,239</td>
+<td>14</td>
+<td>2,919</td>
+<td>4</td>
+<td>72.2</td>
+</tr>
+<tr class="odd">
+<td>A</td>
+<td>2</td>
+<td>4,288</td>
+<td>9</td>
+<td>2,920</td>
+<td>0</td>
+<td>82.3</td>
+</tr>
+<tr class="even">
+<td>B</td>
+<td>0 (fitted)</td>
+<td>0</td>
+<td>0</td>
+<td>11</td>
+<td>2</td>
+<td>92.2</td>
+</tr>
+<tr class="odd">
+<td>B</td>
+<td>0.5</td>
+<td>836</td>
+<td>19</td>
+<td>19</td>
+<td>0</td>
+<td>102.8</td>
+</tr>
+<tr class="even">
+<td>B</td>
+<td>2</td>
+<td>1,325</td>
+<td>19</td>
+<td>19</td>
+<td>0</td>
+<td>102.8</td>
+</tr>
+</tbody>
+</table></div>
+<h3 data-status="Drafted" id="sec-3-11-learned-models-predict-slightly-better-mechanistic-mode">3.11 Learned models predict slightly better; mechanistic models remain usable for control <span class="status status-drafted">Drafted</span></h3>
+<p>Neural models (boosted trees, an MLP, a universal differential equation with a neural kill term, and a pure neural ODE) were scored against the best mechanistic model on the same held-out tests (Table 3.16). A difference counted as a tie when it was smaller than 0.02 log units or the seed-to-seed spread of the neural score. Neural models won 4 tests, mechanistic models none, and 4 were ties. The clearest neural wins were next-day prediction, the on→off schedule, and the three-way comparison on the held-out 30k Ce1 coculture, where the pure neural ODE reached an RMSE of 511 cells against 633 for the closed-form mechanistic model and 640 for the UDE (Table 3.17). Unseen doses, the off→on schedule and an unseen seeding density were ties.</p>
+<p>The neural advantage comes at a large cost in parameters (121–131 against 12–14) and grows only slowly with data: the UDE was worse than the Hill mechanistic model with 25% of the training data (log-RMSE difference +0.47) and only slightly better with all of it (−0.06). The neural models also have no parameters that map onto growth, crowding or kill, so they cannot answer the transportability questions of Section 3.6 or be extended to fasting. These tests cover four constant doses up to 1.47 µM, two single-switch schedules and two seeding densities, and say nothing about schedules with more switches or larger data sets.</p>
+<p><strong>Table 3.16.</strong> Held-out scorecard, neural vs mechanistic (log RMSE unless stated; lower is better).</p>
+<div class="table-wrap"><table style="width:100%;">
+
+<thead>
+<tr class="header">
+<th><strong>Test</strong></th>
+<th><strong>Best neural</strong></th>
+<th><strong>Score</strong></th>
+<th><strong>Best mechanistic</strong></th>
+<th><strong>Score</strong></th>
+<th><strong>Winner</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Next-day prediction, treated coculture</td>
+<td>Pure neural ODE</td>
+<td>0.225</td>
+<td>Hill</td>
+<td>0.250</td>
+<td>Neural</td>
+</tr>
+<tr class="even">
+<td>Forward prediction, held-out Ce1 (20k + 30k)</td>
+<td>UDE (NN kill)</td>
+<td>0.390</td>
+<td>Closed form</td>
+<td>0.394</td>
+<td>Tie</td>
+</tr>
+<tr class="odd">
+<td>Unseen schedule, on→off</td>
+<td>Pure neural ODE</td>
+<td>0.197</td>
+<td>Hill</td>
+<td>0.235</td>
+<td>Neural</td>
+</tr>
+<tr class="even">
+<td>Unseen schedule, off→on</td>
+<td>Pure neural ODE</td>
+<td>0.356</td>
+<td>Hill</td>
+<td>0.385</td>
+<td>Tie</td>
+</tr>
+<tr class="odd">
+<td>Unseen dose, 1 µM monoculture</td>
+<td>UDE (NN kill)</td>
+<td>0.217</td>
+<td>No drug</td>
+<td>0.203</td>
+<td>Tie</td>
+</tr>
+<tr class="even">
+<td>Unseen seeding density, all 20k wells</td>
+<td>UDE (NN kill)</td>
+<td>0.437</td>
+<td>Hill</td>
+<td>0.439</td>
+<td>Tie</td>
+</tr>
+<tr class="odd">
+<td>Three-way, held-out 30k Ce1 (cells)</td>
+<td>Pure neural ODE</td>
+<td>511</td>
+<td>Closed form</td>
+<td>633</td>
+<td>Neural</td>
+</tr>
+<tr class="even">
+<td>Three-way, held-out 30k Ce1</td>
+<td>Pure neural ODE</td>
+<td>0.348</td>
+<td>Closed form</td>
+<td>0.637</td>
+<td>Neural</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Table 3.17.</strong> Held-out 30k Ce1 coculture: same training data, same points, same starting-value rule.</p>
+<div class="table-wrap"><table>
+
+<thead>
+<tr class="header">
+<th><strong>Model</strong></th>
+<th><strong>Parameters</strong></th>
+<th><strong>RMSE (cells)</strong></th>
+<th><strong>nRMSE</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Mechanistic zoo (Stage 3a)</td>
+<td>14</td>
+<td>1,132</td>
+<td>0.90</td>
+</tr>
+<tr class="even">
+<td>Hill (NN track)</td>
+<td>13</td>
+<td>654</td>
+<td>0.52</td>
+</tr>
+<tr class="odd">
+<td>Closed form (NN track)</td>
+<td>12</td>
+<td>633</td>
+<td>0.51</td>
+</tr>
+<tr class="even">
+<td>UDE (neural kill)</td>
+<td>121</td>
+<td>640</td>
+<td>0.51</td>
+</tr>
+<tr class="odd">
+<td>Pure neural ODE</td>
+<td>131</td>
+<td>511</td>
+<td>0.41</td>
+</tr>
+<tr class="even">
+<td>No drug</td>
+<td>—</td>
+<td>1,002</td>
+<td>0.80</td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="sec-4-discussion">4 Discussion</h2>
 <p>The Discussion makes five claims, each backed by a Results section, then places them in the literature. <span class="draft-note">[Pending; write after Results]</span></p>
 <h3 id="sec-4-1-model-complexity-should-track-experimental-complexity">4.1 Model complexity should track experimental complexity</h3>
@@ -895,27 +2112,105 @@
 </tr>
 <tr class="odd">
 <td>Table 3.1</td>
-<td>Optimal model and parameters per stage</td>
-<td>3.2–3.5</td>
-<td>zoo_parameters.csv</td>
+<td>Monoculture counts per condition</td>
+<td>3.1</td>
+<td>new_data_report</td>
 </tr>
 <tr class="even">
 <td>Table 3.2</td>
+<td>Coculture composition on day 14</td>
+<td>3.1</td>
+<td>new_data_report</td>
+</tr>
+<tr class="odd">
+<td>Table 3.3</td>
+<td>Growth-law candidates</td>
+<td>3.2</td>
+<td>zoo_fits</td>
+</tr>
+<tr class="even">
+<td>Table 3.4</td>
+<td>Low-resource candidates</td>
+<td>3.3</td>
+<td>zoo_fits</td>
+</tr>
+<tr class="odd">
+<td>Table 3.5</td>
+<td>Shared cisplatin structures</td>
+<td>3.4</td>
+<td>zoo_fits</td>
+</tr>
+<tr class="even">
+<td>Table 3.6</td>
+<td>Cisplatin parameters per line</td>
+<td>3.4</td>
+<td>zoo_parameters.csv</td>
+</tr>
+<tr class="odd">
+<td>Table 3.7</td>
+<td>Coculture candidates</td>
+<td>3.5</td>
+<td>zoo_fits</td>
+</tr>
+<tr class="even">
+<td>Table 3.8</td>
+<td>Coculture parameters</td>
+<td>3.5</td>
+<td>zoo_parameters.csv</td>
+</tr>
+<tr class="odd">
+<td>Table 3.9</td>
 <td>Transportability tests</td>
 <td>3.6</td>
 <td>This doc</td>
 </tr>
+<tr class="even">
+<td>Table 3.10</td>
+<td>Selected models, stability and identifiability</td>
+<td>3.7</td>
+<td>zoo_analyses/bootstrap</td>
+</tr>
 <tr class="odd">
-<td>Table 3.3</td>
-<td>Control outcomes per policy</td>
+<td>Table 3.11</td>
+<td>Local sensitivity ranking</td>
+<td>3.7</td>
+<td>zoo_analyses/sensitivity</td>
+</tr>
+<tr class="even">
+<td>Table 3.12</td>
+<td>Validation on held-out data</td>
+<td>3.8</td>
+<td>zoo_analyses/validation</td>
+</tr>
+<tr class="odd">
+<td>Table 3.13</td>
+<td>14-day control outcomes per policy</td>
 <td>3.9</td>
 <td>control_outcomes.csv</td>
 </tr>
 <tr class="even">
-<td>Table 3.4</td>
-<td>Method comparison</td>
+<td>Table 3.14</td>
+<td>120-day dose + fasting outcomes</td>
+<td>3.10</td>
+<td>control_120d</td>
+</tr>
+<tr class="odd">
+<td>Table 3.15</td>
+<td>Recovery-rate (k_off) sensitivity</td>
+<td>3.10</td>
+<td>control_120d</td>
+</tr>
+<tr class="even">
+<td>Table 3.16</td>
+<td>Neural vs mechanistic held-out scorecard</td>
 <td>3.11</td>
-<td>verdict.csv (rescored)</td>
+<td>nn_track/verdict</td>
+</tr>
+<tr class="odd">
+<td>Table 3.17</td>
+<td>Three-way held-out comparison</td>
+<td>3.11</td>
+<td>nn_track/verdict</td>
 </tr>
 </tbody>
 </table></div>
