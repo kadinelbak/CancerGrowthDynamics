@@ -54,6 +54,7 @@ struct Weights
     μC::Float64; μT::Float64; δ::Float64
     Bc::Float64; Btox::Float64; umax::Float64; K::Float64
     qP::Float64; Bp::Float64; sP::Float64; qRT::Float64      # progression weight, threshold, step width; terminal resistant weight
+    barrier::Symbol; hw::Float64; hs::Float64                 # burden penalty shape at B_cancer ([cancer] barrier); hard-wall weight and width (cells)
 end
 # a copy of a weight struct with some fields replaced, e.g. with_fields(W; Bc=…)
 with_fields(W::T; kw...) where {T} = T((haskey(kw, f) ? kw[f] : getfield(W, f) for f in fieldnames(T))...)
@@ -70,27 +71,43 @@ end
 # bc_frac: B_cancer as a fraction of K (0 = no burden penalty); tf: terminal factor (both swept in the report)
 function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]),
                          bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
-                         prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]))
-    c = CFG["weights"]
+                         prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]),
+                         barrier=Symbol(get(CFG["cancer"], "barrier", "relaxed_log")))
+    c = CFG["weights"]; cc = CFG["cancer"]
+    barrier in BARRIERS || error("unknown burden barrier $barrier (one of $(join(BARRIERS, ", ")))")
     qB, qR, qT, ru, qP, qRT = objective_weights(w)
     Bp, sP = progression_scale(P.K; prog_frac=prog_frac)
     Weights(qB, qR, qT, ru, tf, c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
-            bc_frac > 0 ? bc_frac * P.K : Inf, Btox, umax, P.K, qP, Bp, sP, qRT)
+            bc_frac > 0 ? bc_frac * P.K : Inf, Btox, umax, P.K, qP, Bp, sP, qRT,
+            barrier, Float64(get(cc, "hard_weight", 1000.0)), Float64(get(cc, "hard_width_fraction_of_K", 0.001)) * P.K)
 end
 
 # tumour burden plus the resistance premium, linear in the counts (≥ 0, so the exact search can prune)
 burden_cost(N, C, W) = (W.qB * (max(N, zero(N)) + max(C, zero(C))) + W.qR * max(C, zero(C))) / W.K
 relaxed_barrier(z, μ, δ) = z >= δ ? -μ * log(z) : μ * (0.5 * ((z - 2δ) / δ)^2 - 0.5 - log(δ))
-# smooth step: ≈ 0 below the progression threshold, ≈ 1 above it (logistic of width s, overflow-safe)
-function progressed(N, C, W)
-    z = (max(N, zero(N)) + max(C, zero(C)) - W.Bp) / W.sP
-    z >= 0 ? 1 / (1 + exp(-z)) : exp(z) / (1 + exp(z))
+logistic(z) = z >= 0 ? 1 / (1 + exp(-z)) : exp(z) / (1 + exp(z))       # overflow-safe
+# Soft burden penalty at B_cancer, by shape (PRD 2026-10-27, swept by run_control_sweep.jl). All are ≥ 0, so
+# the exact search can still prune, and all are differentiable for SQP.
+#   relaxed_log  the relaxed log barrier (Feller & Ebenbauer 2017): rises below B_cancer, steep quadratic above
+#   quadratic    zero below B_cancer, the relaxed barrier's own curvature μ/(2δ²) above it (an exterior penalty)
+#   hard         a near-wall: hw·σ((N + C − B_cancer)/hs + 6) plus hw·(excess fraction), so any interval at or
+#                above B_cancer costs ≈ hw (far above every other term: a crossing plan is chosen only when every
+#                plan crosses, then the one that crosses least); the wall leaks < 1 within 2% of K below B_cancer
+#   none         no burden penalty (B_cancer only reported)
+const BARRIERS = (:relaxed_log, :quadratic, :hard, :none)
+function burden_penalty(tot, W)
+    W.barrier === :relaxed_log && return relaxed_barrier(1 - tot / W.Bc, W.μC, W.δ)
+    (W.barrier === :none || !isfinite(W.Bc)) && return zero(tot)
+    ex = max(tot / W.Bc - 1, zero(tot))
+    W.barrier === :quadratic ? W.μC / (2 * W.δ^2) * ex^2 : W.hw * (logistic((tot - W.Bc) / W.hs + 6) + ex)
 end
+# smooth step: ≈ 0 below the progression threshold, ≈ 1 above it (logistic of width s)
+progressed(N, C, W) = logistic((max(N, zero(N)) + max(C, zero(C)) - W.Bp) / W.sP)
 progression_cost(N, C, W) = W.qP * progressed(N, C, W)
 function stage_cost(x, u, P::Plant, W::Weights)
     N, C, T = x[P.iN], x[P.iC], x[P.iT]
     progression_cost(N, C, W) + burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.ru * (u / W.umax)^2 +
-        relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ)
+        burden_penalty(N + C, W) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ)
 end
 # terminal: the state-cost terms ×tf, plus the resistant cells left at the end of the look-ahead
 terminal_cost(x, P::Plant, W::Weights) = W.tf * (progression_cost(x[P.iN], x[P.iC], W) + burden_cost(x[P.iN], x[P.iC], W) + W.qT * (x[P.iT] / W.Btox)^2) +
@@ -115,7 +132,7 @@ function cost_terms(P::Plant, x0, U, Δ, W::Weights)
     for k in eachindex(U)
         x = xs[k+1]; N, C, T = x[P.iN], x[P.iC], x[P.iT]
         z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (U[k] / W.umax)^2,
-               relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ), relaxed_barrier(1 - T / W.Btox, W.μT, W.δ), progression_cost(N, C, W)]
+               burden_penalty(N + C, W), relaxed_barrier(1 - T / W.Btox, W.μT, W.δ), progression_cost(N, C, W)]
     end
     (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6], progression=z[7], total=sum(z))
 end
@@ -219,7 +236,7 @@ end
 # look-ahead blocks: an Int H means H single intervals; a vector lists the intervals of each decision block
 as_blocks(H::Integer) = fill(1, H)
 as_blocks(H::AbstractVector) = collect(Int, H)
-# the blocks cut to at most m intervals in total (the old shrinking horizon; comparison only)
+# the blocks cut to at most m intervals in total: the look-ahead that ends with the run (shrink=true)
 function cut_blocks(b, m)
     out = Int[]; left = m
     for x in b
@@ -298,7 +315,7 @@ end
 # The planner observes only N and C (observe!); the drug-effect chains, B and T are reconstructed by
 # simulating Pm under the applied doses, as they are driven by the input alone. With Pm = Pp and no noise
 # the reconstruction is exact, so the nominal closed loop equals replaying its own schedule (tested).
-# Fixed look-ahead at every decision (shrink=true: the old horizon that ends with the run; comparison only).
+# Look-ahead H at every decision; shrink=true cuts it at the end of the run (control_config lookahead_to_end).
 # H: an Int (single intervals) or the look-ahead blocks (move blocking, discrete mode); continuous mode
 # plans every interval of the same look-ahead.
 function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:continuous, levels=Float64[],

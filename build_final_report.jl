@@ -2,8 +2,12 @@
 # Each chapter is the published report embedded as a self-contained, auto-height frame, so the
 # chapters keep their own styles, scripts and equations and none of the source pages is modified.
 # Rerun after any chapter's report is regenerated:   julia build_final_report.jl
+# Every build that changes the page is also archived, never overwritten, under
+# docs/outputs/final_report/history/<version>/ with its modelling decisions (report_history.jl); the page opens
+# with those decisions against the previous version, and history/index.html compares every version.
 
 using Dates, TOML
+include(joinpath(@__DIR__, "report_history.jl"))
 # length of the long dose + fasting run (control_config.toml), for chapter 7
 const LONG_DAYS = round(Int, TOML.parsefile(joinpath(@__DIR__, "Modeling_Approaches", "02_mechanical_automatic_package", "control_config.toml"))["schedule"]["long_days"])
 
@@ -23,13 +27,19 @@ chapters = [
      "$PKG/zoo_analyses/sensitivity/report.html"),
     ("validation", "5 · Validation", "Held-out treated cocultures predicted from the untreated cocultures and the monoculture drug fits, blocked leave-one-dose / ratio / run-out validation, and forecasts of the last 30% of days.",
      "$PKG/zoo_analyses/validation/report.html"),
-    ("control", "6 · Optimal control", "Sequential (successive-linearisation) model-predictive control of the cisplatin dose at each media change, on the carried Stage 3 model (normal medium) and the same model with the fitted low-resource modules (low resource; equal to the Stage 4 fit at 1 µM), with one stated goal (low total burden, resistant cells counted double), a literature toxicity proxy, barriers on cancer burden and toxicity, baseline schedules, bootstrap robustness, identifiability warnings and suggested experiments.",
+    ("control", "6 · Optimal control", "Sequential (successive-linearisation) model-predictive control of the cisplatin dose at each media change, on the carried Stage 3 model (normal medium) and the same model with the fitted low-resource modules (low resource; equal to the Stage 4 fit at 1 µM), with one stated goal (the longest time to progression: N + C held under B_prog = K/2, with the resistant cells left at the end priced), a literature toxicity proxy, a burden penalty and a toxicity barrier, baseline schedules, bootstrap robustness, identifiability warnings and suggested experiments.",
      "$PKG/control/report.html"),
-    ("control30", "7 · Optimal control over $LONG_DAYS days: cisplatin and fasting", "Model-predictive control choosing both the cisplatin dose and fasting (low resource) at every media change for $LONG_DAYS days, read off at days 14, 30, 60 and $LONG_DAYS of the same run, with a body-weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days 14–$LONG_DAYS are beyond the data, and the fasting effect is the in-vitro effect at full strength.",
+    ("control_30d", "7a · Optimal control over 30 days (cisplatin; beyond the data)", "The same controller and comparators as chapter 6, run for 30 days with the look-ahead ending at the run's end (user, 2026-10-27). Days 15–30 follow the fitted equations beyond the data.",
+     "$PKG/control_30d/report.html"),
+    ("control_60d", "7b · Optimal control over 60 days (cisplatin; beyond the data)", "The same controller and comparators, run for 60 days with the look-ahead ending at the run's end (user, 2026-10-27). Days 15–60 are extrapolation.",
+     "$PKG/control_60d/report.html"),
+    ("sweep", "7c · Control sweep: barriers, thresholds, run lengths", "The control study rerun under four burden-barrier shapes (relaxed log, quadratic, hard, none), thresholds from 0.5 to 0.8 K, 14/30/60-day runs, fixed vs run-ending look-ahead, other objectives, and with and without the A2780cis 1 µM monoculture: which control results come from the biology and which from modelling decisions.",
+     "$PKG/control_sweep/report.html"),
+    ("control30", "8 · Optimal control over $LONG_DAYS days: cisplatin and fasting", "Model-predictive control choosing both the cisplatin dose and fasting (low resource) at every media change for $LONG_DAYS days, read off at days 14, 30, 60 and $LONG_DAYS of the same run, with a body-weight limit (cachexia threshold) and fasting protection of healthy tissue from the literature. Days 14–$LONG_DAYS are beyond the data, and the fasting effect is the in-vitro effect at full strength.",
      "$PKG/control_$(LONG_DAYS)d/report.html"),
-    ("findings", "8 · Key findings, assumptions and limitations", "What did not carry over between conditions, the estimated starting values, validation, the controller against the best fixed policies, linear vs Hill drug response, the mechanistic vs neural-network comparison, the assumptions register and the limitations with the experiments that would resolve them. Generated from the outputs of the same run.",
+    ("findings", "9 · Key findings, assumptions and limitations", "What did not carry over between conditions, the estimated starting values, validation, the controller against the best fixed policies, linear vs Hill drug response, the mechanistic vs neural-network comparison, the assumptions register and the limitations with the experiments that would resolve them. Generated from the outputs of the same run.",
      "$PKG/findings/report.html"),
-    ("nn", "9 · Mechanistic vs neural-network models", "The neural-network and universal-differential-equation track and its matched comparison with the mechanistic models on the same held-out data.",
+    ("nn", "10 · Mechanistic vs neural-network models", "The neural-network and universal-differential-equation track and its matched comparison with the mechanistic models on the same held-out data.",
      "outputs/nn_track/comparison/report.html"),
 ]
 
@@ -117,6 +127,7 @@ function json_str(s::AbstractString)
 end
 
 parts = String[]
+chapter_stamps = Tuple{String,String}[]               # (title, report time) of every chapter, for the version record
 toc = String[]
 missing_parts = String[]
 for (id, title, blurb, rel) in chapters
@@ -130,8 +141,22 @@ for (id, title, blurb, rel) in chapters
     html = occursin(r"<head[^>]*>"i, html) ? replace(html, r"<head[^>]*>"i => s -> s * inject; count=1) : inject * html
     stamp = Dates.format(unix2datetime(mtime(path)), "yyyy-mm-dd HH:MM")
     push!(parts, "{id:$(json_str(id)),title:$(json_str(title)),blurb:$(json_str(blurb)),src:$(json_str(base)),stamp:$(json_str(stamp)),html:$(json_str(html))}")
-    push!(toc, "<a href='#$id'>$title</a>")
+    push!(toc, "<a href='#$id'>$title</a>"); push!(chapter_stamps, (title, stamp))
 end
+
+# ── version and modelling decisions ─────────────────────────────────────────────
+settings = report_settings(); results = report_results()
+content_sha = bytes2hex(sha256(join(parts) * hjson([collect(x) for x in settings]) * hjson([collect(x) for x in results]) * hjson(decision_log())))
+current = joinpath(OUT, "report.html")
+archive_unrecorded(current)                          # a report.html from before the history is kept, not lost
+prev_all = load_versions()
+same = !isempty(prev_all) && get(prev_all[end], "content_sha", "") == content_sha
+version_id = same ? prev_all[end]["id"] : Dates.format(now(), "yyyy-mm-dd_HHMM")
+while !same && isdir(joinpath(HIST, version_id))     # two builds in one minute
+    global version_id = version_id * "b"
+end
+prev = same ? (length(prev_all) > 1 ? prev_all[end-1] : nothing) : (isempty(prev_all) ? nothing : prev_all[end])
+DECISIONS = decisions_panel(version_id, settings, results, prev; chapters=chapter_stamps)
 
 page = """<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
@@ -157,13 +182,21 @@ section.chapter>details[open]>summary{border-bottom:1px solid var(--line)}
 .tools{display:flex;gap:8px;margin:0 0 6px}.tools button{border:1px solid var(--line);background:#eef5f6;color:var(--accent);border-radius:999px;padding:5px 12px;font:650 13px system-ui,sans-serif;cursor:pointer}
 iframe{display:block;width:100%;border:0;min-height:400px;background:var(--page)}
 .warn{background:#fff6d9;border-radius:8px;padding:10px 14px}
+section.decisions{max-width:1400px;margin:8px auto 0;padding:14px 18px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--accent);border-radius:12px}
+section.decisions h2{margin:0 0 4px;color:#124b6e;font-size:22px}section.decisions .tscroll{overflow-x:auto}
+section.decisions table{border-collapse:collapse;font-size:13px;width:100%;margin:6px 0}section.decisions th,section.decisions td{border-bottom:1px solid #e5eaec;padding:5px 8px;text-align:left;vertical-align:top}
+section.decisions th{background:#eef3f5}section.decisions tr.chg td{background:#fff3c4}section.decisions .tag{color:#9a6700;font-size:12px}section.decisions .mut{color:var(--muted)}
+section.decisions details{margin:6px 0}section.decisions summary{cursor:pointer;font-weight:650;color:var(--accent)}
+.version{color:var(--muted);font-size:13px}
 </style></head><body>
 <header>
 <a class='home' href='../../index.html' aria-label='Reports home'>⌂ Reports home</a>
 <h1>Final report — A2780 / A2780cis new data</h1>
-<p class='lead'>The analysis on one page: the data, the compartment models used at every stage, their bootstrapping, sensitivity analysis and validation, and optimal control of the cisplatin schedule built on them, over 14 days and, with fasting as a second control, over $LONG_DAYS days (read off at days 14, 30, 60 and $LONG_DAYS). Earlier time-based models are kept only in the <a href='../archive_time/index.html'>time-based archive</a>. Each chapter is the full report for that step (assembled $(Dates.format(now(), "yyyy-mm-dd HH:MM"))); the date under each heading is when that report was last generated. Rebuild with <code>julia build_final_report.jl</code>.</p>
+<p class='lead'>The analysis on one page: the data, the compartment models used at every stage, their bootstrapping, sensitivity analysis and validation, and optimal control of the cisplatin schedule built on them, over 14 days (and, beyond the data, 30 and 60 days), a sweep over the control's modelling decisions, and, with fasting as a second control, over $LONG_DAYS days (read off at days 14, 30, 60 and $LONG_DAYS). The modelling decisions of this version come first, next to the previous version. Earlier time-based models are kept only in the <a href='../archive_time/index.html'>time-based archive</a>. Each chapter is the full report for that step (assembled $(Dates.format(now(), "yyyy-mm-dd HH:MM"))); the date under each heading is when that report was last generated. Rebuild with <code>julia build_final_report.jl</code>.</p>
+<p class='version'>Version $(version_id) · <a href='history/index.html'>all versions and what changed</a></p>
 $(isempty(missing_parts) ? "" : "<p class='warn'>Not found, so left out: " * join(missing_parts, ", ") * "</p>")
 </header>
+<div style='padding:0 12px'>$DECISIONS</div>
 <nav class='toc' aria-label='Final report chapters'><div>$(join(toc))</div></nav>
 <div style='max-width:1400px;margin:10px auto 0;padding:0 24px' class='tools'><button type='button' id='openall'>Open all chapters</button><button type='button' id='closeall'>Close all</button><span style='color:var(--muted);font-size:13px;align-self:center'>Every chapter and section is a dropdown: click a heading to show it.</span></div>
 <main id='chapters'></main>
@@ -208,6 +241,15 @@ document.querySelectorAll('section.chapter').forEach(s => obs.observe(s));
 
 mkpath(OUT)
 include(joinpath(@__DIR__, "Modeling_Approaches", "02_mechanical_automatic_package", "stage_names.jl"))   # thesis stage names (1, 2a, 2b, 3a, 3b, 4)
-write(joinpath(OUT, "report.html"), stage_names(page))
-println("Wrote $(joinpath(OUT, "report.html")) ($(round(filesize(joinpath(OUT, "report.html")) / 1e6; digits=2)) MB, $(length(parts)) chapters)")
+final = stage_names(page)
+write(current, final)
+println("Wrote $current ($(round(filesize(current) / 1e6; digits=2)) MB, $(length(parts)) chapters), version $version_id")
+if same
+    println("Unchanged since version $version_id: not archived again")
+else
+    archive_version(version_id, final; settings=settings, results=results, chapters=chapter_stamps, source="build_final_report.jl", content_sha=content_sha)
+    println("Archived as docs/outputs/final_report/history/$version_id/")
+end
+write_history_index()
+println("Wrote docs/outputs/final_report/history/index.html ($(length(load_versions())) versions)")
 isempty(missing_parts) || println("Missing: ", join(missing_parts, ", "))

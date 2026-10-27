@@ -92,8 +92,12 @@ id = "s2"
 kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
 kind = "mechanism"
 stage_label = "2 Treated monoculture"
-title = "Stage 2 · {line} treated (3 doses jointly)"
+title = "Stage 2 · {line} treated (measured doses jointly)"
 data = { condition = "treated", culture = "mono" }
+# user, 2026-10-27: the A2780cis 1 µM monoculture shows no kill by day 14 (it ends above untreated at 20k and
+# 30k), so A2780cis is fitted on 0.62 and 1.47 µM; A2780 keeps all three doses. ZOO_NO_EXCLUDE=1 refits with
+# it (the original fit, kept as a sensitivity variant)
+exclude = [{ line = "A2780cis", dose = 1.0 }]
 input = "D"
 catalogue = "DRUG_ZOO"
 inherits = { growth = "s1" }

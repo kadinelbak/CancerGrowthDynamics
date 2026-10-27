@@ -8,9 +8,10 @@
 #                 (control_config.toml [initial]: 100 cells split by the ratio), not a measured day-0 count
 #   policies      no treatment, constant 1 µM, maximum measured dose, periodic, threshold adaptive,
 #                 MPC data-supported (measured doses only), MPC demonstration (continuous, up to u_max_demo)
-#                 MPC uses a FIXED look-ahead at every decision, also at the end of the run: control_config
-#                 lookahead_blocks (move blocking; [1,1,2,2,4,4] = 28 days in 6 decisions)
-#   objective     time to progression (control_config [progression]): intervals at N + C ≥ 0.8 K cost qP,
+#                 MPC looks ahead lookahead_blocks (move blocking; [1,1,2,2,4,4] = 28 days in 6 decisions);
+#                 with control_config lookahead_to_end (default since 2026-10-27) the look-ahead stops at the
+#                 end of the run, otherwise it is fixed at every decision (CONTROL_LOOKAHEAD_TO_END=0/1 overrides)
+#   objective     time to progression (control_config [progression]): intervals at N + C ≥ B_prog (K/2) cost qP,
 #                 resistant cells at the end of the look-ahead cost qRT·C/K
 #   sweeps        weights, soft burden penalty (B_cancer) × terminal factor, toxicity (r_H, s_B, B_tox),
 #                 horizon, decision interval, integration step, 28-day extrapolation
@@ -35,6 +36,8 @@ const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const LOOK = Int.(CFG["schedule"]["lookahead_blocks"])            # look-ahead blocks (intervals per decision), the same at every decision
 const LOOK_DAYS = round(Int, sum(LOOK) * Δ0)
 const NRUN = round(Int, DAYS / Δ0)                                  # decisions over the whole run
+# look-ahead ends with the run (shrinking horizon) or is fixed at every decision (PRD 2026-10-27)
+const SHRINK = get(ENV, "CONTROL_LOOKAHEAD_TO_END", string(Int(get(CFG["schedule"], "lookahead_to_end", false)))) == "1"
 const LEVELS = Float64.(CFG["dose"]["levels_data"])
 const UMAX_DATA = Float64(CFG["dose"]["u_max_data"]); const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
 const BOOT_N = min(Int(CFG["robustness"]["open_loop_draws"]), size(ZOO_STATE.results["s3"].res.pars[1], 1))
@@ -47,7 +50,7 @@ ratios_normal = [merge((ratio=r,), nominal_seeding(r)) for r in ("25:75", "50:50
 ratios_lr = ratios_normal
 plant_for(env, scen; b=nothing, tox=default_tox()) = env == :normal ? scenario_plant(scen; b=b, tox=tox) : lr_plant(scen; b=b, tox=tox)
 ratios_for(env) = env == :normal ? ratios_normal : ratios_lr
-println("=== optimal control: $(Threads.nthreads()) threads; Δ = $Δ0 d, $NRUN decisions ($DAYS days, fixed look-ahead $LOOK_DAYS days, blocks $LOOK); checkpoint has $(collect(keys(cck))) ==="); flush(stdout)
+println("=== optimal control: $(Threads.nthreads()) threads; Δ = $Δ0 d, $NRUN decisions ($DAYS days, $(SHRINK ? "look-ahead $LOOK_DAYS days, ending with the run" : "fixed look-ahead $LOOK_DAYS days"), blocks $LOOK); checkpoint has $(collect(keys(cck))) ==="); flush(stdout)
 # label of an objective-weight vector [qB, qR, qT, ru, qP, qRT] (control_config.toml [weights] sweep)
 wlabel(w) = length(w) == 6 && w[5] == 0 && w[6] == 0 ? "previous objective (burden + resistance): qB=$(w[1]) qR=$(w[2])" :
     "qP=$(w[5]) qRT=$(w[6]) qB=$(w[1]) qR=$(w[2]) qT=$(w[3]) ru=$(w[4])"
@@ -60,9 +63,9 @@ function run_all_policies(P, x0; Δ=Δ0, n=NRUN, H=LOOK)
     for (name, pol) in baseline_policies(P, W)
         U = run_policy(pol, P, x0, Δ, n); out[name] = (U=U, o=outcomes(P, x0, U, Δ, W))
     end
-    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, W; mode=:discrete, levels=LEVELS)
+    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, W; mode=:discrete, levels=LEVELS, shrink=SHRINK)
     out["MPC, measured doses only"] = (U=cl.U, o=outcomes(P, x0, cl.U, Δ, W), secs=time() - t)
-    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, Wd; mode=:continuous)
+    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, Wd; mode=:continuous, shrink=SHRINK)
     out["MPC demonstration (continuous, ≤ $(UMAX_DEMO) µM)"] = (U=cl.U, o=outcomes(P, x0, cl.U, Δ, W), secs=time() - t, iters=cl.iters)
     out
 end
@@ -83,7 +86,7 @@ end
 # ── sweeps (normal medium, 50:50, data-supported MPC) ─────────────────────────
 # Wo: the weights the outcomes are scored with (bound counts always at the default B_cancer)
 function mpc_outcome(P, x0, W; Wo=W, Δ=Δ0, n=NRUN, H=LOOK, mode=:discrete)
-    cl = closed_loop(P, P, x0, Δ, n, H, W; mode=mode, levels=LEVELS)
+    cl = closed_loop(P, P, x0, Δ, n, H, W; mode=mode, levels=LEVELS, shrink=SHRINK)
     (U=cl.U, o=outcomes(P, x0, cl.U, Δ, Wo))
 end
 if !haskey(cck, :sweeps)
@@ -173,7 +176,7 @@ if !haskey(cck, :robust)
                 d[pn] = o === nothing ? nothing : summ(o)
             end
             if b <= NCL
-                c = try closed_loop(P0, Pb, m.x0, Δ0, NRUN, LOOK, W0; mode=:discrete, levels=LEVELS, noise=noise) catch; nothing end
+                c = try closed_loop(P0, Pb, m.x0, Δ0, NRUN, LOOK, W0; mode=:discrete, levels=LEVELS, noise=noise, shrink=SHRINK) catch; nothing end
                 d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes(Pb, m.x0, c.U, Δ0, Wb)), (U=c.U,))
             end
             draws[b] = d

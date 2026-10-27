@@ -343,7 +343,8 @@ last_day(g, k) = maximum(g.datasets[k].x)
 # outputs per fit: (label, dataset index)
 function gsa_outputs(g)
     g.kind in (:s1, :s1b) && return [("count on the last day", 1)]
-    g.kind == :s2 && return [("count on the last day at 1.0 µM", findfirst(==(1.0), treated[g.line].doses))]
+    # the 1.0 µM series, or the nearest fitted dose when a stage excludes it (A2780cis since 2026-10-27)
+    g.kind == :s2 && return (d = treated[g.line].doses; k = argmin(abs.(d .- 1.0)); [("count on the last day at $(d[k]) µM", k)])
     g.kind == :s3 && return [("Ce1 50:50 sensitive, last day", 9), ("Ce1 50:50 resistant, last day", 10)]
     g.kind == :s4 && return [("sensitive, last day", 1), ("resistant, last day", 2)]
     [("run 1, 1:1 sensitive, last day", 3), ("run 1, 1:1 resistant, last day", 4)]

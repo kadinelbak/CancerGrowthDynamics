@@ -22,9 +22,13 @@ long_days = 120.0                # ASSUMPTION: the long dose + fasting run (run_
 snapshot_days = [14.0, 30.0, 60.0, 120.0]   # ASSUMPTION (reporting choice): the long run is read off at these days (one continuing policy, not separate runs)
 data_days = 14.0                 # DATA: the last measured day; marked on the long report's time plots
 rk4_step_days = 0.05             # ASSUMPTION (numerical setting): fixed RK4 step for F(x, u); checked against Tsit5 in test/test_control.jl and by the step sweep in the report
-# The look-ahead is FIXED: every decision, including the last ones of a run, plans horizon_days ahead
-# (past the end of the run if need be). A run's schedule is therefore the first decisions of a
-# continuing policy, and runs of different lengths make the same decisions (no end-of-run effect).
+# Look-ahead (user, 2026-10-27): with lookahead_to_end = true the look-ahead of every decision stops at the end
+# of the run (a shrinking horizon, at most lookahead_blocks long), so the last decisions know the run is ending
+# and may spend dose on a final kill; the resistant cells left at the end are still priced (qRT). With false
+# (2026-10-07 to 2026-10-27) every decision plans the full lookahead_blocks ahead, past the end of the run if
+# need be, so a run's schedule is the first decisions of a continuing policy. The sweep runs both.
+lookahead_to_end = true          # ASSUMPTION (user, 2026-10-27; false before)
+run_days = [14.0, 30.0, 60.0]    # ASSUMPTION (user, 2026-10-27): run lengths of the control sweep (run_control_sweep.jl); days after 14 are beyond the data
 
 [dose]
 units = "µM cisplatin in the medium"   # DATA: the experimental dose unit
@@ -61,8 +65,15 @@ B_tox_sweep = [0.15, 0.25, 0.30] # ASSUMPTION: stricter and looser healthy-tissu
 # threshold (e.g. adaptive-therapy thresholds set relative to the burden, Zhang et al. 2017, Nat Commun
 # 8:1816), not a hard bound. In normal medium every policy that lets the culture grow exceeds it; the
 # report counts how often and for how long, and sweeps B_cancer and the terminal weight.
-B_cancer_fraction_of_K = 0.8     # ASSUMPTION: the burden penalty rises steeply from 80% of the fitted shared capacity K
-B_cancer_sweep = [0.8, 0.9, 1.0, 0.0]    # ASSUMPTION: sensitivity of the 50:50 MPC; 0 = no burden penalty at all
+B_cancer_fraction_of_K = 0.5     # ASSUMPTION (user, 2026-10-27: K/2; 0.8 before): the burden penalty rises steeply from half the fitted shared capacity K, well below the untreated plateau (0.71–0.84 K), so the penalty binds
+B_cancer_sweep = [0.5, 0.6, 0.65, 0.7, 0.8, 0.0]    # ASSUMPTION: sensitivity of the 50:50 MPC; 0.8 = the pre-2026-10-27 default; 0 = no burden penalty at all
+# Shape of the burden penalty at B_cancer (PRD 2026-10-27, control_mpc.jl burden_penalty): relaxed_log (the
+# relaxed log barrier above), quadratic (exterior penalty, zero below B_cancer), hard (a near-wall costing about
+# hard_weight on crossing) or none. All four are compared by run_control_sweep.jl.
+barrier = "relaxed_log"          # ASSUMPTION: the shape used by run_control.jl
+barrier_sweep = ["relaxed_log", "quadratic", "hard", "none"]   # ASSUMPTION
+hard_weight = 1000.0             # ASSUMPTION (numerical): cost of crossing the hard wall, far above every other term (q_P = 10 per interval)
+hard_width_fraction_of_K = 0.001 # ASSUMPTION (numerical): width of the hard wall's smooth step, 0.1% of K (the wall is ≈ hw at B_cancer, < 1 from 2% of K below it)
 terminal_factor_sweep = [1.0, 5.0, 10.0] # ASSUMPTION: sensitivity of the 50:50 MPC to the terminal weight
 
 [initial]
@@ -91,7 +102,7 @@ closed_loop_draws = 40           # ASSUMPTION (runtime): bootstrap sets with clo
 # Cancer Res 69:4894). At the end of the look-ahead qRT·C/K prices the resistant cells left behind, which drive
 # the next, untreatable progression. Reported outcomes: the first day at B_prog and the time to progression (the
 # start of the first spell above B_prog that lasts sustain_days or to the end of the run).
-threshold_fraction_of_K = 0.8    # ASSUMPTION (user: "80% confluence"): B_prog = 0.8 K, the same level as B_cancer
+threshold_fraction_of_K = 0.5    # ASSUMPTION (user, 2026-10-27: K/2, the same level as B_cancer; 0.8 = "80% confluence" before): the untreated plateau (0.71–0.84 K) sat right at 0.8 K, which made the objective flat
 step_width_fraction_of_K = 0.02  # ASSUMPTION (numerical): width s of the smooth step, 2% of K (σ goes from 0.12 to 0.88 over ±4% of K)
 qP = 10.0                        # ASSUMPTION: cost of one decision interval spent progressed; dominates the other terms (swept)
 qRT = 10.0                       # ASSUMPTION: terminal cost of the resistant cells, qRT·C/K at the end of the look-ahead (swept 0 / 10 / 30)
