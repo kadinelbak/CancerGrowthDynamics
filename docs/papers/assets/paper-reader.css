@@ -176,7 +176,8 @@ kbd {
 .status-drafted { background: var(--drafted); }
 .status-now { background: var(--now); }
 .status-update { background: var(--update); }
-.status-pending, .status-write-last { background: var(--pending); }
+.status-pending, .status-write-last, .status-to-write { background: var(--pending); }
+.status-bullets { background: var(--now); }
 .draft-note {
   font-family: Arial, Helvetica, sans-serif;
   font-size: .85em;

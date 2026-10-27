@@ -31,7 +31,7 @@ TITLE = "From Culture to Control"
 SUBTITLE = ("Staged Mechanistic Modeling and Optimal Dosing of Cisplatin-Sensitive and "
             "-Resistant Ovarian Cancer Cells")
 
-STATUS_RE = re.compile(r"\s*\[(Drafted|Now|Update|Pending|Write last)\]\s*$")
+STATUS_RE = re.compile(r"\s*\[(Drafted|Now|Update|Pending|Write last|Bullets|To write)(?:;[^\]]*)?\]\s*$")
 EQ_NUM_RE = re.compile(r"^\((\d+\.\d+)\)$")
 PLACEHOLDER_RE = re.compile(r"\((?:ADD [^)]*|LINK IT|INSERT SOURCE)\)|\{[^{}]{1,12}\}")
 CITE_RE = re.compile(
@@ -82,6 +82,9 @@ def equation_block(soup, tex, number=None, key=None):
     side.append(button)
     block.append(side)
     return block
+
+
+COPIES = []  # (extracted media path, published file name), filled by transform
 
 
 def transform(fragment, image_name):
@@ -221,18 +224,27 @@ def transform(fragment, image_name):
         wrap = soup.new_tag("div", attrs={"class": "table-wrap"})
         table.wrap(wrap)
 
-    # The pipeline figure: local file, zoomable, caption attached.
+    # Figures: each image is copied next to the page under a name taken from its caption
+    # ("Figure 3.4." -> figure-3-4.png; Figure 2.3 keeps its pipeline name), zoomable, caption attached.
     for img in soup.find_all("img"):
-        img["src"] = image_name
-        img["alt"] = "Pipeline from raw images to dosing schedules in nine steps"
+        holder = img.find_parent("p") or img
+        caption = holder.find_next_sibling("p")
+        cap_text = caption.get_text() if caption else ""
+        m = re.match(r"Figure (\d+)\.(\d+)", cap_text)
+        if m is None or (m.group(1), m.group(2)) == ("2", "3"):
+            name, fid, alt = image_name, "fig-2-3", "Pipeline from raw images to dosing schedules in nine steps"
+        else:
+            name, fid = f"figure-{m.group(1)}-{m.group(2)}.png", f"fig-{m.group(1)}-{m.group(2)}"
+            alt = cap_text.split(".", 2)[-1].strip()
+        COPIES.append((img["src"], name))
+        img["src"] = name
+        img["alt"] = alt
         img["class"] = ["zoomable"]
         del img["style"]
-        figure = soup.new_tag("figure", attrs={"class": "figure", "id": "fig-2-3"})
-        holder = img.find_parent("p") or img
+        figure = soup.new_tag("figure", attrs={"class": "figure", "id": fid})
         holder.replace_with(figure)
         figure.append(img)
-        caption = figure.find_next_sibling("p")
-        if caption and caption.get_text().startswith("Figure"):
+        if caption and m is not None:
             figcap = soup.new_tag("figcaption")
             for child in list(caption.contents):
                 figcap.append(child)
@@ -252,13 +264,17 @@ def main():
         sys.exit(__doc__)
     docx = pathlib.Path(sys.argv[1])
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    image_name = "figure-2-3-pipeline.png"
     with tempfile.TemporaryDirectory() as tmp:
         fragment = pandoc(docx, tmp)
-        images = sorted(pathlib.Path(tmp).rglob("*.png"))
-        image_name = "figure-2-3-pipeline.png"
-        if images:
-            shutil.copy(images[0], OUT_DIR / image_name)
-    body = transform(fragment, image_name)
+        body = transform(fragment, image_name)
+        for src, name in COPIES:
+            path = pathlib.Path(src)
+            if not path.is_absolute():
+                path = pathlib.Path(tmp) / src
+            if not path.exists():
+                path = next(pathlib.Path(tmp).rglob(pathlib.Path(src).name))
+            shutil.copy(path, OUT_DIR / name)
     template = (HERE / "paper_template.html").read_text()
     page = (template
             .replace("{{TITLE}}", TITLE)

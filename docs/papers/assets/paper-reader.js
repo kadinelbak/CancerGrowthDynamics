@@ -41,7 +41,7 @@
   // ---------- Sections, contents and status ----------
   const headings = $$('h1, h2, h3, h4', doc);
   const level = (h) => ({ H1: 1, H2: 1, H3: 2, H4: 3 }[h.tagName]);
-  const statusColor = { Drafted: 'var(--drafted)', Now: 'var(--now)', Update: 'var(--update)', Pending: 'var(--pending)', 'Write last': 'var(--pending)' };
+  const statusColor = { Drafted: 'var(--drafted)', Now: 'var(--now)', Update: 'var(--update)', Pending: 'var(--pending)', 'Write last': 'var(--pending)', Bullets: 'var(--now)', 'To write': 'var(--pending)' };
   const toc = $('.toc');
   const tocLinks = new Map();
   let lastLevel2 = null;

@@ -53,7 +53,7 @@
         <h1 class="hero-title">From Culture to Control</h1>
         <p class="hero-sub">Staged Mechanistic Modeling and Optimal Dosing of Cisplatin-Sensitive and -Resistant Ovarian Cancer Cells</p>
         <div class="hero-meta">
-          <span>Built 2026-10-27 from <i>Working Draft - equations 2 (Results filled).docx</i></span>
+          <span>Built 2026-10-27 from <i>Working Draft - equations 2 (structured).docx</i></span>
           <span class="read-time"></span>
         </div>
         <div class="status-bar" aria-label="Draft status of the sections"></div>
@@ -132,37 +132,41 @@
 <ol type="1">
 <li><p>From Culture to Control: Staged Mechanistic Modeling and Optimal Dosing of Cisplatin-Sensitive and -Resistant Ovarian Cancer Cells and a Transportability Study Between Stages.</p></li>
 </ol>
-<p><strong>Abstract</strong> <span class="draft-note">[Write last; about 300 words, one sentence per item]</span></p>
+<p><strong>Abstract <span class="draft-note">[Write last; 250 words or less; must stand alone with no references to the main text]</span></strong></p>
 <ol type="1">
 <li><p>Problem: resistance after platinum therapy; adaptive therapy needs measured, not assumed, competition and drug parameters.</p></li>
 <li><p>Gap: models are rarely identified across systematically more complex conditions, and parameter transportability is assumed.</p></li>
 <li><p>Experiments: A2780/A2780cis in monoculture and coculture (1:3, 1:1, 3:1), normal and low resource (0.5% FBS), with cisplatin at 0.62–1.47 µM, imaged for 14 days.</p></li>
 <li><p>Framework: an autonomous compartment-model zoo, fitted in six stages with the fewest-parameters-within-3-BIC rule, in a Julia package.</p></li>
-<li><p>Key identification result: one sentence on the Stage 4 transportability failure (ΔBIC <span class="placeholder" title="Placeholder in the draft">{+70}</span>) and what ε means.</p></li>
-<li><p>Qualification: bootstrap stability, identifiability (<span class="placeholder" title="Placeholder in the draft">{4}</span> of <span class="placeholder" title="Placeholder in the draft">{23}</span> not fully identifiable), held-out prediction error.</p></li>
+<li><p>Key identification result: one sentence on the Stage 4 transportability result (inheriting everything is ΔBIC +27.6 worse than one drug × low-resource interaction χ) and what χ means.</p></li>
+<li><p>Qualification: bootstrap stability, identifiability (5 of 21 parameters not pinned on both sides), held-out prediction error.</p></li>
 <li><p>Control: MPC schedule vs constant dosing, with the headline numbers for cancer burden and cumulative dose.</p></li>
 <li><p>Comparison: mechanistic vs UDE/NN in one sentence.</p></li>
 <li><p>Significance: one sentence.</p></li>
 </ol>
+<ul>
+<li><p>Structured abstract layout (optional, allowed by BME): Background (items 1–2) · Objective (the one-sentence aim) · Methods (3–4) · Results (5–8) · Conclusions (9).</p></li>
+<li><p>Highlight the main objective and the main conclusion; about one sentence per item keeps it under 250 words.</p></li>
+</ul>
 <p><strong>Other front matter:</strong> acknowledgments, table of contents, list of figures, list of tables, list of abbreviations (LR, Ce0, Ce1, MPC, BIC, UDE, S/R, IC25/IC50/IC75), list of symbols (Appendix A is the full parameter table).</p>
 <h2 id="sec-1-introduction">1 Introduction</h2>
 <h3 data-status="Drafted" id="sec-1-1-ovarian-cancer-and-platinum-resistance">1.1 Ovarian cancer and platinum resistance <span class="status status-drafted">Drafted</span></h3>
-<p>Ovarian cancer provides a particularly compelling system for mathematical modeling. High relapse rates following platinum-based chemotherapy, such as cisplatin, suggest resistance dynamics play a central role in disease progression. Given ovarian cancer is the fifth most common cause of cancer death in women, with approximately 80% of patients relapsing with resistant disease within 18 months, it also has high clinical impact (<a class="cite" href="#ref-luvero-2014">Luvero et al., 2014</a>).</p>
-<p>Cisplatin mainly works by triggering DNA-damage and apoptosis responses, which tumors can evade through multiple resistance routes (<a class="cite" href="#ref-galluzzi-2012">Galluzzi et al., 2012</a>). The development of the preferable cisplatin-resistant trait, like many evolved phenotypes, is subject to trade-offs (<a class="cite" href="#ref-shoval-2012">Shoval et al., 2012</a>). However, under certain environmental conditions, generalist populations may be beaten out by specialist populations with greater flexibility (<a class="cite" href="#ref-gatenby-2020">Gatenby &amp; Brown, 2020</a>). This greater flexibility may entail other fitness costs, such as a reduced proliferation rate.</p>
+<p>Ovarian cancer provides a particularly compelling system for mathematical modeling. High relapse rates following platinum-based chemotherapy, such as cisplatin, suggest resistance dynamics play a central role in disease progression. Given ovarian cancer is the fifth most common cause of cancer death in women, with approximately 80% of patients relapsing with resistant disease within 18 months, it also has high clinical impact (Luvero et al., 2014).</p>
+<p>Cisplatin mainly works by triggering DNA-damage and apoptosis responses, which tumors can evade through multiple resistance routes (Galluzzi et al., 2012). The development of the preferable cisplatin-resistant trait, like many evolved phenotypes, is subject to trade-offs (Shoval et al., 2012). However, under certain environmental conditions, generalist populations may be beaten out by specialist populations with greater flexibility (Gatenby &amp; Brown, 2020). This greater flexibility may entail other fitness costs, such as a reduced proliferation rate.</p>
 <h3 data-status="Drafted" id="sec-1-2-competition-fitness-costs-and-adaptive-therapy">1.2 Competition, fitness costs and adaptive therapy <span class="status status-drafted">Drafted</span></h3>
-<p>Evolutionary modeling has demonstrated that resistant cells may incur a fitness cost in drug-free environments, allowing sensitive cells to competitively suppress resistant populations (<a class="cite" href="#ref-strobl-2021">Strobl et al., 2021</a>). This insight forms the basis for adaptive therapy: rather than attempting to completely remove the tumor, treatment may strategically maintain a population of drug-sensitive cells to suppress resistant clones. Systemic cancer treatment has traditionally been built upon the principle that administering a maximum tolerated dose (MTD) will eradicate malignant cancer cells and cure the disease. Unfortunately, many platinum-based chemotherapies fail and result in a drug-resistant tumor through the selection of drug-resistant subclones (<a class="cite" href="#ref-gatenby-2020">Gatenby &amp; Brown, 2020</a>). Adaptive therapy takes advantage of the fitness costs incurred by drug-resistant cancer cells when treatment is absent by reducing drug doses or introducing treatment holidays (<a class="cite" href="#ref-zhang-2017">Zhang et al., 2017</a>; <a class="cite" href="#ref-hockings-2025">Hockings et al., 2025</a>). By maintaining a population of sensitive cells, the growth of a resistant population can be suppressed while controlling overall tumor size.</p>
-<p>In recent studies, low-resource conditions have also been shown to cause a selective decline of resistant subpopulations (<a class="cite" href="#ref-obrist-2018">Obrist et al., 2018</a>). Limiting resources may enhance competition and suppress resistant subpopulations while maintaining manageable sensitive populations. The resulting apoptosis and reduced proliferation rates suggest that limiting access to nutrients may provide another mechanism for long-term tumor control. Newer papers also present models incorporating transitions between sensitive, resistant, and drug-tolerant cells. This complication may make coculture experiments difficult to accurately interpret. Labeling a sensitive cell at the beginning of an experiment may not represent a fixed phenotype if cells acquire resistance over multiple generations of reproduction. Similarly, resistant cells may revert if there is no selective pressure. Papers have represented this switching phenomenon through multicompartmental models of sensitive-like or drug-tolerant cells (<a class="cite" href="#ref-gevertz-2025">Gevertz et al., 2025</a>). Incorporating the fitness cost of resistance in a tumor and transitions between cellular states may provide a stronger mathematical basis for determining how other effects mechanistically alter resistant and naïve cell populations. Given that we often cannot identify cellular resistance beyond the initial labeling, these modeling effects are interpreted rather than assumed biological events.</p>
+<p>Evolutionary modeling has demonstrated that resistant cells may incur a fitness cost in drug-free environments, allowing sensitive cells to competitively suppress resistant populations (Strobl et al., 2021). This insight forms the basis for adaptive therapy: rather than attempting to completely remove the tumor, treatment may strategically maintain a population of drug-sensitive cells to suppress resistant clones. Systemic cancer treatment has traditionally been built upon the principle that administering a maximum tolerated dose (MTD) will eradicate malignant cancer cells and cure the disease. Unfortunately, many platinum-based chemotherapies fail and result in a drug-resistant tumor through the selection of drug-resistant subclones (Gatenby &amp; Brown, 2020). Adaptive therapy takes advantage of the fitness costs incurred by drug-resistant cancer cells when treatment is absent by reducing drug doses or introducing treatment holidays (Zhang et al., 2017; Hockings et al., 2025). By maintaining a population of sensitive cells, the growth of a resistant population can be suppressed while controlling overall tumor size.</p>
+<p>In recent studies, low-resource conditions have also been shown to cause a selective decline of resistant subpopulations (Obrist et al., 2018). Limiting resources may enhance competition and suppress resistant subpopulations while maintaining manageable sensitive populations. The resulting apoptosis and reduced proliferation rates suggest that limiting access to nutrients may provide another mechanism for long-term tumor control. Newer papers also present models incorporating transitions between sensitive, resistant, and drug-tolerant cells. This complication may make coculture experiments difficult to accurately interpret. Labeling a sensitive cell at the beginning of an experiment may not represent a fixed phenotype if cells acquire resistance over multiple generations of reproduction. Similarly, resistant cells may revert if there is no selective pressure. Papers have represented this switching phenomenon through multicompartmental models of sensitive-like or drug-tolerant cells (Gevertz et al., 2025). Incorporating the fitness cost of resistance in a tumor and transitions between cellular states may provide a stronger mathematical basis for determining how other effects mechanistically alter resistant and naïve cell populations. Given that we often cannot identify cellular resistance beyond the initial labeling, these modeling effects are interpreted rather than assumed biological events.</p>
 <h3 data-status="Drafted" id="sec-1-3-mechanistic-models-and-the-identification-problem">1.3 Mechanistic models and the identification problem <span class="status status-drafted">Drafted</span></h3>
-<p>Modeling cancer growth remains challenging due to the large number of interacting biological mechanisms that shape population dynamics. Tumor growth is influenced by density dependence, cell-state transitions, drug pharmacodynamics, ecological competition, resistance costs, stochasticity, and microenvironmental feedback. Across the literature, different modeling techniques utilize subsets of these mechanisms. Studies adopt pharmacodynamic approaches incorporating Hill-type drug-response terms derived from experimental dose-response curves (<a class="cite" href="#ref-el-kareh-2003">El-Kareh &amp; Secomb, 2003</a>). Other studies focus on techniques from classical mechanistic modeling grounded in population ecology and differential equations, such as logistic growth and competition interactions in coculture systems. Although mechanistic modeling approaches are often presented separately, many produce similarly accurate explanatory fits across experimental datasets. Similar growth suppression can be modeled with different biological mechanisms. A reduction in population growth may arise from density-dependent proliferation, treatment-induced arrest, or coculture competition. Therefore, the central modeling challenge is not just selecting an equation that fits observed cell counts but determining the necessary biological mechanisms across controlled perturbations.</p>
+<p>Modeling cancer growth remains challenging due to the large number of interacting biological mechanisms that shape population dynamics. Tumor growth is influenced by density dependence, cell-state transitions, drug pharmacodynamics, ecological competition, resistance costs, stochasticity, and microenvironmental feedback. Across the literature, different modeling techniques utilize subsets of these mechanisms. Studies adopt pharmacodynamic approaches incorporating Hill-type drug-response terms derived from experimental dose-response curves (El-Kareh &amp; Secomb, 2003). Other studies focus on techniques from classical mechanistic modeling grounded in population ecology and differential equations, such as logistic growth and competition interactions in coculture systems. Although mechanistic modeling approaches are often presented separately, many produce similarly accurate explanatory fits across experimental datasets. Similar growth suppression can be modeled with different biological mechanisms. A reduction in population growth may arise from density-dependent proliferation, treatment-induced arrest, or coculture competition. Therefore, the central modeling challenge is not just selecting an equation that fits observed cell counts but determining the necessary biological mechanisms across controlled perturbations.</p>
 <p>Exploiting these biological features requires a modeling framework capable of distinguishing whether dynamics arise from competitive resistance, phenotypic plasticity, delayed damage response, Allee effects, density-dependent growth, or pharmacodynamic kill terms. Many published studies test only a limited subset of these mechanisms. Other approaches emphasize death-term modifications, Allee-type dynamics, cell-state transitions, or damage-repair processes. Yet few attempts have systematically compared broad families of models under unified experimental conditions. The central problem, therefore, is not simply identifying new mechanisms, but determining which mechanisms dominate observed population dynamics under defined experimental conditions.</p>
 <h3 data-status="Drafted" id="sec-1-4-parameter-transportability">1.4 Parameter transportability <span class="status status-drafted">Drafted</span></h3>
 <p>Various biological models accurately explaining individual experiments are inadequate for establishing underlying biology. A stronger test is whether parameters inferred under one experimental condition remain predictive when applied to different, but related, conditions that were not used during fitting. Hierarchical fitting assumes that previous parameters remain important through increasingly complex experiments. However, this assumption may not always be held. In an untreated monoculture, for example, the growth rate and carrying capacity could require a different mathematical representation under a low-resource condition. It also seems reasonable that coculture effects could be altered by treatment effects. Therefore, appropriate fitting should test both hierarchical fitting and stage skipping.</p>
 <p>This leads to two competing methods. Fitting parameters under every experimental condition could improve explanatory fit but may incorporate mechanisms that are no longer important. In contrast, fitting parameters at key experimental conditions could maintain both explanatory fit and mechanistic interpretability. This leads to the central questions: <strong>which parameters should be carried through conditions, and which should change when the environment changes?</strong> Furthermore, when producing simulations, toggling between models in different conditions may be valuable, especially for dynamic environments such as a patient's physiological condition over a year.</p>
 <h3 data-status="Drafted" id="sec-1-5-optimal-control-of-treatment">1.5 Optimal control of treatment <span class="status status-drafted">Drafted</span></h3>
-<p>Many treatment schedules currently utilize maximum tolerated dose with the goal of tumor elimination. This is meant to maximize the delivered drug to the tumor site. However, recent research has indicated that MTD may not optimize long-term treatment benefits, especially in cancers with high relapse rates such as ovarian cancer (<a class="cite" href="#ref-gatenby-2020">Gatenby &amp; Brown, 2020</a>; <a class="cite" href="#ref-hockings-2025">Hockings et al., 2025</a>). Reducing treatment intensity or introducing treatment holidays in adaptive therapy schedules may help delay resistant tumor growth and reduce treatment side effects. Optimal control provides a framework based on control theory that allows these objectives to be formalized. Rather than optimizing only one result, objective functions can simultaneously penalize cell resistance, tumor burden, and drug toxicity. The resulting treatment schedule reflects a balance among these parameters. The quality of optimal control is directly dependent on the validity of the dynamic models it uses. Typically, these models are semi-mechanistic because they are intended to capture the most important growth and suppression factors (<a class="cite" href="#ref-moore-2018">Moore, 2018</a>). This is why it is important to identify the most prominent mechanisms and properly evaluate parameter identifiability and parameter transportability before optimization.</p>
+<p>Many treatment schedules currently utilize maximum tolerated dose with the goal of tumor elimination. This is meant to maximize the delivered drug to the tumor site. However, recent research has indicated that MTD may not optimize long-term treatment benefits, especially in cancers with high relapse rates such as ovarian cancer (Gatenby &amp; Brown, 2020; Hockings et al., 2025). Reducing treatment intensity or introducing treatment holidays in adaptive therapy schedules may help delay resistant tumor growth and reduce treatment side effects. Optimal control provides a framework based on control theory that allows these objectives to be formalized. Rather than optimizing only one result, objective functions can simultaneously penalize cell resistance, tumor burden, and drug toxicity. The resulting treatment schedule reflects a balance among these parameters. The quality of optimal control is directly dependent on the validity of the dynamic models it uses. Typically, these models are semi-mechanistic because they are intended to capture the most important growth and suppression factors (Moore, 2018). This is why it is important to identify the most prominent mechanisms and properly evaluate parameter identifiability and parameter transportability before optimization.</p>
 <h3 data-status="Pending" id="sec-1-6-mechanistic-versus-data-driven-models">1.6 Mechanistic versus data-driven models <span class="status status-pending">Pending</span></h3>
 <ul>
-<li><p>UDEs and neural ODEs as a competing route (<a class="cite" href="#ref-rackauckas-2020">Rackauckas et al., 2020</a>; <a class="cite" href="#ref-brunton-2016">Brunton et al., 2016</a>); one paragraph on each trades.</p></li>
+<li><p>UDEs and neural ODEs as a competing route (Rackauckas et al., 2020; Brunton et al., 2016); one paragraph on each trades.</p></li>
 </ul>
 <h3 data-status="Drafted" id="sec-1-7-aims-and-contributions">1.7 Aims and contributions <span class="status status-drafted">Drafted</span></h3>
 <p>This thesis proposes a unified modeling framework to systematically evaluate competing mechanistic hypotheses in ovarian cancer growth. Using untreated and treated monoculture datasets, as well as coculture competition experiments under treated, untreated, and low-resource conditions, this work develops and implements modular infrastructure capable of:</p>
@@ -178,9 +182,36 @@
 <p>Rather than proposing a single “correct” model, this framework evaluates how increasing mechanistic complexity alters explanatory power and predictive stability. In doing so, ovarian cancer modeling becomes a test case for a broader question in systems biology: <strong>how can complex biological mechanisms be modularized, compared, and integrated within a unified computational architecture?</strong></p>
 <p>This approach was implemented through a Julia package that simplifies the process of model comparison and analysis. The package is intended to be adaptable and extend beyond ovarian cancer growth modeling.</p>
 <p>By reducing the infrastructural barrier to systematic model comparison, this package enables future researchers to test mechanistic combinations without rebuilding simulation infrastructure from scratch. The major aim of this thesis is therefore to develop modeling infrastructure capable of analyzing varying mechanisms of ovarian cancer growth across a complex system of experimental conditions and models to reach new biological insights.</p>
-<h3 data-status="Drafted" id="sec-1-8-thesis-outline">1.8 Thesis outline <span class="status status-drafted">Drafted</span></h3>
+<h3 data-status="To write" id="sec-1-8-aim-hypotheses-and-objectives">1.8 Aim, hypotheses and objectives <span class="status status-to-write">To write</span></h3>
+<ul>
+<li><p>Aim, in one sentence near the end of the Introduction: “The aim of my research is to …”</p></li>
+<li><p>Hypotheses (one or two sentences each), each tested in Results:</p>
+<ul>
+<li><p>H1 Identification: sensitive and resistant cells need different growth, low-resource and drug-response mechanisms (3.2–3.4).</p></li>
+<li><p>H2 Transportability: parameters fitted in monoculture predict coculture and combined conditions (3.5, 3.6, 3.8).</p></li>
+<li><p>H3 Control: a model-predictive schedule delays progression with less drug than constant dosing (3.9, 3.10).</p></li>
+<li><p>H4 Method comparison: mechanistic models predict held-out data as well as learned models (3.11).</p></li>
+</ul></li>
+<li><p>Engineering objectives: the staged model-fitting package; the dosing controller (MPC) with toxicity and weight limits.</p></li>
+</ul>
+<h3 data-status="To write" id="sec-1-9-significance">1.9 Significance <span class="status status-to-write">To write</span></h3>
+<ul>
+<li><p>What this adds that is not already known (measured rather than assumed competition and drug parameters).</p></li>
+<li><p>What follows if the aim is met (who could use the package and the transportability tests).</p></li>
+<li><p>What is deliberately out of scope (in vivo dosing, other cell lines) so the problem space is solvable.</p></li>
+</ul>
+<h3 data-status="To write" id="sec-1-10-key-assumptions">1.10 Key assumptions <span class="status status-to-write">To write</span></h3>
+<ul>
+<li><p>Cell counts per image track population size (constant cell size, segmentation).</p></li>
+<li><p>2D in vitro coculture stands in for competition in a tumour.</p></li>
+<li><p>0.5% FBS stands in for fasting; literature host model stands in for toxicity and weight.</p></li>
+<li><p>Earlier-stage parameters can be held fixed in later stages.</p></li>
+<li><p>One biological run per condition is representative.</p></li>
+<li><p>For each: what changes in the conclusions if it is false (answered in 4.8).</p></li>
+</ul>
+<h3 data-status="Drafted" id="sec-1-11-thesis-outline">1.11 Thesis outline <span class="status status-drafted">Drafted</span></h3>
 <p>This thesis follows staged progression from experiment to control. Experimental measurements of sensitive and resistant cancer populations are first used to identify the models within 3 BIC of the lowest BIC models capable of explaining population dynamics with the fewest free parameters. These models are then qualified through uncertainty, sensitivity, identifiability, transportability, and predictive-validation analyses. Qualified models are subsequently used to simulate treatment and environmental perturbations and ultimately to evaluate treatment schedules through optimal control. Mechanistic models are additionally compared with time-based and data-driven alternatives. Ultimately, this paper will create an infrastructure that can take growth data and produce possible dosing schedules using optimal control theory while doing a case study on A2780 and TykNu cells.</p>
-<h2 id="sec-2-methods">2 Methods</h2>
+<h2 id="sec-2-materials-and-methods">2 Materials and Methods</h2>
 <p>Methods are broken into two parts for readability. There is a section for collecting data and a separate section for the mathematical framework.</p>
 <h2 id="sec-2-1-experimental-methods">2.1 Experimental methods</h2>
 <h3 data-status="Drafted" id="sec-2-1-1-cell-lines">2.1.1 Cell lines <span class="status status-drafted">Drafted</span></h3>
@@ -236,7 +267,7 @@
 <h2 id="sec-2-2-modeling-framework">2.2 Modeling framework</h2>
 <h3 data-status="Drafted" id="sec-2-2-1-computational-pipeline-and-package">2.2.1 Computational pipeline and package <span class="status status-drafted">Drafted</span></h3>
 <p>This project has a 9-stage process that utilizes a wealth of packages as well as GrowthParameterEstimation.jl, an author created package. This workflow was meant to make a seamless pipeline for automating the steps from collecting images to producing results while maintaining enough modularity to be used across experiments.</p>
-<p>Stages 1 and 2 of analyzing images for cell counts occurred in QuPath and are described in sections 2.1.4 and 2.1.5. The following step was done based on lab-specific microscope collection practices. During stage 3, Python scripts were used to remove unnecessary images recursively from project folders. These typically followed regex patterns that excluded string combinations and image types that we desired in calculation. Stage 4 was using Julia to develop model zoos that defined terms with common grammar that the package would be able to operate on. This step was complete without the help of GrowthParameterEstimation.jl as converting equations in different languages was outside the scope of this project, however the zoo_models.jl file within the Github repo has an example file, so that future scientists can replicate the format. Stage 5-7 is when the GrowthParameterEstimation.jl package is utilized. A skeleton loop calls on staged fitting functions within the package that fit the first stage of models on untreated data. It uses a Tsit5() Runge-Kutta error estimation function. This function will predict the estimated error at every given time point (<a class="cite" href="#ref-tsitouras-2011">Tsitouras, 2011</a>). Rodas4 and Rosenbrock23 were used at the beginning of the project, but after a recollection of data that improved data quality significantly, stiff solvers were no longer needed nor utilized. BFGS was the main optimizer. It follows the slope of <span class="math inline">\(SSE\)</span> values to a minimum while going down a parameter gradient. It is able to determine how far down a parameter gradient is reasonable by estimating the curvature of a given model to converge faster than plain gradient descent (<a class="cite" href="#ref-nocedal-2006">Nocedal &amp; Wright, 2006</a>). Since BFGS may only find a local minimum, the package adopted multi-start functionality to attempt the search three times. BFGS parameter values were bounded by biological reasonable values found in literature or rule-based determination like .5x - 20x mean. Furthermore, Nelder-Mead polished the result. Nelder –Mead creates a simplex, or a shape based on a set of points. It then modifies the points of this shape on the domain of the function it is traversing. It continues to figuratively crawl, reflect, and jump across the function until it cannot find a point lower than the minimum with the modifications it is able to do (<a class="cite" href="#ref-nelder-1965">Nelder &amp; Mead, 1965</a>).</p>
+<p>Stages 1 and 2 of analyzing images for cell counts occurred in QuPath and are described in sections 2.1.4 and 2.1.5. The following step was done based on lab-specific microscope collection practices. During stage 3, Python scripts were used to remove unnecessary images recursively from project folders. These typically followed regex patterns that excluded string combinations and image types that we desired in calculation. Stage 4 was using Julia to develop model zoos that defined terms with common grammar that the package would be able to operate on. This step was complete without the help of GrowthParameterEstimation.jl as converting equations in different languages was outside the scope of this project, however the zoo_models.jl file within the Github repo has an example file, so that future scientists can replicate the format. Stage 5-7 is when the GrowthParameterEstimation.jl package is utilized. A skeleton loop calls on staged fitting functions within the package that fit the first stage of models on untreated data. It uses a Tsit5() Runge-Kutta error estimation function. This function will predict the estimated error at every given time point (Tsitouras, 2011). Rodas4 and Rosenbrock23 were used at the beginning of the project, but after a recollection of data that improved data quality significantly, stiff solvers were no longer needed nor utilized. BFGS was the main optimizer. It follows the slope of <span class="math inline">\(SSE\)</span> values to a minimum while going down a parameter gradient. It is able to determine how far down a parameter gradient is reasonable by estimating the curvature of a given model to converge faster than plain gradient descent (Nocedal &amp; Wright, 2006). Since BFGS may only find a local minimum, the package adopted multi-start functionality to attempt the search three times. BFGS parameter values were bounded by biological reasonable values found in literature or rule-based determination like .5x - 20x mean. Furthermore, Nelder-Mead polished the result. Nelder –Mead creates a simplex, or a shape based on a set of points. It then modifies the points of this shape on the domain of the function it is traversing. It continues to figuratively crawl, reflect, and jump across the function until it cannot find a point lower than the minimum with the modifications it is able to do (Nelder &amp; Mead, 1965).</p>
 <p>Stage 6 is going through the output of this fitting function to find the models that contain the fewest parameters within 3 BIC points of the optimal. This was chosen given a difference in 3 BIC points that were unlikely consequential. This is also the step in which the bootstrap qualification is run to generate the 95% confidence intervals that the rest of the qualification functions required. The project repo held another skeleton loop that would run each type of analysis at each stage. Only global analysis was completed at the end of stage 4. For these packages function to work Julia 1.10 or higher is necessary due to the project.toml file while Julia 1.12.7 was used in this project.</p>
 <figure class="figure" id="fig-2-3"><img alt="Pipeline from raw images to dosing schedules in nine steps" class="zoomable" src="figure-2-3-pipeline.png"/><figcaption><strong>Figure 2.3.</strong> The analysis pipeline from raw images to dosing schedules; the color of each step shows the tool that performs it.</figcaption></figure>
 
@@ -254,7 +285,7 @@
 <ol start="2" type="1">
 <li><p><strong>At most 3 compartments per line,</strong> the control problem stays small. Previous papers by <span class="placeholder" title="Placeholder in the draft">(INSERT SOURCE)</span> indicate that more than 3 compartments brought no major improvements to model selection, so it seems unnecessary to complicate the problem. Up to 8 compartment versions were tested with none producing a BIC that was more than 3 points lower than the 3 compartment models.</p></li>
 <li><p><strong>A grid of delay kernel × effect</strong> (Table 2.2), not a hand-picked list. To test as many combinations as possible, two tables were generated. One table modeled various accumulation functions, while the other table modeled types of effect functions. The model zoo was a combination of every effect type and accumulation function. Some heat maps were generated to quickly view which combinations were most parsimonious. Model names were typically derived from the kernel plus effect names.</p></li>
-<li><p><strong>One cisplatin mechanism for both lines</strong>, with separate rates. A2780cis derives cellular mechanisms from A2780; previous research determined that resistance changes uptake, glutathione and repair rates, not the mechanism of cisplatin effect (<a class="cite" href="#ref-galluzzi-2012">Galluzzi et al., 2012</a>). This leads to the conclusion that A2780 and a2780cis cells should have the same mechanisms but different parameter values.</p></li>
+<li><p><strong>One cisplatin mechanism for both lines</strong>, with separate rates. A2780cis derives cellular mechanisms from A2780; previous research determined that resistance changes uptake, glutathione and repair rates, not the mechanism of cisplatin effect (Galluzzi et al., 2012). This leads to the conclusion that A2780 and a2780cis cells should have the same mechanisms but different parameter values.</p></li>
 </ol>
 <h3 data-status="Drafted" id="sec-2-2-3-candidate-model-zoo">2.2.3 Candidate model zoo <span class="status status-drafted">Drafted</span></h3>
 <p><strong>Table 2.2a — Delay kernels (how the input w = D or u_R becomes the effect E)</strong></p>
@@ -465,15 +496,15 @@
 <div class="eq" data-eq="u1" id="eq-u1"><div class="eq-body">\[RSS_{new\,} = \,\frac{RSS_{original}}{y}\]</div><div class="eq-side"><button aria-expanded="false" aria-label="Explain equation" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p><strong>Important:</strong> your newer thesis skeleton correctly marks this as something that must be checked against the current zoo implementation before final prose is written. Do not copy the old loss description directly into the thesis until the current code is verified.</p>
 <h3 data-status="Drafted" id="sec-2-2-6-model-selection">2.2.6 Model selection <span class="status status-drafted">Drafted</span></h3>
-<p>Candidate models were compared using the Bayesian Information Criterion (BIC) (<a class="cite" href="#ref-schwarz-1978">Schwarz, 1978</a>) and relevant biological information:</p>
+<p>Candidate models were compared using the Bayesian Information Criterion (BIC) (Schwarz, 1978) and relevant biological information:</p>
 <div class="eq" data-eq="2.14" id="eq-2-14"><div class="eq-body">\[BIC = n\ln\left( \frac{RSS}{n} \right) + k\ln n\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-14" title="Link to this equation">(2.14)</a><button aria-expanded="false" aria-label="Explain equation 2.14" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p>where <span class="math inline">\(n\)</span> is the number of observations, <span class="math inline">\(k\)</span> the number of fitted parameters and RSS the residual sum of squares.</p>
-<p>The model selection approach changed significantly throughout the process of this project as understood constraints changed. Choosing models was also different depending on the experimental condition. For all conditions, the chosen model was within 3 BIC of the lowest BIC model that also had the least number of parameters. Previous literature indicates that 0-2 is a weak significance, while 2-6 is modest and 6+ is significant (<a class="cite" href="#ref-kass-1995">Kass &amp; Raftery, 1995</a>). We decided to land on 3 as it was a convenient number for a handful of models that empirically described the data equivalently with fewer parameters. However, A2780 and A2780cis cells under treated conditions were indicted to have similar mechanisms yet different severities from previous literature. For this reason, the model that was used for coculture treatment had to maintain the same treatment term for both A2780 and A2780cis cells.</p>
+<p>The model selection approach changed significantly throughout the process of this project as understood constraints changed. Choosing models was also different depending on the experimental condition. For all conditions, the chosen model was within 3 BIC of the lowest BIC model that also had the least number of parameters. Previous literature indicates that 0-2 is a weak significance, while 2-6 is modest and 6+ is significant (Kass &amp; Raftery, 1995). We decided to land on 3 as it was a convenient number for a handful of models that empirically described the data equivalently with fewer parameters. However, A2780 and A2780cis cells under treated conditions were indicted to have similar mechanisms yet different severities from previous literature. For this reason, the model that was used for coculture treatment had to maintain the same treatment term for both A2780 and A2780cis cells.</p>
 <p>Untreated Coculture and Treated Coculture conditions were fitted together so that the data had to explain parameters for these interactions simultaneously. This was to account for the apparent inverse selectivity caused by coculturing sensitive and resistant cells as well as treating those cells. Similar models were found in both cases, but different parameter values that were more biologically transportable were utilized for in this paper's methodology using stage 2 treatment terms. The goal of model selection was to add complexity when new data indicated it was necessary.</p>
 <h3 data-status="Now" id="sec-2-2-7-model-qualification">2.2.7 Model qualification <span class="status status-now">Now</span></h3>
 <p>Model qualification is used to ensure that the model being chosen is appropriate to simulate and run optimal control on. In this paper, there were 5 different levels of qualification in which some features of the model were changed while keeping everything else fixed.</p>
 <h4 id="sec-bootstrapping">Bootstrapping</h4>
-<p>Bootstrapping is meant to help introduce more synthetic data from the provided experimental data. The bootstrapping operation takes the residuals from the most complex candidate of each fit, resample them in blocks of three wrapping around the entire set (I.E. - 12, 13, 1 is a possible combination) (<a class="cite" href="#ref-künsch-1989">Künsch, 1989</a>; <a class="cite" href="#ref-politis-1992">Politis &amp; Romano, 1992</a>), and added back to the reference-model predictions to create synthetic datasets. Every model is then refitted on every synthetic dataset. The goal is to determine whether the model selected with the original data would be chosen if this experiment was repeated, called structural certainty. This paper applied a few common perturbations to the baseline bootstrapping operation.</p>
+<p>Bootstrapping is meant to help introduce more synthetic data from the provided experimental data. The bootstrapping operation takes the residuals from the most complex candidate of each fit, resample them in blocks of three wrapping around the entire set (I.E. - 12, 13, 1 is a possible combination) (Künsch, 1989; Politis &amp; Romano, 1992), and added back to the reference-model predictions to create synthetic datasets. Every model is then refitted on every synthetic dataset. The goal is to determine whether the model selected with the original data would be chosen if this experiment was repeated, called structural certainty. This paper applied a few common perturbations to the baseline bootstrapping operation.</p>
 <p>Synthetic data was developed in blocks. A string of three residuals would be used to produce 3 days at a time since in biological growth if one cell count residual is likely related to the next day (I.E. if one residual is above baseline, it is more likely that following cells are also above baseline). This choice was validated when we did a lag-1 autocorrelation calculation:</p>
 <div class="eq" data-eq="2.15" id="eq-2-15"><div class="eq-body">\[\rho = \frac{\sum_{i = 1}^{n - 1}\left( e_{i} - \bar{e} \right)\left( e_{i + 1} - \bar{e} \right)}{\sum_{i = 1}^{n}\left( e_{i} - \bar{e} \right)^{2}}\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-15" title="Link to this equation">(2.15)</a><button aria-expanded="false" aria-label="Explain equation 2.15" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p>where <span class="math inline">\(e_{i}\)</span> is the residual on day <span class="math inline">\(i\)</span> of one trajectory and <span class="math inline">\(\bar{e}\)</span> its mean.</p>
@@ -486,17 +517,17 @@
 <div class="eq" data-eq="2.17" id="eq-2-17"><div class="eq-body">\[SI_{p} = \frac{1}{0.1}\max_{\pm ,\, t,\, j}\frac{\left| {\widehat{y}}_{j}\left( t;\,\theta_{p}(1 \pm 0.1) \right) - {\widehat{y}}_{j}(t;\,\theta) \right|}{\max\left( {\widehat{y}}_{j}(t;\,\theta),\, 1 \right)}\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-17" title="Link to this equation">(2.17)</a><button aria-expanded="false" aria-label="Explain equation 2.17" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p>where <span class="math inline">\({\widehat{y}}_{j}\)</span> is the prediction for trajectory <span class="math inline">\(j\)</span>; the maximum is taken over both perturbation directions, all observed trajectories and all times, and predictions are floored at one cell so that dying trajectories do not divide by zero.</p>
 <h4 id="sec-identifiability">Identifiability.</h4>
-<p>There are two types of identifiability Structural and Practical, but this paper focuses on practical Identifiability. A likelihood profile test (<a class="cite" href="#ref-raue-2009">Raue et al., 2009</a>) was used for each parameter fitted within a stage following a nine-point grid from 0.5x - 2x for the parameter value.</p>
+<p>There are two types of identifiability Structural and Practical, but this paper focuses on practical Identifiability. A likelihood profile test (Raue et al., 2009) was used for each parameter fitted within a stage following a nine-point grid from 0.5x - 2x for the parameter value.</p>
 <p>The first step is to obtain the cut-off value for your given system. Since this system only restricts one variable, therefore needing a test which gives the cut-off value of 3.84.</p>
 <p>Next, the likelihood profile test requires finding the lowest <span class="math inline">\(SSE\)</span> when fitting a given model to the data. Next, for each parameter at each stage when forcing a parameter value to be equal to a set value within the nine-point grid from 0.5x - 2x finding the <span class="math inline">\(SSE\)</span> for that fit.</p>
 <p>You then find the difference in deviance given by this equation:</p>
 <div class="eq" data-eq="2.18" id="eq-2-18"><div class="eq-body">\[\Delta_{p}(c) = n\,\ln\frac{SSE_{p}(c)}{SSE_{\min}},\quad\quad SSE_{p}(c) = \min_{\theta_{- p}}SSE\left( \theta \mid \theta_{p} = c \right)\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-18" title="Link to this equation">(2.18)</a><button aria-expanded="false" aria-label="Explain equation 2.18" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p>Where indicates parameter and indicates the fixed parameter value. Afterwards, you compare the difference in deviation with the threshold value found from your statistical look-up table (e.g. Chi Squared Test). When the difference in deviation, likelihood ratio statistic, crosses the threshold value indicating that sides bound for the 95% confidence interval. If a given parameter is bound on both sides, this indicates a practically identifiable parameter as well as its 95% confidence interval. When sensitivity explains how much predictions change when you change the parameter, this identifiability test indicates how specific a given parameter is within a model. This helps determine if that parameter is necessary or unique to the data.</p>
 <h4 id="sec-global-sensitivity">Global sensitivity.</h4>
-<p>To test global sensitivity Sobol indices was used. While local sensitivity elasticity measurements looked at a given point, Sobol analysis averages over the plausible region and captures interactions. This creates two indices. The first order index describes how much variation is explained directly by a given parameter over its 95% bootstrap interval. This may look like a change in a given cell to count the overall output. The second index is a total-order index that will describe how much variation is explained by a given parameter indirectly over the 95% bootstrap interval. This may look like a large difference in a model's other parameters. In combinations, this provides insight into how much model estimations are directly affected by a parameter, and how much the parameter affects the total model output. This specific analysis used the Saltelli first-order and Jansen total-order estimators. At first, this analysis was only done per stage as it was in the previous tests, but then this test was done on the treated co-culture in which inherited parameters were also manipulated to calculate Sobol indices for every parameter. The methodology and math of this test is explained in greater detail in the original paper (<a class="cite" href="#ref-sobol-2001">Sobol′, 2001</a>; <a class="cite" href="#ref-saltelli-2010">Saltelli et al., 2010</a>; <a class="cite" href="#ref-jansen-1999">Jansen, 1999</a>)</p>
+<p>To test global sensitivity Sobol indices was used. While local sensitivity elasticity measurements looked at a given point, Sobol analysis averages over the plausible region and captures interactions. This creates two indices. The first order index describes how much variation is explained directly by a given parameter over its 95% bootstrap interval. This may look like a change in a given cell to count the overall output. The second index is a total-order index that will describe how much variation is explained by a given parameter indirectly over the 95% bootstrap interval. This may look like a large difference in a model's other parameters. In combinations, this provides insight into how much model estimations are directly affected by a parameter, and how much the parameter affects the total model output. This specific analysis used the Saltelli first-order and Jansen total-order estimators. At first, this analysis was only done per stage as it was in the previous tests, but then this test was done on the treated co-culture in which inherited parameters were also manipulated to calculate Sobol indices for every parameter. The methodology and math of this test is explained in greater detail in the original paper (Sobol′, 2001; Saltelli et al., 2010; Jansen, 1999)</p>
 <div class="eq" data-eq="2.19" id="eq-2-19"><div class="eq-body">\[S_{i} = \frac{Var\left\lbrack E\left( Y \mid \theta_{i} \right) \right\rbrack}{Var(Y)},\quad\quad S_{T,i} = \frac{E\left\lbrack Var\left( Y \mid \theta_{\sim i} \right) \right\rbrack}{Var(Y)}\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-19" title="Link to this equation">(2.19)</a><button aria-expanded="false" aria-label="Explain equation 2.19" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <div class="eq" data-eq="2.20" id="eq-2-20"><div class="eq-body">\[{\widehat{S}}_{i} = \frac{\frac{1}{N}\sum_{j = 1}^{N}f(B)_{j}\left\lbrack f\left( A_{B}^{(i)} \right)_{j} - f(A)_{j} \right\rbrack}{Var(Y)},\quad\quad{\widehat{S}}_{T,i} = \frac{\frac{1}{2N}\sum_{j = 1}^{N}\left\lbrack f(A)_{j} - f\left( A_{B}^{(i)} \right)_{j} \right\rbrack^{2}}{Var(Y)}\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-20" title="Link to this equation">(2.20)</a><button aria-expanded="false" aria-label="Explain equation 2.20" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
-<p>where <span class="math inline">\(Y\)</span> is a model output, <span class="math inline">\(\theta_{\sim i}\)</span> denotes every parameter except <span class="math inline">\(\theta_{i}\)</span>, <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> are two independent <span class="math inline">\(N \times k\)</span> matrices of parameter samples drawn uniformly over each parameter's 95% bootstrap interval (<span class="math inline">\(N = 16,384\)</span>), and <span class="math inline">\(A_{B}^{(i)}\)</span> is <span class="math inline">\(A\)</span> with its <span class="math inline">\(i\)</span>-th column taken from <span class="math inline">\(B\)</span>. The first estimator is that of <a class="cite" href="#ref-saltelli-2010">Saltelli et al. (2010</a>), applied to a centered output; the second is the <a class="cite" href="#ref-jansen-1999">Jansen (1999</a>) estimator.</p>
+<p>where <span class="math inline">\(Y\)</span> is a model output, <span class="math inline">\(\theta_{\sim i}\)</span> denotes every parameter except <span class="math inline">\(\theta_{i}\)</span>, <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> are two independent <span class="math inline">\(N \times k\)</span> matrices of parameter samples drawn uniformly over each parameter's 95% bootstrap interval (<span class="math inline">\(N = 16,384\)</span>), and <span class="math inline">\(A_{B}^{(i)}\)</span> is <span class="math inline">\(A\)</span> with its <span class="math inline">\(i\)</span>-th column taken from <span class="math inline">\(B\)</span>. The first estimator is that of Saltelli et al. (2010), applied to a centered output; the second is the Jansen (1999) estimator.</p>
 <h4 id="sec-validation">Validation.</h4>
 <p>This final step is meant to determine whether these models can be applied to data outside the data it was trained on. Since the data for a combination of experimental factors did not favor a model that was simply the combination of terms but rather a more complex fitted model four validation methods were designed</p>
 <p><strong>Intermittent Data</strong></p>
@@ -517,7 +548,7 @@
 <p>Each model fits for the first 70% of days. Typically, this was 10 days or less of a 14-day series. The model then predicts the rest of the data. The same analysis values for RSME, nRSME, and the Held-out / in-sample ratio are used for comparison and interpretation.</p>
 <h3 data-status="Now" id="sec-2-2-8-simulation">2.2.8 Simulation <span class="status status-now">Now</span></h3>
 <p>Most simulation models were qualified well through the above analysis methods; however, a few models were not well qualified and are marked this way; this only applied to the low-resource cultures. Schedules were largely simulated based on 2-day interval changes. The model steps across every time point to ensure every simulation is repeatable, and no estimation occurs. Drug values could only be changed every 2 days, since all our data included media refreshes in two days. Most schedules could only provide doses at .62 um, 1 um, and 1.47 um since those were the values validated. Some schedules went up to 3 um and are indicated. Furthermore, some schedules may have given doses between the established doses; however, this greatly increased complexity, and it was reduced to only one schedule.</p>
-<p>Simulated schedules included a constant 1 µM, maximum measured dose 1.47 µM, periodic 2 days on / 2 off, threshold adaptive (Zhang-style) (<a class="cite" href="#ref-zhang-2017">Zhang et al., 2017</a>). Simulations were run on all starting ratios 1:3, 1:1, 3:1. These were all validated relatively well and likely did not introduce any added complexity within a model given variation could be explained via just their initial populations sizes per population. Time horizons of simulation were first completed in 14 days. After optimal control indicated time to tumor progression of greater than 14 days, simulations were completed for 30 days and 60 days. Note that compound effects outside 14 days are difficult to validate and are therefore extrapolations for simulation. Optimal controls simulations included versions in which fasting was a control and was not a control. This was done across all schedules given that the low-resource model was less validated. Simulations were also bootstrapped to generate 95% confidence intervals. These served as ways to ensure results were likely rather than just the average. RK4 algorithms were used to create predictions while Tsit5 was used to validate a sample of RK4 predictions. This was done because RK4 provided a smooth curve and was less computationally expensive than Tsit5, which allowed for more model iterations.</p>
+<p>Simulated schedules included a constant 1 µM, maximum measured dose 1.47 µM, periodic 2 days on / 2 off, threshold adaptive (Zhang-style) (Zhang et al., 2017). Simulations were run on all starting ratios 1:3, 1:1, 3:1. These were all validated relatively well and likely did not introduce any added complexity within a model given variation could be explained via just their initial populations sizes per population. Time horizons of simulation were first completed in 14 days. After optimal control indicated time to tumor progression of greater than 14 days, simulations were completed for 30 days and 60 days. Note that compound effects outside 14 days are difficult to validate and are therefore extrapolations for simulation. Optimal controls simulations included versions in which fasting was a control and was not a control. This was done across all schedules given that the low-resource model was less validated. Simulations were also bootstrapped to generate 95% confidence intervals. These served as ways to ensure results were likely rather than just the average. RK4 algorithms were used to create predictions while Tsit5 was used to validate a sample of RK4 predictions. This was done because RK4 provided a smooth curve and was less computationally expensive than Tsit5, which allowed for more model iterations.</p>
 <h3 data-status="Now" id="sec-2-2-9-optimal-control">2.2.9 Optimal control <span class="status status-now">Now</span></h3>
 <p>Optimal control engineering attempts to maintain and output value inside of a safe set of values that is defined by a set of barrier functions (an upper and lower bound in this case). The predicted value is generated by the models fitted in previous sections, and toxicity, protection, and weight equations derived from literature. The appropriate inputs are determined by algorithm while the cost function informs the algorithm. Inputs and controls can be constrained by inequalities based on state functions or other values. To properly describe this full system, the section will be broken down into dynamics, host model, the control problem and its constraints, the cost and barrier functions, and finally the algorithms.</p>
 <h4 id="sec-2-2-9-1-dynamics">2.2.9.1 Dynamics</h4>
@@ -539,35 +570,35 @@
 <p>The control for this includes a <span class="math inline">\(u_{R}\)</span> from 0-.995 indicating FBS values from 10% - 0.5% respectively. The scaling for the low resource effects and the drug effects is meant to remove the terms if the dose drops to zero. This is vital for a functioning optimal control. Otherwise, effects would carry on for no apparent reason in simulations.</p>
 
 <h4 id="sec-2-2-9-2-host-model-toxicity-fasting-protection-and-body-weig">2.2.9.2 Host Model: Toxicity, Fasting Protection, and Body Weight</h4>
-<p>The host model was not fitted on any data within these experiments. Instead, they were taken from the tumor-immune-chemotherapy model of <a class="cite" href="#ref-de-pillis-2001">de Pillis and Radunskaya (2001</a>). Their healthy-cell equation is:</p>
+<p>The host model was not fitted on any data within these experiments. Instead, they were taken from the tumor-immune-chemotherapy model of de Pillis and Radunskaya (2001). Their healthy-cell equation is:</p>
 <div class="eq" data-eq="2.33" id="eq-2-33"><div class="eq-body">\[\frac{dH}{dt} = r_{H}H(1 - H) - a_{H}\left( 1 - e^{- B} \right)H,\quad\quad\frac{dB}{dt} = s_{B}\, u - d_{B}\, B\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-33" title="Link to this equation">(2.33)</a><button aria-expanded="false" aria-label="Explain equation 2.33" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <div class="eq" data-eq="2.34" id="eq-2-34"><div class="eq-body">\[\frac{dT}{dt} = a_{H}\left( 1 - p_{H}P \right)\left( 1 - e^{- B} \right)(1 - T) - r_{H}\, T(1 - T),\quad\quad T = 1 - H\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-34" title="Link to this equation">(2.34)</a><button aria-expanded="false" aria-label="Explain equation 2.34" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
-<p>where <span class="math inline">\(H\)</span> is healthy tissue as a fraction of its capacity, <span class="math inline">\(B\)</span> the systemic drug burden, <span class="math inline">\(r_{H}\)</span> = 1 day⁻¹ the healthy-tissue regrowth rate, <span class="math inline">\(a_{H}\)</span> = 0.1 the fractional kill of healthy tissue, <span class="math inline">\(d_{B}\)</span> = 1 day⁻¹ the drug clearance rate (<a class="cite" href="#ref-de-pillis-2001">de Pillis &amp; Radunskaya, 2001</a>; <a class="cite" href="#ref-luo-2024">Luo et al., 2024</a>) and <span class="math inline">\(s_{B}\)</span> = 1 per µM the assumed mapping from medium concentration to burden. The toxicity burden <span class="math inline">\(T = 1 - H\)</span> is the fraction of healthy tissue loss; the factor <span class="math inline">\((1 - p_{H}P)\)</span> adds fasting protection, defined below.</p>
-<p>However, it is also important to understand that normal cells have fasting protection which provides a selective advantage against cancer cells. This is modelled and parameters are used from de Pillis and Radunskaya, as tabulated by <a class="cite" href="#ref-luo-2024">Luo et al. (2024</a>). Their constraints indicate healthy tissue remains at or above 75% of capacity gives a toxicity limit of <span class="math inline">\(B_{tox}\, = \, 0.25\)</span><em>. When given a dose u B approaches s</em>Bu/dB and T approaches the state</p>
+<p>where <span class="math inline">\(H\)</span> is healthy tissue as a fraction of its capacity, <span class="math inline">\(B\)</span> the systemic drug burden, <span class="math inline">\(r_{H}\)</span> = 1 day⁻¹ the healthy-tissue regrowth rate, <span class="math inline">\(a_{H}\)</span> = 0.1 the fractional kill of healthy tissue, <span class="math inline">\(d_{B}\)</span> = 1 day⁻¹ the drug clearance rate (de Pillis &amp; Radunskaya, 2001; Luo et al., 2024) and <span class="math inline">\(s_{B}\)</span> = 1 per µM the assumed mapping from medium concentration to burden. The toxicity burden <span class="math inline">\(T = 1 - H\)</span> is the fraction of healthy tissue loss; the factor <span class="math inline">\((1 - p_{H}P)\)</span> adds fasting protection, defined below.</p>
+<p>However, it is also important to understand that normal cells have fasting protection which provides a selective advantage against cancer cells. This is modelled and parameters are used from de Pillis and Radunskaya, as tabulated by Luo et al. (2024). Their constraints indicate healthy tissue remains at or above 75% of capacity gives a toxicity limit of <span class="math inline">\(B_{tox}\, = \, 0.25\)</span><em>. When given a dose u B approaches s</em>Bu/dB and T approaches the state</p>
 <div class="eq" data-eq="2.35" id="eq-2-35"><div class="eq-body">\[T^{*} = \frac{a_{H}\left( 1 - p_{H}P \right)\left( 1 - e^{- s_{B}u/d_{B}} \right)}{r_{H}} \leq \frac{a_{H}}{r_{H}} = 0.1\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-35" title="Link to this equation">(2.35)</a><button aria-expanded="false" aria-label="Explain equation 2.35" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p>At the highest measured dose (1.47 µM, no fasting) this gives <span class="math inline">\(T^{*} = 0.077\)</span>, below the limit <span class="math inline">\(B_{tox} = 0.25\)</span>.</p>
 <p>Although the given parameters cannot reach the toxicity limit, it does shape the cost term. This will limit drug usage and/or exposure to the cost function. Although other values for toxicity were tried given the IC25 of the drug kept the total toxicity given below, the total dose it did not seem unreasonable to use.</p>
-<p>Fasting Protection. Short term starvation protects normal cells, but not cancer cells, against chemotherapy. This is described as differential stress resistance (<a class="cite" href="#ref-raffaghello-2008">Raffaghello et al., 2008</a>; <a class="cite" href="#ref-lee-2012">Lee et al., 2012</a>). A protection state is often used in current chemotherapies and helps reduce chemotherapy-induced DNA damage in T cells (<a class="cite" href="#ref-de-groot-2020">de Groot et al., 2020</a>). This protection state is modelled as:</p>
+<p>Fasting Protection. Short term starvation protects normal cells, but not cancer cells, against chemotherapy. This is described as differential stress resistance (Raffaghello et al., 2008; Lee et al., 2012). A protection state is often used in current chemotherapies and helps reduce chemotherapy-induced DNA damage in T cells (de Groot et al., 2020). This protection state is modelled as:</p>
 <div class="eq" data-eq="2.36" id="eq-2-36"><div class="eq-body">\[\frac{dP}{dt} = k_{P}(v - P),\quad\quad 0 \leq P \leq 1\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-36" title="Link to this equation">(2.36)</a><button aria-expanded="false" aria-label="Explain equation 2.36" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p>where <span class="math inline">\(P\)</span> is the protection state (0 = none, 1 = full), <span class="math inline">\(v\)</span> the fasting control, <span class="math inline">\(k_{P}\)</span> = 1 day⁻¹ its build-up rate and <span class="math inline">\(p_{H}\)</span> = 0.5 the largest fraction of healthy-tissue damage prevented (both assumptions).</p>
 <p>It scales healthy tissue kill by (1-p<em>HP) as in the toxicity equation above. One 48hr fast raises P to .86. This is why fasting precedes drug in protocols. Values for k</em>P and PH are assumptions. Randomized trials found no difference between toxicity grades so p_H can equal large differences.</p>
 <p>Body weight. Just like drug has a toxicity cost, fasting also has a cost in body weight or healthy cells. Using this equation:</p>
 <div class="eq" data-eq="2.37" id="eq-2-37"><div class="eq-body">\[\frac{dW}{dt} = - k_{W}\, v + r_{W}(1 - W)(1 - v),\quad\quad W(0) = 1\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-37" title="Link to this equation">(2.37)</a><button aria-expanded="false" aria-label="Explain equation 2.37" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
-<p>where <span class="math inline">\(W\)</span> is body weight as a fraction of baseline, <span class="math inline">\(k_{W}\)</span> = 0.012 day⁻¹ the weight lost per fasting day and <span class="math inline">\(r_{W}\)</span> = 0.15 day⁻¹ the recovery rate after refeeding (assumptions informed by <a class="cite" href="#ref-safdie-2009">Safdie et al., 2009</a>). Weight must stay at or above <span class="math inline">\(W_{\min} = 0.95\)</span>, the cachexia threshold of more than 5% weight loss (<a class="cite" href="#ref-fearon-2011">Fearon et al., 2011</a>).</p>
-<p>These rates were all informed in case studies of patients fasting around chemotherapy (<a class="cite" href="#ref-safdie-2009">Safdie et al., 2009</a>). The therapy found that fasts of less than 72 hours were considered safe (<a class="cite" href="#ref-dorff-2016">Dorff et al., 2016</a>). Therefore, we instituted a control constraint in which fasts could not last longer than 72 hours within our culture. It is possible that culture values should not equate to patient values, and so this is an upper bound for an appropriate constraint on fasting within a given culture. This metric was tracked against the 75% threshold to determine which schedules may be infeasible and provide an upper bound check for the optimal control schedule.</p>
+<p>where <span class="math inline">\(W\)</span> is body weight as a fraction of baseline, <span class="math inline">\(k_{W}\)</span> = 0.012 day⁻¹ the weight lost per fasting day and <span class="math inline">\(r_{W}\)</span> = 0.15 day⁻¹ the recovery rate after refeeding (assumptions informed by Safdie et al., 2009). Weight must stay at or above <span class="math inline">\(W_{\min} = 0.95\)</span>, the cachexia threshold of more than 5% weight loss (Fearon et al., 2011).</p>
+<p>These rates were all informed in case studies of patients fasting around chemotherapy (Safdie et al., 2009). The therapy found that fasts of less than 72 hours were considered safe (Dorff et al., 2016). Therefore, we instituted a control constraint in which fasts could not last longer than 72 hours within our culture. It is possible that culture values should not equate to patient values, and so this is an upper bound for an appropriate constraint on fasting within a given culture. This metric was tracked against the 75% threshold to determine which schedules may be infeasible and provide an upper bound check for the optimal control schedule.</p>
 <h4 id="sec-2-2-9-3-discretization-and-the-optimal-control-problem">2.2.9.3 Discretization and the optimal control problem</h4>
 <p>The initial state for the 14-day plant is 10 while the longer simulations include the extra weight, protection, and stress strain states. This cumulative state is described as x. The control decision is represented as w = (u, v). Therefore dx/dt = f(x, w) . This prediction is calculated for two days at a time using 4<sup>th</sup> order Runge-Kutta (RK4) at 40-time steps of .05 per day.</p>
 <div class="eq" data-eq="2.38" id="eq-2-38"><div class="eq-body">\[\begin{aligned}
 \kappa_{1} &amp; = f(y,w), &amp; \kappa_{2} &amp; = f\left( y + \frac{h}{2}\kappa_{1},w \right), &amp; \kappa_{3} &amp; = f\left( y + \frac{h}{2}\kappa_{2},w \right), &amp; \kappa_{4} &amp; = f\left( y + h\kappa_{3},w \right)
 \end{aligned}\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-38" title="Link to this equation">(2.38)</a><button aria-expanded="false" aria-label="Explain equation 2.38" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <div class="eq" data-eq="2.39" id="eq-2-39"><div class="eq-body">\[y \leftarrow y + \frac{h}{6}\left( \kappa_{1} + 2\kappa_{2} + 2\kappa_{3} + \kappa_{4} \right),\quad\quad x_{k + 1} = F\left( x_{k},w_{k} \right)\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-39" title="Link to this equation">(2.39)</a><button aria-expanded="false" aria-label="Explain equation 2.39" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
-<p>repeated 40 times with step <span class="math inline">\(h = 0.05\)</span> day across each 2-day interval (<a class="cite" href="#ref-hairer-1993">Hairer et al., 1993</a>).</p>
+<p>repeated 40 times with step <span class="math inline">\(h = 0.05\)</span> day across each 2-day interval (Hairer et al., 1993).</p>
 <p>This makes for a smooth deterministic function. These predictions were validated with the Tsit5 solver 10^-6. This solver's choice was to save computational time.</p>
 <p>Receding-horizon problem. At each decision point (every 2 days), with the current state x_k the controller solves the finite-horizon problem. This will solve the optimal schedule for up to 14 days in advance (k=7). The equation:</p>
 <div class="eq" data-eq="2.40" id="eq-2-40"><div class="eq-body">\[\min_{w_{0},\ldots,w_{H_{k} - 1}}J = \sum_{j = 0}^{H_{k} - 1}\ell\left( x_{j + 1},w_{j} \right) + \phi\left( x_{H_{k}} \right)\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-40" title="Link to this equation">(2.40)</a><button aria-expanded="false" aria-label="Explain equation 2.40" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <div class="eq" data-eq="2.41" id="eq-2-41"><div class="eq-body">\[\text{s.t.}\quad x_{0} = {\widehat{x}}_{k},\quad x_{j + 1} = F\left( x_{j},w_{j} \right),\quad w_{j} \in \mathcal{W},\quad\quad H_{k} = \min\left( 7,\ N_{dec} - k \right)\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-41" title="Link to this equation">(2.41)</a><button aria-expanded="false" aria-label="Explain equation 2.41" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <div class="eq" data-eq="2.42" id="eq-2-42"><div class="eq-body">\[{\widehat{x}}_{k + 1} = F\left( {\widehat{x}}_{k},\ w_{0}^{*} \right)\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-42" title="Link to this equation">(2.42)</a><button aria-expanded="false" aria-label="Explain equation 2.42" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
-<p>where <span class="math inline">\(\ell\)</span> is the stage cost and <span class="math inline">\(\phi\)</span> the terminal cost (Section 2.2.9.4), <span class="math inline">\({\widehat{x}}_{k}\)</span> the state at decision <span class="math inline">\(k\)</span>, <span class="math inline">\(\mathcal{W}\)</span> the set of admissible controls, <span class="math inline">\(H_{k}\)</span> the look-ahead in 2-day intervals, and <span class="math inline">\(N_{dec}\)</span> the number of decisions (7 for 14 days, 15 for 30 days). Only the first control <span class="math inline">\(w_{0}^{*}\)</span> of the optimal plan is applied before the problem is solved again (<a class="cite" href="#ref-rawlings-2017">Rawlings et al., 2017</a>).</p>
+<p>where <span class="math inline">\(\ell\)</span> is the stage cost and <span class="math inline">\(\phi\)</span> the terminal cost (Section 2.2.9.4), <span class="math inline">\({\widehat{x}}_{k}\)</span> the state at decision <span class="math inline">\(k\)</span>, <span class="math inline">\(\mathcal{W}\)</span> the set of admissible controls, <span class="math inline">\(H_{k}\)</span> the look-ahead in 2-day intervals, and <span class="math inline">\(N_{dec}\)</span> the number of decisions (7 for 14 days, 15 for 30 days). Only the first control <span class="math inline">\(w_{0}^{*}\)</span> of the optimal plan is applied before the problem is solved again (Rawlings et al., 2017).</p>
 <p>J = the cost of making every set of decisions. The first term penalizes the immediate effect while the second term penalizes the final state effect. Including both is important to ensure the controller makes decisions based on both the immediate effects and future effects. The controller then chooses the pathway that has the lowest cost function and applies only to the first decisions. At this point, the new state is recalculated and planted upon itself. Now to recalculate the next best decisions, a parameter that was found within the 95% bootstrap interval is used to determine the next best decision. That next best decision is then applied to the planted model. This process then repeats until you reach the end of the simulation period. However, it was important to reduce the look ahead of the number of decisions to the end date of the simulation. Finally, this can sometimes make odd behaviors as a controller is juggling between the current state and the future state. This is inconsequential though as long as the target populations remain within the safe set of values.</p>
 <p>Admissible controls w(u,v). Two modes were used. One that was data supported using only measured doses and media <span class="math inline">\(u_{j} \in \{ 0,\ 0.62,\ 1,\ 1.47\}\ \mu M,\quad v_{j} \in \{ 0,1\},\quad v_{j} = 1 \Rightarrow v_{j - 1} = 0\)</span>. The fasting interval could only last 48 hours though. The second format was continuous control. This was from 0-3 for drug or 0.5% - 10% for fasted state. Total dose was tracked and could be restricted although in this run it was not restricted.</p>
 <h4 id="sec-2-2-9-4-cost-function-and-barrier-functions">2.2.9.4 Cost function and barrier functions</h4>
@@ -580,7 +611,7 @@
 <p>The terminal cost function only looks at final states rather than intermediate states:</p>
 <div class="eq" data-eq="2.44" id="eq-2-44"><div class="eq-body">\[\phi(x) = 5\left\lbrack q_{N}\left( \frac{N}{K} \right)^{2} + q_{C}\left( \frac{C}{K} \right)^{2} + q_{T}\left( \frac{T}{B_{tox}} \right)^{2} + q_{W}\left( \frac{1 - W}{1 - W_{\min}} \right)^{2} \right\rbrack\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-44" title="Link to this equation">(2.44)</a><button aria-expanded="false" aria-label="Explain equation 2.44" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
 <p>Cancer terms reward having fewer N and C cells. These cells are penalized separately so that the controller can reward a competitive-release trade-off of adaptive therapy. Control terms were based on dose and fasting, which were small. So, treatment is used when it buys a meaningful reduction in cells. Barriers included total cells &lt; B<em>cancermax, toxicity &lt; Btoxmax, and weight &gt; Weight_min.</em> Each will grow steeply as you approach their limits.</p>
-<p>A relaxed logarithmic barrier is utilized from <a class="cite" href="#ref-feller-2017a">Feller and Ebenbauer (2017a</a>, 2017b) to ensure the cost function and costs never approach an actual zero or infinity. This reduces the likelihood of the controller breaking.</p>
+<p>A relaxed logarithmic barrier is utilized from Feller and Ebenbauer (2017a, 2017b) to ensure the cost function and costs never approach an actual zero or infinity. This reduces the likelihood of the controller breaking.</p>
 <div class="eq" data-eq="2.45" id="eq-2-45"><div class="eq-body">\[b_{\mu}(z) = \left\{ \begin{matrix}
  - \mu\ln z, &amp; z \geq \delta \\
 \mu\left\lbrack \frac{1}{2}\left( \frac{z - 2\delta}{\delta} \right)^{2} - \frac{1}{2} - \ln\delta \right\rbrack, &amp; z &lt; \delta
@@ -619,7 +650,7 @@
 <tr class="odd">
 <td>μ (all barriers), δ</td>
 <td>0.05, 0.02</td>
-<td>Assumption; δ as in <a class="cite" href="#ref-feller-2017a">Feller and Ebenbauer (2017</a>)</td>
+<td>Assumption; δ as in Feller and Ebenbauer (2017)</td>
 </tr>
 <tr class="even">
 <td><span class="math inline">\(Κ\)</span> (normalisation)</td>
@@ -634,12 +665,12 @@
 <tr class="even">
 <td><span class="math inline">\(B_{tox}\)</span></td>
 <td>0.25</td>
-<td>Literature: healthy tissue ≥ 75% (<a class="cite" href="#ref-de-pillis-2001">de Pillis and Radunskaya, 2001</a>)</td>
+<td>Literature: healthy tissue ≥ 75% (de Pillis and Radunskaya, 2001)</td>
 </tr>
 <tr class="odd">
 <td><span class="math inline">\(W_{min}\)</span></td>
 <td>0.95</td>
-<td>Literature: cachexia threshold (<a class="cite" href="#ref-fearon-2011">Fearon et al., 2011</a>)</td>
+<td>Literature: cachexia threshold (Fearon et al., 2011)</td>
 </tr>
 <tr class="even">
 <td><span class="math inline">\(u_{max}\)</span></td>
@@ -652,24 +683,59 @@
 <p>Given there were two modes, one discrete dosing and one with continuous dosing, two different solvers were used. In the data-supported mode that only uses exact experimental values, a finite horizon search described earlier makes sense and is used. Accumulated cost represents the cost across all the future decisions of a given depth.</p>
 <p>The partial cost function is defined by:</p>
 <div class="eq" data-eq="2.46" id="eq-2-46"><div class="eq-body">\[c_{j} = \sum_{i = 0}^{j - 1}\ell\left( x_{i + 1},w_{i} \right)\]</div><div class="eq-side"><a class="eq-num" href="#eq-2-46" title="Link to this equation">(2.46)</a><button aria-expanded="false" aria-label="Explain equation 2.46" class="eq-info" title="Explain this equation" type="button">i</button></div></div>
-<p>This minimum value search is able to take advantage of two shortcuts: runs that have the same start can share the calculation and comparison. So, depth can be searched first rather than trying to calculate all values in parallel. The lowest cost value calculated within a branch can be compared to another branch of the decision tree. Furthermore, if a partial calculation cost is already greater than the lowest current cost function, the rest of those calculations can be cut (pruning; <a class="cite" href="#ref-land-1960">Land &amp; Doig, 1960</a>).</p>
+<p>This minimum value search is able to take advantage of two shortcuts: runs that have the same start can share the calculation and comparison. So, depth can be searched first rather than trying to calculate all values in parallel. The lowest cost value calculated within a branch can be compared to another branch of the decision tree. Furthermore, if a partial calculation cost is already greater than the lowest current cost function, the rest of those calculations can be cut (pruning; Land &amp; Doig, 1960).</p>
 <p>This result is therefore the exact optimum over the set given the test covers all potential solutions discretely. For the 14-day problem, there are 4^7 = 16,384 dose sequences. In the 30-day problem with fasting, there are a total of 557,000 possible solutions.</p>
-<p>The second mode follows SQP or sequential quadratic programming. This was taken as a successive linearization of MPC from (<a class="cite" href="#ref-nocedal-2006">Nocedal &amp; Wright, 2006</a>; <a class="cite" href="#ref-rawlings-2017">Rawlings et al., 2017</a>). There are 6 stages of this process. First is defining the nonlinear model. Then linearize the model at a given point. These equations are obtained exactly by forward-mode automatic differentiation using RK4 steps (ForwardDiff.jl; <a class="cite" href="#ref-revels-2016">Revels et al., 2016</a>). A gradient by the adjoint recursion does a backward pass that computes the whole gradient with on vector Jacobian product per interval. A Gauss-Newton Hessian from forward sensitivities to keep the values positive and semidefinite. The solver is an accelerated projected-gradient method (FISTA; <a class="cite" href="#ref-beck-2009">Beck &amp; Teboulle, 2009</a>). Step size is kept at 1 while there are up to 3000 iterations done. Finally, the iterations stop when the change in the optimal path is less than 10_8 for each step. Given that the equation is prelinearized at every decision and carries bounds and non-quadratic barriers, this is a nonlinear MPC, not a fixed linear-quadratic regulator like the method before.</p>
+<p>The second mode follows SQP or sequential quadratic programming. This was taken as a successive linearization of MPC from (Nocedal &amp; Wright, 2006; Rawlings et al., 2017). There are 6 stages of this process. First is defining the nonlinear model. Then linearize the model at a given point. These equations are obtained exactly by forward-mode automatic differentiation using RK4 steps (ForwardDiff.jl; Revels et al., 2016). A gradient by the adjoint recursion does a backward pass that computes the whole gradient with on vector Jacobian product per interval. A Gauss-Newton Hessian from forward sensitivities to keep the values positive and semidefinite. The solver is an accelerated projected-gradient method (FISTA; Beck &amp; Teboulle, 2009). Step size is kept at 1 while there are up to 3000 iterations done. Finally, the iterations stop when the change in the optimal path is less than 10_8 for each step. Given that the equation is prelinearized at every decision and carries bounds and non-quadratic barriers, this is a nonlinear MPC, not a fixed linear-quadratic regulator like the method before.</p>
 <h3 data-status="Pending" id="sec-2-2-10-comparison-methods">2.2.10 Comparison methods <span class="status status-pending">Pending</span></h3>
 <ul>
 <li><p>Time-based models (archived): why they cannot drive control.</p></li>
-<li><p>UDE/NN track: logistic backbone + neural kill term, pure neural ODE, SINDy closed form (<a class="cite" href="#ref-rackauckas-2020">Rackauckas et al., 2020</a>; <a class="cite" href="#ref-brunton-2016">Brunton et al., 2016</a>).</p></li>
+<li><p>UDE/NN track: logistic backbone + neural kill term, pure neural ODE, SINDy closed form (Rackauckas et al., 2020; Brunton et al., 2016).</p></li>
 <li><p>One evaluation protocol for all three: same held-out sets (Ce1, intermittent, unseen dose, unseen density), same metric and scale.</p></li>
 </ul>
+<h2 data-status="To write" id="sec-2-3-method-choices-advantages-and-limitations">2.3 Method choices, advantages and limitations <span class="status status-to-write">To write</span></h2>
+<ul>
+<li><p>For each key technique, one line on the basic principle, why it was chosen, and its main limitation:</p>
+<ul>
+<li><p>Live-cell imaging and QuPath cell counting.</p></li>
+<li><p>Staged (hierarchical) fitting versus one joint fit.</p></li>
+<li><p>BIC selection with the fewest-parameters-within-3-BIC rule.</p></li>
+<li><p>Block bootstrap, profile likelihood, local and Sobol sensitivity.</p></li>
+<li><p>Model-predictive control with barrier functions.</p></li>
+<li><p>Universal differential equations and neural ODEs.</p></li>
+</ul></li>
+<li><p>Biology of the model system: origin of A2780 and A2780cis, known resistance mechanisms, limits of 2D in vitro culture, what serum starvation does and does not model.</p></li>
+</ul>
 <h2 id="sec-3-results">3 Results</h2>
-<p>Results follow the same line as Methods. Sections 3.1–3.6 go stage by stage; 3.7–3.8 cover qualification across all stages; 3.9–3.10 report optimal control and 3.11 compares the mechanistic models with learned models. All numbers come from the model-zoo fits run on 2026-10-07 (reports generated 2026-10-10) and the control runs of 2026-10-10. At every stage the selected model is the one with the fewest free parameters among the candidates within 3 BIC of the lowest (Section 2.2.6). Intervals in brackets are 95% block-bootstrap intervals (200 replicates, 3-day blocks) unless stated otherwise. Cell counts are mean cells per image.</p>
-<h3 data-status="Drafted" id="sec-3-1-sensitive-and-resistant-cells-respond-differently-to-eve">3.1 Sensitive and resistant cells respond differently to every perturbation <span class="status status-drafted">Drafted</span></h3>
-<p>Every condition was imaged daily for 14 days in three wells (Table 3.1, Figure 3.1). Untreated, both lines plateaued near 4,000 cells per image (A2780 4,170 and A2780cis 3,732 on day 14), but they got there differently. A2780 grew from the first day, whereas A2780cis showed a lag: its day-1 count (80) was below the nominal seeding of 100 cells, and it reached half of its plateau about 2 days later than A2780.</p>
-<p>Cisplatin separated the two lines. A2780 responded in a dose-dependent way: 0.62 µM slowed growth slightly (3,424 cells on day 14), 1 µM held the culture near 1,800 cells from day 7 to day 13, and 1.47 µM produced a rise to 1,293 cells on day 3 followed by a steady decline to 60 cells on day 14. A2780cis kept growing at every dose and reached 3,327–4,117 cells by day 14; even at the highest measured dose its growth was only delayed. The kill therefore appears days after the drug is added, which is the first sign that the drug effect is delayed (Section 3.4).</p>
-<p>Low resource (0.5% FBS) also separated the lines, in the opposite direction. A2780 still grew, to a lower plateau (3,018 cells on day 14 at 30k), while A2780cis peaked by day 3 and then died out (12 cells by day 11). In low-resource cocultures the same pattern held: A2780 reached 2,300–3,900 cells in eight of nine series and A2780cis peaked within 2–4 days and fell to 6–99 cells in the seven series with a usable final count. Two 3:1 series repeat their day-1 value as the final count and were treated as missing.</p>
-<p>Coculture showed competition that depends on the medium and on the drug (Table 3.2). Untreated, sensitive cells dominated at every seeding ratio: even when resistant cells made up 75% of the seeding they were 46% of cells on day 14, and at 75:25 they fell to 5%. With 1 µM cisplatin the balance reversed, and resistant cells made up 45–81% of cells on day 14. In low resource resistant cells were all but eliminated whatever the seeding ratio.</p>
-<p>Day-1 counts were often well away from the nominal seeding. Starting values were therefore estimated for the 21 of 36 series whose first count differed more than 3-fold from nominal; low-resource series started 1.5–10.5 times above nominal (median 3.2).</p>
-<p>[Figure 3.1: grid of mean counts per condition on one shared y-axis.]</p>
+<ul>
+<li><p>Numbers come from the model-zoo fits run on 2026-10-07 (reports 2026-10-10) and the control runs of 2026-10-10.</p></li>
+<li><p>Selection rule at every stage: fewest free parameters among candidates within 3 BIC of the lowest (Section 2.2.6).</p></li>
+<li><p>Intervals in brackets: 95% block-bootstrap intervals (200 replicates, 3-day blocks). Counts are mean cells per image.</p></li>
+<li><p>Order: 3.1 data; 3.2–3.6 stage by stage; 3.7–3.8 qualification; 3.9–3.10 control; 3.11 comparison with learned models.</p></li>
+</ul>
+<h3 data-status="Bullets" id="sec-3-1-sensitive-and-resistant-cells-respond-differently-to-eve">3.1 Sensitive and resistant cells respond differently to every perturbation <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Untreated: both lines plateau near 4,000 cells (A2780 4,170, A2780cis 3,732 on day 14).</p></li>
+<li><p>A2780cis lags: day-1 count 80 (below the 100 seeded); reaches half its plateau about 2 days after A2780.</p></li>
+<li><p>Cisplatin, A2780: dose-dependent. 0.62 µM slight slowing (3,424 on day 14); 1 µM holds near 1,800 from day 7 to 13; 1.47 µM peaks at 1,293 on day 3, then falls to 60.</p></li>
+<li><p>Cisplatin, A2780cis: grows at every dose (3,327–4,117 on day 14); 1.47 µM only delays growth.</p></li>
+<li><p>Kill appears days after dosing: first sign of a delayed drug effect (3.4).</p></li>
+<li><p>Low resource (0.5% FBS): A2780 reaches a lower plateau (3,018); A2780cis peaks by day 3 and dies out (12 cells by day 11).</p></li>
+<li><p>Untreated coculture: sensitive cells dominate; resistant share on day 14 is 5% (75:25 seeding) to 46% (25:75).</p></li>
+<li><p>1 µM coculture: balance reverses; resistant share 45–81% on day 14.</p></li>
+<li><p>Low-resource coculture: A2780 reaches 2,300–3,900 cells in 8 of 9 series; A2780cis peaks within 2–4 days and ends at 6–99 cells.</p></li>
+<li><p>Data-quality notes: starting values estimated for 21 of 36 series (first count more than 3-fold from nominal); low-resource series start 1.5–10.5× nominal; two 3:1 low-resource series repeat their day-1 value as the final count.</p></li>
+</ul>
+<figure class="figure" id="fig-3-1"><img alt="All measured conditions on one scale." class="zoomable" src="figure-3-1.png"/><figcaption><strong>Figure 3.1.</strong> All measured conditions on one scale.</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>Mean cells per image of 3 wells, error bars SEM; × = point excluded in quality control.</p></li>
+<li><p>Blue = A2780 (sensitive), orange = A2780cis (resistant); darker shade = higher cisplatin dose.</p></li>
+<li><p>a untreated monoculture; b, c cisplatin 0–1.47 µM; d low resource; e–g cocultures (line style = seeding ratio); h low resource + 1 µM.</p></li>
+<li><p>Point to make: each perturbation (drug, low resource, coculture) separates the two lines in a different direction.</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.1.</strong> Monoculture counts (mean cells per image, 3 wells) on days 1, 7 and 14. Low-resource monocultures are the 30k seeding of run 1.</p>
 <div class="table-wrap"><table style="width:100%;">
 
@@ -837,9 +903,26 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-2-the-two-lines-need-different-growth-laws">3.2 The two lines need different growth laws <span class="status status-drafted">Drafted</span></h3>
-<p>A2780 follows the logistic law (Table 3.3): theta-logistic fits slightly worse once its extra parameter is counted (ΔBIC +2.58) and Gompertz is clearly worse (+17.7). The logistic model was selected in 94% of bootstrap replicates, with r<sub>N</sub> = 0.817/day (0.782–0.855), a doubling time of 0.85 days, and K<sub>N</sub> = 3,941 cells (3,773–4,084).</p>
-<p>A2780cis needs the theta-logistic law: the logistic model is 8.06 BIC worse, and the theta-logistic model was selected in 89% of replicates. Its growth rate is about half that of A2780, r<sub>C</sub> = 0.448/day (0.415–0.473), a doubling time of 1.55 days, with K<sub>C</sub> = 3,798 (3,313–4,021). The shape parameter θ<sub>C</sub> = 5.49 means A2780cis grows almost exponentially until it is close to capacity and then stops abruptly, which matches the sharp plateau in Table 3.1. θ<sub>C</sub> is only bounded from below: its bootstrap interval (1.70–10.0) reaches the upper bound of the search and its profile is flat above the estimate.</p>
+<h3 data-status="Bullets" id="sec-3-2-the-two-lines-need-different-growth-laws">3.2 The two lines need different growth laws <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>A2780: logistic; rN = 0.817/day (0.782–0.855), doubling 0.85 days; KN = 3,941 (3,773–4,084); selected in 94% of replicates.</p></li>
+<li><p>Theta-logistic for A2780 is not needed (ΔBIC +2.58); Gompertz is clearly worse (+17.7).</p></li>
+<li><p>A2780cis: theta-logistic; rC = 0.448/day (0.415–0.473), doubling 1.55 days; KC = 3,798 (3,313–4,021); θC = 5.49; selected in 89%.</p></li>
+<li><p>Logistic is 8.06 BIC worse for A2780cis: near-exponential growth then an abrupt stop (sharp plateau).</p></li>
+<li><p>θC only bounded from below (interval 1.70–10.0 reaches the search bound; flat profile above).</p></li>
+<li><p>Draft numbers to replace: θC was 3.3 in the old outline.</p></li>
+</ul>
+<figure class="figure" id="fig-3-2"><img alt="Selected growth and low-resource models against the monoculture data." class="zoomable" src="figure-3-2.png"/><figcaption><strong>Figure 3.2.</strong> Selected growth and low-resource models against the monoculture data.</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>Points = data (mean ± SEM), lines = selected model at its point estimates; × = excluded point.</p></li>
+<li><p>a A2780 logistic; b A2780cis theta-logistic (Stage 1).</p></li>
+<li><p>c A2780 low resource, second-order effect lowering K; d A2780cis low resource, cumulative-exposure loss (Stage 2a).</p></li>
+<li><p>Point to make: same medium change, opposite fate (A2780 survives at a lower plateau, A2780cis dies out).</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.3.</strong> Stage 1 growth-law candidates. k is the number of fitted parameters; “Bootstrap” gives how often each model was selected by the rule / had the lowest BIC across 200 replicates.</p>
 <div class="table-wrap"><table style="width:100%;">
 
@@ -904,10 +987,16 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-3-low-resource-acts-through-different-mechanisms-in-each-l">3.3 Low resource acts through different mechanisms in each line <span class="status status-drafted">Drafted</span></h3>
-<p>In A2780, low resource lowers the carrying capacity through a delayed, second-order effect (Table 3.4): K<sub>eff</sub> = K<sub>N</sub>/(1 + c<sub>N</sub>S<sub>N</sub>) with c<sub>N</sub> = 0.526 (0.374–0.604), so the plateau falls by about a third. The fitted damping ζ<sub>N</sub><sup>R</sup> = 0.05 sits at its lower bound and ω<sub>N</sub><sup>R</sup> = 1.03/day, so the effect behaves like a slowly fading oscillation with a period of about 6 days; this probably absorbs the day-to-day ups and downs of the low-resource data rather than describing a real oscillation. The selection is the least stable of all stages (50% of replicates); the simplest alternatives, an immediate loss (ΔBIC +3.36) or an immediately lowered K (+4.91), are each selected in 12–14% of replicates. All of these candidates agree that A2780 survives: the selected model settles at 2,624–2,634 cells between day 30 and day 200.</p>
-<p>In A2780cis, low resource acts as a cumulative exposure that never clears: dS<sub>C</sub>/dt = u<sub>R</sub> and the loss rate is d<sub>C</sub><sup>LR</sup>S<sub>C</sub> with d<sub>C</sub><sup>LR</sup> = 0.161 (0.155–0.165), a single parameter. The loss rate therefore grows linearly in time and overtakes the growth rate r<sub>C</sub> after about 2.9 days in 0.5% FBS, after which the culture dies out. This was selected in 66% of replicates; a toxic by-product model with the same number of parameters (ΔBIC +1.92) took 21%. Both describe a stress that accumulates rather than an immediate cost.</p>
-<p>A single low-resource structure for both lines was rejected: the best shared structure (effect compartment → loss) has a summed BIC of 60.75 against 53.67 for each line's own choice with the same total number of parameters (ΔBIC +7.09). This is the first transportability result: the two lines respond to starvation through different mechanisms, not just at different rates.</p>
+<h3 data-status="Bullets" id="sec-3-3-low-resource-acts-through-different-mechanisms-in-each-l">3.3 Low resource acts through different mechanisms in each line <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>A2780: delayed second-order effect lowers capacity, Keff = KN/(1 + cNSN); cN = 0.526 (0.374–0.604), plateau falls by about a third.</p></li>
+<li><p>Damping ζN<sup>R</sup> = 0.05 at its lower bound, ωN<sup>R</sup> = 1.03/day: slowly fading oscillation, period about 6 days; likely absorbs day-to-day noise, not real biology.</p></li>
+<li><p>Least stable selection (50%); immediate loss (ΔBIC +3.36) and immediately lowered K (+4.91) take 12–14% each. All agree A2780 survives (2,624–2,634 cells, days 30–200).</p></li>
+<li><p>A2780cis: cumulative exposure, never cleared; loss rate dC<sup>LR</sup>SC, dC<sup>LR</sup> = 0.161 (0.155–0.165), one parameter; selected in 66%.</p></li>
+<li><p>Loss rate passes the growth rate rC after about 2.9 days in 0.5% FBS, then the culture dies out. Toxic by-product model (ΔBIC +1.92) takes 21%.</p></li>
+<li><p>Shared low-resource structure rejected: summed BIC 60.75 vs 53.67 at equal k (ΔBIC +7.09). First transportability result.</p></li>
+<li><p>Draft numbers to replace: cN was 0.41, ΔBIC was +4.87, and the A2780cis module was a 3-compartment stress chain.</p></li>
+</ul>
 <p><strong>Table 3.4.</strong> Stage 2a low-resource candidates (best five per line of 29 tested).</p>
 <div class="table-wrap"><table style="width:100%;">
 
@@ -1004,9 +1093,26 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-4-cisplatin-kill-is-delayed-in-both-lines-and-slower-and-w">3.4 Cisplatin kill is delayed in both lines, and slower and weaker in A2780cis <span class="status status-drafted">Drafted</span></h3>
-<p>Because A2780cis is derived from A2780 and cisplatin kills both through DNA damage, the two lines were required to share one drug mechanism with their own rates, and the selection rule was applied to the joint BIC. The selected structure is a chain of 3 transit compartments feeding a linear (Norton–Simon) kill, scaled by the free space (1 − N/K<sub>N</sub>): joint BIC 296.7 with k = 4 (Table 3.5). A Hill kill on the same chain fits equally well (joint ΔBIC +2.9) but needs two more parameters, so the saturating kill described in Section 2.2.3 is not needed at the measured doses (0.62–1.47 µM). Models where the drug acts immediately are clearly worse: ΔBIC +68.8 for A2780 and +20.7 to +25.4 for A2780cis.</p>
-<p>Resistance shows up as slower and weaker kill, not a different mechanism (Table 3.6). The mean delay through the chain (3/k) is 4.2 days for A2780 and 11.6 days for A2780cis, and the kill strength is 1.7 times higher in A2780 (β<sub>N</sub> = 0.829 vs β<sub>C</sub> = 0.485). The A2780cis kill is real in monoculture: removing it costs 31.4 BIC. It is only bounded from below, however: its bootstrap interval runs from 0.26 to 1.47 and its profile is one-sided. On its own, A2780cis would prefer a cumulative-exposure model (6.8 BIC lower), which the shared-mechanism rule rules out.</p>
+<h3 data-status="Bullets" id="sec-3-4-cisplatin-kill-is-delayed-in-both-lines-and-slower-and-w">3.4 Cisplatin kill is delayed in both lines, and slower and weaker in A2780cis <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Both lines share one mechanism (rule applied to joint BIC): 3 transit compartments → linear kill scaled by free space (1 − N/KN); joint BIC 296.7, k = 4.</p></li>
+<li><p>Hill kill on the same chain fits as well (joint ΔBIC +2.9) but needs 2 more parameters: no saturation needed at 0.62–1.47 µM.</p></li>
+<li><p>Immediate-effect models are worse: ΔBIC +68.8 (A2780), +20.7 to +25.4 (A2780cis).</p></li>
+<li><p>Mean delay 3/k: 4.2 days (A2780) vs 11.6 days (A2780cis); kill strength βN = 0.829 vs βC = 0.485 (1.7×).</p></li>
+<li><p>A2780cis kill is real in monoculture (removing it +31.4 BIC) but one-sided (0.26–1.47).</p></li>
+<li><p>On its own A2780cis would prefer cumulative exposure (6.8 BIC lower); the shared-mechanism rule excludes it.</p></li>
+<li><p>Draft text to replace: the old outline and Methods describe a Hill (saturating) kill with joint BIC 1062.9.</p></li>
+</ul>
+<figure class="figure" id="fig-3-3"><img alt="Cisplatin monoculture fits (Stage 2b)." class="zoomable" src="figure-3-3.png"/><figcaption><strong>Figure 3.3.</strong> Cisplatin monoculture fits (Stage 2b).</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>Points = data at 0.62, 1 and 1.47 µM; lines = shared 3-compartment linear-kill model with each line's own rates.</p></li>
+<li><p>a A2780: kill visible from about day 4 and dose-ordered; b A2780cis: same structure, slower and weaker kill.</p></li>
+<li><p>Point to make: resistance changes the rates, not the mechanism.</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.5.</strong> Stage 2b shared cisplatin structures, ranked by the joint BIC of the two lines.</p>
 <div class="table-wrap"><table>
 
@@ -1102,10 +1208,37 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-5-coculture-shows-asymmetric-competition-and-no-resistant-">3.5 Coculture shows asymmetric competition and no resistant kill <span class="status status-drafted">Drafted</span></h3>
-<p>Untreated and 1 µM cocultures at three ratios were fitted together with one shared carrying capacity (Stage 3a, Table 3.7). The selected model adds asymmetric crowding, a death rate for each line, and a refitted sensitive kill, and has no cisplatin term for the resistant cells: 6 parameters, BIC 637.7, selected in 57% of replicates. The model without resistant death d<sub>C</sub> (ΔBIC +3.81) took the remaining 43%. Refitting the resistant kill drives it to β<sub>C</sub> ≈ 0 and costs 5.1 BIC, and no bootstrap replicate selected it. Keeping the A2780 monoculture kill unchanged, without the coculture death terms, is much worse (ΔBIC +47.8), and one-for-one crowding with everything inherited is worst (+108.7).</p>
-<p>The fitted crowding is asymmetric (Table 3.8). In the resistant growth term each sensitive cell counts as α<sub>CN</sub> = 1.47 resistant cells, while in the sensitive growth term each resistant cell counts as only α<sub>NC</sub> = 0.68 sensitive cells. In normal medium, sensitive cells therefore suppress resistant cells more than the reverse, which matches the untreated cocultures in Table 3.2, where resistant cells lose ground even from a 25:75 start. In coculture the sensitive kill is less than half its monoculture value (β<sub>N</sub> = 0.386 vs 0.829), but sensitive cells also die at d<sub>N</sub> = 0.168/day in every coculture, treated or not.</p>
-<p>The low-resource cocultures (Stage 3b) were fitted with the Stage 2a mechanisms carried over unchanged and refitted K and crowding: 3 parameters, BIC 700.6, selected in 78% of replicates. Removing the low-resource effects costs 28.5–33.4 BIC. Here the crowding reverses (α<sub>NC</sub> = 4.31, α<sub>CN</sub> = 0.08) and K rises to 5,290 (4,953–5,756). Because A2780cis dies out in every low-resource coculture, these values rest mainly on the first few days and are poorly identified: α<sub>NC</sub> reaches its upper bound and α<sub>CN</sub> is flat.</p>
+<h3 data-status="Bullets" id="sec-3-5-coculture-shows-asymmetric-competition-and-no-resistant-">3.5 Coculture shows asymmetric competition and no resistant kill <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Stage 3a (Ce0 + Ce1 jointly, shared K): asymmetric crowding + death in both lines + refitted sensitive kill, no resistant kill; k = 6, BIC 637.7, selected in 57%.</p></li>
+<li><p>Runner-up without resistant death dC (ΔBIC +3.81) takes 43%. Refitting βC drives it to 0 (+5.1 BIC, never selected).</p></li>
+<li><p>Keeping the A2780 monoculture kill without coculture death: +47.8. One-for-one crowding, all inherited: +108.7.</p></li>
+<li><p>Crowding: αCN = 1.47 (sensitive cells count 1.47× in the resistant growth term), αNC = 0.68: sensitive cells suppress resistant cells more than the reverse.</p></li>
+<li><p>Matches Table 3.2: resistant cells lose ground untreated even from a 25:75 start. (Old outline bullet had this direction reversed.)</p></li>
+<li><p>Sensitive kill in coculture is 47% of monoculture (βN 0.386 vs 0.829), plus death dN = 0.168/day in every coculture.</p></li>
+<li><p>Stage 3b (low-resource coculture): Stage 2a mechanisms carried unchanged, K and crowding refitted; k = 3, BIC 700.6, selected in 78%; removing low-resource effects +28.5 to +33.4.</p></li>
+<li><p>Stage 3b crowding reverses (αNC = 4.31, αCN = 0.08), K = 5,290, but poorly identified because A2780cis dies out (αNC at bound, αCN flat).</p></li>
+</ul>
+<figure class="figure" id="fig-3-4"><img alt="Stage 3a coculture fit, untreated (top) and 1 µM (bottom)." class="zoomable" src="figure-3-4.png"/><figcaption><strong>Figure 3.4.</strong> Stage 3a coculture fit, untreated (top) and 1 µM (bottom).</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>Columns = seeding ratio S:R 75:25, 50:50, 25:75; points = data, lines = one joint model with shared K.</p></li>
+<li><p>Untreated: A2780cis rises then declines as A2780 fills the well. 1 µM: A2780cis takes over.</p></li>
+<li><p>Fit misses some late A2780cis peaks at 1 µM, 25:75 (days 9–13).</p></li>
+</ul></li>
+</ul>
+<figure class="figure" id="fig-3-5"><img alt="Low-resource coculture (Stage 3b) and low resource + cisplatin (Stage 4)." class="zoomable" src="figure-3-5.png"/><figcaption><strong>Figure 3.5.</strong> Low-resource coculture (Stage 3b) and low resource + cisplatin (Stage 4).</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>a–c run 1 at three ratios; d the 1:1 combination culture (0.5% FBS + 1 µM).</p></li>
+<li><p>Starting values estimated for these series (day 1 is 1.5–10× nominal).</p></li>
+<li><p>Point to make: A2780cis disappears in low resource regardless of ratio; Stage 4 needs only one new parameter χ.</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.7.</strong> Stage 3a coculture candidates (Ce0 + Ce1 fitted jointly; 12 tested).</p>
 <div class="table-wrap"><table>
 
@@ -1182,37 +1315,37 @@
 <td>5,290 (4,953–5,756)</td>
 </tr>
 <tr class="even">
-<td>α<sub>NC</sub></td>
+<td>αNC</td>
 <td>Crowding of A2780 by A2780cis</td>
 <td>0.679 (0.564–0.745)</td>
 <td>4.31 (2.66–5.0, at bound)</td>
 </tr>
 <tr class="odd">
-<td>α<sub>CN</sub></td>
+<td>αCN</td>
 <td>Crowding of A2780cis by A2780</td>
 <td>1.471 (1.466–1.711)</td>
 <td>0.082 (not identified)</td>
 </tr>
 <tr class="even">
-<td>d<sub>N</sub></td>
+<td>dN</td>
 <td>A2780 death in coculture (/day)</td>
 <td>0.168 (0.160–0.210)</td>
 <td>—</td>
 </tr>
 <tr class="odd">
-<td>d<sub>C</sub></td>
+<td>dC</td>
 <td>A2780cis death in coculture (/day)</td>
 <td>0.026 (0.007–0.040)</td>
 <td>—</td>
 </tr>
 <tr class="even">
-<td>β<sub>N</sub></td>
+<td>βN</td>
 <td>A2780 kill in coculture (/µM/day)</td>
 <td>0.386 (0.331–0.406)</td>
 <td>—</td>
 </tr>
 <tr class="odd">
-<td>β<sub>C</sub></td>
+<td>βC</td>
 <td>A2780cis kill in coculture</td>
 <td>0 (not selected)</td>
 <td>—</td>
@@ -1225,9 +1358,15 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-6-parameters-transport-only-partly">3.6 Parameters transport only partly <span class="status status-drafted">Drafted</span></h3>
-<p>This is the central result; Table 3.9 summarizes every transportability test. Growth and low-resource parameters carry from monoculture into coculture, but drug responses do not: the A2780 kill is redistributed into a smaller kill plus a coculture death rate, the A2780cis kill disappears, and the crowding coefficients change with the medium.</p>
-<p>In the combined low-resource + cisplatin coculture (Stage 4), inheriting everything is 27.6 BIC worse than adding a single drug × low-resource interaction χ = 1.15 (0.94–1.29; profile 0.97–1.44), selected in 90% of replicates. In low resource the cisplatin kill of A2780 is therefore about 2.2 times stronger (1 + χ). Because the resistant kill is zero in coculture, χ acts on A2780 only. Separate low-resource strengths per line (ε<sub>N</sub> = 7.80, ε<sub>C</sub> = 0.70), the alternative described in Section 2.2.9, are 7.96 BIC worse and were never selected.</p>
+<h3 data-status="Bullets" id="sec-3-6-parameters-transport-only-partly">3.6 Parameters transport only partly <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Central result; every test in Table 3.9.</p></li>
+<li><p>Carry over: growth laws and low-resource mechanisms. Do not carry over: drug responses and crowding.</p></li>
+<li><p>Stage 4: inheriting everything is 27.6 BIC worse than adding one shared interaction χ = 1.15 (0.94–1.29; profile 0.97–1.44), selected in 90%.</p></li>
+<li><p>Meaning: in low resource the A2780 cisplatin kill is about 2.2× stronger (1 + χ); χ acts on A2780 only because the resistant kill is 0.</p></li>
+<li><p>Per-line low-resource strengths εN = 7.80, εC = 0.70 (the form in Section 2.2.9) are 7.96 BIC worse and never selected.</p></li>
+<li><p>Draft text to replace: old ΔBIC +70 vs ε, and “χ not selected”, are reversed in the current run.</p></li>
+</ul>
 <p><strong>Table 3.9.</strong> Transportability tests.</p>
 <div class="table-wrap"><table>
 
@@ -1247,22 +1386,22 @@
 <tr class="even">
 <td>One cisplatin mechanism for both lines</td>
 <td>Yes, with own rates</td>
-<td>Shared 3-compartment linear kill; β<sub>N</sub>/β<sub>C</sub> = 1.7, delay 4.2 vs 11.6 days</td>
+<td>Shared 3-compartment linear kill; βN/βC = 1.7, delay 4.2 vs 11.6 days</td>
 </tr>
 <tr class="odd">
 <td>A2780 monoculture kill in coculture</td>
 <td>Partly</td>
-<td>β<sub>N</sub> refitted to 47% of monoculture, plus d<sub>N</sub> = 0.168/day; keeping Stage 2b kill ΔBIC +47.8</td>
+<td>βN refitted to 47% of monoculture, plus dN = 0.168/day; keeping Stage 2b kill ΔBIC +47.8</td>
 </tr>
 <tr class="even">
 <td>A2780cis monoculture kill in coculture</td>
 <td>No</td>
-<td>Refitted β<sub>C</sub> → 0; keeping it ΔBIC +5.1 (Stage 3a), +4.2 (Stage 4)</td>
+<td>Refitted βC → 0; keeping it ΔBIC +5.1 (Stage 3a), +4.2 (Stage 4)</td>
 </tr>
 <tr class="odd">
 <td>Normal-medium crowding in low resource</td>
 <td>No</td>
-<td>α<sub>NC</sub> 0.68 → 4.31, α<sub>CN</sub> 1.47 → 0.08, K 4,379 → 5,290</td>
+<td>αNC 0.68 → 4.31, αCN 1.47 → 0.08, K 4,379 → 5,290</td>
 </tr>
 <tr class="even">
 <td>Low-resource mechanisms in coculture</td>
@@ -1281,11 +1420,26 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-7-some-selections-are-stable-some-are-not">3.7 Some selections are stable, some are not <span class="status status-drafted">Drafted</span></h3>
-<p>Refitting every candidate to 200 block-bootstrap replicates shows how often the same rule picks the same model (Table 3.10, Figure 3.2). Selections are stable for the growth laws (89–94%), the cisplatin chain (84%), and the Stage 4 interaction (90%). They are least stable for the A2780 low-resource module (50%) and the normal-medium coculture (57%), where the runner-up differs only in one death term.</p>
-<p>Of the 21 profiled parameters, 5 are not pinned on both sides: θ<sub>C</sub> (flat above the estimate), β<sub>C</sub> in Stage 2b and d<sub>C</sub> in Stage 3a (one-sided), and α<sub>NC</sub> and α<sub>CN</sub> in Stage 3b (one at its bound, one flat). Two more sit at a search bound (c<sub>N</sub> and ζ<sub>N</sub><sup>R</sup>). Residual lag-1 autocorrelation is low for the coculture fit (0.01) and moderate elsewhere (0.10 and 0.35 in Stage 1, 0.38 and 0.27 in Stage 2b, 0.32 in Stage 3b), which is why the bootstrap resamples 3-day blocks rather than single points.</p>
-<p>Local sensitivity ranks the coculture crowding of resistant cells highest (Table 3.11): α<sub>CN</sub> has an index of 38.3, almost twice the next parameter. Global (Sobol) analysis of the treated 50:50 coculture gives a day-14 resistant fraction of 0.73 (SD 0.086), driven mainly by d<sub>N</sub> (total index 0.30) and r<sub>N</sub> (0.26). Within stages, d<sub>N</sub> (0.58) and β<sub>N</sub> (0.20) dominate the sensitive counts in Stage 3a and d<sub>N</sub> (0.48) the resistant counts; in Stage 2b, β (0.65 for A2780, 0.61 for A2780cis) and k (0.34, 0.52) share the variance.</p>
-<p>[Figure 3.2: bootstrap selection frequency per stage.]</p>
+<h3 data-status="Bullets" id="sec-3-7-some-selections-are-stable-some-are-not">3.7 Some selections are stable, some are not <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Bootstrap re-selection: stable for growth laws (89–94%), cisplatin chain (84%), Stage 4 χ (90%).</p></li>
+<li><p>Least stable: A2780 low-resource module (50%), normal-medium coculture (57%, runner-up differs by one death term).</p></li>
+<li><p>Identifiability: 5 of 21 profiled parameters not pinned on both sides (θC, βC in 2b, dC in 3a, αNC and αCN in 3b); cN and ζN<sup>R</sup> at search bounds.</p></li>
+<li><p>Residual lag-1 autocorrelation: 0.01 (3a) to 0.38 (2b): reason for 3-day block bootstrap.</p></li>
+<li><p>Local sensitivity: αCN highest (38.3), almost twice βN in 2b (21.4).</p></li>
+<li><p>Sobol, treated 50:50 coculture: day-14 resistant fraction 0.73 (SD 0.086), driven by dN (total index 0.30) and rN (0.26).</p></li>
+<li><p>Within stages: Stage 3a sensitive counts dN 0.58, βN 0.20; resistant counts dN 0.48. Stage 2b: β 0.65 / 0.61, k 0.34 / 0.52 (A2780 / A2780cis).</p></li>
+</ul>
+<figure class="figure" id="fig-3-6"><img alt="Selection stability and parameter sensitivity." class="zoomable" src="figure-3-6.png"/><figcaption><strong>Figure 3.6.</strong> Selection stability and parameter sensitivity.</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>a % of 200 block-bootstrap replicates in which the rule picks the same model (blue) or that model has the lowest BIC (green).</p></li>
+<li><p>b Ten largest local sensitivity indices, stage in brackets.</p></li>
+<li><p>Point to make: the parameters the controller depends on most (αCN, βN, dN) are well identified; the weakly identified ones are low-resource and resistant-kill terms.</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.10.</strong> Selected model at each stage, its bootstrap stability and identifiability.</p>
 <div class="table-wrap"><table style="width:100%;">
 
@@ -1314,7 +1468,7 @@
 <td>3</td>
 <td>46.5</td>
 <td>89% / 98%</td>
-<td>θ<sub>C</sub> (flat above)</td>
+<td>θC (flat above)</td>
 </tr>
 <tr class="odd">
 <td>2a · A2780</td>
@@ -1322,7 +1476,7 @@
 <td>3</td>
 <td>39.2</td>
 <td>50% / 70%</td>
-<td>c<sub>N</sub>, ζ<sub>N</sub><sup>R</sup> at bound</td>
+<td>cN, ζN<sup>R</sup> at bound</td>
 </tr>
 <tr class="even">
 <td>2a · A2780cis</td>
@@ -1346,7 +1500,7 @@
 <td>2</td>
 <td>163.9</td>
 <td>84% / 39%</td>
-<td>β<sub>C</sub> (one-sided)</td>
+<td>βC (one-sided)</td>
 </tr>
 <tr class="odd">
 <td>3a · Ce0 + Ce1</td>
@@ -1354,7 +1508,7 @@
 <td>6</td>
 <td>637.7</td>
 <td>57% / 76%</td>
-<td>d<sub>C</sub> (one-sided)</td>
+<td>dC (one-sided)</td>
 </tr>
 <tr class="even">
 <td>3b · low-resource coculture</td>
@@ -1362,7 +1516,7 @@
 <td>3</td>
 <td>700.6</td>
 <td>78% / 80%</td>
-<td>α<sub>NC</sub> (bound), α<sub>CN</sub> (flat)</td>
+<td>αNC (bound), αCN (flat)</td>
 </tr>
 <tr class="odd">
 <td>4 · low resource + cisplatin</td>
@@ -1388,37 +1542,37 @@
 <tbody>
 <tr class="odd">
 <td>1</td>
-<td>α<sub>CN</sub></td>
+<td>αCN</td>
 <td>3a</td>
 <td>38.3</td>
 </tr>
 <tr class="even">
 <td>2</td>
-<td>β<sub>N</sub></td>
+<td>βN</td>
 <td>2b</td>
 <td>21.4</td>
 </tr>
 <tr class="odd">
 <td>3</td>
-<td>d<sub>C</sub><sup>LR</sup></td>
+<td>dC<sup>LR</sup></td>
 <td>2a</td>
 <td>15.4</td>
 </tr>
 <tr class="even">
 <td>4</td>
-<td>d<sub>N</sub></td>
+<td>dN</td>
 <td>3a</td>
 <td>10.3</td>
 </tr>
 <tr class="odd">
 <td>5</td>
-<td>k<sub>N</sub></td>
+<td>kN</td>
 <td>2b</td>
 <td>7.13</td>
 </tr>
 <tr class="even">
 <td>6</td>
-<td>α<sub>NC</sub></td>
+<td>αNC</td>
 <td>3b</td>
 <td>4.66</td>
 </tr>
@@ -1436,22 +1590,37 @@
 </tr>
 <tr class="odd">
 <td>9</td>
-<td>α<sub>NC</sub></td>
+<td>αNC</td>
 <td>3a</td>
 <td>3.25</td>
 </tr>
 <tr class="even">
 <td>10</td>
-<td>r<sub>C</sub></td>
+<td>rC</td>
 <td>1</td>
 <td>3.22</td>
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-8-models-predict-held-out-data-with-stated-error">3.8 Models predict held-out data with stated error <span class="status status-drafted">Drafted</span></h3>
-<p>Intermittent-dosing cultures (drug on then off, off then on, or both) were never used in fitting. The Stage 2b models predicted them with a normalised RMSE of 0.22–0.55 for A2780 and 0.22–0.29 for A2780cis (Table 3.12); the off→on schedule was hardest for A2780. A separate washout rate for the drug effect was not supported (ΔBIC +2.46 for A2780, +3.10 for A2780cis), so the effect fades at the same rate it builds.</p>
-<p>The treated coculture (Ce1) was the hardest test. Predicted from the untreated cocultures and the monoculture drug response alone, its RMSE was 1,132 cells (nRMSE 0.90), against 366 (0.29) when Ce1 is fitted and 975 (0.78) for an untreated reference that ignores the drug. The difference from the untreated reference, 157 cells (95% CI −88 to 448; 14% of draws below 0), means the monoculture drug response does not improve the coculture prediction, which is the reason Ce1 is fitted in Stage 3a rather than predicted.</p>
-<p>Forecasting the last part of each series from the first part raised the error by a factor of 1.1–2.5 relative to the in-sample fit, worst for the A2780cis treated forecast (2.53). Leaving one dose out of Stage 2b gave ratios of 1.24–2.04 for A2780 and 1.00–1.99 for A2780cis, worst when the highest dose was left out; leaving one seeding ratio out gave 1.17–1.54 in Stage 3a and 0.94–1.94 in Stage 3b.</p>
+<h3 data-status="Bullets" id="sec-3-8-models-predict-held-out-data-with-stated-error">3.8 Models predict held-out data with stated error <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Intermittent dosing never fitted: nRMSE 0.22–0.55 (A2780), 0.22–0.29 (A2780cis); off→on hardest for A2780 (model regrows too fast before dosing).</p></li>
+<li><p>Separate washout rate not supported (ΔBIC +2.46, +3.10): effect fades at the rate it builds.</p></li>
+<li><p>Held-out Ce1 predicted from Ce0 + monoculture kill: RMSE 1,132 (nRMSE 0.90) vs 366 fitted, 975 for a no-drug reference.</p></li>
+<li><p>Difference from no-drug reference 157 cells (95% CI −88 to 448; 14% of draws &lt; 0): monoculture drug response does not improve the coculture prediction, so Ce1 is fitted in 3a. Negative result worth stating.</p></li>
+<li><p>Forecasting the last days: error 1.1–2.5× in-sample, worst A2780cis treated (2.53).</p></li>
+<li><p>Leave-one-out: dose 1.24–2.04 (A2780), 1.00–1.99 (A2780cis), worst without 1.47 µM; ratio 1.17–1.54 (3a), 0.94–1.94 (3b).</p></li>
+</ul>
+<figure class="figure" id="fig-3-7"><img alt="Validation on data the models never saw." class="zoomable" src="figure-3-7.png"/><figcaption><strong>Figure 3.7.</strong> Validation on data the models never saw.</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>a, b intermittent schedules (1 µM days 0–7 then off; off then 1 µM from day 7, dashed line); points = data, lines = Stage 2b prediction.</p></li>
+<li><p>c held-out treated coculture RMSE: fitted vs predicted from monoculture vs no-drug reference.</p></li>
+<li><p>d forecast error ratio per stage (1 = as good as in-sample).</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.12.</strong> Validation on data not used for fitting. nRMSE is RMSE divided by the mean observed count; ratios are held-out RMSE divided by in-sample RMSE.</p>
 <div class="table-wrap"><table>
 
@@ -1535,11 +1704,28 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-9-model-predictive-control-delays-treatment-and-uses-a-thi">3.9 Model-predictive control delays treatment and uses a third of the dose <span class="status status-drafted">Drafted</span></h3>
-<p>MPC chose the cisplatin concentration for each 2-day interval between media changes, from the measured doses (0, 0.62, 1, 1.47 µM), to maximise the time to progression (N + C reaching 0.8 K) over a 28-day look-ahead. Two scenarios bracket the uncertainty about the resistant kill: scenario A uses the selected Stage 3a model (no resistant kill), and scenario B uses each line's monoculture drug response (β<sub>C</sub> = 0.485).</p>
-<p>In normal medium from a 50:50 start, scenario A MPC gave no drug for the first 8 days and then 1 µM followed by 0.62 µM (Table 3.13, Figure 3.3). It used 4.5 µM·day of cisplatin against 14.0 for constant 1 µM, ended with 3,260 cells instead of 3,862, and held the resistant fraction at 0.20 instead of 0.75. Constant, maximum and periodic dosing all progressed at about day 10; MPC and the threshold-adaptive rule did not progress by day 14. The cost of control is a larger resistant population than no treatment at all (664 vs 417 cells): in this scenario cisplatin only helps by trimming the sensitive cells that would otherwise reach the threshold. In 40 paired closed-loop runs on bootstrap parameter sets with 10% counting noise, MPC ended with fewer total and fewer resistant cells than constant, maximum and periodic dosing in every draw, and fewer total cells than no treatment in every draw.</p>
-<p>In scenario B the drug also kills resistant cells, and MPC switched to near-maximal dosing (1.47 µM for 12 days, then 1 µM): 470 cells on day 14, almost all resistant, which matches the maximum dose. In low resource both scenarios drive the culture close to zero (49 cells under scenario A MPC, 5 under B with only 0.62 µM). Peak toxicity stayed at or below 0.077 in every run, so the 0.25 toxicity limit never constrained the schedule. Replacing the linear kill with the Hill kill gave the same picture (scenario A 3,391 cells, 416 resistant; scenario B 518, 517).</p>
-<p>[Figure 3.3: schedules and trajectories versus comparator schedules.]</p>
+<h3 data-status="Bullets" id="sec-3-9-model-predictive-control-delays-treatment-and-uses-a-thi">3.9 Model-predictive control delays treatment and uses a third of the dose <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Setup: dose chosen per 2-day interval from the measured doses (0, 0.62, 1, 1.47 µM); maximise time to progression (N + C ≥ 0.8 K) over a 28-day look-ahead.</p></li>
+<li><p>Scenario A = selected Stage 3a model (no resistant kill); scenario B = monoculture kill for both lines (βC = 0.485), crowding from untreated cocultures.</p></li>
+<li><p>Scenario A, 50:50: no drug for 8 days, then 1 µM, then 0.62 µM; 4.5 vs 14.0 µM·day (constant); 3,260 vs 3,862 cells; resistant fraction 0.20 vs 0.75.</p></li>
+<li><p>Constant, maximum and periodic progress at about day 10; MPC and threshold-adaptive do not progress by day 14.</p></li>
+<li><p>Cost: more resistant cells than no treatment (664 vs 417); here the drug only trims sensitive cells to stay under the threshold.</p></li>
+<li><p>Robustness: 40 paired closed-loop runs on bootstrap parameters with 10% count noise; MPC beats constant, maximum and periodic on total and resistant cells in every draw; fewer total cells than no treatment in every draw.</p></li>
+<li><p>Scenario B: near-maximal dosing (1.47 µM for 12 days, then 1 µM); 470 cells, almost all resistant (same as maximum dose).</p></li>
+<li><p>Low resource: culture driven near zero (49 cells A, 5 cells B with 0.62 µM). Peak toxicity ≤ 0.077: the 0.25 limit never binds. Hill-kill variant gives the same picture.</p></li>
+<li><p>Draft numbers to replace: old outline had MPC treating days 6–12 with 7.1 µM·day and a burden cost; objective is now time to progression.</p></li>
+</ul>
+<figure class="figure" id="fig-3-8"><img alt="Fourteen-day dosing schedules and the cells they produce (50:50 start)." class="zoomable" src="figure-3-8.png"/><figcaption><strong>Figure 3.8.</strong> Fourteen-day dosing schedules and the cells they produce (50:50 start).</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>Rows: dose per 2-day interval; total cells with the progression threshold (0.8 K, dashed); resistant cells.</p></li>
+<li><p>a scenario A (no resistant kill); b scenario B (monoculture kill for both lines). Thick blue = MPC.</p></li>
+<li><p>Curves simulated with the selected models at their point estimates (they reproduce the control report's day-14 values).</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.13.</strong> 14-day control outcomes in normal medium from a 50:50 start (best-fit parameters). Schedules are µM for the seven 2-day intervals.</p>
 <div class="table-wrap"><table style="width:100%;">
 
@@ -1665,10 +1851,27 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-10-adding-fasting-as-a-second-control-lowers-burden-furthe">3.10 Adding fasting as a second control lowers burden further, if recovery is slow <span class="status status-drafted">Drafted</span></h3>
-<p>Over 120 days the controller could also switch the culture to low resource (fasting) for 48-hour intervals, with the host model limiting weight loss and toxicity. In scenario A, MPC with fasting fasted on days 0–2, 24–26, 60–62 and 90–92 (8 days in total), gave 62.6 µM·day of cisplatin, and ended with 2,814 cells and no resistant cells, against 2,944 (13 resistant) and 82.4 µM·day without fasting (Table 3.14). Weight stayed at or above 0.975 and toxicity at or below 0.057. Constant and maximum dosing progressed at about day 10 and ended almost entirely resistant; the threshold rule delayed progression to day 28. Fixed fasting schedules lowered the burden further (1,109 cells for constant 1 µM plus a fast every 6 days) but reached the weight limit, which MPC avoided.</p>
-<p>This benefit rests on an untested assumption. In the fitted Stage 2a model, starvation stress in A2780cis accumulates and never fades after refeeding, so each fast adds permanently to the resistant death rate. No experiment measured recovery. If the stress fades at k<sub>off</sub> = 0.5/day or 2/day, the same MPC plan ends with 4,239 or 4,288 resistant cells; re-optimising recovers 14 or 9 resistant cells but with 4 or 0 fasting days, so fasting adds little once recovery is allowed (Table 3.15). In scenario B, MPC with fasting reached 11 cells with 2 fasting days, but constant 1 µM alone already eliminated the culture.</p>
-<p>[Figure 3.4: 120-day dose + fasting schedule and k_off sweep.]</p>
+<h3 data-status="Bullets" id="sec-3-10-adding-fasting-as-a-second-control-lowers-burden-furthe">3.10 Adding fasting as a second control lowers burden further, if recovery is slow <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>120 days; fasting = 48-h low-resource intervals, limited by host weight and toxicity.</p></li>
+<li><p>Scenario A, MPC + fasting: fasts days 0–2, 24–26, 60–62, 90–92 (8 days); 62.6 µM·day; 2,814 cells, 0 resistant; weight ≥ 0.975, toxicity ≤ 0.057.</p></li>
+<li><p>MPC without fasting: 2,944 cells (13 resistant), 82.4 µM·day. Constant and maximum progress near day 10; threshold rule delays to day 28.</p></li>
+<li><p>Fixed fasting schedules go lower (1,109 cells, constant + fast every 6 days) but hit the weight limit; MPC does not.</p></li>
+<li><p>Untested assumption: A2780cis starvation stress never fades after refeeding (koff = 0); no experiment measured recovery.</p></li>
+<li><p>With koff = 0.5 or 2/day the same plan leaves 4,239 or 4,288 resistant cells; re-optimised gives 14 or 9 with 4 or 0 fasting days: fasting adds little once recovery is allowed.</p></li>
+<li><p>Scenario B: MPC + fasting 11 cells (2 fasting days), but constant 1 µM alone already eliminates the culture.</p></li>
+<li><p>Draft numbers to replace: the old 30-day result (1,369 cells, kC<sup>R</sup>).</p></li>
+</ul>
+<figure class="figure" id="fig-3-9"><img alt="Cisplatin and fasting over 120 days (scenario A, 50:50)." class="zoomable" src="figure-3-9.png"/><figcaption><strong>Figure 3.9.</strong> Cisplatin and fasting over 120 days (scenario A, 50:50).</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>a cells on day 120 per policy, resistant part in orange; dashed line = progression threshold.</p></li>
+<li><p>b resistant cells on day 120 when starvation damage fades after refeeding at rate koff: MPC plan replayed vs re-optimised.</p></li>
+<li><p>Point to make: the fasting benefit rests on one unmeasured rate; the refeeding experiment in 5.2 would settle it.</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.14.</strong> 120-day control with cisplatin and fasting, scenario A, 50:50 start.</p>
 <div class="table-wrap"><table style="width:100%;">
 
@@ -1776,14 +1979,13 @@
 </tr>
 </tbody>
 </table></div>
-<p><em>Periodic dosing spent 7 days above 0.8 K but was below it at day 120</em></p>
-<p><strong>Table 3.15.</strong> Sensitivity of the 120-day result to recovery after refeeding (k<sub>off</sub>).</p>
+<p><strong>Table 3.15.</strong> Sensitivity of the 120-day result to recovery after refeeding (koff).</p>
 <div class="table-wrap"><table style="width:100%;">
 
 <thead>
 <tr class="header">
 <th><strong>Scenario</strong></th>
-<th><strong>k<sub>off</sub> (/day)</strong></th>
+<th><strong>koff (/day)</strong></th>
 <th><strong>C day 120, MPC plan replayed</strong></th>
 <th><strong>C day 120, re-optimised</strong></th>
 <th><strong>N + C, re-optimised</strong></th>
@@ -1848,9 +2050,25 @@
 </tr>
 </tbody>
 </table></div>
-<h3 data-status="Drafted" id="sec-3-11-learned-models-predict-slightly-better-mechanistic-mode">3.11 Learned models predict slightly better; mechanistic models remain usable for control <span class="status status-drafted">Drafted</span></h3>
-<p>Neural models (boosted trees, an MLP, a universal differential equation with a neural kill term, and a pure neural ODE) were scored against the best mechanistic model on the same held-out tests (Table 3.16). A difference counted as a tie when it was smaller than 0.02 log units or the seed-to-seed spread of the neural score. Neural models won 4 tests, mechanistic models none, and 4 were ties. The clearest neural wins were next-day prediction, the on→off schedule, and the three-way comparison on the held-out 30k Ce1 coculture, where the pure neural ODE reached an RMSE of 511 cells against 633 for the closed-form mechanistic model and 640 for the UDE (Table 3.17). Unseen doses, the off→on schedule and an unseen seeding density were ties.</p>
-<p>The neural advantage comes at a large cost in parameters (121–131 against 12–14) and grows only slowly with data: the UDE was worse than the Hill mechanistic model with 25% of the training data (log-RMSE difference +0.47) and only slightly better with all of it (−0.06). The neural models also have no parameters that map onto growth, crowding or kill, so they cannot answer the transportability questions of Section 3.6 or be extended to fasting. These tests cover four constant doses up to 1.47 µM, two single-switch schedules and two seeding densities, and say nothing about schedules with more switches or larger data sets.</p>
+<h3 data-status="Bullets" id="sec-3-11-learned-models-predict-slightly-better-mechanistic-mode">3.11 Learned models predict slightly better; mechanistic models remain usable for control <span class="status status-bullets">Bullets</span></h3>
+<ul>
+<li><p>Same held-out tests for neural models (boosted trees, MLP, UDE with neural kill, pure neural ODE) and the best mechanistic model.</p></li>
+<li><p>Tie rule: difference &lt; 0.02 log units or &lt; seed-to-seed spread of the neural score.</p></li>
+<li><p>Score: neural 4 wins, mechanistic 0, ties 4. Neural wins: next-day prediction, on→off schedule, three-way held-out 30k Ce1 (511 vs 633 cells; UDE 640).</p></li>
+<li><p>Ties: unseen dose, off→on schedule, unseen seeding density, forward prediction of Ce1.</p></li>
+<li><p>Cost: 121–131 parameters vs 12–14; UDE worse than Hill with 25% of training data (+0.47 log RMSE), slightly better with all (−0.06).</p></li>
+<li><p>Neural models have no growth, crowding or kill parameters: cannot answer transportability (3.6) or be extended to fasting.</p></li>
+<li><p>Scope: 4 constant doses ≤ 1.47 µM, 2 single-switch schedules, 2 densities; nothing about multi-switch schedules or larger data.</p></li>
+</ul>
+<figure class="figure" id="fig-3-10"><img alt="Neural vs mechanistic models on held-out tests." class="zoomable" src="figure-3-10.png"/><figcaption><strong>Figure 3.10.</strong> Neural vs mechanistic models on held-out tests.</figcaption></figure>
+
+<ul>
+<li><p>Caption notes (rewrite as a caption):</p>
+<ul>
+<li><p>Each row = one held-out test; circle = best neural model, square = best mechanistic model; winner at right (tie rule above).</p></li>
+<li><p>Log RMSE, lower is better.</p></li>
+</ul></li>
+</ul>
 <p><strong>Table 3.16.</strong> Held-out scorecard, neural vs mechanistic (log RMSE unless stated; lower is better).</p>
 <div class="table-wrap"><table style="width:100%;">
 
@@ -1990,36 +2208,56 @@
 </ul>
 <h3 id="sec-4-2-parameters-cannot-be-assumed-to-transport-across-environ">4.2 Parameters cannot be assumed to transport across environments</h3>
 <ul>
-<li><p>Low-resource and drug effects interact on the cells (ε_N about 8×), even though no explicit interaction term χ was selected.</p></li>
+<li><p>Low-resource and drug effects interact: one shared interaction χ = 1.15 is selected (A2780 kill about 2.2× stronger in low resource); per-line strengths ε are rejected.</p></li>
 <li><p>Coculture removes the resistant kill seen in monoculture.</p></li>
 <li><p>Consequence for hierarchical fitting: carry structure forward, but test every inherited value.</p></li>
 <li><p>Backed by 3.3, 3.5, 3.6.</p></li>
 </ul>
 <h3 id="sec-4-3-qualification-must-come-before-control">4.3 Qualification must come before control</h3>
 <ul>
-<li><p>What the controller relies on is what is least certain: k_C^R decides the fasting result, and the resistant kill in coculture decides scenario A vs B.</p></li>
+<li><p>What the controller relies on is what is least certain: recovery after refeeding (k_off) decides the fasting result, and the resistant kill in coculture decides scenario A vs B.</p></li>
 <li><p>Backed by 3.7, 3.8, 3.10.</p></li>
 </ul>
 <h3 id="sec-4-4-biological-meaning-of-the-control-results">4.4 Biological meaning of the control results</h3>
 <ul>
-<li><p>Delaying treatment and keeping sensitive cells lowers the resistant fraction, consistent with adaptive therapy (<a class="cite" href="#ref-zhang-2017">Zhang et al., 2017</a>; <a class="cite" href="#ref-strobl-2021">Strobl et al., 2021</a>).</p></li>
+<li><p>Delaying treatment and keeping sensitive cells lowers the resistant fraction, consistent with adaptive therapy (Zhang et al., 2017; Strobl et al., 2021).</p></li>
 <li><p>Low resource alone controls A2780cis in vitro; why the controller then withholds drug.</p></li>
 <li><p>Fasting as an adjuvant: in-vitro serum starvation is an upper bound on in-vivo fasting.</p></li>
 </ul>
 <h3 id="sec-4-5-mechanistic-and-learned-models-trade-interpretability-fo">4.5 Mechanistic and learned models trade interpretability for flexibility</h3>
 <ul>
-<li><p>Backed by 3.11. Mechanistic models extrapolate better to unseen doses; UDEs fit unseen schedule shapes better; BIC favors the mechanistic form.</p></li>
+<li><p>Backed by 3.11. Neural models win 4 held-out tests, mechanistic 0, ties 4 (unseen dose and density are ties); mechanistic models keep interpretable parameters and 10× fewer of them.</p></li>
 </ul>
 <h3 id="sec-4-6-comparison-with-published-work">4.6 Comparison with published work</h3>
 <ul>
 <li><p>Gevertz et al. (train, validate on withheld doses, identifiability, then control): closest parallel.</p></li>
-<li><p><a class="cite" href="#ref-moore-2018">Moore (2018</a>) workflow for optimal control in oncology.</p></li>
+<li><p>Moore (2018) workflow for optimal control in oncology.</p></li>
+</ul>
+<h3 data-status="To write" id="sec-4-7-what-i-would-do-differently">4.7 What I would do differently <span class="status status-to-write">To write</span></h3>
+<ul>
+<li><p>Design choices you would change with hindsight (for example, coculture dose series, refeeding experiment, more biological runs).</p></li>
+<li><p>Roadblocks met and how they were worked around (Stage 4 fitted, not predicted; held-out Ce1 not better than the no-drug reference).</p></li>
+</ul>
+<h3 data-status="To write" id="sec-4-8-assumptions-revisited">4.8 Assumptions revisited <span class="status status-to-write">To write</span></h3>
+<ul>
+<li><p>Go through the assumptions in 1.10: which results change if each one fails.</p></li>
+</ul>
+<h3 data-status="To write" id="sec-4-9-reproducibility-variability-and-statistical-support">4.9 Reproducibility, variability and statistical support <span class="status status-to-write">To write</span></h3>
+<ul>
+<li><p>One biological run per condition; error bars are SEM of 3 wells.</p></li>
+<li><p>What the bootstrap intervals and selection frequencies do and do not cover (earlier stages held fixed).</p></li>
+<li><p>Residual autocorrelation and the block bootstrap; how ΔBIC thresholds map to evidence strength.</p></li>
+<li><p>Negative results to state plainly (3.8 held-out Ce1; 3.11 no mechanistic wins).</p></li>
+</ul>
+<h3 data-status="To write" id="sec-4-10-open-questions">4.10 Open questions <span class="status status-to-write">To write</span></h3>
+<ul>
+<li><p>What remains unanswered and the hypotheses it generates; link to the experiments in 5.2.</p></li>
 </ul>
 <h2 id="sec-5-limitations-and-future-experiments">5 Limitations and future experiments</h2>
 <h3 data-status="Now" id="sec-5-1-limitations">5.1 Limitations <span class="status status-now">Now</span></h3>
 <ul>
-<li><p>In vitro, one cell-line pair, 14-day experiments; control horizons of 28–30 days extrapolate.</p></li>
-<li><p>Coculture treated at 1 µM only; EC50 fixed, not estimated; doses above 1.47 µM extrapolate the Hill curve.</p></li>
+<li><p>In vitro, one cell-line pair, 14-day experiments; the 120-day control horizon extrapolates.</p></li>
+<li><p>Coculture treated at 1 µM only; the linear kill is fitted at 0.62–1.47 µM, so higher doses extrapolate.</p></li>
 <li><p>Stage 4 fitted to one culture at one dose; no out-of-sample test of the low-resource control model.</p></li>
 <li><p>Toxicity, host weight and fasting protection come from literature, not these data.</p></li>
 <li><p>Bootstrap holds earlier-stage values fixed, so uncertainty bands are approximate.</p></li>
@@ -2029,14 +2267,19 @@
 <ol type="1">
 <li><p>Coculture dose series (0.25, 0.5, 2, 4 µM at 50:50): estimates EC50 and settles scenario A vs B.</p></li>
 <li><p>Coculture intermittent schedules: tests washout and regrowth in the controlled system.</p></li>
-<li><p>Recovery after refeeding in A2780cis: measures k_C^R.</p></li>
+<li><p>Recovery after refeeding in A2780cis: measures k_off.</p></li>
 <li><p>Low resource + cisplatin at a second dose: separates ε from a drug × low-resource interaction.</p></li>
 <li><p>More replicates of Ce0/Ce1: narrows r_N, d_N and the crowding coefficients.</p></li>
 <li><p>A toxicity readout (for example, a fibroblast line) to replace the literature proxy.</p></li>
 <li><p>Test an MPC schedule experimentally.</p></li>
 </ol>
-<h3 data-status="Write last" id="sec-5-3-conclusion">5.3 Conclusion <span class="status status-write-last">Write last</span></h3>
-<p>One paragraph that answers the central question.</p>
+<h2 data-status="Write last" id="sec-6-conclusions">6 Conclusions <span class="status status-write-last">Write last</span></h2>
+<ul>
+<li><p>Answer the aim in one or two sentences.</p></li>
+<li><p>One line per hypothesis: supported or not, with the Results section that shows it (H1 3.2–3.4; H2 3.5–3.6, 3.8; H3 3.9–3.10; H4 3.11).</p></li>
+<li><p>Significance for adaptive therapy and model-based dosing.</p></li>
+<li><p>The single most important next experiment.</p></li>
+</ul>
 <h2 id="sec-back-matter">Back matter</h2>
 <h3 id="sec-figures-and-tables">Figures and tables</h3>
 <div class="table-wrap"><table>
@@ -2076,27 +2319,63 @@
 </tr>
 <tr class="odd">
 <td>Fig 3.1</td>
-<td>Mean counts across all conditions</td>
+<td>All measured conditions</td>
 <td>3.1</td>
-<td>Final Report Ch. 1</td>
+<td>measurements.csv</td>
 </tr>
 <tr class="even">
 <td>Fig 3.2</td>
-<td>Bootstrap selection frequency by stage</td>
-<td>3.7</td>
-<td>Final Report Ch. 3</td>
+<td>Stage 1 and 2a fits</td>
+<td>3.2–3.3</td>
+<td>zoo_parameters.csv</td>
 </tr>
 <tr class="odd">
 <td>Fig 3.3</td>
-<td>MPC schedules and trajectories vs comparators</td>
-<td>3.9</td>
-<td>Final Report Ch. 6</td>
+<td>Stage 2b cisplatin fits</td>
+<td>3.4</td>
+<td>zoo_parameters.csv</td>
 </tr>
 <tr class="even">
 <td>Fig 3.4</td>
-<td>30-day dose + fasting schedule and k_off sweep</td>
+<td>Stage 3a coculture fit</td>
+<td>3.5</td>
+<td>zoo_parameters.csv</td>
+</tr>
+<tr class="odd">
+<td>Fig 3.5</td>
+<td>Stage 3b and Stage 4 fits</td>
+<td>3.5–3.6</td>
+<td>zoo_parameters.csv</td>
+</tr>
+<tr class="even">
+<td>Fig 3.6</td>
+<td>Bootstrap selection and local sensitivity</td>
+<td>3.7</td>
+<td>zoo_analyses</td>
+</tr>
+<tr class="odd">
+<td>Fig 3.7</td>
+<td>Validation on unseen data</td>
+<td>3.8</td>
+<td>zoo_analyses, heldout_ce1.csv</td>
+</tr>
+<tr class="even">
+<td>Fig 3.8</td>
+<td>14-day schedules and trajectories</td>
+<td>3.9</td>
+<td>control_outcomes.csv</td>
+</tr>
+<tr class="odd">
+<td>Fig 3.9</td>
+<td>120-day dose + fasting and k_off</td>
 <td>3.10</td>
-<td>Final Report Ch. 7</td>
+<td>control_120d</td>
+</tr>
+<tr class="even">
+<td>Fig 3.10</td>
+<td>Neural vs mechanistic scorecard</td>
+<td>3.11</td>
+<td>nn_track verdict</td>
 </tr>
 <tr class="odd">
 <td>Table 2.1</td>
@@ -2217,10 +2496,13 @@
 <h3 id="sec-references-to-collect">References to collect</h3>
 <ul>
 <li><p>Already cited in methods.pdf: Luvero et al.; Strobl et al.; Gevertz et al.; Hockings et al.; Galluzzi et al.; Shoval et al.; Gattenby and Brown; Moore; cisplatin pharmacodynamics and coculture papers.</p></li>
-<li><p>Already cited in the Final Report: <a class="cite" href="#ref-de-pillis-2001">de Pillis and Radunskaya 2001</a>; <a class="cite" href="#ref-friberg-2002">Friberg et al. 2002</a>; <a class="cite" href="#ref-feller-2017a">Feller and Ebenbauer 2017</a>; <a class="cite" href="#ref-zhang-2017">Zhang et al. 2017</a>; <a class="cite" href="#ref-strobl-2021">Strobl et al. 2021</a>; <a class="cite" href="#ref-fearon-2011">Fearon et al. 2011</a>; <a class="cite" href="#ref-luo-2024">Luo et al. 2024</a> (DTR-Bench).</p></li>
+<li><p>Already cited in the Final Report: de Pillis and Radunskaya 2001; Friberg et al. 2002; Feller and Ebenbauer 2017; Zhang et al. 2017; Strobl et al. 2021; Fearon et al. 2011; Luo et al. 2024 (DTR-Bench).</p></li>
 <li><p>Still missing: a Monod / resource-limited growth paper (methods.pdf placeholder); Allee and lag-phase references for OVCAR/A2780; UDE (Rackauckas et al.) and SINDy (Brunton et al.); BIC (Schwarz; Kass and Raftery); block bootstrap; Sobol; profile likelihood (Raue et al.).</p></li>
 </ul>
 <h3 id="sec-appendices">Appendices</h3>
+<ul>
+<li><p>Supplementary only: the committee is not required to read appendices, so every critical figure (Figures 3.1–3.10) stays in the main text.</p></li>
+</ul>
 <ul>
 <li><p>A. Parameter and symbol table with units, bounds, estimates, intervals.</p></li>
 <li><p>B. Full model zoo: every candidate per stage with k, BIC, ΔBIC, bootstrap frequency.</p></li>
@@ -2230,7 +2512,7 @@
 <li><p>F. QuPath settings and the image-analysis workflow.</p></li>
 <li><p>G. Software: package API, scripts, versions, repository links, how to reproduce.</p></li>
 </ul>
-<h2 id="sec-fix-before-drafting">Fix before drafting</h2>
+<h2 id="sec-fix-before-drafting-working-notes-delete-before-submission">Fix before drafting (working notes; delete before submission)</h2>
 <p>methods.pdf predates the current pipeline; these items conflict with it and should be settled before Methods text is reused.</p>
 <ul>
 <li><p>Replace the 0–2 / 2–6 / &gt;6 BIC rule with the fewest-parameters-within-3-BIC rule.</p></li>
@@ -2244,50 +2526,50 @@
 <li><p>State that Stage 4 is fitted, so the low-resource control model has no out-of-sample test; lead validation with the intermittent data.</p></li>
 <li><p>Rescore mechanistic vs UDE/NN on the same held-out sets and the same metric (the NN verdict uses log <span class="math inline">\(RMSE\)</span>; the zoo uses linear <span class="math inline">\(nRMSE\)</span>).</p></li>
 </ul>
-<h2 id="sec-references">References</h2>
-<p class="reference" id="ref-aghaee-2023">Aghaee, M., Ledzewicz, U., Robbins, M., Bezman, N., Cho, H. J., &amp; Moore, H. (2023). Determining optimal combination regimens for patients with multiple myeloma. <em>European Journal of Pharmaceutical Sciences, 187</em>, 106492. <a href="https://doi.org/10.1016/j.ejps.2023.106492" rel="noopener" target="_blank">https://doi.org/10.1016/j.ejps.2023.106492</a></p>
-<p class="reference" id="ref-beck-2009">Beck, A., &amp; Teboulle, M. (2009). A fast iterative shrinkage-thresholding algorithm for linear inverse problems. <em>SIAM Journal on Imaging Sciences, 2</em>(1), 183–202. https://doi.org/10.1137/080716542</p>
-<p class="reference" id="ref-brunton-2016">Brunton, S. L., Proctor, J. L., &amp; Kutz, J. N. (2016). Discovering governing equations from data by sparse identification of nonlinear dynamical systems. <em>Proceedings of the National Academy of Sciences, 113</em>(15), 3932–3937. <a href="https://doi.org/10.1073/pnas.1517384113" rel="noopener" target="_blank">https://doi.org/10.1073/pnas.1517384113</a></p>
-<p class="reference" id="ref-de-groot-2020">de Groot, S., et al. (2020). Fasting mimicking diet as an adjunct to neoadjuvant chemotherapy for breast cancer in the multicentre randomized phase 2 DIRECT trial. <em>Nature Communications, 11</em>, 3083. https://doi.org/10.1038/s41467-020-16138-3</p>
-<p class="reference" id="ref-de-pillis-2001">de Pillis, L. G., &amp; Radunskaya, A. E. (2001). A mathematical tumor model with immune resistance and drug therapy: An optimal control approach. <em>Journal of Theoretical Medicine, 3</em>(2), 79–100. <a href="https://doi.org/10.1080/10273660108833067" rel="noopener" target="_blank">https://doi.org/10.1080/10273660108833067</a></p>
-<p class="reference" id="ref-dorff-2016">Dorff, T. B., Groshen, S., Garcia, A., Shah, M., Tsao-Wei, D., Pham, H., et al. (2016). Safety and feasibility of fasting in combination with platinum-based chemotherapy. <em>BMC Cancer, 16</em>, 360. https://doi.org/10.1186/s12885-016-2370-6</p>
-<p class="reference" id="ref-el-kareh-2003">El-Kareh, A. W., &amp; Secomb, T. W. (2003). A mathematical model for cisplatin cellular pharmacodynamics. <em>Neoplasia, 5</em>(2), 161–169. <a href="https://doi.org/10.1016/S1476-5586(03)80008-8" rel="noopener" target="_blank">https://doi.org/10.1016/S1476-5586(03)80008-8</a></p>
-<p class="reference" id="ref-fearon-2011">Fearon, K., Strasser, F., Anker, S. D., Bosaeus, I., Bruera, E., Fainsinger, R. L., Jatoi, A., Loprinzi, C., MacDonald, N., Mantovani, G., Davis, M., Muscaritoli, M., Ottery, F., Radbruch, L., Ravasco, P., Walsh, D., Wilcock, A., Kaasa, S., &amp; Baracos, V. E. (2011). Definition and classification of cancer cachexia: An international consensus. <em>The Lancet Oncology, 12</em>(5), 489–495. <a href="https://doi.org/10.1016/S1470-2045(10)70218-7" rel="noopener" target="_blank">https://doi.org/10.1016/S1470-2045(10)70218-7</a></p>
-<p class="reference" id="ref-feller-2017a">Feller, C., &amp; Ebenbauer, C. (2017a). A stabilizing iteration scheme for model predictive control based on relaxed barrier functions. <em>Automatica, 80</em>, 328–339. <a href="https://doi.org/10.1016/j.automatica.2017.02.001" rel="noopener" target="_blank">https://doi.org/10.1016/j.automatica.2017.02.001</a></p>
-<p class="reference" id="ref-feller-2017b">Feller, C., &amp; Ebenbauer, C. (2017b). Relaxed logarithmic barrier function based model predictive control of linear systems. <em>IEEE Transactions on Automatic Control, 62</em>(3), 1223–1238.</p>
-<p class="reference" id="ref-friberg-2002">Friberg, L. E., Henningsson, A., Maas, H., Nguyen, L., &amp; Karlsson, M. O. (2002). Model of chemotherapy-induced myelosuppression with parameter consistency across drugs. <em>Journal of Clinical Oncology, 20</em>(24), 4713–4721. <a href="https://doi.org/10.1200/JCO.2002.02.140" rel="noopener" target="_blank">https://doi.org/10.1200/JCO.2002.02.140</a></p>
-<p class="reference" id="ref-galluzzi-2012">Galluzzi, L., Senovilla, L., Vitale, I., Michels, J., Martins, I., Kepp, O., Castedo, M., &amp; Kroemer, G. (2012). Molecular mechanisms of cisplatin resistance. <em>Oncogene, 31</em>(15), 1869–1883. <a href="https://doi.org/10.1038/onc.2011.384" rel="noopener" target="_blank">https://doi.org/10.1038/onc.2011.384</a></p>
-<p class="reference" id="ref-gatenby-2020">Gatenby, R. A., &amp; Brown, J. S. (2020). Integrating evolutionary dynamics into cancer therapy. <em>Nature Reviews Clinical Oncology, 17</em>(11), 675–686. https://doi.org/10.1038/s41571-020-0411-1</p>
-<p class="reference" id="ref-gevertz-2025">Gevertz, J. L., Greene, J. M., Prosperi, S., Comandante-Lou, N., &amp; Sontag, E. D. (2025). Understanding therapeutic tolerance through a mathematical model of drug-induced resistance. <em>npj Systems Biology and Applications, 11</em>, 30. <a href="https://doi.org/10.1038/s41540-025-00511-3" rel="noopener" target="_blank">https://doi.org/10.1038/s41540-025-00511-3</a></p>
-<p class="reference" id="ref-hairer-1993">Hairer, E., Nørsett, S. P., &amp; Wanner, G. (1993). <em>Solving ordinary differential equations I: Nonstiff problems</em> (2nd ed.). Springer. https://doi.org/10.1007/978-3-540-78862-1</p>
-<p class="reference" id="ref-hockings-2025">Hockings, H., Lakatos, E., Huang, W., Mossner, M., Khan, M. A., Bakali, N., McDermott, J., Smith, K., Baker, A.-M., Graham, T. A., &amp; Lockley, M. (2025). Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer to achieve long-term tumor control. <em>Cancer Research, 85</em>(18), 3503–3517. <a href="https://doi.org/10.1158/0008-5472.CAN-25-0351" rel="noopener" target="_blank">https://doi.org/10.1158/0008-5472.CAN-25-0351</a></p>
-<p class="reference" id="ref-jansen-1999">Jansen, M. J. W. (1999). Analysis of variance designs for model output. <em>Computer Physics Communications, 117</em>(1–2), 35–43. https://doi.org/10.1016/S0010-4655(98)00154-4</p>
-<p class="reference" id="ref-kass-1995">Kass, R. E., &amp; Raftery, A. E. (1995). Bayes factors. <em>Journal of the American Statistical Association, 90</em>(430), 773–795. <a href="https://doi.org/10.1080/01621459.1995.10476572" rel="noopener" target="_blank">https://doi.org/10.1080/01621459.1995.10476572</a></p>
-<p class="reference" id="ref-künsch-1989">Künsch, H. R. (1989). The jackknife and the bootstrap for general stationary observations. <em>The Annals of Statistics, 17</em>(3), 1217–1241. https://doi.org/10.1214/aos/1176347265</p>
-<p class="reference" id="ref-land-1960">Land, A. H., &amp; Doig, A. G. (1960). An automatic method of solving discrete programming problems. <em>Econometrica, 28</em>(3), 497–520. https://doi.org/10.2307/1910129</p>
-<p class="reference" id="ref-lee-2012">Lee, C., Raffaghello, L., Brandhorst, S., Safdie, F. M., Bianchi, G., Martin-Montalvo, A., et al. (2012). Fasting cycles retard growth of tumors and sensitize a range of cancer cell types to chemotherapy. <em>Science Translational Medicine, 4</em>(124), 124ra27. https://doi.org/10.1126/scitranslmed.3003293</p>
-<p class="reference" id="ref-luo-2024">Luo, Z., Zhu, M., Liu, F., Li, J., Pan, Y., Zhou, J., &amp; Zhu, T. (2024). DTR-Bench: An in silico environment and benchmark platform for reinforcement learning based dynamic treatment regime. <em>arXiv</em>. <a href="https://doi.org/10.48550/arXiv.2405.18610" rel="noopener" target="_blank">https://doi.org/10.48550/arXiv.2405.18610</a></p>
-<p class="reference" id="ref-luvero-2014">Luvero, D., Milani, A., &amp; Ledermann, J. A. (2014). Treatment options in recurrent ovarian cancer: Latest evidence and clinical potential. <em>Therapeutic Advances in Medical Oncology, 6</em>(5), 229–239. <a href="https://doi.org/10.1177/1758834014544121" rel="noopener" target="_blank">https://doi.org/10.1177/1758834014544121</a></p>
-<p class="reference" id="ref-monod-1949">Monod, J. (1949). The growth of bacterial cultures. <em>Annual Review of Microbiology, 3</em>, 371–394. <a href="https://doi.org/10.1146/annurev.mi.03.100149.002103" rel="noopener" target="_blank">https://doi.org/10.1146/annurev.mi.03.100149.002103</a></p>
-<p class="reference" id="ref-moore-2018">Moore, H. (2018). How to mathematically optimize drug regimens using optimal control. <em>Journal of Pharmacokinetics and Pharmacodynamics, 45</em>, 127–137. <a href="https://doi.org/10.1007/s10928-018-9568-y" rel="noopener" target="_blank">https://doi.org/10.1007/s10928-018-9568-y</a></p>
-<p class="reference" id="ref-nelder-1965">Nelder, J. A., &amp; Mead, R. (1965). A simplex method for function minimization. <em>The Computer Journal, 7</em>(4), 308–313. https://doi.org/10.1093/comjnl/7.4.308</p>
-<p class="reference" id="ref-nocedal-2006">Nocedal, J., &amp; Wright, S. J. (2006). <em>Numerical optimization</em> (2nd ed.). Springer. https://doi.org/10.1007/978-0-387-40065-5</p>
-<p class="reference" id="ref-obrist-2018">Obrist, F., Michels, J., Durand, S., Chery, A., Pol, J., et al. (2018). Metabolic vulnerability of cisplatin-resistant cancers. <em>The EMBO Journal, 37</em>(14), e98597. https://doi.org/10.15252/embj.201798597</p>
-<p class="reference" id="ref-politis-1992">Politis, D. N., &amp; Romano, J. P. (1992). A circular block-resampling procedure for stationary data. In R. LePage &amp; L. Billard (Eds.), <em>Exploring the limits of bootstrap</em> (pp. 263–270). Wiley.</p>
-<p class="reference" id="ref-rackauckas-2020">Rackauckas, C., Ma, Y., Martensen, J., Warner, C., Zubov, K., Supekar, R., Skinner, D., Ramadhan, A., &amp; Edelman, A. (2020). Universal differential equations for scientific machine learning. <em>arXiv</em>. <a href="https://doi.org/10.48550/arXiv.2001.04385" rel="noopener" target="_blank">https://doi.org/10.48550/arXiv.2001.04385</a></p>
-<p class="reference" id="ref-raffaghello-2008">Raffaghello, L., Lee, C., Safdie, F. M., Wei, M., Madia, F., Bianchi, G., &amp; Longo, V. D. (2008). Starvation-dependent differential stress resistance protects normal but not cancer cells against high-dose chemotherapy. <em>Proceedings of the National Academy of Sciences, 105</em>(24), 8215–8220. https://doi.org/10.1073/pnas.0708100105</p>
-<p class="reference" id="ref-raue-2009">Raue, A., Kreutz, C., Maiwald, T., Bachmann, J., Schilling, M., Klingmüller, U., &amp; Timmer, J. (2009). Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood. <em>Bioinformatics, 25</em>(15), 1923–1929. <a href="https://doi.org/10.1093/bioinformatics/btp358" rel="noopener" target="_blank">https://doi.org/10.1093/bioinformatics/btp358</a></p>
-<p class="reference" id="ref-rawlings-2017">Rawlings, J. B., Mayne, D. Q., &amp; Diehl, M. M. (2017). <em>Model predictive control: Theory, computation, and design</em> (2nd ed.). Nob Hill Publishing.</p>
-<p class="reference" id="ref-revels-2016">Revels, J., Lubin, M., &amp; Papamarkou, T. (2016). <em>Forward-mode automatic differentiation in Julia</em>. arXiv. https://doi.org/10.48550/arXiv.1607.07892</p>
-<p class="reference" id="ref-safdie-2009">Safdie, F. M., Dorff, T., Quinn, D., Fontana, L., Wei, M., Lee, C., Cohen, P., &amp; Longo, V. D. (2009). Fasting and cancer treatment in humans: A case series report. <em>Aging, 1</em>(12), 988–1007.</p>
-<p class="reference" id="ref-saltelli-2010">Saltelli, A., Annoni, P., Azzini, I., Campolongo, F., Ratto, M., &amp; Tarantola, S. (2010). Variance based sensitivity analysis of model output. Design and estimator for the total sensitivity index. <em>Computer Physics Communications, 181</em>(2), 259–270. https://doi.org/10.1016/j.cpc.2009.09.018</p>
-<p class="reference" id="ref-schwarz-1978">Schwarz, G. (1978). Estimating the dimension of a model. <em>The Annals of Statistics, 6</em>(2), 461–464. <a href="https://doi.org/10.1214/aos/1176344136" rel="noopener" target="_blank">https://doi.org/10.1214/aos/1176344136</a></p>
-<p class="reference" id="ref-shoval-2012">Shoval, O., Sheftel, H., Shinar, G., Hart, Y., Ramote, O., Mayo, A., Dekel, E., Kavanagh, K., &amp; Alon, U. (2012). Evolutionary trade-offs, Pareto optimality, and the geometry of phenotype space. <em>Science, 336</em>(6085), 1157–1160. <a href="https://doi.org/10.1126/science.1217405" rel="noopener" target="_blank">https://doi.org/10.1126/science.1217405</a></p>
-<p class="reference" id="ref-sobol-2001">Sobol′, I. M. (2001). Global sensitivity indices for nonlinear mathematical models and their Monte Carlo estimates. <em>Mathematics and Computers in Simulation, 55</em>(1–3), 271–280. https://doi.org/10.1016/S0378-4754(00)00270-6</p>
-<p class="reference" id="ref-strobl-2021">Strobl, M. A. R., West, J., Viossat, Y., Damaghi, M., Robertson-Tessi, M., Brown, J. S., Gatenby, R. A., Maini, P. K., &amp; Anderson, A. R. A. (2021). Turnover modulates the need for a cost of resistance in adaptive therapy. <em>Cancer Research, 81</em>(4), 1135–1147. <a href="https://doi.org/10.1158/0008-5472.CAN-20-0806" rel="noopener" target="_blank">https://doi.org/10.1158/0008-5472.CAN-20-0806</a></p>
-<p class="reference" id="ref-tsitouras-2011">Tsitouras, Ch. (2011). Runge–Kutta pairs of order 5(4) satisfying only the first column simplifying assumption. <em>Computers &amp; Mathematics with Applications, 62</em>(2), 770–775. https://doi.org/10.1016/j.camwa.2011.06.002</p>
-<p class="reference" id="ref-zhang-2017">Zhang, J., Cunningham, J. J., Brown, J. S., &amp; Gatenby, R. A. (2017). Integrating evolutionary dynamics into treatment of metastatic castrate-resistant prostate cancer. <em>Nature Communications, 8</em>, 1816. <a href="https://doi.org/10.1038/s41467-017-01968-5" rel="noopener" target="_blank">https://doi.org/10.1038/s41467-017-01968-5</a></p>
-<h1 id="sec-fixes">Fixes</h1>
+<h2 id="sec-bibliography">Bibliography</h2>
+<p>Aghaee, M., Ledzewicz, U., Robbins, M., Bezman, N., Cho, H. J., &amp; Moore, H. (2023). Determining optimal combination regimens for patients with multiple myeloma. <em>European Journal of Pharmaceutical Sciences, 187</em>, 106492. <a href="https://doi.org/10.1016/j.ejps.2023.106492" rel="noopener" target="_blank">https://doi.org/10.1016/j.ejps.2023.106492</a></p>
+<p>Beck, A., &amp; Teboulle, M. (2009). A fast iterative shrinkage-thresholding algorithm for linear inverse problems. <em>SIAM Journal on Imaging Sciences, 2</em>(1), 183–202. https://doi.org/10.1137/080716542</p>
+<p>Brunton, S. L., Proctor, J. L., &amp; Kutz, J. N. (2016). Discovering governing equations from data by sparse identification of nonlinear dynamical systems. <em>Proceedings of the National Academy of Sciences, 113</em>(15), 3932–3937. <a href="https://doi.org/10.1073/pnas.1517384113" rel="noopener" target="_blank">https://doi.org/10.1073/pnas.1517384113</a></p>
+<p>de Groot, S., et al. (2020). Fasting mimicking diet as an adjunct to neoadjuvant chemotherapy for breast cancer in the multicentre randomized phase 2 DIRECT trial. <em>Nature Communications, 11</em>, 3083. https://doi.org/10.1038/s41467-020-16138-3</p>
+<p>de Pillis, L. G., &amp; Radunskaya, A. E. (2001). A mathematical tumor model with immune resistance and drug therapy: An optimal control approach. <em>Journal of Theoretical Medicine, 3</em>(2), 79–100. <a href="https://doi.org/10.1080/10273660108833067" rel="noopener" target="_blank">https://doi.org/10.1080/10273660108833067</a></p>
+<p>Dorff, T. B., Groshen, S., Garcia, A., Shah, M., Tsao-Wei, D., Pham, H., et al. (2016). Safety and feasibility of fasting in combination with platinum-based chemotherapy. <em>BMC Cancer, 16</em>, 360. https://doi.org/10.1186/s12885-016-2370-6</p>
+<p>El-Kareh, A. W., &amp; Secomb, T. W. (2003). A mathematical model for cisplatin cellular pharmacodynamics. <em>Neoplasia, 5</em>(2), 161–169. <a href="https://doi.org/10.1016/S1476-5586(03)80008-8" rel="noopener" target="_blank">https://doi.org/10.1016/S1476-5586(03)80008-8</a></p>
+<p>Fearon, K., Strasser, F., Anker, S. D., Bosaeus, I., Bruera, E., Fainsinger, R. L., Jatoi, A., Loprinzi, C., MacDonald, N., Mantovani, G., Davis, M., Muscaritoli, M., Ottery, F., Radbruch, L., Ravasco, P., Walsh, D., Wilcock, A., Kaasa, S., &amp; Baracos, V. E. (2011). Definition and classification of cancer cachexia: An international consensus. <em>The Lancet Oncology, 12</em>(5), 489–495. <a href="https://doi.org/10.1016/S1470-2045(10)70218-7" rel="noopener" target="_blank">https://doi.org/10.1016/S1470-2045(10)70218-7</a></p>
+<p>Feller, C., &amp; Ebenbauer, C. (2017a). A stabilizing iteration scheme for model predictive control based on relaxed barrier functions. <em>Automatica, 80</em>, 328–339. <a href="https://doi.org/10.1016/j.automatica.2017.02.001" rel="noopener" target="_blank">https://doi.org/10.1016/j.automatica.2017.02.001</a></p>
+<p>Feller, C., &amp; Ebenbauer, C. (2017b). Relaxed logarithmic barrier function based model predictive control of linear systems. <em>IEEE Transactions on Automatic Control, 62</em>(3), 1223–1238.</p>
+<p>Friberg, L. E., Henningsson, A., Maas, H., Nguyen, L., &amp; Karlsson, M. O. (2002). Model of chemotherapy-induced myelosuppression with parameter consistency across drugs. <em>Journal of Clinical Oncology, 20</em>(24), 4713–4721. <a href="https://doi.org/10.1200/JCO.2002.02.140" rel="noopener" target="_blank">https://doi.org/10.1200/JCO.2002.02.140</a></p>
+<p>Galluzzi, L., Senovilla, L., Vitale, I., Michels, J., Martins, I., Kepp, O., Castedo, M., &amp; Kroemer, G. (2012). Molecular mechanisms of cisplatin resistance. <em>Oncogene, 31</em>(15), 1869–1883. <a href="https://doi.org/10.1038/onc.2011.384" rel="noopener" target="_blank">https://doi.org/10.1038/onc.2011.384</a></p>
+<p>Gatenby, R. A., &amp; Brown, J. S. (2020). Integrating evolutionary dynamics into cancer therapy. <em>Nature Reviews Clinical Oncology, 17</em>(11), 675–686. https://doi.org/10.1038/s41571-020-0411-1</p>
+<p>Gevertz, J. L., Greene, J. M., Prosperi, S., Comandante-Lou, N., &amp; Sontag, E. D. (2025). Understanding therapeutic tolerance through a mathematical model of drug-induced resistance. <em>npj Systems Biology and Applications, 11</em>, 30. <a href="https://doi.org/10.1038/s41540-025-00511-3" rel="noopener" target="_blank">https://doi.org/10.1038/s41540-025-00511-3</a></p>
+<p>Hairer, E., Nørsett, S. P., &amp; Wanner, G. (1993). <em>Solving ordinary differential equations I: Nonstiff problems</em> (2nd ed.). Springer. https://doi.org/10.1007/978-3-540-78862-1</p>
+<p>Hockings, H., Lakatos, E., Huang, W., Mossner, M., Khan, M. A., Bakali, N., McDermott, J., Smith, K., Baker, A.-M., Graham, T. A., &amp; Lockley, M. (2025). Adaptive therapy exploits fitness deficits in chemotherapy-resistant ovarian cancer to achieve long-term tumor control. <em>Cancer Research, 85</em>(18), 3503–3517. <a href="https://doi.org/10.1158/0008-5472.CAN-25-0351" rel="noopener" target="_blank">https://doi.org/10.1158/0008-5472.CAN-25-0351</a></p>
+<p>Jansen, M. J. W. (1999). Analysis of variance designs for model output. <em>Computer Physics Communications, 117</em>(1–2), 35–43. https://doi.org/10.1016/S0010-4655(98)00154-4</p>
+<p>Kass, R. E., &amp; Raftery, A. E. (1995). Bayes factors. <em>Journal of the American Statistical Association, 90</em>(430), 773–795. <a href="https://doi.org/10.1080/01621459.1995.10476572" rel="noopener" target="_blank">https://doi.org/10.1080/01621459.1995.10476572</a></p>
+<p>Künsch, H. R. (1989). The jackknife and the bootstrap for general stationary observations. <em>The Annals of Statistics, 17</em>(3), 1217–1241. https://doi.org/10.1214/aos/1176347265</p>
+<p>Land, A. H., &amp; Doig, A. G. (1960). An automatic method of solving discrete programming problems. <em>Econometrica, 28</em>(3), 497–520. https://doi.org/10.2307/1910129</p>
+<p>Lee, C., Raffaghello, L., Brandhorst, S., Safdie, F. M., Bianchi, G., Martin-Montalvo, A., et al. (2012). Fasting cycles retard growth of tumors and sensitize a range of cancer cell types to chemotherapy. <em>Science Translational Medicine, 4</em>(124), 124ra27. https://doi.org/10.1126/scitranslmed.3003293</p>
+<p>Luo, Z., Zhu, M., Liu, F., Li, J., Pan, Y., Zhou, J., &amp; Zhu, T. (2024). DTR-Bench: An in silico environment and benchmark platform for reinforcement learning based dynamic treatment regime. <em>arXiv</em>. <a href="https://doi.org/10.48550/arXiv.2405.18610" rel="noopener" target="_blank">https://doi.org/10.48550/arXiv.2405.18610</a></p>
+<p>Luvero, D., Milani, A., &amp; Ledermann, J. A. (2014). Treatment options in recurrent ovarian cancer: Latest evidence and clinical potential. <em>Therapeutic Advances in Medical Oncology, 6</em>(5), 229–239. <a href="https://doi.org/10.1177/1758834014544121" rel="noopener" target="_blank">https://doi.org/10.1177/1758834014544121</a></p>
+<p>Monod, J. (1949). The growth of bacterial cultures. <em>Annual Review of Microbiology, 3</em>, 371–394. <a href="https://doi.org/10.1146/annurev.mi.03.100149.002103" rel="noopener" target="_blank">https://doi.org/10.1146/annurev.mi.03.100149.002103</a></p>
+<p>Moore, H. (2018). How to mathematically optimize drug regimens using optimal control. <em>Journal of Pharmacokinetics and Pharmacodynamics, 45</em>, 127–137. <a href="https://doi.org/10.1007/s10928-018-9568-y" rel="noopener" target="_blank">https://doi.org/10.1007/s10928-018-9568-y</a></p>
+<p>Nelder, J. A., &amp; Mead, R. (1965). A simplex method for function minimization. <em>The Computer Journal, 7</em>(4), 308–313. https://doi.org/10.1093/comjnl/7.4.308</p>
+<p>Nocedal, J., &amp; Wright, S. J. (2006). <em>Numerical optimization</em> (2nd ed.). Springer. https://doi.org/10.1007/978-0-387-40065-5</p>
+<p>Obrist, F., Michels, J., Durand, S., Chery, A., Pol, J., et al. (2018). Metabolic vulnerability of cisplatin-resistant cancers. <em>The EMBO Journal, 37</em>(14), e98597. https://doi.org/10.15252/embj.201798597</p>
+<p>Politis, D. N., &amp; Romano, J. P. (1992). A circular block-resampling procedure for stationary data. In R. LePage &amp; L. Billard (Eds.), <em>Exploring the limits of bootstrap</em> (pp. 263–270). Wiley.</p>
+<p>Rackauckas, C., Ma, Y., Martensen, J., Warner, C., Zubov, K., Supekar, R., Skinner, D., Ramadhan, A., &amp; Edelman, A. (2020). Universal differential equations for scientific machine learning. <em>arXiv</em>. <a href="https://doi.org/10.48550/arXiv.2001.04385" rel="noopener" target="_blank">https://doi.org/10.48550/arXiv.2001.04385</a></p>
+<p>Raffaghello, L., Lee, C., Safdie, F. M., Wei, M., Madia, F., Bianchi, G., &amp; Longo, V. D. (2008). Starvation-dependent differential stress resistance protects normal but not cancer cells against high-dose chemotherapy. <em>Proceedings of the National Academy of Sciences, 105</em>(24), 8215–8220. https://doi.org/10.1073/pnas.0708100105</p>
+<p>Raue, A., Kreutz, C., Maiwald, T., Bachmann, J., Schilling, M., Klingmüller, U., &amp; Timmer, J. (2009). Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood. <em>Bioinformatics, 25</em>(15), 1923–1929. <a href="https://doi.org/10.1093/bioinformatics/btp358" rel="noopener" target="_blank">https://doi.org/10.1093/bioinformatics/btp358</a></p>
+<p>Rawlings, J. B., Mayne, D. Q., &amp; Diehl, M. M. (2017). <em>Model predictive control: Theory, computation, and design</em> (2nd ed.). Nob Hill Publishing.</p>
+<p>Revels, J., Lubin, M., &amp; Papamarkou, T. (2016). <em>Forward-mode automatic differentiation in Julia</em>. arXiv. https://doi.org/10.48550/arXiv.1607.07892</p>
+<p>Safdie, F. M., Dorff, T., Quinn, D., Fontana, L., Wei, M., Lee, C., Cohen, P., &amp; Longo, V. D. (2009). Fasting and cancer treatment in humans: A case series report. <em>Aging, 1</em>(12), 988–1007.</p>
+<p>Saltelli, A., Annoni, P., Azzini, I., Campolongo, F., Ratto, M., &amp; Tarantola, S. (2010). Variance based sensitivity analysis of model output. Design and estimator for the total sensitivity index. <em>Computer Physics Communications, 181</em>(2), 259–270. https://doi.org/10.1016/j.cpc.2009.09.018</p>
+<p>Schwarz, G. (1978). Estimating the dimension of a model. <em>The Annals of Statistics, 6</em>(2), 461–464. <a href="https://doi.org/10.1214/aos/1176344136" rel="noopener" target="_blank">https://doi.org/10.1214/aos/1176344136</a></p>
+<p>Shoval, O., Sheftel, H., Shinar, G., Hart, Y., Ramote, O., Mayo, A., Dekel, E., Kavanagh, K., &amp; Alon, U. (2012). Evolutionary trade-offs, Pareto optimality, and the geometry of phenotype space. <em>Science, 336</em>(6085), 1157–1160. <a href="https://doi.org/10.1126/science.1217405" rel="noopener" target="_blank">https://doi.org/10.1126/science.1217405</a></p>
+<p>Sobol′, I. M. (2001). Global sensitivity indices for nonlinear mathematical models and their Monte Carlo estimates. <em>Mathematics and Computers in Simulation, 55</em>(1–3), 271–280. https://doi.org/10.1016/S0378-4754(00)00270-6</p>
+<p>Strobl, M. A. R., West, J., Viossat, Y., Damaghi, M., Robertson-Tessi, M., Brown, J. S., Gatenby, R. A., Maini, P. K., &amp; Anderson, A. R. A. (2021). Turnover modulates the need for a cost of resistance in adaptive therapy. <em>Cancer Research, 81</em>(4), 1135–1147. <a href="https://doi.org/10.1158/0008-5472.CAN-20-0806" rel="noopener" target="_blank">https://doi.org/10.1158/0008-5472.CAN-20-0806</a></p>
+<p>Tsitouras, Ch. (2011). Runge–Kutta pairs of order 5(4) satisfying only the first column simplifying assumption. <em>Computers &amp; Mathematics with Applications, 62</em>(2), 770–775. https://doi.org/10.1016/j.camwa.2011.06.002</p>
+<p>Zhang, J., Cunningham, J. J., Brown, J. S., &amp; Gatenby, R. A. (2017). Integrating evolutionary dynamics into treatment of metastatic castrate-resistant prostate cancer. <em>Nature Communications, 8</em>, 1816. <a href="https://doi.org/10.1038/s41467-017-01968-5" rel="noopener" target="_blank">https://doi.org/10.1038/s41467-017-01968-5</a></p>
+<h1 id="sec-fixes-working-notes-delete-before-submission">Fixes (working notes; delete before submission)</h1>
 <p>These are problems the plan won't fix: they need new data, a larger method change, or your decision afterwards.</p>
 <ol type="1">
 <li><p><strong>Why inherited mechanisms don't transfer</strong> to coculture and to drug + low resource. We can state it but not explain it without interaction terms or new experiments.</p></li>
