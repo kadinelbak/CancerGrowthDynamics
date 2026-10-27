@@ -28,7 +28,7 @@ sym = "C"
 ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-10-02; was 1 µM for both lines before)
 
 [selection]
-rule_bic = 3.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC)
+rule_bic = 2.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC); was 3.0 until 2026-10-27 (user)
 # Residual weights (review, 2026-10-07): one pooled variance model for every series, scale = max(y, 50)^0.55
 # (the log-log slope of replicate SD against the mean count over all series; 50 cells = a noise floor). This
 # replaces the per-point 3-well SDs, which have 2 degrees of freedom each and, with per-series floors, made

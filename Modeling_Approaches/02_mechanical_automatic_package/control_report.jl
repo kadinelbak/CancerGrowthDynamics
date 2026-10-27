@@ -442,10 +442,10 @@ function assumptions_section()
     rr = joinpath(CTRL14, "resource_reset_test.csv")
     rrows = isfile(rr) ? [trow([td(r.line), td(hesc(r.model)), tn(r.k), tn(@sprintf("%.2f", r.bic)), tn(@sprintf("%+.2f", r.delta_bic)), td(hesc(r.params))]) for r in eachrow(CSV.read(rr, DataFrame))] : String[]
     """<h2>Tests of two model assumptions</h2>
-<div class='intro'><p><b>Drug washout.</b> The drug-effect compartments assume the effect decays after the drug is removed at the same rate it built up. The intermittent experiments (1 µM on then off, or off then on, at day 7) test this: a separate washout rate is <b>not</b> supported ($wash; a negative value beyond −3 would be needed). The equal-rate model is kept, and its no-refit predictions of those experiments are on the <a href='../zoo_analyses/validation/report.html'>Validation</a> page.</p>
-<p><b>Low resource with media changes.</b> Media are changed every 2 days, so a resource state R that is depleted between changes and reset at each change was compared with the carried constant effect (both a simple exponential depletion and a cell-driven depletion \\(dR/dt=-\\lambda X R/1000\\)). Neither passes the 3-BIC rule, so the constant low-resource effect is kept.</p>
+<div class='intro'><p><b>Drug washout.</b> The drug-effect compartments assume the effect decays after the drug is removed at the same rate it built up. The intermittent experiments (1 µM on then off, or off then on, at day 7) test this: a separate washout rate is <b>not</b> supported ($wash; a negative value beyond −2 would be needed). The equal-rate model is kept, and its no-refit predictions of those experiments are on the <a href='../zoo_analyses/validation/report.html'>Validation</a> page.</p>
+<p><b>Low resource with media changes.</b> Media are changed every 2 days, so a resource state R that is depleted between changes and reset at each change was compared with the carried constant effect (both a simple exponential depletion and a cell-driven depletion \\(dR/dt=-\\lambda X R/1000\\)). Neither passes the 2-BIC rule, so the constant low-resource effect is kept.</p>
 $(isempty(rrows) ? "" : table([("Line", "Cell line (low-resource monoculture)."), ("Model", "Resource-reset candidate."), ("k", "Free parameters."), ("BIC", "BIC of the fit."),
-                                ("ΔBIC vs carried", "BIC minus the BIC of the carried Stage 1b model; the rule keeps the carried model unless this is below −3, or within 3 with fewer parameters."), ("Fitted values", "λ (and d where present).")], rrows))</div>"""
+                                ("ΔBIC vs carried", "BIC minus the BIC of the carried Stage 1b model; the rule keeps the carried model unless this is below −2, or within 2 with fewer parameters."), ("Fitted values", "λ (and d where present).")], rrows))</div>"""
 end
 
 const BEYOND_LONG = "<li><b>Days 15–$(round(Int, DAYS)) are extrapolation.</b> Every stage was fitted on 14 days of data or fewer, so everything after day 14 follows the fitted equations " *
@@ -570,9 +570,9 @@ const BETTER = Dict{String,Any}(
     "Toxicity bound hit" => "Better: No / 0% (the bound is never reached).",
     "Draws" => "Higher gives more reliable percentages.",
     "T $DL" => :lower,
-    "k" => "Lower is better (fewer parameters), as long as the fit stays within 3 BIC.",
+    "k" => "Lower is better (fewer parameters), as long as the fit stays within 2 BIC.",
     "BIC" => :lower,
-    "ΔBIC vs carried" => "Below −3 would favour the resource-reset model; otherwise the carried model stays.")
+    "ΔBIC vs carried" => "Below −2 would favour the resource-reset model; otherwise the carried model stays.")
 const AGREE = "Better: the rows agree; the smallest step is the reference."
 hcell(h::AbstractString) = "<th>$h</th>"; hcell(h::Tuple) = "<th>$(h[1])$(tip(h[2], header_better(BETTER, h)))</th>"
 table(head, rows) = "<div class='tscroll'><table><tr>" * join(hcell.(head)) * "</tr>" * join(rows) * "</table></div>"

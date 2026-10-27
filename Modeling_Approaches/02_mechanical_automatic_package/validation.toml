@@ -59,4 +59,4 @@ scale = 1.0                 # fixed: the values are image areas already normalis
 nominal_count = 100.0       # starting count at day 0 for a monoculture seeded at nominal_seeding cells
 nominal_seeding = 30000     # (start = nominal_count × seeding / nominal_seeding × line share of the ratio)
 washout_test = true         # hypothesis test (not validation): a separate clearance rate k_off of the
-                            # effect compartment after removal, fitted to these data, kept only by the 3-BIC rule
+                            # effect compartment after removal, fitted to these data, kept only by the 2-BIC rule

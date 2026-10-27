@@ -9,7 +9,7 @@
 #             than BETA_C_FLOOR × its Stage 2 value; user decision 2026-10-01)
 #   Stage 3b  low-resource cocultures         Stage 1 growth + each line's Stage 1b mechanism
 #
-# At every stage the optimal model is the candidate with the fewest free parameters within 3 BIC of the
+# At every stage the optimal model is the candidate with the fewest free parameters within 2 BIC of the
 # lowest BIC (lower BIC breaks ties); it is carried into later stages. At most 3 compartments per line.
 # Every candidate is then refitted to B residual block-bootstrap replicates (bootstrap_tools.jl)
 # for 95% parameter intervals, prediction bands and how often the optimal model stays lowest.

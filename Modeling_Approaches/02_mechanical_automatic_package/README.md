@@ -101,7 +101,7 @@ STAGES_TOML=sens/stages.toml SOURCES_TOML=sens/sources.toml DATA_TABLE=sens/meas
 | s3b | 3b | low-resource cocultures | both lines with their Stage 2a mechanisms |
 | s4 | 4 | low resource + 1 µM coculture | both mechanisms per line, inherited; a few refitted parameters |
 
-At every stage the carried model is the candidate with the fewest free parameters within 3 BIC of
+At every stage the carried model is the candidate with the fewest free parameters within 2 BIC of
 the lowest (lower BIC breaks ties). Every candidate is refitted to 200 residual block-bootstrap
 replicates. The Hill kill uses each line's measured IC50 as EC50 (A2780 1 µM, A2780cis 8.34 µM).
 
