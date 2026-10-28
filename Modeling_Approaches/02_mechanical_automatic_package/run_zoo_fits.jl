@@ -20,7 +20,9 @@
 #
 # Run:  julia -t auto run_zoo_fits.jl        (BOOT_B = replicates, default 200)
 #   DRYRUN=1          build every stage's candidates without fitting (test/test_stages.jl)
-#   ZOO_RESUME=1      reuse the Stage 1 / 1b / 2 fits from zoo_mono_stages.jls
+#   ZOO_RESUME=1      reuse the Stage 1 / 1b / 2 fits from zoo_mono_stages.jls and finished group bootstraps
+#                     from boot_checkpoints/ (when the group's candidates and fits are unchanged)
+#   BOOT_WORK_FACTOR  bootstrap work budget, × the evaluations of one refit (default stages.toml, 50; 0 = none)
 #   ZOO_REUSE_BOOT=1  reuse the bootstrap of every group whose candidates and fits are unchanged
 #                     since the last zoo_state.jls (same names, BICs and parameters)
 
@@ -307,15 +309,37 @@ function previous_boot(g)
     same = length(h.cands) == length(g.cands) && all(a.name == b.name && a.bic == b.bic && a.params == b.params for (a, b) in zip(h.cands, g.cands))
     same ? PREV.results[g.id] : nothing
 end
+# Per-group bootstrap checkpoints (2026-10-28): each finished group is saved to boot_checkpoints/<id>.jls, so a
+# run stopped part-way resumes (ZOO_RESUME=1) without redoing the groups whose candidates and fits are unchanged
+const BOOT_CKPT_DIR = joinpath(ZOO_DIR, "boot_checkpoints")
+const BOOT_KEY = (B=BOOT_B, work_factor=get(ENV, "BOOT_WORK_FACTOR", string(selection_cfg("bootstrap_work_factor", 50))),
+                  generator=selection_cfg("bootstrap_generator", "most_complex"))
+fit_key(g) = [(c.name, c.bic, c.params) for c in g.cands]
+function checkpoint_boot(g)
+    get(ENV, "ZOO_RESUME", "0") == "1" || return nothing
+    f = joinpath(BOOT_CKPT_DIR, "$(g.id).jls"); isfile(f) || return nothing
+    ck = try deserialize(f) catch; return nothing end
+    ck.key == BOOT_KEY && ck.fits == fit_key(g) ? ck.res : nothing
+end
 results = Dict{String,Any}()
 for g in groups
     t0 = time()
     prev = previous_boot(g)
+    ckres = prev === nothing ? checkpoint_boot(g) : nothing
     if prev !== nothing
         res = prev.res
         println("  $(g.id): candidates and fits unchanged, bootstrap reused from the previous run")
+    elseif ckres !== nothing
+        res = ckres
+        println("  $(g.id): candidates and fits unchanged, bootstrap reused from its checkpoint")
     elseif BOOT_B > 0
         res = bootstrap(g; B=BOOT_B)
+        try
+            mkpath(BOOT_CKPT_DIR)
+            serialize(joinpath(BOOT_CKPT_DIR, "$(g.id).jls"), (key=BOOT_KEY, fits=fit_key(g), res=res))
+        catch err
+            @warn "bootstrap checkpoint not written" g.id err
+        end
     else
         nc = length(g.cands); ks = [length(c.params) for c in g.cands]
         res = (cands=g.cands, ks=ks, ref=g.cands[1], bic=fill(NaN, 0, nc), pars=[fill(NaN, 0, k) for k in ks],
@@ -373,7 +397,7 @@ for g in groups
 end
 CSV.write(joinpath(ZOO_DIR, "starting_values.csv"), isempty(x0_rows) ? DataFrame(group=String[]) : DataFrame(x0_rows))
 
-# no optimiser has a wall-clock limit any more, so this list stays empty (kept for the manifest's count)
+# bootstrap optimiser runs that went over their work budget (bootstrap_tools.jl); limit = evaluations, not seconds
 CSV.write(joinpath(ZOO_DIR, "time_limit_hits.csv"),
           isempty(LIMIT_HITS) ? DataFrame(fit=String[], optimizer=String[], seconds=Float64[], limit=Float64[]) : DataFrame(LIMIT_HITS))
 

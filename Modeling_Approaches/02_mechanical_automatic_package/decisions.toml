@@ -129,3 +129,11 @@ decision = "Control runs of 14, 30 and 60 days, and a sweep over four burden-bar
 was = "14 days (and the 120-day fasting run)"
 by = "user"
 where = "control_config.toml run_days, barrier_sweep; run_control_sweep.jl"
+
+[[decision]]
+date = "2026-10-28"
+area = "fitting"
+decision = "Bootstrap optimiser runs get a work budget of 50× the evaluations of one refit (a count, not a time limit); runs over it are dropped for that replicate and listed. Finished group bootstraps are checkpointed so a stopped run resumes."
+was = "no limit (one Stage 4 replicate ran for 11+ h)"
+by = "claude"
+where = "stages.toml bootstrap_work_factor; bootstrap_tools.jl bs_fit"

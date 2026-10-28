@@ -38,6 +38,10 @@ weight_power = 0.55
 # Bootstrap replicates are generated from the carried model, so its intervals are centred on its estimates;
 # replicates from the most complex candidate biased the selection frequencies against simpler models.
 bootstrap_generator = "selected"
+# Work budget per bootstrap optimiser run, × the right-hand-side evaluations of one refit to the original data
+# (2026-10-28, after one Stage 4 replicate ran for 11+ h). A count, not a time limit, so results stay
+# reproducible; runs over budget are discarded for that replicate and listed in time_limit_hits.csv. 0 = none.
+bootstrap_work_factor = 50
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
