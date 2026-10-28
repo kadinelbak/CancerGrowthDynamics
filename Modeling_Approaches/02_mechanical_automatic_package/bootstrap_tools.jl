@@ -141,7 +141,7 @@ function bootstrap(g; B, seed=20260927)
             bs_fit(cands[j].model, g.datasets, cu0(cands[j], g), cands[j].params, cands[j].bounds; tag="$(g.id) $(cands[j].name) budget", evals=ev)
             budget[j] = max(round(Int, factor * maximum(ev)), 1_000_000)
         end
-        println("    $(g.id): bootstrap work budget per optimiser run = $(factor)× a refit ($(minimum(budget[ks .> 0]; init=0))–$(maximum(budget)) evaluations)"); flush(stdout)
+        println("    $(g.id): bootstrap work budget per optimiser run = $(factor)× a refit ($((any(ks .> 0) ? minimum(budget[ks .> 0]) : 0))–$(maximum(budget)) evaluations)"); flush(stdout)
     end
     done = Threads.Atomic{Int}(0)
     Threads.@threads :dynamic for b in 1:B
