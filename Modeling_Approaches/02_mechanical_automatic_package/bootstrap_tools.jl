@@ -139,7 +139,7 @@ function bootstrap(g; B, seed=20260927)
             ks[j] == 0 && continue
             ev = Int[]
             bs_fit(cands[j].model, g.datasets, cu0(cands[j], g), cands[j].params, cands[j].bounds; tag="$(g.id) $(cands[j].name) budget", evals=ev)
-            budget[j] = max(round(Int, factor * maximum(ev)), 1_000_000)
+            budget[j] = max(round(Int, factor * maximum(ev)), 100_000_000)   # floor: a warm-start refit of a small model is cheap
         end
         println("    $(g.id): bootstrap work budget per optimiser run = $(factor)× a refit ($((any(ks .> 0) ? minimum(budget[ks .> 0]) : 0))–$(maximum(budget)) evaluations)"); flush(stdout)
     end

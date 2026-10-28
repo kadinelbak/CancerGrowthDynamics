@@ -133,7 +133,7 @@ where = "control_config.toml run_days, barrier_sweep; run_control_sweep.jl"
 [[decision]]
 date = "2026-10-28"
 area = "fitting"
-decision = "Bootstrap optimiser runs get a work budget of 50× the evaluations of one refit (a count, not a time limit); runs over it are dropped for that replicate and listed. Finished group bootstraps are checkpointed so a stopped run resumes."
+decision = "Bootstrap optimiser runs get a work budget of 50× the evaluations of one refit, at least 1e8 (a count, not a time limit; the first run used a 1e6 floor and 875 mostly monoculture BFGS runs hit it, with Nelder–Mead taking over); runs over it are dropped for that replicate and listed. Finished group bootstraps are checkpointed so a stopped run resumes."
 was = "no limit (one Stage 4 replicate ran for 11+ h)"
 by = "claude"
 where = "stages.toml bootstrap_work_factor; bootstrap_tools.jl bs_fit"
