@@ -137,9 +137,10 @@ end
         end
 
         @testset "scenario $scen: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end" begin
-            below = x0_for(P, 0.25W.Bp, 0.25W.Bp); above = x0_for(P, W.Bp, W.Bp)   # 2 B_prog: 40 step widths above
-            @test progression_cost(below[P.iN], below[P.iC], W) < 1e-6 * W.qP              # ≈ 0 well under the threshold
-            @test progression_cost(above[P.iN], above[P.iC], W) > (1 - 1e-6) * W.qP        # ≈ qP well above it
+            # placed in step widths from B_prog, so the check holds for any threshold (K/2 since 2026-10-27)
+            lo = (W.Bp - 15W.sP) / 2; hi = (W.Bp + 15W.sP) / 2; above = x0_for(P, W.Bp, W.Bp)
+            @test progression_cost(lo, lo, W) < 1e-6 * W.qP              # ≈ 0 well under the threshold
+            @test progression_cost(hi, hi, W) > (1 - 1e-6) * W.qP        # ≈ qP well above it
             at = x0_for(P, 0.5W.Bp, 0.5W.Bp)
             @test isapprox(progression_cost(at[P.iN], at[P.iC], W), W.qP / 2; rtol=1e-12)   # half way at the threshold
             W0 = with_fields(W; qRT=0.0)
