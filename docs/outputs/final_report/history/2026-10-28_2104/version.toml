@@ -1,10 +1,11 @@
+content_sha = "862827de6f57e2d3a072e3e3f583af360719c34f6614fb30ef08f2d5cc2bcf2b"
+id = "2026-10-28_2104"
 note = ""
+report_sha = "83421f5879b2721c83cb04919c6333c53696db9d2f98164a3e062d2a986cafab"
+report_shas = ["30523bdb1fe630e51f71c64d53c214902c919d7f2a2f6a0d221a3f4bdeb83308"]
+date = "2026-10-28 21:04"
 commit = "054d0c6"
 source = "build_final_report.jl"
-id = "2026-10-28_2104"
-content_sha = "862827de6f57e2d3a072e3e3f583af360719c34f6614fb30ef08f2d5cc2bcf2b"
-report_sha = "83421f5879b2721c83cb04919c6333c53696db9d2f98164a3e062d2a986cafab"
-date = "2026-10-28 21:04"
 
 [[settings]]
 key = "rule_bic"
