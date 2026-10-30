@@ -101,7 +101,7 @@ STAGES_TOML=sens/stages.toml SOURCES_TOML=sens/sources.toml DATA_TABLE=sens/meas
 | s3b | 3b | low-resource cocultures | both lines with their Stage 2a mechanisms |
 | s4 | 4 | low resource + 1 µM coculture | both mechanisms per line, inherited; a few refitted parameters |
 
-At every stage the carried model is the candidate with the fewest free parameters within 3 BIC of
+At every stage the carried model is the candidate with the fewest free parameters within 2 BIC of
 the lowest (lower BIC breaks ties). Every candidate is refitted to 200 residual block-bootstrap
 replicates. The Hill kill uses each line's measured IC50 as EC50 (A2780 1 µM, A2780cis 8.34 µM).
 
@@ -113,9 +113,11 @@ replicates. The Hill kill uses each line's measured IC50 as EC50 (A2780 1 µM, A
 | `zoo_models.jl` | the model engine: growth laws, delay kernels, actions, inputs D(t), equations as TeX |
 | `run_zoo_fits.jl` | runs the stages of `stages.toml`, bootstraps, writes `outputs/zoo_fits/` and the site bundle |
 | `zoo_analyses.jl` | package bootstrap, sensitivity (local, profile, Sobol), validation (`validation.toml`) |
-| `run_control.jl`, `control_report.jl` | 14-day dose control (sequential MPC with a toxicity proxy) |
+| `run_control.jl`, `control_report.jl` | 14-day dose control (sequential MPC with a toxicity proxy); `CONTROL_DAYS=30` / `60` for the longer runs |
+| `run_control_sweep.jl`, `control_sweep_report.jl` | control sweep over burden-barrier shape, threshold, run length, look-ahead mode and objective (`SWEEP_DATA` + `ZOO_STATE` for the all-doses fit) |
 | `run_control_fasting.jl`, `control_fasting_report.jl` | long (120-day, `long_days`) dose + fasting control, read off at days 14/30/60/120 |
-| `../../build_final_report.jl` | the Final Report from every chapter |
+| `../../build_final_report.jl` | the Final Report from every chapter, opening with the modelling decisions; every version is archived in `docs/outputs/final_report/history/` (`../../report_history.jl`) |
+| `decisions.toml` | dated log of modelling decisions, shown in the Final Report and its history |
 
 ## Tests
 

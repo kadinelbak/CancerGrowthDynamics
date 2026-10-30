@@ -1,0 +1,175 @@
+id = "2026-10-02_1600"
+date = "2026-10-02 16:00"
+commit = "3d1bd72"
+source = "git history (seeded 2026-10-27 by tools/seed_report_history.py)"
+note = "Snapshot of the current pipeline before the reproducibility refactor"
+content_sha = ""
+report_sha = "62c7c2d430a1387182d4c615f25c5706a4c72469448bccd807bb1ad5034d870a"
+
+[[settings]]
+key = "rule_bic"
+label = "Model selection rule"
+value = "fewest parameters within 3 BIC"
+
+[[settings]]
+key = "weighting"
+label = "Residual weighting"
+value = "none"
+
+[[settings]]
+key = "s2_exclude"
+label = "Stage 2b series left out"
+value = "none"
+
+[[settings]]
+key = "kill_coupled"
+label = "Kill coupled to growth (Norton–Simon)"
+value = "no"
+
+[[settings]]
+key = "betaC_floor"
+label = "Resistant kill floor in coculture (× Stage 2b)"
+value = "not set"
+
+[[settings]]
+key = "ec50"
+label = "EC50, A2780 / A2780cis (µM)"
+value = "not recorded"
+
+[[settings]]
+key = "B_cancer"
+label = "B_cancer (burden penalty level)"
+value = "0.8 K"
+
+[[settings]]
+key = "B_prog"
+label = "B_prog (progression threshold)"
+value = "no progression goal"
+
+[[settings]]
+key = "barrier"
+label = "Burden barrier shape"
+value = "relaxed_log"
+
+[[settings]]
+key = "lookahead"
+label = "Look-ahead"
+value = "14 days"
+
+[[settings]]
+key = "to_end"
+label = "Look-ahead ends with the run"
+value = "no"
+
+[[settings]]
+key = "run_days"
+label = "Control run lengths (days)"
+value = "14, 30"
+
+[[settings]]
+key = "objective"
+label = "Objective weights"
+value = "qP = 0, qRT = 0, qT = 1, ru = 0.1, terminal factor = 5"
+
+[[settings]]
+key = "B_tox"
+label = "Toxicity limit B_tox"
+value = "0.25"
+
+[[settings]]
+key = "doses"
+label = "Measured doses (µM)"
+value = "0, 0.62, 1, 1.47"
+
+[[results]]
+key = "carried:s1-a2780"
+label = "Carried model · s1-a2780"
+value = "logistic"
+
+[[results]]
+key = "carried:s1-a2780cis"
+label = "Carried model · s1-a2780cis"
+value = "theta_logistic"
+
+[[results]]
+key = "carried:s1b-a2780"
+label = "Carried model · s1b-a2780"
+value = "lr_imm_capacity"
+
+[[results]]
+key = "carried:s1b-a2780cis"
+label = "Carried model · s1b-a2780cis"
+value = "lr_imm_plus_chain3_loss"
+
+[[results]]
+key = "carried:s2-a2780"
+label = "Carried model · s2-a2780"
+value = "chain3_hill"
+
+[[results]]
+key = "carried:s2-a2780cis"
+label = "Carried model · s2-a2780cis"
+value = "chain3_hill"
+
+[[results]]
+key = "carried:s3"
+label = "Carried model · s3"
+value = "cc_K_alpha_deathN_beta"
+
+[[results]]
+key = "carried:s3b"
+label = "Carried model · s3b"
+value = "lrcc_K"
+
+[[results]]
+key = "carried:s4"
+label = "Carried model · s4"
+value = "s4_eps"
+
+[[results]]
+key = "mpc:A"
+label = "14-day MPC schedule · scenario A, 50:50 (µM)"
+value = "0.0 0.0 0.0 0.62 1.47 1.47 0.0"
+
+[[results]]
+key = "mpc_total:A"
+label = "14-day MPC N + C at the end · scenario A, 50:50"
+value = "3319"
+
+[[results]]
+key = "mpc:B"
+label = "14-day MPC schedule · scenario B, 50:50 (µM)"
+value = "0.0 0.0 0.0 0.0 1.0 1.47 0.0"
+
+[[results]]
+key = "mpc_total:B"
+label = "14-day MPC N + C at the end · scenario B, 50:50"
+value = "2590"
+
+[[chapters]]
+title = "1 · Data"
+stamp = "2026-09-30 14:21"
+
+[[chapters]]
+title = "2 · Compartment models (the models used)"
+stamp = "2026-10-02 13:35"
+
+[[chapters]]
+title = "3 · Bootstrapping"
+stamp = "2026-10-02 13:28"
+
+[[chapters]]
+title = "4 · Sensitivity analysis"
+stamp = "2026-10-02 13:28"
+
+[[chapters]]
+title = "5 · Validation"
+stamp = "2026-10-02 13:28"
+
+[[chapters]]
+title = "6 · Optimal control"
+stamp = "2026-10-02 13:30"
+
+[[chapters]]
+title = "7 · Optimal control over 30 days: cisplatin and fasting"
+stamp = "2026-10-02 13:32"

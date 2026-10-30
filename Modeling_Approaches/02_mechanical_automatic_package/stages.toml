@@ -28,7 +28,7 @@ sym = "C"
 ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-10-02; was 1 µM for both lines before)
 
 [selection]
-rule_bic = 3.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC)
+rule_bic = 2.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC); was 3.0 until 2026-10-27 (user)
 # Residual weights (review, 2026-10-07): one pooled variance model for every series, scale = max(y, 50)^0.55
 # (the log-log slope of replicate SD against the mean count over all series; 50 cells = a noise floor). This
 # replaces the per-point 3-well SDs, which have 2 degrees of freedom each and, with per-series floors, made
@@ -38,6 +38,10 @@ weight_power = 0.55
 # Bootstrap replicates are generated from the carried model, so its intervals are centred on its estimates;
 # replicates from the most complex candidate biased the selection frequencies against simpler models.
 bootstrap_generator = "selected"
+# Work budget per bootstrap optimiser run, × the right-hand-side evaluations of one refit to the original data
+# (2026-10-28, after one Stage 4 replicate ran for 11+ h). A count, not a time limit, so results stay
+# reproducible; runs over budget are discarded for that replicate and listed in time_limit_hits.csv. 0 = none.
+bootstrap_work_factor = 50
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
@@ -92,8 +96,12 @@ id = "s2"
 kill_growth_coupled = true   # Norton–Simon kill (user, 2026-10-06; sensitivity variant V5)
 kind = "mechanism"
 stage_label = "2 Treated monoculture"
-title = "Stage 2 · {line} treated (3 doses jointly)"
+title = "Stage 2 · {line} treated (measured doses jointly)"
 data = { condition = "treated", culture = "mono" }
+# user, 2026-10-27: the A2780cis 1 µM monoculture shows no kill by day 14 (it ends above untreated at 20k and
+# 30k), so A2780cis is fitted on 0.62 and 1.47 µM; A2780 keeps all three doses. ZOO_NO_EXCLUDE=1 refits with
+# it (the original fit, kept as a sensitivity variant)
+exclude = [{ line = "A2780cis", dose = 1.0 }]
 input = "D"
 catalogue = "DRUG_ZOO"
 inherits = { growth = "s1" }

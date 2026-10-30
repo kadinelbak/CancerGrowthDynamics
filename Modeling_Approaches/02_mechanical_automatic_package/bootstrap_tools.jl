@@ -36,21 +36,39 @@ function bs_resample(rng, yhat, e, w=nothing)
     w === nothing ? max.(yhat .+ out[1:m], 0.0) : max.(yhat .+ w .* out[1:m], 0.0)
 end
 
-# Reproducibility: every optimiser call stops on its iteration cap only (BFGS 1500, Nelder–Mead 2500); there
-# is no wall-clock limit, so a fit does not depend on machine load, threads or sleep (review, 2026-10-07: the
-# earlier 120 s / 300 s limits were hit 83 times). LIMIT_HITS stays empty and is kept for the CSV it feeds.
+# Reproducibility: every optimiser call stops on its iteration cap (BFGS 1500, Nelder–Mead 2500); there is no
+# wall-clock limit, so a fit does not depend on machine load, threads or sleep (review, 2026-10-07: the earlier
+# 120 s / 300 s limits were hit 83 times). Bootstrap replicates also get a work budget counted in right-hand-side
+# evaluations (2026-10-28: one Stage 4 replicate ran for 11+ h): a count, not seconds, so it is reproducible.
+# An optimiser run over budget is discarded (its BIC stays Inf for that replicate) and listed in LIMIT_HITS.
 const LIMIT_HITS = NamedTuple[]
+const LIMIT_LOCK = ReentrantLock()
+struct WorkBudgetHit <: Exception end
+function counted(model, budget)
+    n = Ref(0)
+    f!(du, u, p, t) = ((n[] += 1) > budget > 0 && throw(WorkBudgetHit()); model(du, u, p, t))
+    f!, n
+end
 # u0_builder (optional): the starting state as a function of the parameter vector (estimated starting values)
-function bs_fit(model, datasets, u0, p_start, bounds; tag="", u0_builder=nothing)
+# budget: right-hand-side evaluations allowed per optimiser run (0 = none); evals: per-optimiser counts, filled in
+function bs_fit(model, datasets, u0, p_start, bounds; tag="", u0_builder=nothing, budget=0, evals=nothing)
     p0 = [clamp(p, lo + 1e-4*(hi - lo), hi - 1e-4*(hi - lo)) for (p, (lo, hi)) in zip(p_start, bounds)]
     best = (params=fill(NaN, length(p0)), bic=Inf, sse=Inf)
     for opt in (:bfgs, :nelder_mead)
+        f!, n = counted(model, budget); t0 = time()
         try
-            r = run_joint_fit(model, gpe_datasets(datasets), u0, isfinite(best.bic) ? best.params : p0; bounds=bounds, optimizer=opt,
+            r = run_joint_fit(f!, gpe_datasets(datasets), u0, isfinite(best.bic) ? best.params : p0; bounds=bounds, optimizer=opt,
                               maxiters = opt == :bfgs ? 1500 : 2500, reltol=1e-7, abstol=1e-7, u0_builder=u0_builder,
                               initial_time=0.0)   # u0 is the state at day 0 (the seeding), not at the first data point
+            n[] <= budget || budget == 0 || throw(WorkBudgetHit())
             isfinite(r.bic) && r.bic < best.bic && (best = (params=r.params, bic=r.bic, sse=r.sse))
         catch
+        end
+        evals === nothing || push!(evals, n[])
+        if budget > 0 && n[] > budget
+            lock(LIMIT_LOCK) do
+                push!(LIMIT_HITS, (fit=tag, optimizer=string(opt), seconds=time() - t0, limit=Float64(budget)))
+            end
         end
     end
     best
@@ -112,6 +130,19 @@ function bootstrap(g; B, seed=20260927)
     resid = [d.y .- yh for (d, yh) in zip(g.datasets, yhat)]
     bic = fill(Inf, B, nc)
     pars = [fill(NaN, B, ks[j]) for j in 1:nc]
+    # work budget per candidate: factor × the evaluations of one fit to the original data from the estimates
+    # (stages.toml [selection] bootstrap_work_factor; BOOT_WORK_FACTOR overrides; 0 = no budget)
+    factor = parse(Float64, get(ENV, "BOOT_WORK_FACTOR", string(isdefined(Main, :selection_cfg) ? selection_cfg("bootstrap_work_factor", 50) : 50)))
+    budget = zeros(Int, nc)
+    if factor > 0
+        Threads.@threads :dynamic for j in 1:nc
+            ks[j] == 0 && continue
+            ev = Int[]
+            bs_fit(cands[j].model, g.datasets, cu0(cands[j], g), cands[j].params, cands[j].bounds; tag="$(g.id) $(cands[j].name) budget", evals=ev)
+            budget[j] = max(round(Int, factor * maximum(ev)), 100_000_000)   # floor: a warm-start refit of a small model is cheap
+        end
+        println("    $(g.id): bootstrap work budget per optimiser run = $(factor)× a refit ($((any(ks .> 0) ? minimum(budget[ks .> 0]) : 0))–$(maximum(budget)) evaluations)"); flush(stdout)
+    end
     done = Threads.Atomic{Int}(0)
     Threads.@threads :dynamic for b in 1:B
         rng = Xoshiro(seed + b)
@@ -121,7 +152,7 @@ function bootstrap(g; B, seed=20260927)
             if ks[j] == 0
                 bic[b, j] = predict_candidate(c.name, c.label, c.model, ds, cu0(c, g)).bic
             else
-                f = bs_fit(c.model, ds, cu0(c, g), c.params, c.bounds; tag="$(g.id) $(c.name) bootstrap $b")
+                f = bs_fit(c.model, ds, cu0(c, g), c.params, c.bounds; tag="$(g.id) $(c.name) bootstrap $b", budget=budget[j])
                 bic[b, j] = f.bic; pars[j][b, :] = f.params
             end
         end
@@ -131,7 +162,7 @@ function bootstrap(g; B, seed=20260927)
     winner = [argmin(bic[b, :]) for b in 1:B]
     pick = [choose(bic[b, :], ks) for b in 1:B]
     selected = argmax([count(==(j), pick) for j in 1:nc])
-    (cands=cands, ks=ks, ref=ref, bic=bic, pars=pars, winner=winner, pick=pick, selected=selected,
+    (cands=cands, ks=ks, ref=ref, bic=bic, pars=pars, winner=winner, pick=pick, selected=selected, budget=budget,
      orig_pick=choose([c.bic for c in cands], ks))
 end
 

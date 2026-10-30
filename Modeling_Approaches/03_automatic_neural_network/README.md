@@ -15,7 +15,7 @@ This is a data-driven modelling track that does **not** use GrowthParameterEstim
   - In the current data this applies to 5 high-dose or untreated A2780 monocultures, every low-resource series and every treated A2780 coculture series.
   - **Held-out series always start from the nominal seeding**, as in the zoo's `validation.toml`. Held-out data never set a starting value.
 - **Intermittent values are cell counts** (already normalised to cell size), on the same scale as the other data. There is no per-trajectory offset.
-- **Model choice:** among the candidates within 3 BIC of the lowest, the one with the fewest free parameters is kept.
+- **Model choice:** among the candidates within 2 BIC of the lowest, the one with the fewest free parameters is kept.
 - **Seeds:** every neural fit is repeated from `NN_SEEDS` (default 5) random initialisations, and so is every hold-out fold. There are two runtime reductions, both made on 2026-10-07 because the full rerun shared the machine with the mechanistic refit: the input-ablation retrains of Stage 4 use 3 seeds (`NN_ABL_SEEDS`), and the learned-resource UDE is not refitted in the hold-out folds. Scores are reported as mean ± SD over seeds and for the seed-ensemble prediction. Stochastic next-day models (boosted trees, MLP ensemble) are also refitted with 5 seeds. Hill, the closed form and no-drug are deterministic single fits; an 8-member Bayesian bootstrap of Hill and of the closed form gives parameter intervals.
 - **Info tips:** every table and figure on the pages has an "i" tip that says how to read it and which direction is better. `html_table` and `figure` in `src/report.jl` refuse to build without one.
 

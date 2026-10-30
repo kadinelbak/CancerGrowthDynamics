@@ -56,9 +56,9 @@ for rs in eachrow(fronts[-1.0].front), rr in eachrow(fronts[1.0].front)
     @info "screened" rs.formula rr.formula screen.bic_drug[end]
 end
 order = sortperm(screen.bic_drug); screen = screen[order, :]; cands = cands[order]
-# selection rule (user, 2026-09-29): fewest free parameters among candidates within 3 BIC of the lowest;
+# selection rule (user, 2026-09-29; 2 BIC instead of 3 since 2026-10-27): fewest free parameters among candidates within 2 BIC of the lowest;
 # a lower BIC breaks ties
-const RULE_BIC = 3.0
+const RULE_BIC = 2.0
 screen.delta_bic = screen.bic_drug .- minimum(screen.bic_drug)
 eligible = findall(screen.delta_bic .<= RULE_BIC)
 pick = eligible[argmin([(screen.kill_params[i], screen.bic_drug[i]) for i in eligible])]
@@ -139,9 +139,9 @@ runtime = round((time() - t_start) / 60; digits = 1)
 N.write_report(joinpath(out, "report.html"), "Stage 3 — analytical form of the learned kill term",
     [("Optimal closed form",
       N.para(eq(opt)) *
-      N.para("v = filtered exposure (uM), dv/dt = γ(u − v); ρ = relative density; H(v; c, n) = vⁿ/(cⁿ + vⁿ). The NN kill term was sampled from the mean of the $(length(ude)) UDE seeds. Every combination of the best 1–3-term A2780 form and 0–3-term A2780cis form was refit as an ODE on the data and ranked by BIC. The optimal form is the one with the fewest free parameters among candidates within 3 BIC of the lowest (a lower BIC breaks ties). Its coefficients carry Bayesian-bootstrap 5–95% intervals; terms whose interval includes 0 are flagged, not removed. Runtime: $(runtime) min.") *
+      N.para("v = filtered exposure (uM), dv/dt = γ(u − v); ρ = relative density; H(v; c, n) = vⁿ/(cⁿ + vⁿ). The NN kill term was sampled from the mean of the $(length(ude)) UDE seeds. Every combination of the best 1–3-term A2780 form and 0–3-term A2780cis form was refit as an ODE on the data and ranked by BIC. The optimal form is the one with the fewest free parameters among candidates within 2 BIC of the lowest (a lower BIC breaks ties). Its coefficients carry Bayesian-bootstrap 5–95% intervals; terms whose interval includes 0 are flagged, not removed. Runtime: $(runtime) min.") *
       N.html_table(coef_rows; tip = ("Coefficient of each kill term with its bootstrap 5–95% interval; includes_zero = the data do not show the term is needed.", :none))),
-     ("Candidate ranking (BIC on training drug units; lower is better)", N.html_table(screen; tip = ("Each (A2780, A2780cis) closed-form pair refit as an ODE. delta_bic = BIC minus the lowest; the chosen form has the fewest parameters within 3 of the lowest.", :lower))),
+     ("Candidate ranking (BIC on training drug units; lower is better)", N.html_table(screen; tip = ("Each (A2780, A2780cis) closed-form pair refit as an ODE. delta_bic = BIC minus the lowest; the chosen form has the fewest parameters within 2 of the lowest.", :lower))),
      ("Forward RMSE against the NN and Hill (log scale)", N.html_table(unstack(metric, :model, :set, :forward_rmse); tip = ("Forward-prediction RMSE of log counts (neural models: mean over seeds). Training columns show fit; the VALIDATION column is out of sample, from the nominal seeding.", :lower))),
      ("BIC against the other models", N.html_table(cmp; tip = ("BIC on the training drug units (best seed for neural models). The pure neural ODE also saw the untreated co-culture.", :lower))),
      ("Closed form against the NN", N.figure("kill_closed_forms.png", "Kill rate vs exposure at low/mid/high density; bands = sd over seeds (UDE) or bootstrap members (closed form); shaded = exposures never reached in the data"; tip = ("Kill rate per day of the learned NN term and of the refitted closed form.", "Closer agreement between the two curves inside the unshaded region is better."))),

@@ -7,7 +7,7 @@
     @test isfile(config_path)
     @test occursin("a2780_adaptive_simulator_config.js", report)
     @test occursin("&larr; Back", report)
-    @test !occursin("Back to reports", report)
+    @test occursin("Back to reports home", report)  # restored on purpose in 915ef12
     @test !occursin("Research and teaching use only", report)
     @test !occursin("A2780 research simulator", report)
     @test !occursin("Explore fitted growth and treatment schedules", report)

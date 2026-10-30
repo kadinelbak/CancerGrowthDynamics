@@ -13,9 +13,14 @@ const O = LegacyData
         sh = L == "A2780cis" && first(O.lrmono[L].x) < 0 ? 1.0 : (L == "A2780cis" && length(O.lrmono[L].x) < length(lrmono[L].x) ? 1.0 : 0.0)
         newd = Dict(zip(lrmono[L].x, lrmono[L].y))
         @test all(get(newd, t + sh, NaN) == v || get(newd, t, NaN) == v for (t, v) in zip(O.lrmono[L].x, O.lrmono[L].y))
-        @test treated[L].doses == O.treated[L].doses && treated[L].files == O.treated[L].files
-        @test all(a[1] == b[1] && a[2] == b[2] for (a, b) in zip(treated[L].data, O.treated[L].data))
+        # Stage 2b leaves out the series in its stages.toml `exclude` list (A2780cis 1 µM since 2026-10-27)
+        cut = [e for e in excluded_sources() if e.stage == "s2" && e.line == L]
+        k = [i for i in eachindex(O.treated[L].files) if !any(e -> e.file == O.treated[L].files[i], cut)]
+        @test length(k) == length(O.treated[L].files) - length(cut)
+        @test treated[L].doses == O.treated[L].doses[k] && treated[L].files == O.treated[L].files[k]
+        @test all(a[1] == b[1] && a[2] == b[2] for (a, b) in zip(treated[L].data, O.treated[L].data[k]))
     end
+    @test [(e.line, e.stage) for e in excluded_sources()] == [("A2780cis", "s2")]
     @test length(co_data) == length(O.co_data) == 6
     for (a, b, la, lb) in zip(co_data, O.co_data, COCULTURE_LAYOUT, O.COCULTURE_LAYOUT)
         @test a.S[1] == b.S[1] && a.S[2] == b.S[2] && a.R[1] == b.R[1] && a.R[2] == b.R[2]

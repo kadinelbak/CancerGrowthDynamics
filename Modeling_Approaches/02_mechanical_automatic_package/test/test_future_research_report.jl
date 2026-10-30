@@ -1,3 +1,5 @@
+include("site_copy.jl")
+
 @testset "Future research report contract" begin
     package_root = normpath(joinpath(@__DIR__, ".."))
     report_path = joinpath(package_root, "outputs", "reports", "a2780_future_research.html")
@@ -8,7 +10,7 @@
 
     report = read(report_path, String)
     docs_report = read(docs_report_path, String)
-    @test report == docs_report
+    @test strip_site_chrome(report) == strip_site_chrome(docs_report)
     @test occursin("A2780 Coculture Adaptive Therapy", report)
     @test occursin("aria-label=\"Table of contents\"", report)
     @test occursin("&#9776;", report)
