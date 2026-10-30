@@ -157,6 +157,7 @@ while !same && isdir(joinpath(HIST, version_id))     # two builds in one minute
 end
 prev = same ? (length(prev_all) > 1 ? prev_all[end-1] : nothing) : (isempty(prev_all) ? nothing : prev_all[end])
 DECISIONS = decisions_panel(version_id, settings, results, prev; chapters=chapter_stamps)
+HISTORY = history_panel(version_id, settings)
 
 page = """<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
@@ -193,10 +194,11 @@ section.decisions details{margin:6px 0}section.decisions summary{cursor:pointer;
 <a class='home' href='../../index.html' aria-label='Reports home'>⌂ Reports home</a>
 <h1>Final report — A2780 / A2780cis new data</h1>
 <p class='lead'>The analysis on one page: the data, the compartment models used at every stage, their bootstrapping, sensitivity analysis and validation, and optimal control of the cisplatin schedule built on them, over 14 days (and, beyond the data, 30 and 60 days), a sweep over the control's modelling decisions, and, with fasting as a second control, over $LONG_DAYS days (read off at days 14, 30, 60 and $LONG_DAYS). The modelling decisions of this version come first, next to the previous version. Earlier time-based models are kept only in the <a href='../archive_time/index.html'>time-based archive</a>. Each chapter is the full report for that step (assembled $(Dates.format(now(), "yyyy-mm-dd HH:MM"))); the date under each heading is when that report was last generated. Rebuild with <code>julia build_final_report.jl</code>.</p>
-<p class='version'>Version $(version_id) · <a href='history/index.html'>all versions and what changed</a></p>
+<p class='version'>Version $(version_id) · <a href='#history'>report history</a> · <a href='history/index.html'>all versions and what changed</a></p>
 $(isempty(missing_parts) ? "" : "<p class='warn'>Not found, so left out: " * join(missing_parts, ", ") * "</p>")
 </header>
 <div style='padding:0 12px'>$DECISIONS</div>
+<div style='padding:0 12px'>$HISTORY</div>
 <nav class='toc' aria-label='Final report chapters'><div>$(join(toc))</div></nav>
 <div style='max-width:1400px;margin:10px auto 0;padding:0 24px' class='tools'><button type='button' id='openall'>Open all chapters</button><button type='button' id='closeall'>Close all</button><span style='color:var(--muted);font-size:13px;align-self:center'>Every chapter and section is a dropdown: click a heading to show it.</span></div>
 <main id='chapters'></main>
@@ -245,6 +247,11 @@ final = stage_names(page)
 write(current, final)
 println("Wrote $current ($(round(filesize(current) / 1e6; digits=2)) MB, $(length(parts)) chapters), version $version_id")
 if same
+    # same content, rebuilt page (e.g. a new page layout): remember its hash so it is not archived as unrecorded
+    let f = joinpath(HIST, version_id, "version.toml"), r = TOML.parsefile(f), sha = bytes2hex(sha256(final))
+        sha == get(r, "report_sha", "") || sha in get(r, "report_shas", String[]) ||
+            (r["report_shas"] = vcat(get(r, "report_shas", String[]), sha); open(io -> TOML.print(io, r), f, "w"))
+    end
     println("Unchanged since version $version_id: not archived again")
 else
     archive_version(version_id, final; settings=settings, results=results, chapters=chapter_stamps, source="build_final_report.jl", content_sha=content_sha)

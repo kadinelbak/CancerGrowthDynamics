@@ -168,6 +168,37 @@ $stalehtml<div class='tscroll'><table>$th$(join([row(k, l, v, "settings") for (k
 </section>"""
 end
 
+# the version history on the Final Report page itself (user, 2026-10-30): every archived version, newest
+# first, with what changed in its settings against the version before it and a link to the archived copy
+function history_panel(id, settings; date=Dates.format(now(), "yyyy-mm-dd HH:MM"), commit=gitc("rev-parse", "--short", "HEAD"))
+    vs = load_versions()
+    cur = Dict{String,Any}("id" => id, "date" => date, "commit" => commit,
+                           "settings" => [Dict("key" => k, "label" => l, "value" => v) for (k, l, v) in settings])
+    any(v -> v["id"] == id, vs) || push!(vs, cur)
+    sort!(vs; by=v -> v["id"])
+    function changed(v, p)
+        p === nothing && return "<span class='mut'>first recorded version</span>"
+        a = get(v, "settings", Any[]); b = get(p, "settings", Any[])
+        (isempty(a) || isempty(b)) && return "<span class='mut'>settings not recorded</span>"
+        ch = [r["label"] for r in a if (pv = lookup(b, r["key"]); pv !== nothing && pv != r["value"])]
+        new_ = [r["label"] for r in a if lookup(b, r["key"]) === nothing]
+        parts = String[]
+        isempty(ch) || push!(parts, "changed: " * join(hesc_.(ch), ", "))
+        isempty(new_) || push!(parts, "new: " * join(hesc_.(new_), ", "))
+        isempty(parts) ? "<span class='mut'>same settings (results or chapters differ)</span>" : join(parts, "; ")
+    end
+    rows = String[]
+    for i in length(vs):-1:1
+        v = vs[i]; p = i > 1 ? vs[i-1] : nothing; this = v["id"] == id
+        link = this ? "<b>$(hesc_(v["id"]))</b> <span class='tag'>this page</span>" : "<a href='history/$(hesc_(v["id"]))/report.html'>$(hesc_(v["id"]))</a>"
+        push!(rows, "<tr$(this ? " class='chg'" : "")><td>$link</td><td>$(hesc_(get(v, "date", "")))</td><td><code>$(hesc_(get(v, "commit", "")))</code></td><td>$(changed(v, p))</td></tr>")
+    end
+    """<section class='decisions' id='history'><h2>Report history</h2>
+<p class='lead'>Every Final Report version, newest first. Old versions are archived and never overwritten; open one to see that report as it was, or <a href='history/index.html'>compare any two versions</a> side by side.</p>
+<div class='tscroll'><table><tr><th>Version</th><th>Built</th><th>Commit</th><th>Settings against the version before</th></tr>$(join(rows))</table></div>
+</section>"""
+end
+
 gitc(args...) = try readchomp(Cmd(`git -C $(@__DIR__) $args`)) catch; "" end
 
 # archive a page under history/<id>/ with its version record
@@ -188,7 +219,7 @@ end
 function archive_unrecorded(current)
     isfile(current) || return
     sha = bytes2hex(open(sha256, current))
-    any(v -> get(v, "report_sha", "") == sha, load_versions()) && return
+    any(v -> get(v, "report_sha", "") == sha || sha in get(v, "report_shas", String[]), load_versions()) && return
     id = Dates.format(unix2datetime(mtime(current)), "yyyy-mm-dd_HHMM") * "_unrecorded"
     page = read(current, String)
     archive_version(id, page; settings=Tuple{String,String,String}[], results=Tuple{String,String,String}[], chapters=Tuple{String,String}[],
