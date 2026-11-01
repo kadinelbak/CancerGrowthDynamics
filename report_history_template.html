@@ -121,11 +121,11 @@ function listView() {
   <div class='acts'><a class='btn' href='#read/${esc(v.id)}'>Read</a></div>
 </article>`).join('')}</div>
 <h2>All versions side by side</h2>
-<details class='panel'><summary>Every setting and key result in every version (${ALL.length} columns)</summary><div class='tscroll'><table id='grid'></table></div></details>
+<details class='panel'><summary>Every setting and key result in every version (${ALL.length} columns)</summary><p class='mut'>A yellow cell differs from the same row in the next older version (the column to its right).</p><div class='tscroll'><table id='grid'></table></div></details>
 <details class='panel'><summary>Decision log (${LOG.length} decisions, newest first; <code>decisions.toml</code>)</summary><div class='tscroll'><table>
 <tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th><th>Where</th></tr>
 ${LOG.slice().reverse().map(d => `<tr><td class='nw'>${esc(d.date)}</td><td>${esc(d.area)}</td><td>${esc(d.decision)}</td><td>${esc(d.was)}</td><td>${esc(d.by)}</td><td><code>${esc(d.where)}</code></td></tr>`).join('')}</table></div></details>
-<p class='mut'>Page generated ${esc(H ? H.generated : '')}. A version's short note comes from <code>note</code> in its <code>version.toml</code>; the rest is worked out from the settings, key results and dated decisions.</p>`;
+`;
   grid(newest);
   const sync = () => {
     document.querySelectorAll('.card').forEach(c => { const on = picked.includes(c.dataset.id); c.classList.toggle('sel', on); c.querySelector('.pick').checked = on; });
@@ -170,7 +170,7 @@ function preface(older, newer, mode) {
   const decs = decisionsBetween(older, newer);
   const between = older ? ALL.slice(idx(older) + 1, idx(newer)) : [];
   const oN = older ? older.id : '—', nN = newer.id;
-  const head = mode === 'read'
+  let head = mode === 'read'
     ? `<h2>Modelling decisions in ${esc(nN)}</h2><p class='lead'>${older ? `What is new since the version before it, <a href='#read/${esc(oN)}'>${esc(oN)}</a>. <a href='#compare/${esc(oN)}/${esc(nN)}'>Compare the two side by side</a>.` : 'The first recorded version, so every setting is listed.'}${newer.note ? ` Note: <b>${esc(newer.note)}</b>` : ''}</p>`
     : `<h2>Modelling decisions: ${esc(oN)} → ${esc(nN)}</h2><p class='lead'>What differs between the two versions you picked${between.length ? `, across ${between.length} version${between.length > 1 ? 's' : ''} in between (${between.map(v => `<a href='#read/${esc(v.id)}'>${esc(v.id)}</a>`).join(', ')})` : ''}.</p>`;
   const decHtml = decs.length
@@ -193,6 +193,7 @@ function preface(older, newer, mode) {
     setHtml = `<h3>Settings: ${nS ? `${nS} changed` : 'none changed'}</h3>${changeTable(s, oN, nN)}${sameTable(s, nN)}`;
     resHtml = `<h3>Key results: ${nR ? `${nR} differ` : 'none differ'}</h3>${changeTable(r, oN, nN)}${sameTable(r, nN)}`;
   }
+  head += `<p class='mut'>Yellow rows changed between the two versions.</p>`;
   return `<section class='panel preface'>${head}${decHtml}${qHtml}${setHtml}${resHtml}</section>`;
 }
 
