@@ -4,10 +4,10 @@
 <link rel="stylesheet" href="site.css">
 <style>
 html,body{height:100%;margin:0;background:#0f1d27;overflow:hidden}
-#bar{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:6px 12px;background:#0f1d27;color:#c9d6de;font:13px system-ui}
+#bar{position:fixed;top:50px;justify-content:flex-end;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:6px 12px;background:#0f1d27;color:#c9d6de;font:13px system-ui}
 #bar a,#bar button{color:#c9d6de;background:#1c3040;border:0;border-radius:6px;padding:5px 10px;text-decoration:none;font:600 12px system-ui;cursor:pointer}
 #bar .count{margin-left:auto}
-#viewport{position:fixed;top:38px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center}
+#viewport{position:fixed;top:88px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center}
 #deck{position:relative;width:1600px;height:900px;transform-origin:center center}
 .slide.title{justify-content:center}
 .slide{position:absolute;inset:0;background:#f6f4ee;color:#16283a;padding:56px 72px;display:flex;flex-direction:column;gap:18px;visibility:hidden;opacity:0;transition:opacity .25s;overflow:hidden;border-radius:6px}
@@ -38,14 +38,16 @@ html,body{height:100%;margin:0;background:#0f1d27;overflow:hidden}
 .slide.dark .foot{color:#9fb2bf}
 svg.plot{border:1px solid #d6dee3}
 .glance table{font-size:17px}.glance td{vertical-align:top;padding:8px 10px}.glance .geq{font-size:14px;overflow-x:auto;max-width:980px}.glance .geq mjx-container[display]{margin:.1em 0 !important;text-align:left !important}
+/* the site bar (assets/site-nav.js) sits above the slide controls; full screen shows only the slides */
+nav.cgd-nav{position:fixed !important;top:0;left:0;right:0}
+html:fullscreen nav.cgd-nav{display:none}html:fullscreen #bar{top:0}html:fullscreen #viewport{top:38px}
 </style>
 <script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]}};</script>
 <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <script>/* always load the latest run */ var __v = Date.now(); document.write('<script src="bundle.js?' + __v + '"><\/script><script src="site.js?' + __v + '"><\/script><script src="control.js?' + __v + '"><\/script><script src="controlLong.js?' + __v + '"><\/script>');</script>
 <script defer src="../../assets/site-nav.js"></script>
 </head><body>
-<div id="bar"><a href="../../index.html">⌂ Home</a><a href="summary.html">Summary</a><a href="explorer.html">Explorer</a><a href="../final_report/report.html">Final report</a>
-  <button id="fs">Full screen (F)</button><span class="muted" style="color:#9fb2bf">← → to move</span><span class="count" id="count"></span></div>
+<div id="bar"><span class="muted" style="color:#9fb2bf">← → to move</span><span class="count" id="count"></span><button id="fs">Full screen (F)</button></div>
 <div id="viewport"><div id="deck"></div></div>
 <script>
 const deck = document.getElementById('deck');
