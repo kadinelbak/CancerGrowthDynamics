@@ -1,62 +1,242 @@
 <!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>Final report history</title>
+<title>Final report versions</title>
 <!-- written by report_history.jl (build_final_report.jl) and tools/seed_report_history.py; the data below is replaced at each build -->
+<!-- Three views on one page: the version list (default), #read/<id> (one version, opened by its modelling
+     decisions against the version before it) and #compare/<older>/<newer> (two versions, opened by what
+     differs between them). The archived reports are shown below the preface with their own decision panels
+     hidden, so the preface is the only decisions section. -->
 <style>
-:root{--ink:#17212b;--muted:#52636b;--accent:#176b87;--line:#d9e2e6;--page:#f4f7f8;--chg:#fff3c4}
+:root{--ink:#17212b;--muted:#52636b;--accent:#176b87;--line:#d9e2e6;--page:#f4f7f8;--chg:#fff3c4;--new:#e3f4ea}
 *{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
-main{max-width:1400px;margin:auto;padding:20px 16px 40px}h1{color:#124b6e;margin:8px 0 6px;font-size:30px}h2{color:#124b6e;margin:26px 0 8px}
-.lead{color:var(--muted);max-width:980px}.home{display:inline-flex;gap:6px;padding:6px 10px;border-radius:8px;background:#eef5f6;color:var(--accent);text-decoration:none;font-weight:650;margin-right:6px}
+main{max-width:1400px;margin:auto;padding:20px 16px 40px}h1{color:#124b6e;margin:8px 0 6px;font-size:30px}h2{color:#124b6e;margin:22px 0 8px;font-size:22px}h3{color:#124b6e;margin:14px 0 6px;font-size:17px}
+.lead{color:var(--muted);max-width:980px;margin:0 0 10px}.home{display:inline-flex;gap:6px;padding:6px 10px;border-radius:8px;background:#eef5f6;color:var(--accent);text-decoration:none;font-weight:650;margin:0 6px 6px 0}
 .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
+.preface{border-left:6px solid var(--accent)}
 .tscroll{overflow-x:auto}table{border-collapse:collapse;font-size:13px;min-width:100%}th,td{border-bottom:1px solid #e5eaec;padding:6px 8px;text-align:left;vertical-align:top}
-th{background:#eef3f5;position:sticky;top:0}td.chg{background:var(--chg);font-weight:600}tr.sep td{background:#f7fafb;font-weight:700;color:#124b6e}
-.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}select,label{font:14px system-ui,sans-serif}select{padding:4px 6px;border-radius:6px;border:1px solid var(--line)}
+th{background:#eef3f5}td.chg,tr.chg td{background:var(--chg)}tr.sep td{background:#f7fafb;font-weight:700;color:#124b6e}
 .mut{color:var(--muted)}code{background:#eef3f5;padding:1px 4px;border-radius:4px}a{color:var(--accent)}
-</style></head><body><main>
-<a class='home' href='../../../index.html'>⌂ Reports home</a><a class='home' href='../report.html'>Current Final Report</a>
-<h1>Final report history</h1>
-<p class='lead'>Every Final Report version is kept here and never overwritten. Each column is one version; a highlighted cell differs from the version before it. The settings come from <code>stages.toml</code> and <code>control_config.toml</code> of that version, the key results from its committed outputs, and the dated decisions from <code>decisions.toml</code>. Pick two versions to see only what differs between them.</p>
-<div class='panel controls'><label>Compare <select id='a'></select></label><label>with <select id='b'></select></label>
-<label><input type='checkbox' id='diff'> only rows that differ</label><span class='mut' id='gen'></span></div>
-<div class='panel tscroll'><table id='grid'></table></div>
-<h2>Versions</h2><div class='panel tscroll'><table id='vers'></table></div>
-<h2>Decision log</h2><div class='panel tscroll'><table id='log'></table></div>
-</main>
+details{margin:8px 0}summary{cursor:pointer;font-weight:650;color:var(--accent)}
+button,.btn{font:650 14px system-ui,sans-serif;border-radius:8px;padding:7px 13px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;text-decoration:none;display:inline-block}
+button.ghost,.btn.ghost{background:#fff;color:var(--accent)}button:disabled{opacity:.45;cursor:default}
+/* version list */
+.bar{position:sticky;top:0;z-index:3;background:var(--page);padding:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.cards{display:grid;gap:12px;margin-top:12px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:6px 14px;align-items:start}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(23,107,135,.18)}
+.card .pick{margin-top:5px;width:18px;height:18px;accent-color:var(--accent)}
+.card h3{margin:0;font-size:18px}.card .meta{color:var(--muted);font-size:13px}
+.card ul{margin:6px 0 0;padding-left:18px}.card li{margin:2px 0}
+.badge{display:inline-block;font-size:12px;font-weight:650;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:2px;background:#eef3f5;color:var(--accent)}
+.badge.latest{background:var(--accent);color:#fff}
+.area{display:inline-block;min-width:62px;font-size:12px;font-weight:650;color:#9a6700}
+@media (max-width:640px){.card{grid-template-columns:auto 1fr}.card .acts{grid-column:1/-1}}
+/* report view */
+.seg{display:inline-flex;border:1px solid var(--accent);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;background:#fff;color:var(--accent)}.seg button.on{background:var(--accent);color:#fff}
+.frames{display:grid;gap:12px}.frames.two{grid-template-columns:1fr 1fr}
+.frames figure{margin:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.frames figcaption{padding:8px 12px;font-weight:650;color:#124b6e;border-bottom:1px solid var(--line)}
+iframe{display:block;width:100%;border:0;min-height:600px;background:var(--page)}
+td.nw{white-space:nowrap}
+.old{color:var(--muted);text-decoration:line-through}.arrow{color:var(--muted);padding:0 4px}
+</style></head><body><main id='app'></main>
 <script>
 const H = /*HISTORY_JSON*/null;
-const V = (H && H.versions || []).slice().reverse();            // newest first
+const ALL = (H && H.versions || []).slice().sort((a, b) => a.id < b.id ? -1 : 1);   // oldest first
+const LOG = (H && H.decisions) || [];
 const esc = s => String(s == null ? '' : s).replace(/[&<>']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;'}[c]));
-const val = (v, grp, k) => { const r = (v[grp] || []).find(x => x.key === k); return r ? r.value : null; };
-const rowsOf = grp => { const seen = new Map(); for (const v of V) for (const r of (v[grp] || [])) if (!seen.has(r.key)) seen.set(r.key, r.label); return [...seen]; };
-const A = document.getElementById('a'), B = document.getElementById('b'), D = document.getElementById('diff');
-const opt = v => `<option value='${esc(v.id)}'>${esc(v.id)}${v.commit ? ' · ' + esc(v.commit) : ''}</option>`;
-A.innerHTML = "<option value=''>all versions</option>" + V.map(opt).join('');
-B.innerHTML = V.map(opt).join('');
-if (V.length > 1) { A.value = V[1].id; B.value = V[0].id; }
-document.getElementById('gen').textContent = H ? 'Page generated ' + H.generated + ' · ' + V.length + ' versions' : 'No versions yet';
-function draw() {
-  const cols = A.value ? [V.find(v => v.id === A.value), V.find(v => v.id === B.value)].filter(Boolean) : V;
-  let h = '<tr><th>Setting / result</th>' + cols.map(v => `<th><a href='${esc(v.id)}/report.html'>${esc(v.id)}</a><br><span class='mut'>${esc(v.commit || '')}</span></th>`).join('') + '</tr>';
+const byId = id => ALL.find(v => v.id === id);
+const idx = v => ALL.indexOf(v);
+const prevOf = v => idx(v) > 0 ? ALL[idx(v) - 1] : null;
+const day = v => String(v.date || v.id).slice(0, 10);
+const val = (v, grp, k) => { const r = ((v && v[grp]) || []).find(x => x.key === k); return r ? r.value : null; };
+const app = document.getElementById('app');
+const HOME = "<a class='home' href='../../../index.html'>⌂ Reports home</a>";
+
+// decisions logged after the older version's day, up to and including the newer version's day (a decision
+// dated the same day as two versions belongs to the first of them, since the second starts on that day)
+function decisionsBetween(older, newer) {
+  const lo = older ? day(older) : '', hi = day(newer);
+  return LOG.filter(d => d.date > lo && d.date <= hi);
+}
+// rows of a group across two versions: changed, added, unchanged
+function diff(older, newer, grp) {
+  const keys = new Map();
+  for (const v of [newer, older]) for (const r of ((v && v[grp]) || [])) if (!keys.has(r.key)) keys.set(r.key, r.label);
+  const out = {changed: [], added: [], same: [], gone: []};
+  for (const [k, label] of keys) {
+    const a = val(older, grp, k), b = val(newer, grp, k);
+    if (b == null) out.gone.push({label, a});
+    else if (a == null) out.added.push({label, b});
+    else if (a !== b) out.changed.push({label, a, b});
+    else out.same.push({label, b});
+  }
+  return out;
+}
+const recorded = v => ((v && v.settings) || []).length > 0;
+
+// the short "major changes" description on each card
+function summary(v) {
+  const p = prevOf(v), items = [];
+  if (v.note) items.push(`<li><b>${esc(v.note)}</b></li>`);
+  for (const d of decisionsBetween(p, v)) items.push(`<li><span class='area'>${esc(d.area)}</span> ${esc(d.decision)}</li>`);
+  if (!p) items.push(`<li class='mut'>First recorded version.</li>`);
+  else if (!recorded(v) || !recorded(p)) items.push(`<li class='mut'>Settings not recorded for ${recorded(v) ? 'the version before' : 'this version'}.</li>`);
+  else {
+    const s = diff(p, v, 'settings'), r = diff(p, v, 'results');
+    if (s.changed.length || s.added.length) items.push(`<li>Settings changed: ${s.changed.concat(s.added).map(x => esc(x.label)).join(', ')}.</li>`);
+    else items.push(`<li class='mut'>Same settings as ${esc(p.id)}.</li>`);
+    const nr = r.changed.length + r.added.length, tot = nr + r.same.length;
+    if (tot) items.push(`<li${nr ? '' : " class='mut'"}>${nr} of ${tot} key results differ from ${esc(p.id)}${nr ? ': ' + r.changed.concat(r.added).map(x => esc(x.label)).slice(0, 4).join('; ') + (nr > 4 ? '; and more' : '') : ''}.</li>`);
+  }
+  return `<ul>${items.join('')}</ul>`;
+}
+
+// ── version list ────────────────────────────────────────────────────────────────
+let picked = [];
+function listView() {
+  document.title = 'Final report versions';
+  const newest = ALL.slice().reverse();
+  app.innerHTML = `${HOME}
+<h1>Final report versions</h1>
+<p class='lead'>Every Final Report version, newest first, with what changed in it. Old versions are archived and never overwritten. Press <b>Read</b> to open one version, or tick two and press <b>Compare</b>. Either way the report opens with its modelling decisions: what changed since the version before it, or between the two you picked.</p>
+<div class='bar'><button id='cmp' disabled>Compare 2 selected</button><button class='ghost' id='clr' disabled>Clear</button><span class='mut' id='hint'>Tick two versions to compare them.</span></div>
+<div class='cards'>${newest.map((v, i) => `
+<article class='card' data-id='${esc(v.id)}'>
+  <input type='checkbox' class='pick' aria-label='Select ${esc(v.id)} to compare'>
+  <div><h3>${esc(v.id)}${i === 0 ? "<span class='badge latest'>latest</span>" : ''}</h3>
+  <div class='meta'>Built ${esc(v.date)}${v.commit ? ' · commit <code>' + esc(v.commit) + '</code>' : ''} · ${(v.chapters || []).length || 'chapters not recorded'}${(v.chapters || []).length ? ' chapters' : ''}</div>
+  ${summary(v)}</div>
+  <div class='acts'><a class='btn' href='#read/${esc(v.id)}'>Read</a></div>
+</article>`).join('')}</div>
+<h2>All versions side by side</h2>
+<details class='panel'><summary>Every setting and key result in every version (${ALL.length} columns)</summary><div class='tscroll'><table id='grid'></table></div></details>
+<details class='panel'><summary>Decision log (${LOG.length} decisions, newest first; <code>decisions.toml</code>)</summary><div class='tscroll'><table>
+<tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th><th>Where</th></tr>
+${LOG.slice().reverse().map(d => `<tr><td class='nw'>${esc(d.date)}</td><td>${esc(d.area)}</td><td>${esc(d.decision)}</td><td>${esc(d.was)}</td><td>${esc(d.by)}</td><td><code>${esc(d.where)}</code></td></tr>`).join('')}</table></div></details>
+<p class='mut'>Page generated ${esc(H ? H.generated : '')}. A version's short note comes from <code>note</code> in its <code>version.toml</code>; the rest is worked out from the settings, key results and dated decisions.</p>`;
+  grid(newest);
+  const sync = () => {
+    document.querySelectorAll('.card').forEach(c => { const on = picked.includes(c.dataset.id); c.classList.toggle('sel', on); c.querySelector('.pick').checked = on; });
+    document.getElementById('cmp').disabled = picked.length !== 2;
+    document.getElementById('clr').disabled = !picked.length;
+    document.getElementById('hint').textContent = picked.length === 2 ? `Compare ${picked.slice().sort().join(' and ')}.` : picked.length === 1 ? 'Tick one more version.' : 'Tick two versions to compare them.';
+  };
+  document.querySelectorAll('.card .pick').forEach(cb => cb.addEventListener('change', () => {
+    const id = cb.closest('.card').dataset.id;
+    picked = cb.checked ? picked.filter(x => x !== id).concat(id).slice(-2) : picked.filter(x => x !== id);
+    sync();
+  }));
+  document.getElementById('clr').onclick = () => { picked = []; sync(); };
+  document.getElementById('cmp').onclick = () => { const [a, b] = picked.slice().sort(); location.hash = `#compare/${a}/${b}`; };
+  sync();
+}
+function grid(cols) {
+  const keys = grp => { const m = new Map(); for (const v of cols) for (const r of (v[grp] || [])) if (!m.has(r.key)) m.set(r.key, r.label); return [...m]; };
+  let h = '<tr><th>Setting / result</th>' + cols.map(v => `<th><a href='#read/${esc(v.id)}'>${esc(v.id)}</a></th>`).join('') + '</tr>';
   for (const [grp, title] of [['settings', 'Modelling decisions'], ['results', 'Key results']]) {
     h += `<tr class='sep'><td colspan='${cols.length + 1}'>${title}</td></tr>`;
-    for (const [k, label] of rowsOf(grp)) {
+    for (const [k, label] of keys(grp)) {
       const vals = cols.map(v => val(v, grp, k));
-      const known = vals.filter(x => x != null);
-      if (D.checked && new Set(known).size <= 1) continue;
-      // highlight a cell that differs from the next older column (the column to its right)
-      h += `<tr><td>${esc(label)}</td>` + vals.map((x, i) => {
-        const older = A.value ? (i === 1 ? vals[0] : null) : vals[i + 1];
-        const chg = x != null && older != null && x !== older;
-        return `<td${chg ? " class='chg'" : ''}>${x == null ? "<span class='mut'>not recorded</span>" : esc(x)}</td>`;
-      }).join('') + '</tr>';
+      h += `<tr><td>${esc(label)}</td>` + vals.map((x, i) => { const o = vals[i + 1]; return `<td${x != null && o != null && x !== o ? " class='chg'" : ''}>${x == null ? "<span class='mut'>not recorded</span>" : esc(x)}</td>`; }).join('') + '</tr>';
     }
   }
   document.getElementById('grid').innerHTML = h;
 }
-[A, B, D].forEach(e => e.addEventListener('change', draw)); draw();
-document.getElementById('vers').innerHTML = '<tr><th>Version</th><th>Archived</th><th>Commit</th><th>Source</th><th>Chapters</th><th>Note</th></tr>' +
-  V.map(v => `<tr><td><a href='${esc(v.id)}/report.html'>${esc(v.id)}</a></td><td>${esc(v.date)}</td><td>${esc(v.commit)}</td><td>${esc(v.source)}</td><td>${(v.chapters || []).length}</td><td>${esc(v.note)}</td></tr>`).join('');
-document.getElementById('log').innerHTML = '<tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th><th>Where</th></tr>' +
-  (H && H.decisions || []).slice().reverse().map(d => `<tr><td>${esc(d.date)}</td><td>${esc(d.area)}</td><td>${esc(d.decision)}</td><td>${esc(d.was)}</td><td>${esc(d.by)}</td><td><code>${esc(d.where)}</code></td></tr>`).join('');
+
+// ── preface: the modelling decisions of one version, or between two ────────────
+function changeTable(d, olderName, newerName) {
+  const rows = d.changed.map(x => `<tr class='chg'><td>${esc(x.label)}</td><td>${esc(x.b)}</td><td class='mut'>${esc(x.a)}</td></tr>`)
+    .concat(d.added.map(x => `<tr class='chg'><td>${esc(x.label)} <span class='badge'>new</span></td><td>${esc(x.b)}</td><td class='mut'>not recorded</td></tr>`))
+    .concat(d.gone.map(x => `<tr><td>${esc(x.label)}</td><td class='mut'>not recorded</td><td class='mut'>${esc(x.a)}</td></tr>`));
+  return rows.length ? `<div class='tscroll'><table><tr><th>What</th><th>${esc(newerName)}</th><th>${esc(olderName)}</th></tr>${rows.join('')}</table></div>` : '';
+}
+function sameTable(d, name) {
+  return d.same.length ? `<details><summary>Unchanged (${d.same.length})</summary><div class='tscroll'><table><tr><th>What</th><th>${esc(name)}</th></tr>${d.same.map(x => `<tr><td>${esc(x.label)}</td><td>${esc(x.b)}</td></tr>`).join('')}</table></div></details>` : '';
+}
+function preface(older, newer, mode) {
+  const s = diff(older, newer, 'settings'), r = diff(older, newer, 'results');
+  const decs = decisionsBetween(older, newer);
+  const between = older ? ALL.slice(idx(older) + 1, idx(newer)) : [];
+  const oN = older ? older.id : '—', nN = newer.id;
+  const head = mode === 'read'
+    ? `<h2>Modelling decisions in ${esc(nN)}</h2><p class='lead'>${older ? `What is new since the version before it, <a href='#read/${esc(oN)}'>${esc(oN)}</a>. <a href='#compare/${esc(oN)}/${esc(nN)}'>Compare the two side by side</a>.` : 'The first recorded version, so every setting is listed.'}${newer.note ? ` Note: <b>${esc(newer.note)}</b>` : ''}</p>`
+    : `<h2>Modelling decisions: ${esc(oN)} → ${esc(nN)}</h2><p class='lead'>What differs between the two versions you picked${between.length ? `, across ${between.length} version${between.length > 1 ? 's' : ''} in between (${between.map(v => `<a href='#read/${esc(v.id)}'>${esc(v.id)}</a>`).join(', ')})` : ''}.</p>`;
+  const decHtml = decs.length
+    ? `<h3>Decisions made ${mode === 'read' ? 'for this version' : 'between them'} (${decs.length})</h3><div class='tscroll'><table><tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th></tr>${decs.map(d => `<tr><td class='nw'>${esc(d.date)}</td><td>${esc(d.area)}</td><td>${esc(d.decision)}</td><td class='mut'>${esc(d.was) || '—'}</td><td>${esc(d.by)}</td></tr>`).join('')}</table></div>`
+    : `<h3>Decisions</h3><p class='mut'>No decision in <code>decisions.toml</code> is dated ${older ? `between ${esc(day(older))} and ${esc(day(newer))}` : `on or before ${esc(day(newer))}`}.</p>`;
+  let setHtml, resHtml;
+  if (!recorded(newer) || (older && !recorded(older))) {
+    setHtml = `<h3>Settings</h3><p class='mut'>Settings were not recorded for ${!recorded(newer) ? esc(nN) : esc(oN)}, so they cannot be compared.</p>`;
+    resHtml = '';
+  } else if (!older) {
+    setHtml = `<h3>Settings</h3>${sameTable({same: (newer.settings || []).map(x => ({label: x.label, b: x.value}))}, nN).replace('<details>', '<details open>')}`;
+    resHtml = `<h3>Key results</h3>${sameTable({same: (newer.results || []).map(x => ({label: x.label, b: x.value}))}, nN)}`;
+  } else {
+    const nS = s.changed.length + s.added.length + s.gone.length, nR = r.changed.length + r.added.length + r.gone.length;
+    setHtml = `<h3>Settings: ${nS ? `${nS} changed` : 'none changed'}</h3>${changeTable(s, oN, nN)}${sameTable(s, nN)}`;
+    resHtml = `<h3>Key results: ${nR ? `${nR} differ` : 'none differ'}</h3>${changeTable(r, oN, nN)}${sameTable(r, nN)}`;
+  }
+  return `<section class='panel preface'>${head}${decHtml}${setHtml}${resHtml}</section>`;
+}
+
+// an archived report, with its own decision and history panels hidden (the preface replaces them)
+function frame(v) {
+  return `<figure><figcaption>${esc(v.id)} <span class='mut'>· built ${esc(v.date)} · <a href='${esc(v.id)}/report.html' target='_blank' rel='noopener'>open on its own</a></span></figcaption><iframe title='Final report ${esc(v.id)}' src='${esc(v.id)}/report.html'></iframe></figure>`;
+}
+function wireFrames() {
+  document.querySelectorAll('.frames iframe').forEach(f => {
+    const fit = () => { try { const d = f.contentDocument; if (!d || !d.body) return; f.style.height = Math.max(600, d.documentElement.scrollHeight) + 'px'; } catch (e) {} };
+    f.addEventListener('load', () => {
+      try {
+        const d = f.contentDocument, st = d.createElement('style');
+        st.textContent = 'section.decisions{display:none !important} p.version{display:none} header > a.home{display:none}';
+        d.head.appendChild(st);
+        // links that leave the report open in the whole window, not inside the frame
+        d.querySelectorAll('a[href]').forEach(a => { if (!a.getAttribute('href').startsWith('#') && !a.target) a.target = '_top'; });
+        new ResizeObserver(fit).observe(d.documentElement);
+      } catch (e) {}
+      fit();
+    });
+    setInterval(fit, 1000);
+  });
+}
+function readView(v) {
+  document.title = `Final report ${v.id}`;
+  app.innerHTML = `${HOME}<a class='home' href='#'>← All versions</a>
+<h1>Final report ${esc(v.id)}${v === ALL[ALL.length - 1] ? "<span class='badge latest'>latest</span>" : ''}</h1>
+${preface(prevOf(v), v, 'read')}
+<h2>The report</h2><div class='frames'>${frame(v)}</div>`;
+  wireFrames(); scrollTo(0, 0);
+}
+function compareView(a, b) {
+  const [o, n] = idx(a) < idx(b) ? [a, b] : [b, a];
+  document.title = `Compare ${o.id} and ${n.id}`;
+  app.innerHTML = `${HOME}<a class='home' href='#'>← All versions</a>
+<h1>Compare ${esc(o.id)} and ${esc(n.id)}</h1>
+${preface(o, n, 'compare')}
+<h2>The reports</h2>
+<div class='bar'><span class='seg'><button data-m='n' class='on'>${esc(n.id)} (newer)</button><button data-m='o'>${esc(o.id)} (older)</button><button data-m='both'>Side by side</button></span></div>
+<div class='frames' id='fr'></div>`;
+  const fr = document.getElementById('fr');
+  const show = m => {
+    document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x.dataset.m === m));
+    fr.className = 'frames' + (m === 'both' ? ' two' : '');
+    fr.innerHTML = m === 'both' ? frame(n) + frame(o) : frame(m === 'n' ? n : o);
+    wireFrames();
+  };
+  document.querySelectorAll('.seg button').forEach(x => x.onclick = () => show(x.dataset.m));
+  show('n'); scrollTo(0, 0);
+}
+
+function route() {
+  const p = location.hash.replace(/^#/, '').split('/');
+  if (p[0] === 'read' && byId(p[1])) return readView(byId(p[1]));
+  if (p[0] === 'compare' && byId(p[1]) && byId(p[2]) && p[1] !== p[2]) return compareView(byId(p[1]), byId(p[2]));
+  picked = []; listView(); scrollTo(0, 0);
+}
+addEventListener('hashchange', route);
+if (!ALL.length) app.innerHTML = `${HOME}<h1>Final report versions</h1><p class='lead'>No versions yet. Build one with <code>julia build_final_report.jl</code>.</p>`;
+else route();
 </script>
 </body></html>

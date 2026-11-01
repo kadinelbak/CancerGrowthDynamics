@@ -66,6 +66,12 @@
       font-weight: 700;
       margin-top: 16px;
     }
+    a.sublink {
+      display: inline-block;
+      margin: 16px 0 0 12px;
+      color: var(--accent);
+      font-size: 14px;
+    }
     .details {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -160,9 +166,9 @@
         <div>
           <span class="tag">All details · New data</span>
           <h2>Final Report</h2>
-          <p>The full analysis as chapters of one page: the data, the compartment models used at every stage (with every candidate, including the low resource + cisplatin Stage 4), bootstrapping, sensitivity analysis, validation, optimal control of the cisplatin schedule (sequential MPC with a toxicity proxy), and a 120-day version (read off at days 14, 30, 60 and 120) in which fasting is a second control, with a weight limit and protection of healthy tissue.</p>
+          <p>Opens on the list of every version with what changed in each; read one, or pick two to compare. The full analysis as chapters of one page: the data, the compartment models used at every stage (with every candidate, including the low resource + cisplatin Stage 4), bootstrapping, sensitivity analysis, validation, optimal control of the cisplatin schedule (sequential MPC with a toxicity proxy), and a 120-day version (read off at days 14, 30, 60 and 120) in which fasting is a second control, with a weight limit and protection of healthy tissue.</p>
         </div>
-        <a class="button" href="outputs/final_report/report.html">Open Final Report</a>
+        <div><a class="button" href="outputs/final_report/history/index.html">Open Final Report</a><a class="sublink" href="outputs/final_report/report.html">Skip to the latest version</a></div>
       </article>
     </section>
     <section class="details">
