@@ -42,6 +42,12 @@ bootstrap_generator = "selected"
 # (2026-10-28, after one Stage 4 replicate ran for 11+ h). A count, not a time limit, so results stay
 # reproducible; runs over budget are discarded for that replicate and listed in time_limit_hits.csv. 0 = none.
 bootstrap_work_factor = 50
+# Two-pass bootstrap (user, 2026-11-01): every candidate is refitted to the first bootstrap_screen replicates; the
+# remaining ones go only to candidates that were within rule_bic of the lowest BIC in at least one screened
+# replicate (so the per-line and paired-line rules could pick them), plus the carried model. A candidate
+# never picked in 40 replicates would be picked in under ~7% (95% bound); in the 28 Oct run 75 of 132 candidates
+# were never picked in all 200, so this roughly halves the bootstrap refits. 0 = every candidate gets all B.
+bootstrap_screen = 40
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum

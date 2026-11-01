@@ -143,12 +143,25 @@ function bootstrap(g; B, seed=20260927)
         end
         println("    $(g.id): bootstrap work budget per optimiser run = $(factor)× a refit ($((any(ks .> 0) ? minimum(budget[ks .> 0]) : 0))–$(maximum(budget)) evaluations)"); flush(stdout)
     end
+    # Two-pass bootstrap (user, 2026-11-01: faster reruns without losing rigour). Pass 1 refits every candidate
+    # to the first `screen` replicates; pass 2 refits, on the remaining B − screen, only the candidates that pass 1
+    # had inside its selection band (within RULE_BIC of the lowest BIC) at least once, plus the carried model
+    # (candidate 1) and the replicate generator.
+    # A dropped candidate scores Inf (never chosen) in pass 2. Being picked in 0 of `screen` replicates bounds how
+    # often it would be picked at 1 − 0.05^(1/screen) (95%; ≈ 7.2% for 40). The screen is decided from the
+    # replicates themselves, not from the BIC gap on the data (a Stage 3b candidate 34 BIC behind was still picked
+    # in 21% of replicates). stages.toml [selection] bootstrap_screen; BOOT_SCREEN overrides; 0 = every candidate
+    # gets all B replicates (the behaviour before 2026-11-01).
+    screen = parse(Int, get(ENV, "BOOT_SCREEN", string(isdefined(Main, :selection_cfg) ? selection_cfg("bootstrap_screen", 40) : 40)))
+    screen = screen <= 0 || screen >= B ? B : screen
+    active = trues(nc)
     done = Threads.Atomic{Int}(0)
-    Threads.@threads :dynamic for b in 1:B
+    function replicate!(b)
         rng = Xoshiro(seed + b)
         ds = [hasproperty(d, :w) ? (x=d.x, y=bs_resample(rng, yh, e, d.w), state_index=d.state_index, w=d.w) :
                                    (x=d.x, y=bs_resample(rng, yh, e), state_index=d.state_index) for (d, yh, e) in zip(g.datasets, yhat, resid)]
         for (j, c) in enumerate(cands)
+            active[j] || continue                         # bic stays Inf, parameters NaN
             if ks[j] == 0
                 bic[b, j] = predict_candidate(c.name, c.label, c.model, ds, cu0(c, g)).bic
             else
@@ -159,11 +172,37 @@ function bootstrap(g; B, seed=20260927)
         n = Threads.atomic_add!(done, 1) + 1
         n % 25 == 0 && (println("    $(g.id): $n / $B replicates"); flush(stdout))
     end
+    Threads.@threads :dynamic for b in 1:screen
+        replicate!(b)
+    end
+    if screen < B
+        # kept: every candidate inside the selection band (within RULE_BIC of the lowest BIC) of any screened
+        # replicate, so it could have been picked by the per-line rule or by a paired-line (joint) rule, plus the
+        # lowest-BIC candidate and the per-parameter pick
+        band = isdefined(Main, :RULE_BIC) ? Float64(Main.RULE_BIC) : 2.0
+        seen = falses(nc)
+        for b in 1:screen
+            m = minimum(x for x in bic[b, :] if isfinite(x); init=Inf)
+            isfinite(m) || continue
+            seen .|= [isfinite(x) && x <= m + band for x in bic[b, :]]
+            seen[argmin(bic[b, :])] = true
+            seen[choose(bic[b, :], ks)] = true
+        end
+        seen[1] = true                                    # the carried model: its intervals and bands use all B
+        seen[findfirst(c -> c === ref, cands)] = true     # the candidate the replicates are generated from
+        active .= seen
+        println("    $(g.id): screened after $screen replicates; $(count(active)) of $nc candidates continue to $B" *
+                (all(active) ? "" : " (dropped: " * join([cands[j].name for j in 1:nc if !active[j]], ", ") * ")")); flush(stdout)
+        Threads.@threads :dynamic for b in screen+1:B
+            replicate!(b)
+        end
+    end
+    nboot = [active[j] ? B : screen for j in 1:nc]
     winner = [argmin(bic[b, :]) for b in 1:B]
     pick = [choose(bic[b, :], ks) for b in 1:B]
     selected = argmax([count(==(j), pick) for j in 1:nc])
     (cands=cands, ks=ks, ref=ref, bic=bic, pars=pars, winner=winner, pick=pick, selected=selected, budget=budget,
-     orig_pick=choose([c.bic for c in cands], ks))
+     orig_pick=choose([c.bic for c in cands], ks), screen=screen, nboot=nboot)
 end
 
 # 95% band of candidate j's bootstrap fits (default: the selected model), every state it has

@@ -29,6 +29,14 @@ const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["clo
 const COUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")),
                       DAYS == Float64(CFG["schedule"]["closed_loop_days"]) ? "control" : "control_$(round(Int, DAYS))d"); mkpath(COUT)
 const CKP = joinpath(COUT, "control_state.jls")
+# skip when nothing this run reads has changed since its last finished run (control_model.jl: control_fingerprint)
+const FPRINT = control_fingerprint(@__FILE__, "CONTROL_DAYS" => DAYS,
+    "CONTROL_LOOKAHEAD_TO_END" => get(ENV, "CONTROL_LOOKAHEAD_TO_END", ""))
+const FPFILE = joinpath(COUT, "inputs.sha256")
+if control_unchanged(FPFILE, FPRINT, joinpath(COUT, "control_outcomes.csv"))
+    println("Control inputs unchanged since the last finished run; reusing $(joinpath(COUT, "control_outcomes.csv")) (CONTROL_FORCE=1 recomputes)")
+    exit(0)
+end
 cck = (isfile(CKP) && get(ENV, "REDO", "0") != "1") ? deserialize(CKP) : Dict{Symbol,Any}()
 savec() = serialize(CKP, cck)
 
@@ -201,3 +209,4 @@ for m in cck[:main], (pn, v) in m.policies
 end
 CSV.write(joinpath(COUT, "control_outcomes.csv"), DataFrame(rows))
 println("Wrote $(joinpath(COUT, "control_outcomes.csv"))")
+write(FPFILE, FPRINT)

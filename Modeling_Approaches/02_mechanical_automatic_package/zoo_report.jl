@@ -90,6 +90,9 @@ function write_zoo_report(groups, results)
               @sprintf("<td class='num'>%.1f</td><td class='num'>%s</td></tr>", c.bic, hasb ? @sprintf("%.0f%%", pct(r.pick, 1)) : "—"))
         trs = join([begin
                         low = hasb ? @sprintf("%.0f%% / %.0f%%", pct(r.pick, j), pct(r.winner, j)) : "—"
+                        # two-pass bootstrap: a candidate dropped after the screen was refitted to `screen` replicates only
+                        hasb && hasproperty(r, :nboot) && r.nboot[j] < size(r.bic, 1) &&
+                            (low *= "<div class='muted' style='font-size:11px'>screened out after $(r.nboot[j]) replicates (picked in under $(round(Int, 100 * (1 - 0.05^(1 / r.nboot[j]))))%, 95% bound)</div>")
                         "<tr$(j == 1 ? " class='win'" : "")><td><b>$(hesc(x.label))</b>" * join(["<div class='eq glance'>\\[$t\\]</div>" for t in zoo_tex(g, x)]) *
                         "</td><td>$(hesc(x.family))</td><td class='num'>$(length(x.params))</td>" *
                         @sprintf("<td class='num'>%.2f</td><td class='num'>%+.2f</td><td class='num'>%s</td></tr>", x.bic, x.bic - c.bic, low)
@@ -112,7 +115,7 @@ function write_zoo_report(groups, results)
               thtip("Family", "The delay mechanism the model uses: immediate, effect compartment, transit compartments, second order, accumulation, or damaged cells.", :none) *
               thtip("k", "Free parameters fitted at this stage; values carried over from earlier stages are not counted.", "Lower is better (fewer parameters), as long as the fit stays within 2 BIC.") * thtip("BIC", ZT_BIC, :lower) *
               thtip("ΔBIC vs optimal", "BIC minus the BIC of the carried model. Negative = fits slightly better but needs more parameters (within 2 BIC the rule prefers fewer); positive = fits worse.", "Lower means a better fit, but within 2 of 0 the carried model wins by having fewer parameters; above +2 is clearly worse.") *
-              thtip("Bootstrap: chosen / lowest BIC", "First number: share of the bootstrap data sets in which the selection rule picks this model. Second: share in which it has the lowest BIC outright.", :higher) * "</tr>$trs</table></div>" *
+              thtip("Bootstrap: chosen / lowest BIC", "First number: share of the bootstrap data sets in which the selection rule picks this model. Second: share in which it has the lowest BIC outright. Two-pass bootstrap: every candidate gets the first 40 data sets (stages.toml bootstrap_screen); only those inside the selection band at least once get the rest, so a screened-out candidate shows 0% with a 95% upper bound.", :higher) * "</tr>$trs</table></div>" *
               joint_html(g) * "<h4>Optimal model: $(hesc(c.label))$(tip("The carried model's equations. N, C: sensitive (A2780) and resistant (A2780cis) counts; V: viable, non-damaged cells; A or S: delay compartments driven by the dose D or the low-resource level u_R. Parameter values are in the table below.", :none))</h4>" * join(["<div class='eq'>\\[$t\\]</div>" for t in zoo_tex(g, c)]) *
               "<div class='tscroll'><table class='params'><tr>" * thtip("Parameter", "Parameters fitted at this stage. Rows under 'Carried over / fixed' come from earlier stages and are held at their values.", :none) *
               thtip("Estimate", "Value fitted to the data.", :none) *

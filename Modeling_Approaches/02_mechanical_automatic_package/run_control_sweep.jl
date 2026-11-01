@@ -22,6 +22,16 @@ using Base.Threads
 const SOUT = joinpath(@__DIR__, "outputs", "control_sweep"); mkpath(SOUT)
 const DATA_LABEL = get(ENV, "SWEEP_DATA", "without A2780cis 1 µM")
 const SKP = joinpath(SOUT, "sweep_state_" * replace(lowercase(DATA_LABEL), r"[^a-z0-9]+" => "_") * ".jls")
+# skip when nothing this data choice's sweep reads has changed since its last finished run and its rows are
+# still in the CSV (control_model.jl: control_fingerprint; the run script itself is hashed too)
+const FPRINT = control_fingerprint(@__FILE__, "SWEEP_DATA" => DATA_LABEL)
+const FPFILE = joinpath(SOUT, "inputs_" * replace(lowercase(DATA_LABEL), r"[^a-z0-9]+" => "_") * ".sha256")
+let f = joinpath(SOUT, "sweep_outcomes.csv")
+    if control_unchanged(FPFILE, FPRINT, f) && any(==(DATA_LABEL), string.(CSV.read(f, DataFrame; stringtype=String).data))
+        println("Control inputs unchanged since the last finished sweep ($DATA_LABEL); reusing its rows in $f (CONTROL_FORCE=1 recomputes)")
+        exit(0)
+    end
+end
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const LOOK = Int.(CFG["schedule"]["lookahead_blocks"])
 const LEVELS = Float64.(CFG["dose"]["levels_data"])
@@ -115,3 +125,4 @@ if isfile(f)                                      # keep the rows of the other d
 end
 CSV.write(f, new)
 println("Wrote $f ($(nrow(new)) rows)")
+write(FPFILE, FPRINT)

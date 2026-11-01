@@ -8,6 +8,10 @@
 #   julia run_pipeline.jl --only report14       one step (see --list)
 #   julia run_pipeline.jl --resume              reuse unchanged fits and bootstraps (ZOO_RESUME, ZOO_REUSE_BOOT)
 #                                               and the control checkpoints instead of recomputing
+#   julia run_pipeline.jl --recompute-control   rerun the control steps even when their inputs are unchanged
+#                                               (by default a control step whose code, configs, data and
+#                                               carried models + bootstrap draws match its last finished run
+#                                               is skipped and its outputs reused; CONTROL_FORCE=1)
 #   julia run_pipeline.jl --list                the steps
 #
 # Configuration lives in data/sources.toml (data and their tags), data/schedules.toml (dose schedules),
@@ -28,6 +32,7 @@ function opt(f, default)
     v = args[i+1]; deleteat!(args, i:i+1); v
 end
 const RESUME = flag("--resume")
+const RECOMPUTE_CONTROL = flag("--recompute-control")
 const LIST = flag("--list")
 const THREADS = parse(Int, opt("--threads", string(max(Sys.CPU_THREADS - 2, 1))))
 const FROM = opt("--from", "")
@@ -36,6 +41,7 @@ isempty(args) || error("unknown arguments: $(join(args, " "))")
 
 # (name, what it does, working directory, script and arguments, threads?, extra environment)
 redo = RESUME ? Dict{String,String}() : Dict("REDO" => "1")
+RECOMPUTE_CONTROL && (redo["CONTROL_FORCE"] = "1")     # the control steps get `redo`
 const STEPS = [
     ("data",       "tidy data table from the raw sources",                  PKG,  ["data/build_tidy.jl"],             false, Dict{String,String}()),
     ("checks",     "the tidy table reproduces the source files", PKG, ["test/test_data.jl"],             false, Dict{String,String}()),

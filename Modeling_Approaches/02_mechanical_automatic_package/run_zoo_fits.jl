@@ -23,6 +23,8 @@
 #   ZOO_RESUME=1      reuse the Stage 1 / 1b / 2 fits from zoo_mono_stages.jls and finished group bootstraps
 #                     from boot_checkpoints/ (when the group's candidates and fits are unchanged)
 #   BOOT_WORK_FACTOR  bootstrap work budget, × the evaluations of one refit (default stages.toml, 50; 0 = none)
+#   BOOT_SCREEN       two-pass bootstrap: every candidate gets the first BOOT_SCREEN replicates, the rest go only
+#                     to candidates inside the selection band at least once (default stages.toml, 40; 0 = all get B)
 #   ZOO_REUSE_BOOT=1  reuse the bootstrap of every group whose candidates and fits are unchanged
 #                     since the last zoo_state.jls (same names, BICs and parameters)
 
@@ -303,7 +305,7 @@ using Serialization
 const PREV = get(ENV, "ZOO_REUSE_BOOT", "0") == "1" && isfile(joinpath(ZOO_DIR, "zoo_state.jls")) ? deserialize(joinpath(ZOO_DIR, "zoo_state.jls")) : nothing
 # the previous bootstrap of a group, if its candidates and fits are exactly the same as now
 function previous_boot(g)
-    (PREV === nothing || PREV.B != BOOT_B) && return nothing
+    (PREV === nothing || PREV.B != BOOT_B || get(PREV, :screen, 0) != BOOT_SCREEN) && return nothing
     i = findfirst(h -> h.id == g.id, PREV.groups); i === nothing && return nothing
     h = PREV.groups[i]
     same = length(h.cands) == length(g.cands) && all(a.name == b.name && a.bic == b.bic && a.params == b.params for (a, b) in zip(h.cands, g.cands))
@@ -312,8 +314,9 @@ end
 # Per-group bootstrap checkpoints (2026-10-28): each finished group is saved to boot_checkpoints/<id>.jls, so a
 # run stopped part-way resumes (ZOO_RESUME=1) without redoing the groups whose candidates and fits are unchanged
 const BOOT_CKPT_DIR = joinpath(ZOO_DIR, "boot_checkpoints")
+const BOOT_SCREEN = parse(Int, get(ENV, "BOOT_SCREEN", string(selection_cfg("bootstrap_screen", 40))))
 const BOOT_KEY = (B=BOOT_B, work_factor=get(ENV, "BOOT_WORK_FACTOR", string(selection_cfg("bootstrap_work_factor", 50))),
-                  generator=selection_cfg("bootstrap_generator", "most_complex"))
+                  generator=selection_cfg("bootstrap_generator", "most_complex"), screen=BOOT_SCREEN)
 fit_key(g) = [(c.name, c.bic, c.params) for c in g.cands]
 function checkpoint_boot(g)
     get(ENV, "ZOO_RESUME", "0") == "1" || return nothing
@@ -366,7 +369,7 @@ for g in groups
     for (j, c) in enumerate(g.cands)
         push!(sel_rows, (group=g.id, stage=g.stage, candidate=c.name, label=c.label, family=c.family, k=length(c.params),
                          bic=c.bic, delta_bic=c.bic - g.cands[1].bic, pct_lowest_bic=BOOT_B > 0 ? pct(r.winner, j) : NaN, pct_chosen=BOOT_B > 0 ? pct(r.pick, j) : NaN,
-                         optimal=(j == 1), params=join(["$n=$(v)" for (n, v) in zip(c.pnames, c.params)], "; ")))
+                         n_boot=BOOT_B > 0 ? (hasproperty(r, :nboot) ? r.nboot[j] : BOOT_B) : 0, optimal=(j == 1), params=join(["$n=$(v)" for (n, v) in zip(c.pnames, c.params)], "; ")))
     end
     c = g.cands[1]
     for (i, n) in enumerate(c.pnames)
@@ -403,7 +406,7 @@ CSV.write(joinpath(ZOO_DIR, "time_limit_hits.csv"),
 
 # checkpoint: zoo_rebuild_pages.jl redraws the report and site from this without refitting
 try
-    serialize(joinpath(ZOO_DIR, "zoo_state.jls"), (groups=groups, results=results, B=BOOT_B, joint=JOINT_INFO,
+    serialize(joinpath(ZOO_DIR, "zoo_state.jls"), (groups=groups, results=results, B=BOOT_B, screen=BOOT_SCREEN, joint=JOINT_INFO,
               config=(stages=STAGES_FILE, sources=SOURCES_FILE, data_table=DATA_TABLE, selection=get(STAGE_CFG, "selection", Dict()))))
 catch err
     @warn "checkpoint not written" err
