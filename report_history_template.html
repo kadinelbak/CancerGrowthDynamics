@@ -11,7 +11,9 @@ main{max-width:1400px;margin:auto;padding:20px 16px 40px}h1{color:#124b6e;margin
 .tscroll{overflow-x:auto}table{border-collapse:collapse;font-size:13px;min-width:100%}th,td{border-bottom:1px solid #e5eaec;padding:6px 8px;text-align:left;vertical-align:top}
 th{background:#eef3f5;position:sticky;top:0}td.chg{background:var(--chg);font-weight:600}tr.sep td{background:#f7fafb;font-weight:700;color:#124b6e}
 .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}select,label{font:14px system-ui,sans-serif}select{padding:4px 6px;border-radius:6px;border:1px solid var(--line)}
-.mut{color:var(--muted)}code{background:#eef3f5;padding:1px 4px;border-radius:4px}a{color:var(--accent)}
+.mut{color:var(--muted)}button{font:650 14px system-ui,sans-serif;padding:5px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:10px}.panes[hidden]{display:none}.panes iframe{width:100%;height:85vh;border:1px solid var(--line);border-radius:8px;background:#fff}.panes p{margin:0 0 4px}
+@media (max-width:900px){.panes{grid-template-columns:1fr}}code{background:#eef3f5;padding:1px 4px;border-radius:4px}a{color:var(--accent)}
 </style></head><body><main>
 <a class='home' href='../../../index.html'>⌂ Reports home</a><a class='home' href='../report.html'>Current Final Report</a>
 <h1>Final report history</h1>
@@ -19,6 +21,10 @@ th{background:#eef3f5;position:sticky;top:0}td.chg{background:var(--chg);font-we
 <div class='panel controls'><label>Compare <select id='a'></select></label><label>with <select id='b'></select></label>
 <label><input type='checkbox' id='diff'> only rows that differ</label><span class='mut' id='gen'></span></div>
 <div class='panel tscroll'><table id='grid'></table></div>
+<h2 id='side'>Side by side</h2>
+<div class='panel controls'><span>Open the two versions picked above next to each other.</span><button type='button' id='sbs'>Show side by side</button>
+<label><input type='checkbox' id='sync' checked> scroll together</label></div>
+<div id='panes' class='panes' hidden><div><p class='mut' id='la'></p><iframe id='fa' title='Version A'></iframe></div><div><p class='mut' id='lb'></p><iframe id='fb' title='Version B'></iframe></div></div>
 <h2>Versions</h2><div class='panel tscroll'><table id='vers'></table></div>
 <h2>Decision log</h2><div class='panel tscroll'><table id='log'></table></div>
 </main>
@@ -53,7 +59,41 @@ function draw() {
   }
   document.getElementById('grid').innerHTML = h;
 }
+// a link from the Final Report (?a=…&b=…&side=1) picks the two versions and opens them side by side
+const Q = new URLSearchParams(location.search);
+if (Q.get('a') && V.some(v => v.id === Q.get('a'))) A.value = Q.get('a');
+if (Q.get('b') && V.some(v => v.id === Q.get('b'))) B.value = Q.get('b');
+if (Q.get('a') || Q.get('b')) D.checked = true;
 [A, B, D].forEach(e => e.addEventListener('change', draw)); draw();
+const P = document.getElementById('panes'), FA = document.getElementById('fa'), FB = document.getElementById('fb');
+function side() {
+  const a = A.value || (V[1] || V[0] || {}).id, b = B.value;
+  if (!a || !b) return;
+  P.hidden = false;
+  document.getElementById('la').innerHTML = `<b>${esc(a)}</b> · <a href='${esc(a)}/report.html' target='_blank'>open alone</a>`;
+  document.getElementById('lb').innerHTML = `<b>${esc(b)}</b> · <a href='${esc(b)}/report.html' target='_blank'>open alone</a>`;
+  FA.src = a + '/report.html'; FB.src = b + '/report.html';
+  P.scrollIntoView({behavior: 'smooth'});
+}
+document.getElementById('sbs').onclick = side;
+[A, B].forEach(e => e.addEventListener('change', () => { if (!P.hidden) side(); }));
+// scroll together: the same fraction of each page
+let lock = false;
+function link(src, dst) {
+  src.addEventListener('load', () => {
+    try {
+      src.contentWindow.addEventListener('scroll', () => {
+        if (lock || !document.getElementById('sync').checked) return;
+        const s = src.contentDocument.scrollingElement, d = dst.contentDocument && dst.contentDocument.scrollingElement;
+        if (!d) return;
+        lock = true; d.scrollTop = s.scrollTop / Math.max(1, s.scrollHeight - s.clientHeight) * (d.scrollHeight - d.clientHeight);
+        requestAnimationFrame(() => { lock = false; });
+      });
+    } catch (e) {}
+  });
+}
+link(FA, FB); link(FB, FA);
+if (Q.get('side')) side();
 document.getElementById('vers').innerHTML = '<tr><th>Version</th><th>Archived</th><th>Commit</th><th>Source</th><th>Chapters</th><th>Note</th></tr>' +
   V.map(v => `<tr><td><a href='${esc(v.id)}/report.html'>${esc(v.id)}</a></td><td>${esc(v.date)}</td><td>${esc(v.commit)}</td><td>${esc(v.source)}</td><td>${(v.chapters || []).length}</td><td>${esc(v.note)}</td></tr>`).join('');
 document.getElementById('log').innerHTML = '<tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th><th>Where</th></tr>' +

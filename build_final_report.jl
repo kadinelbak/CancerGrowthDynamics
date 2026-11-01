@@ -187,7 +187,7 @@ section.decisions{max-width:1400px;margin:8px auto 0;padding:14px 18px;backgroun
 section.decisions h2{margin:0 0 4px;color:#124b6e;font-size:22px}section.decisions .tscroll{overflow-x:auto}
 section.decisions table{border-collapse:collapse;font-size:13px;width:100%;margin:6px 0}section.decisions th,section.decisions td{border-bottom:1px solid #e5eaec;padding:5px 8px;text-align:left;vertical-align:top}
 section.decisions th{background:#eef3f5}section.decisions tr.chg td{background:#fff3c4}section.decisions .tag{color:#9a6700;font-size:12px}section.decisions .mut{color:var(--muted)}
-section.decisions details{margin:6px 0}section.decisions summary{cursor:pointer;font-weight:650;color:var(--accent)}
+section.decisions details{margin:6px 0}section.decisions details.ver{border-bottom:1px solid #e5eaec;margin:0;padding:6px 0}section.decisions details.ver>summary{font-weight:400;color:var(--ink)}section.decisions details.ver.this>summary{background:#fff3c4;border-radius:6px;padding:2px 4px}section.decisions .verbody{padding:6px 0 6px 18px}section.decisions form.cmp{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 10px}section.decisions form.cmp select,section.decisions form.cmp button{font:14px system-ui,sans-serif;padding:3px 6px;border-radius:6px;border:1px solid var(--line)}section.decisions form.cmp button{background:var(--accent);color:#fff;border:0;cursor:pointer}section.decisions summary{cursor:pointer;font-weight:650;color:var(--accent)}
 .version{color:var(--muted);font-size:13px}
 </style></head><body>
 <header>
