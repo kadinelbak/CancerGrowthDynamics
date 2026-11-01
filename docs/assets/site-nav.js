@@ -5,7 +5,10 @@
    current one, and on the optimal-control pages adds a second row for the 14/30/60/120-day runs and the sweep.
    Pages shown inside another page (Final Report chapters, the version viewer) keep no bar. */
 (function () {
-  if (window.top !== window.self) return;                       // a chapter inside the Final Report
+  // a page shown inside one of our own pages (Final Report chapters, the version viewer) gets no bar; a page
+  // shown inside someone else's frame (a hosting viewer, cross-origin) still does
+  let inOurFrame = false; try { inOurFrame = !!window.frameElement; } catch (e) {}
+  if (inOurFrame) return;
   const me = document.currentScript || [...document.scripts].find(s => /site-nav\.js/.test(s.src));
   const ROOT = new URL('..', me.src);                           // docs/
   const here = location.pathname;
