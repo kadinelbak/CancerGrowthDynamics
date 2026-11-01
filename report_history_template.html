@@ -14,7 +14,8 @@ main{max-width:1400px;margin:auto;padding:20px 16px 40px}h1{color:#124b6e;margin
 .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
 .preface{border-left:6px solid var(--accent)}
 .tscroll{overflow-x:auto}table{border-collapse:collapse;font-size:13px;min-width:100%}th,td{border-bottom:1px solid #e5eaec;padding:6px 8px;text-align:left;vertical-align:top}
-th{background:#eef3f5}td.chg,tr.chg td{background:var(--chg)}tr.sep td{background:#f7fafb;font-weight:700;color:#124b6e}
+th{background:#eef3f5}td.chg,tr.chg td{background:#e6f0fb}td.worse,tr.worse td{background:#fff3c4}td.better,tr.better td{background:#dff3e6}td.best,tr.best td{background:#1d6b3a;color:#fff}td.best .mut,tr.best td .mut{color:#d6eedd}
+.legend span{display:inline-block;padding:1px 8px;border-radius:4px;margin-right:6px;font-size:12px}tr.sep td{background:#f7fafb;font-weight:700;color:#124b6e}
 .mut{color:var(--muted)}code{background:#eef3f5;padding:1px 4px;border-radius:4px}a{color:var(--accent)}
 details{margin:8px 0}summary{cursor:pointer;font-weight:650;color:var(--accent)}
 button,.btn{font:650 14px system-ui,sans-serif;border-radius:8px;padding:7px 13px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;text-decoration:none;display:inline-block}
@@ -82,6 +83,16 @@ function verdict(k, a, b) {
   const up = k[1] === '+' ? y > x : y < x;
   return `<span class='badge ${up ? 'good' : 'bad'}'>${up ? 'better' : 'worse'}</span>`;
 }
+// colour of a quality value: best of all versions (dark green), better or worse than the older value
+function qClass(k, x, older) {
+  const n = lead(x); if (!isFinite(n)) return '';
+  const all = ALL.map(v => lead(val(v, 'results', k))).filter(isFinite);
+  const best = k[1] === '+' ? Math.max(...all) : Math.min(...all);
+  if (new Set(all).size > 1 && n === best) return 'best';
+  const o = lead(older); if (!isFinite(o) || o === n) return '';
+  return (k[1] === '+' ? n > o : n < o) ? 'better' : 'worse';
+}
+const LEGEND = `<p class='mut legend'><span style='background:#1d6b3a;color:#fff'>best of all versions</span><span style='background:#dff3e6'>better than the older version</span><span style='background:#fff3c4'>worse than the older version</span><span style='background:#e6f0fb'>changed (settings and results with no better or worse)</span></p>`;
 const shortQ = l => String(l).replace(/^Quality · /, '').replace(/ \((higher|lower) is better\)$/, '');
 const recorded = v => ((v && v.settings) || []).length > 0;
 
@@ -121,7 +132,7 @@ function listView() {
   <div class='acts'><a class='btn' href='#read/${esc(v.id)}'>Read</a></div>
 </article>`).join('')}</div>
 <h2>All versions side by side</h2>
-<details class='panel'><summary>Every setting and key result in every version (${ALL.length} columns)</summary><p class='mut'>A yellow cell differs from the same row in the next older version (the column to its right).</p><div class='tscroll'><table id='grid'></table></div></details>
+<details class='panel'><summary>Every setting and key result in every version (${ALL.length} columns)</summary>${LEGEND}<p class='mut'>Each cell is compared with the next older version, the column to its right.</p><div class='tscroll'><table id='grid'></table></div></details>
 <details class='panel'><summary>Decision log (${LOG.length} decisions, newest first; <code>decisions.toml</code>)</summary><div class='tscroll'><table>
 <tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th><th>Where</th></tr>
 ${LOG.slice().reverse().map(d => `<tr><td class='nw'>${esc(d.date)}</td><td>${esc(d.area)}</td><td>${esc(d.decision)}</td><td>${esc(d.was)}</td><td>${esc(d.by)}</td><td><code>${esc(d.where)}</code></td></tr>`).join('')}</table></div></details>
@@ -145,11 +156,15 @@ ${LOG.slice().reverse().map(d => `<tr><td class='nw'>${esc(d.date)}</td><td>${es
 function grid(cols) {
   const keys = grp => { const m = new Map(); for (const v of cols) for (const r of (v[grp] || [])) if (!m.has(r.key)) m.set(r.key, r.label); return [...m]; };
   let h = '<tr><th>Setting / result</th>' + cols.map(v => `<th><a href='#read/${esc(v.id)}'>${esc(v.id)}</a></th>`).join('') + '</tr>';
-  for (const [grp, title] of [['settings', 'Modelling decisions'], ['results', 'Key results']]) {
+  for (const [grp, title, keep] of [['results', 'Research quality', isQ], ['settings', 'Modelling decisions', () => true], ['results', 'Key results', k => !isQ(k)]]) {
     h += `<tr class='sep'><td colspan='${cols.length + 1}'>${title}</td></tr>`;
-    for (const [k, label] of keys(grp)) {
+    for (const [k, label] of keys(grp).filter(([k]) => keep(k))) {
       const vals = cols.map(v => val(v, grp, k));
-      h += `<tr><td>${esc(label)}</td>` + vals.map((x, i) => { const o = vals[i + 1]; return `<td${x != null && o != null && x !== o ? " class='chg'" : ''}>${x == null ? "<span class='mut'>not recorded</span>" : esc(x)}</td>`; }).join('') + '</tr>';
+      h += `<tr><td>${esc(isQ(k) ? shortQ(label) : label)}</td>` + vals.map((x, i) => {
+        const o = vals[i + 1];
+        const c = x == null ? '' : isQ(k) ? qClass(k, x, o) : (o != null && x !== o ? 'chg' : '');
+        return `<td${c ? ` class='${c}'` : ''}>${x == null ? "<span class='mut'>not recorded</span>" : esc(x)}</td>`;
+      }).join('') + '</tr>';
     }
   }
   document.getElementById('grid').innerHTML = h;
@@ -178,7 +193,7 @@ function preface(older, newer, mode) {
     : `<h3>Decisions</h3><p class='mut'>No decision in <code>decisions.toml</code> is dated ${!older ? `on or before ${esc(day(newer))}` : day(older) === day(newer) ? `after ${esc(day(older))}, the day ${esc(oN)} was built` : `after ${esc(day(older))} and on or before ${esc(day(newer))}`}.</p>`;
   const q = diff(older, newer, 'results', isQ);
   const qrows = q.changed.concat(q.same, q.added);
-  const qHtml = qrows.length ? `<h3>Research quality</h3><p class='mut'>The metrics to push up (or down) from version to version: held-out error, parameters pinned, selection stability, control robustness and scenario agreement.</p><div class='tscroll'><table><tr><th>Metric</th><th>${esc(nN)}</th><th>${older ? esc(oN) : ''}</th></tr>${qrows.map(x => `<tr${x.a != null && x.a !== x.b ? " class='chg'" : ''}><td>${esc(shortQ(x.label))} <span class='mut'>(${x.k[1] === '+' ? 'higher' : 'lower'} is better)</span> ${!older ? '' : x.a == null ? "<span class='badge'>new</span>" : verdict(x.k, x.a, x.b)}</td><td>${esc(x.b)}</td><td class='mut'>${older ? (x.a == null ? 'not recorded' : esc(x.a)) : ''}</td></tr>`).join('')}</table></div>`
+  const qHtml = qrows.length ? `<h3>Research quality</h3><p class='mut'>The metrics to push up (or down) from version to version: held-out error, parameters pinned, selection stability, control robustness and scenario agreement.</p><div class='tscroll'><table><tr><th>Metric</th><th>${esc(nN)}</th><th>${older ? esc(oN) : ''}</th></tr>${qrows.map(x => `<tr class='${qClass(x.k, x.b, x.a)}'><td>${esc(shortQ(x.label))} <span class='mut'>(${x.k[1] === '+' ? 'higher' : 'lower'} is better)</span> ${!older ? '' : x.a == null ? "<span class='badge'>new</span>" : verdict(x.k, x.a, x.b)}</td><td>${esc(x.b)}</td><td class='mut'>${older ? (x.a == null ? 'not recorded' : esc(x.a)) : ''}</td></tr>`).join('')}</table></div>`
     : `<h3>Research quality</h3><p class='mut'>Not recorded for this version.</p>`;
   let setHtml, resHtml;
   if (!recorded(newer) || (older && !recorded(older))) {
@@ -193,7 +208,7 @@ function preface(older, newer, mode) {
     setHtml = `<h3>Settings: ${nS ? `${nS} changed` : 'none changed'}</h3>${changeTable(s, oN, nN)}${sameTable(s, nN)}`;
     resHtml = `<h3>Key results: ${nR ? `${nR} differ` : 'none differ'}</h3>${changeTable(r, oN, nN)}${sameTable(r, nN)}`;
   }
-  head += `<p class='mut'>Yellow rows changed between the two versions.</p>`;
+  head += LEGEND;
   return `<section class='panel preface'>${head}${decHtml}${qHtml}${setHtml}${resHtml}</section>`;
 }
 
