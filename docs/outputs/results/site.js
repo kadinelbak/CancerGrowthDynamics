@@ -91,7 +91,10 @@ const TIPS_BETTER = {
 function typeset(el) { if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise(el ? [el] : undefined); }
 
 // ── navigation shared by the three pages ─────────────────────────────────────
+// the site-wide bar now comes from docs/assets/site-nav.js (same tabs on every main page); this returns
+// nothing unless that script is missing, so the page still has a way home
 function navHTML(active) {
+  if (document.querySelector('script[src*="site-nav.js"]')) return '';
   const l = (id, href, label) => `<a href="${href}" class="${id === active ? 'on' : ''}">${label}</a>`;
   return `<nav class="topnav" aria-label="Results navigation">${l('home', '../../index.html', '⌂ Home')}` +
     l('summary', 'summary.html', 'Summary') + l('presentation', 'presentation.html', 'Presentation') +

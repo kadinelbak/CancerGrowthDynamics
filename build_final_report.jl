@@ -259,4 +259,23 @@ else
 end
 write_history_index()
 println("Wrote docs/outputs/final_report/history/index.html ($(length(load_versions())) versions)")
+
+# the same top bar on every main page (docs/assets/site-nav.js; user, 2026-11-01). Regenerated reports lose the
+# script tag, so it is put back here, as docs/assets/add_site_nav.py does; pages that have it are left alone.
+const NAV_PAGES = ["index.html", "papers/index.html", "papers/from-culture-to-control/index.html",
+    "outputs/results/summary.html", "outputs/results/presentation.html", "outputs/results/explorer.html",
+    "outputs/final_report/report.html", "outputs/final_report/history/index.html", "outputs/time_keeping/index.html",
+    (joinpath(PKG, d, "report.html") for d in ("control", "control_30d", "control_60d", "control_120d", "control_sweep", "findings", "zoo_fits",
+        "zoo_analyses/bootstrap", "zoo_analyses/sensitivity", "zoo_analyses/validation", "zoo_analyses/resistant_kill"))...]
+function add_site_nav(rel)
+    f = joinpath(DOCS, rel); isfile(f) || return false
+    html = read(f, String)
+    occursin("site-nav.js", first(html, 20000)) && return false
+    src = replace(relpath(joinpath(DOCS, "assets", "site-nav.js"), dirname(f)), '\\' => '/')
+    tag = "<script defer src=\"$src\"></script>\n"
+    m = findfirst(r"</head\s*>"i, html)
+    write(f, m === nothing ? tag * html : html[1:prevind(html, first(m))] * tag * html[first(m):end])
+    true
+end
+println("Site navigation bar added to $(count(add_site_nav, NAV_PAGES)) page(s)")
 isempty(missing_parts) || println("Missing: ", join(missing_parts, ", "))

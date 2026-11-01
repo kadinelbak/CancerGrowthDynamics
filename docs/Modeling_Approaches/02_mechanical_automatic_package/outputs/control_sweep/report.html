@@ -3,7 +3,8 @@
 .intro,.panel{background:#fff;border:1px solid #d9e2e6;border-radius:12px;padding:14px 18px;margin:12px 0;min-width:0}.intro{border-left:6px solid #176b87}
 table{border-collapse:collapse;font-size:13px;width:100%}th,td{border-bottom:1px solid #e5eaec;padding:5px 7px;text-align:left;vertical-align:top}th{background:#eef3f5}
 td.num{text-align:right;font-variant-numeric:tabular-nums}td.win{background:#e7f6ec;font-weight:600}tr.beyond td{background:#f5f3ff}.tscroll{overflow-x:auto}
-details{margin:8px 0}summary{cursor:pointer;font-weight:600;padding:6px 0}.muted{color:#5b6b73}code{background:#eef3f5;padding:1px 4px;border-radius:4px}</style></head><body><main>
+details{margin:8px 0}summary{cursor:pointer;font-weight:600;padding:6px 0}.muted{color:#5b6b73}code{background:#eef3f5;padding:1px 4px;border-radius:4px}</style><script defer src="../../../../assets/site-nav.js"></script>
+</head><body><main>
 <h1>Control sweep: barriers, thresholds, run lengths</h1>
 <div class='intro'><p>Generated 2026-10-28 19:41 by <code>run_control_sweep.jl</code> and <code>control_sweep_report.jl</code> (PRD, user 2026-10-27). Normal medium; 23 variants, each axis changed one at a time from the default (relaxed_log barrier, B_cancer = B_prog = 0.5 K, 14 days, look-ahead ending with the run, time-to-progression objective), plus the full barrier × run-length cross. Every variant is scored with its own thresholds, and every comparator is rerun under it.</p>
 <p><b>Barriers.</b> relaxed_log: the relaxed log barrier (Feller &amp; Ebenbauer 2017); quadratic: zero below B_cancer, a quadratic penalty above; hard: a near-wall that makes any interval at or above B_cancer cost about 1000.0, so a crossing plan is chosen only when every plan crosses; none: no burden penalty, the progression step only.</p>
