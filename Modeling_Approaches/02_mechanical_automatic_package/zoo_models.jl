@@ -406,7 +406,7 @@ const KERNELS = [(:none, "imm", "Immediate"), (:comp1, "comp", "Effect compartme
 # At most 3 compartments per model: delay states plus damaged-cell states (the second-order effect counts as 2).
 const MAX_COMPARTMENTS = 3
 # selection: fewest free parameters among the candidates within RULE_BIC of the lowest BIC
-const RULE_BIC = 3.0
+const RULE_BIC = 2.0   # user, 2026-10-27 (was 3.0)
 ncompartments(kernel, action) = nker(kernel) + ncell(action) + naux(action)
 kernel_slots(k) = chainlen(k) > 0 || k == :comp1 ? [:k] : k == :second ? [:ω, :ζ] : Symbol[]
 action_slots(a) = Dict(:loss => [:β], :hill => [:β, :h], :damage => [:β, :δ], :transit => [:β, :τ], :capacity => [:c],

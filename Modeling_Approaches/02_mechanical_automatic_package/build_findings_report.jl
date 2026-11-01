@@ -36,7 +36,7 @@ function glance()
         line = endswith(r.group, "-a2780") ? " (A2780)" : endswith(r.group, "-a2780cis") ? " (A2780cis)" : ""
         push!(rows, tr([h(stage_label(r.stage)) * line, h(r.label), string(r.k), f1(r.bic), f0(r.pct_chosen) * "%"]))
     end
-    "<h2>Carried model at each stage $(tip("The model each stage carries forward: the fewest free parameters among the candidates within 3 BIC of the lowest. 'Chosen in' is how often the same rule picks it when the data are resampled (bootstrap generated from the carried model).", :none))</h2>" *
+    "<h2>Carried model at each stage $(tip("The model each stage carries forward: the fewest free parameters among the candidates within 2 BIC of the lowest. 'Chosen in' is how often the same rule picks it when the data are resampled (bootstrap generated from the carried model).", :none))</h2>" *
     table([th("Stage", "Fitting stage (thesis numbering).", :none), th("Carried model", "Selected model.", :none),
            th("k", "Free model parameters (estimated starting values are counted in the BIC but not here).", "Fewer is better at equal fit."),
            th("BIC", "Weighted BIC of the carried model; compare only within a stage.", :lower),
@@ -168,7 +168,7 @@ end
 # ── 8. assumptions register ───────────────────────────────────────────────────
 function register()
     R = [("No explicit time terms; ≤ 3 compartments per mechanism", "Design choice (optimal control needs autonomous models)", "Not compared with time-based models in the results; the earlier time-based zoo is archived."),
-         ("Fewest parameters within 3 BIC of the lowest", "Partly", "Bootstrap shows how often the rule re-picks each model (table above)."),
+         ("Fewest parameters within 2 BIC of the lowest", "Partly", "Bootstrap shows how often the rule re-picks each model (table above)."),
          ("Residual variance ∝ max(y, 50)^1.1 (pooled power law)", "Partly", "Earlier SD-weighted and unweighted fits were compared on the held-out cocultures; residuals are correlated day to day, so the effective number of points is below n."),
          ("Day 0 = nominal seeding; estimated when > 3-fold off", "Yes, per series", "See 'Estimated starting values'."),
          ("Shared cisplatin structure for both lines", "Imposed for the drug; tested for low resource", "Stage 2b chooses one structure on the joint BIC."),

@@ -10,7 +10,7 @@
 #   ε_N, ε_C (low-resource strength per line), or reset the resistant kill to its Stage 2 value
 #   (only offered when the carried Stage 3 model refitted β_C; otherwise it equals the inherited model).
 # The model carried forward is chosen by the same rule as every stage (fewest free parameters within
-# 3 BIC of the lowest). Include after zoo_common.jl, zoo_models.jl, bootstrap_tools.jl, zoo_selection.jl.
+# 2 BIC of the lowest). Include after zoo_common.jl, zoo_models.jl, bootstrap_tools.jl, zoo_selection.jl.
 
 freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
 freeze_line(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple(freeze_slot(getfield(L.s, k), p) for k in keys(L.s))),))

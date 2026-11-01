@@ -343,7 +343,8 @@ last_day(g, k) = maximum(g.datasets[k].x)
 # outputs per fit: (label, dataset index)
 function gsa_outputs(g)
     g.kind in (:s1, :s1b) && return [("count on the last day", 1)]
-    g.kind == :s2 && return [("count on the last day at 1.0 µM", findfirst(==(1.0), treated[g.line].doses))]
+    # the 1.0 µM series, or the nearest fitted dose when a stage excludes it (A2780cis since 2026-10-27)
+    g.kind == :s2 && return (d = treated[g.line].doses; k = argmin(abs.(d .- 1.0)); [("count on the last day at $(d[k]) µM", k)])
     g.kind == :s3 && return [("Ce1 50:50 sensitive, last day", 9), ("Ce1 50:50 resistant, last day", 10)]
     g.kind == :s4 && return [("sensitive, last day", 1), ("resistant, last day", 2)]
     [("run 1, 1:1 sensitive, last day", 3), ("run 1, 1:1 resistant, last day", 4)]
@@ -531,7 +532,7 @@ end
 # values are image areas already normalised to cell size, i.e. ≈ cell counts). Scored as RMSE in cells
 # and nRMSE. Separately, a hypothesis test (not validation, since it fits one rate to these data):
 # does the drug effect decay after removal at the build-up rate k (the model's assumption)? A separate
-# washout rate k_off of the first effect compartment while D = 0 is fitted and kept only if the 3-BIC
+# washout rate k_off of the first effect compartment while D = 0 is fitted and kept only if the 2-BIC
 # rule supports it (weighted SSE with the run's weights; chain and compartment kernels only).
 const SP = VAL["schedule_prediction"]
 const INT_SCHED = Dict(Symbol(k) => v for (k, v) in SP["schedules"])
@@ -621,7 +622,7 @@ function page(file, title, active, body)
     html = """<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>$title</title>
 <script>window.MathJax={tex:{inlineMath:[['\\\\(','\\\\)']],displayMath:[['\\\\[','\\\\]']]}};</script><script defer src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>$nav<h1>$title</h1>
-<p class='muted'>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the model zoo run of $(Libc.strftime("%Y-%m-%d %H:%M", mtime(joinpath(ZOO_DIR, "zoo_state.jls")))) by <code>zoo_analyses.jl</code>. Every model here is a compartment model with no time-based terms; the model analysed in each fit is the carried-forward optimal model (fewest free parameters within 3 BIC of the lowest). Buttons marked $(tip("Hover over, tap or focus an i button to see how to read the graph or column next to it. Click elsewhere or press Esc to close.", "Every tip ends with what is better: lower, higher, or closer to a target value.")) explain how to read the graph or column next to them.</p>
+<p class='muted'>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the model zoo run of $(Libc.strftime("%Y-%m-%d %H:%M", mtime(joinpath(ZOO_DIR, "zoo_state.jls")))) by <code>zoo_analyses.jl</code>. Every model here is a compartment model with no time-based terms; the model analysed in each fit is the carried-forward optimal model (fewest free parameters within 2 BIC of the lowest). Buttons marked $(tip("Hover over, tap or focus an i button to see how to read the graph or column next to it. Click elsewhere or press Esc to close.", "Every tip ends with what is better: lower, higher, or closer to a target value.")) explain how to read the graph or column next to them.</p>
 $body</main></body></html>"""
     dir = joinpath(AN_DIR, file); mkpath(dir); write(joinpath(dir, "report.html"), stage_names(html))
     ddir = joinpath(AN_DOCS, file); mkpath(ddir); cp(joinpath(dir, "report.html"), joinpath(ddir, "report.html"); force=true)
@@ -666,7 +667,7 @@ const BETTER = Dict{String,Any}(
     "nRMSE" => :lower,
     "BIC, equal rates" => :lower,
     "BIC with k_off" => :lower,
-    "ΔBIC" => "More negative favours adding the washout rate; above −3 the simpler equal-rate model is enough.",
+    "ΔBIC" => "More negative favours adding the washout rate; above −2 the simpler equal-rate model is enough.",
     "Points" => "Higher gives a more reliable score.",
     "Held-out RMSE" => :lower,
     "In-sample RMSE" => :lower,
@@ -749,8 +750,8 @@ function write_bootstrap()
     CSV.write(joinpath(AN_DIR, "bootstrap_parameters.csv"), DataFrame(csvp)); CSV.write(joinpath(AN_DIR, "bootstrap_selection.csv"), DataFrame(csvs))
     summ = [trow([td("<a href='#$(g.id)'>$(hesc(g.title))</a>"), td(hesc(g.cands[1].label)), tn(pctfmt(pct(results[g.id].res.pick, 1))), tn(pctfmt(pct(results[g.id].res.winner, 1)))]) for g in groups]
     page("bootstrap", "Bootstrapping — compartment models", "bootstrap", """
-<div class='intro'><p><b>Method.</b> Each fit is resampled $BOOT_B times. The standardised residuals (residual ÷ its weight scale) of the generating model are resampled in circular blocks of $BLOCK days within each trajectory, rescaled and added back to its fit; <b>every candidate</b> is refitted to every replicate and the selection rule (fewest free parameters within 3 BIC of the lowest; shared cisplatin structure across lines; Stage 1b shared-vs-separate test) is replayed on each. This gives how often the optimal model is chosen, 95% parameter intervals and the band around the fit. For comparison the optimal model is also refitted to a within-trajectory bootstrap that resamples the standardised residuals one by one (the scheme of <code>GrowthParameterEstimation.bootstrap_joint_fit</code>, used by the earlier linked-treatment reports; it is run here with the same residual weights as the fits, because the package routine cannot resample weighted data); it ignores day-to-day correlation, so its intervals are usually narrower.</p></div>
-<h2>Selection stability</h2>$(table([("Fit", "The data set and stage."), ("Optimal model", "The model carried forward: fewest free parameters within 3 BIC of the lowest."),
+<div class='intro'><p><b>Method.</b> Each fit is resampled $BOOT_B times. The standardised residuals (residual ÷ its weight scale) of the generating model are resampled in circular blocks of $BLOCK days within each trajectory, rescaled and added back to its fit; <b>every candidate</b> is refitted to every replicate and the selection rule (fewest free parameters within 2 BIC of the lowest; shared cisplatin structure across lines; Stage 1b shared-vs-separate test) is replayed on each. This gives how often the optimal model is chosen, 95% parameter intervals and the band around the fit. For comparison the optimal model is also refitted to a within-trajectory bootstrap that resamples the standardised residuals one by one (the scheme of <code>GrowthParameterEstimation.bootstrap_joint_fit</code>, used by the earlier linked-treatment reports; it is run here with the same residual weights as the fits, because the package routine cannot resample weighted data); it ignores day-to-day correlation, so its intervals are usually narrower.</p></div>
+<h2>Selection stability</h2>$(table([("Fit", "The data set and stage."), ("Optimal model", "The model carried forward: fewest free parameters within 2 BIC of the lowest."),
     ("Chosen by the rule", "Share of the bootstrap data sets in which the same selection rule picks this model. Above about 70% the choice is robust; low values mean another model is about as good."),
     ("Lowest BIC", "Share of the bootstrap data sets in which this model had the lowest BIC outright, before preferring fewer parameters. It can differ from 'chosen' when a model with more terms often fits slightly better.")], summ))
 <h2>Fits</h2>$(join(secs, "\n"))
@@ -915,11 +916,11 @@ $(table([("Line", "Cell line."), ("Schedule", "The dose schedule of the trajecto
          ("RMSE (cells)", "Error of the no-refit prediction, in cells. " * T_RMSE), ("nRMSE", T_NRMSE)], prow))
 <div class='grid'>$(join(plots))</div>
 <h3>Washout hypothesis test $(warn(:hypothesis_test))</h3>
-<p>Separately, these data test the one untested assumption that matters for scheduling: after the drug is removed, the drug effect decays at the same rate \\(k\\) as it built up. A separate washout rate \\(k_{off}\\) of the first effect compartment while the dose is 0 is <i>fitted to these data</i> (one parameter, everything else fixed). BICs use the weighted SSE with the same residual weights as the fits; the extra rate is kept only if it lowers the BIC by more than 3.</p>
+<p>Separately, these data test the one untested assumption that matters for scheduling: after the drug is removed, the drug effect decays at the same rate \\(k\\) as it built up. A separate washout rate \\(k_{off}\\) of the first effect compartment while the dose is 0 is <i>fitted to these data</i> (one parameter, everything else fixed). BICs use the weighted SSE with the same residual weights as the fits; the extra rate is kept only if it lowers the BIC by more than 2.</p>
 $(table([("Line", "Cell line; each row uses both intermittent trajectories of that line."),
          ("BIC, equal rates", "BIC of the no-refit prediction (decay rate = build-up rate, the model as fitted; no free parameters)."),
          ("Best k_off (/day)", "Separate decay rate after the drug is removed that fits best."), ("BIC with k_off", "BIC with that one extra parameter."),
-         ("ΔBIC", "BIC(with k_off) − BIC(equal rates). Negative by more than 3 would justify the extra washout parameter.")], trows))"""
+         ("ΔBIC", "BIC(with k_off) − BIC(equal rates). Negative by more than 2 would justify the extra washout parameter.")], trows))"""
 end
 
 # ---- validation page

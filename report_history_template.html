@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Final report history</title>
+<!-- written by report_history.jl (build_final_report.jl) and tools/seed_report_history.py; the data below is replaced at each build -->
+<style>
+:root{--ink:#17212b;--muted:#52636b;--accent:#176b87;--line:#d9e2e6;--page:#f4f7f8;--chg:#fff3c4}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1400px;margin:auto;padding:20px 16px 40px}h1{color:#124b6e;margin:8px 0 6px;font-size:30px}h2{color:#124b6e;margin:26px 0 8px}
+.lead{color:var(--muted);max-width:980px}.home{display:inline-flex;gap:6px;padding:6px 10px;border-radius:8px;background:#eef5f6;color:var(--accent);text-decoration:none;font-weight:650;margin-right:6px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
+.tscroll{overflow-x:auto}table{border-collapse:collapse;font-size:13px;min-width:100%}th,td{border-bottom:1px solid #e5eaec;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#eef3f5;position:sticky;top:0}td.chg{background:var(--chg);font-weight:600}tr.sep td{background:#f7fafb;font-weight:700;color:#124b6e}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}select,label{font:14px system-ui,sans-serif}select{padding:4px 6px;border-radius:6px;border:1px solid var(--line)}
+.mut{color:var(--muted)}code{background:#eef3f5;padding:1px 4px;border-radius:4px}a{color:var(--accent)}
+</style></head><body><main>
+<a class='home' href='../../../index.html'>⌂ Reports home</a><a class='home' href='../report.html'>Current Final Report</a>
+<h1>Final report history</h1>
+<p class='lead'>Every Final Report version is kept here and never overwritten. Each column is one version; a highlighted cell differs from the version before it. The settings come from <code>stages.toml</code> and <code>control_config.toml</code> of that version, the key results from its committed outputs, and the dated decisions from <code>decisions.toml</code>. Pick two versions to see only what differs between them.</p>
+<div class='panel controls'><label>Compare <select id='a'></select></label><label>with <select id='b'></select></label>
+<label><input type='checkbox' id='diff'> only rows that differ</label><span class='mut' id='gen'></span></div>
+<div class='panel tscroll'><table id='grid'></table></div>
+<h2>Versions</h2><div class='panel tscroll'><table id='vers'></table></div>
+<h2>Decision log</h2><div class='panel tscroll'><table id='log'></table></div>
+</main>
+<script>
+const H = /*HISTORY_JSON*/null;
+const V = (H && H.versions || []).slice().reverse();            // newest first
+const esc = s => String(s == null ? '' : s).replace(/[&<>']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;'}[c]));
+const val = (v, grp, k) => { const r = (v[grp] || []).find(x => x.key === k); return r ? r.value : null; };
+const rowsOf = grp => { const seen = new Map(); for (const v of V) for (const r of (v[grp] || [])) if (!seen.has(r.key)) seen.set(r.key, r.label); return [...seen]; };
+const A = document.getElementById('a'), B = document.getElementById('b'), D = document.getElementById('diff');
+const opt = v => `<option value='${esc(v.id)}'>${esc(v.id)}${v.commit ? ' · ' + esc(v.commit) : ''}</option>`;
+A.innerHTML = "<option value=''>all versions</option>" + V.map(opt).join('');
+B.innerHTML = V.map(opt).join('');
+if (V.length > 1) { A.value = V[1].id; B.value = V[0].id; }
+document.getElementById('gen').textContent = H ? 'Page generated ' + H.generated + ' · ' + V.length + ' versions' : 'No versions yet';
+function draw() {
+  const cols = A.value ? [V.find(v => v.id === A.value), V.find(v => v.id === B.value)].filter(Boolean) : V;
+  let h = '<tr><th>Setting / result</th>' + cols.map(v => `<th><a href='${esc(v.id)}/report.html'>${esc(v.id)}</a><br><span class='mut'>${esc(v.commit || '')}</span></th>`).join('') + '</tr>';
+  for (const [grp, title] of [['settings', 'Modelling decisions'], ['results', 'Key results']]) {
+    h += `<tr class='sep'><td colspan='${cols.length + 1}'>${title}</td></tr>`;
+    for (const [k, label] of rowsOf(grp)) {
+      const vals = cols.map(v => val(v, grp, k));
+      const known = vals.filter(x => x != null);
+      if (D.checked && new Set(known).size <= 1) continue;
+      // highlight a cell that differs from the next older column (the column to its right)
+      h += `<tr><td>${esc(label)}</td>` + vals.map((x, i) => {
+        const older = A.value ? (i === 1 ? vals[0] : null) : vals[i + 1];
+        const chg = x != null && older != null && x !== older;
+        return `<td${chg ? " class='chg'" : ''}>${x == null ? "<span class='mut'>not recorded</span>" : esc(x)}</td>`;
+      }).join('') + '</tr>';
+    }
+  }
+  document.getElementById('grid').innerHTML = h;
+}
+[A, B, D].forEach(e => e.addEventListener('change', draw)); draw();
+document.getElementById('vers').innerHTML = '<tr><th>Version</th><th>Archived</th><th>Commit</th><th>Source</th><th>Chapters</th><th>Note</th></tr>' +
+  V.map(v => `<tr><td><a href='${esc(v.id)}/report.html'>${esc(v.id)}</a></td><td>${esc(v.date)}</td><td>${esc(v.commit)}</td><td>${esc(v.source)}</td><td>${(v.chapters || []).length}</td><td>${esc(v.note)}</td></tr>`).join('');
+document.getElementById('log').innerHTML = '<tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th><th>Where</th></tr>' +
+  (H && H.decisions || []).slice().reverse().map(d => `<tr><td>${esc(d.date)}</td><td>${esc(d.area)}</td><td>${esc(d.decision)}</td><td>${esc(d.was)}</td><td>${esc(d.by)}</td><td><code>${esc(d.where)}</code></td></tr>`).join('');
+</script>
+</body></html>

@@ -1,0 +1,139 @@
+# Modelling decision log: every decision that changes what the pipeline fits or controls, newest last.
+# build_final_report.jl shows it at the top of the Final Report, next to the settings it reads from
+# stages.toml and control_config.toml, and archives both with every report version
+# (docs/outputs/final_report/history/), so versions can be compared decision by decision.
+# Add an entry here whenever a setting is changed on purpose; the settings themselves stay in their configs.
+#   date      the day the decision was made
+#   area      fitting, data, selection, control
+#   decision  what was decided, in one sentence
+#   was       the previous choice ("" for a new feature)
+#   by        who decided (user, review, ...)
+#   where     the config key or file that holds it
+
+[[decision]]
+date = "2026-09-29"
+area = "control"
+decision = "Two drug-response scenarios for the coculture: A = the Stage 3 coculture fit as selected, B = the Stage 2 monoculture kills for both lines with crowding from the untreated cocultures."
+was = ""
+by = "user"
+where = "control_model.jl scenario_plant"
+
+[[decision]]
+date = "2026-10-01"
+area = "data"
+decision = "Image areas are already normalised to cell size, so they are used as cell counts."
+was = ""
+by = "user"
+where = "data/sources.toml"
+
+[[decision]]
+date = "2026-10-02"
+area = "fitting"
+decision = "A2780cis EC50 fixed at its measured IC50, 8.34 µM."
+was = "1 µM for both lines"
+by = "user"
+where = "stages.toml [lines] ec50"
+
+[[decision]]
+date = "2026-10-02"
+area = "control"
+decision = "Control goal: keep the total burden low and hold resistant cells back."
+was = ""
+by = "user"
+where = "control_config.toml [weights]"
+
+[[decision]]
+date = "2026-10-06"
+area = "fitting"
+decision = "Norton–Simon kill: the cisplatin kill is coupled to growth (Stages 2b, 3a and 4)."
+was = "kill independent of growth"
+by = "user"
+where = "stages.toml kill_growth_coupled"
+
+[[decision]]
+date = "2026-10-06"
+area = "fitting"
+decision = "The resistant kill β_C may be refitted down to 0 in coculture, and the candidates without a resistant cisplatin term compete under the selection rule."
+was = "β_C floor at 0.5 × the Stage 2b value (2026-10-01)"
+by = "user"
+where = "stages.toml s3 betaC_floor"
+
+[[decision]]
+date = "2026-10-07"
+area = "fitting"
+decision = "One pooled residual-variance model for every series: weights from max(y, 50)^0.55."
+was = "per-point 3-well SDs"
+by = "review"
+where = "stages.toml [selection] residual_weighting, weight_power"
+
+[[decision]]
+date = "2026-10-07"
+area = "fitting"
+decision = "Every series starts from the nominal seeding (100 cells per well at 30k)."
+was = "first measured count"
+by = "user"
+where = "zoo_data.jl"
+
+[[decision]]
+date = "2026-10-07"
+area = "control"
+decision = "Control goal: time to progression, progression at N + C ≥ 0.8 K (80% confluence), with the resistant cells left at the end priced."
+was = "burden + resistance"
+by = "user"
+where = "control_config.toml [progression]"
+
+[[decision]]
+date = "2026-10-07"
+area = "control"
+decision = "Look-ahead of 28 days at every decision (move blocking 1,1,2,2,4,4)."
+was = "14 days"
+by = "user"
+where = "control_config.toml lookahead_blocks"
+
+[[decision]]
+date = "2026-10-27"
+area = "selection"
+decision = "Carried model: the fewest free parameters within 2 BIC of the lowest BIC."
+was = "within 3 BIC"
+by = "user"
+where = "stages.toml [selection] rule_bic"
+
+[[decision]]
+date = "2026-10-27"
+area = "data"
+decision = "The A2780cis 1 µM monoculture (no kill by day 14) is left out of the Stage 2b fit; the fit with every dose is kept as a variant."
+was = "all three doses for both lines"
+by = "user"
+where = "stages.toml s2 exclude"
+
+[[decision]]
+date = "2026-10-27"
+area = "control"
+decision = "B_cancer and B_prog lowered to K/2, off the untreated plateau (0.71–0.84 K)."
+was = "0.8 K"
+by = "user"
+where = "control_config.toml B_cancer_fraction_of_K, threshold_fraction_of_K"
+
+[[decision]]
+date = "2026-10-27"
+area = "control"
+decision = "The look-ahead stops at the end of the run, so the last decisions know the run is ending."
+was = "fixed 28 days, past the end of the run"
+by = "user"
+where = "control_config.toml lookahead_to_end"
+
+[[decision]]
+date = "2026-10-27"
+area = "control"
+decision = "Control runs of 14, 30 and 60 days, and a sweep over four burden-barrier shapes (relaxed log, quadratic, hard, none), thresholds, look-ahead modes and objectives."
+was = "14 days (and the 120-day fasting run)"
+by = "user"
+where = "control_config.toml run_days, barrier_sweep; run_control_sweep.jl"
+
+[[decision]]
+date = "2026-10-28"
+area = "fitting"
+decision = "Bootstrap optimiser runs get a work budget of 50× the evaluations of one refit, at least 1e8 (a count, not a time limit; the first run used a 1e6 floor and 875 mostly monoculture BFGS runs hit it, with Nelder–Mead taking over); runs over it are dropped for that replicate and listed. Finished group bootstraps are checkpointed so a stopped run resumes."
+was = "no limit (one Stage 4 replicate ran for 11+ h)"
+by = "claude"
+where = "stages.toml bootstrap_work_factor; bootstrap_tools.jl bs_fit"

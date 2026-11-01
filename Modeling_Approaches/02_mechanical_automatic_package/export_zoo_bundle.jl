@@ -1,5 +1,5 @@
 # Writes docs/outputs/results/bundle.js (window.RESULTS) from run_zoo_fits.jl: data, the
-# optimal model (fewest free parameters within 3 BIC of the lowest) of every fit group with its equations, parameters, bootstrap
+# optimal model (fewest free parameters within 2 BIC of the lowest) of every fit group with its equations, parameters, bootstrap
 # intervals, curves and band, the full candidate ranking, and the system spec the in-browser
 # simulator (site.js, MODELS.zoo) needs to re-run it.
 
@@ -138,7 +138,7 @@ zoo_panels(g) = g.kind == :s4 ? ["1:1, low resource + 1 µM cisplatin"] : g.kind
 zoo_main_panel(g) = g.kind in (:s3, :s3b) ? 2 : 1
 
 const ZOO_GROUP_TEXT = Dict(
-    :s1 => "Grown alone at 30k in 10% FBS. The selected growth law (fewest terms within 3 BIC) and its r, K (and θ) are carried into every later stage.",
+    :s1 => "Grown alone at 30k in 10% FBS. The selected growth law (fewest terms within 2 BIC) and its r, K (and θ) are carried into every later stage.",
     :s1b => "Grown alone at 0.5% FBS. Growth is carried over from Stage 1; only the low-resource mechanism is fitted, and every mechanism acts through states driven by u_R, never through time.",
     :s2 => "Cisplatin at 0.62, 1.0 and 1.47 µM, fitted jointly. Growth is carried over from Stage 1; delays and accumulation come from drug-effect or damaged-cell states driven by D, never from time. A Hill kill uses each line's measured IC50 as EC50 (1 and 8.34 µM); with the Norton–Simon option the kill is scaled by the line's growth factor, so crowded cells die less.",
     :s3 => "Untreated (Ce0) and 1 µM treated (Ce1) cocultures at three ratios, all fitted at once with one shared carrying capacity K. Each line keeps its Stage 2 drug mechanism.",
@@ -264,7 +264,7 @@ function export_zoo_bundle(groups, results; B=BOOT_B)
             "xmax" => g.kind == :s1b ? 20.0 : XMAX,
             "ymax" => g.kind == :s1b ? ceil(maximum(maximum(s.y) for s in series) * 1.2; sigdigits=2) : YMAX))
     end
-    bundle = Dict{String,Any}("generated" => Dates.format(now(), "yyyy-mm-dd HH:MM"), "replicates" => B, "selection" => "fewest free parameters within 3 BIC of the lowest", "ruleBIC" => RULE_BIC, "maxCompartments" => MAX_COMPARTMENTS, "weighting" => selection_cfg("residual_weighting", "none"),
+    bundle = Dict{String,Any}("generated" => Dates.format(now(), "yyyy-mm-dd HH:MM"), "replicates" => B, "selection" => "fewest free parameters within 2 BIC of the lowest", "ruleBIC" => RULE_BIC, "maxCompartments" => MAX_COMPARTMENTS, "weighting" => selection_cfg("residual_weighting", "none"),
                               "zoo" => "autonomous", "groups" => out)
     mkpath(RESULTS_DIR)
     write(joinpath(RESULTS_DIR, "bundle.js"), stage_names("window.RESULTS = " * jsonv(bundle) * ";\n"))

@@ -71,8 +71,9 @@ function constant_dose(name)
     ds[1]
 end
 
+const STAGE_CFG = TOML.parsefile(STAGES_FILE)
 # the two lines, their symbols and measured IC50 (stages.toml [lines])
-const LINE_CFG = TOML.parsefile(STAGES_FILE)["lines"]
+const LINE_CFG = STAGE_CFG["lines"]
 const LINES = [(line=L, sym=LINE_CFG[L]["sym"], ec50=Float64(LINE_CFG[L]["ec50"])) for L in ("A2780", "A2780cis")]
 const LINE_SYM = Dict(L.line => L.sym for L in LINES)
 const EC50_OF_SYM = Dict(L.sym => L.ec50 for L in LINES)       # EC50 by line symbol (N, C)
@@ -82,8 +83,25 @@ untreated = Dict(L.line => (s = series(only_source(condition="untreated", line=L
 lrmono = Dict(L.line => (s = series(only_source(condition="low_resource", culture="mono", line=L.line)); (x=s.x, y=s.y, bad=s.bad, why=s.why))
               for L in LINES)
 
+# Series a stage leaves out of its fit: the stage's `exclude` list in stages.toml, each entry a set of tags
+# that must all match (`dose` = the constant dose in µM). ZOO_NO_EXCLUDE=1 ignores every list (the
+# original fit, kept as a sensitivity variant: user, 2026-10-27, dropped the A2780cis 1 µM monoculture).
+const USE_EXCLUDE = get(ENV, "ZOO_NO_EXCLUDE", "0") != "1"
+function excluded(st, s)
+    USE_EXCLUDE || return false
+    any(get(st, "exclude", Any[])) do e
+        all(collect(keys(e))) do k
+            k == "dose" ? (string(get(s, "condition", "")) == "treated" && constant_dose(s["schedule"]) ≈ Float64(e[k])) : string(get(s, k, "")) == string(e[k])
+        end
+    end
+end
+# the excluded sources of every stage, for the reports: [(stage, id, line, file)]
+excluded_sources() = [(stage=st["id"], id=s["id"], line=s["line"], file=basename(s["file"]))
+                      for st in STAGE_CFG["stage"] for s in SOURCES if haskey(st, "data") && excluded(st, s)]
+
 treated = Dict(L.line => begin
-                   ids = select_sources(condition="treated", line=L.line)
+                   st2 = STAGE_CFG["stage"][findfirst(s -> s["id"] == "s2", STAGE_CFG["stage"])]
+                   ids = [i for i in select_sources(condition="treated", line=L.line) if !excluded(st2, source(i))]
                    (doses=[constant_dose(source(i)["schedule"]) for i in ids], data=[(s = series(i); (s.x, s.y)) for i in ids],
                     files=[basename(source(i)["file"]) for i in ids])
                end for L in LINES)
@@ -122,7 +140,6 @@ intermittent = Dict(L.line => Dict(source(i)["schedule"] => (s = series(i); (x=s
 
 # ── data of a fitting stage (stages.toml) ──────────────────────────────────────
 
-const STAGE_CFG = TOML.parsefile(STAGES_FILE)
 selection_cfg(k, default) = get(get(STAGE_CFG, "selection", Dict()), k, default)
 
 # Per-point residual scale of a series under stages.toml [selection] residual_weighting:
@@ -163,7 +180,7 @@ function stage_sources(st; line=nothing)
     sel = st["data"]
     ok(s) = all(k -> (v = sel[k]; w = string(get(s, k, "")); v isa AbstractVector ? w in string.(v) : w == string(v)), collect(keys(sel))) &&
             (line === nothing || s["line"] == line)
-    [s for s in SOURCES if ok(s)]
+    [s for s in SOURCES if ok(s) && !excluded(st, s)]
 end
 env_inputs(s) = (D=dose_input(s["schedule"]), R=ur_of(Float64(s["fbs"])))
 # coculture environments: distinct (condition, ratio, run), each with its sensitive and resistant source

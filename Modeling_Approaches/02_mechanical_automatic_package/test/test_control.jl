@@ -137,9 +137,10 @@ end
         end
 
         @testset "scenario $scen: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end" begin
-            below = x0_for(P, 0.25W.Bp, 0.25W.Bp); above = x0_for(P, W.Bp, W.Bp)   # 2 B_prog: 40 step widths above
-            @test progression_cost(below[P.iN], below[P.iC], W) < 1e-6 * W.qP              # ≈ 0 well under the threshold
-            @test progression_cost(above[P.iN], above[P.iC], W) > (1 - 1e-6) * W.qP        # ≈ qP well above it
+            # placed in step widths from B_prog, so the check holds for any threshold (K/2 since 2026-10-27)
+            lo = (W.Bp - 15W.sP) / 2; hi = (W.Bp + 15W.sP) / 2; above = x0_for(P, W.Bp, W.Bp)
+            @test progression_cost(lo, lo, W) < 1e-6 * W.qP              # ≈ 0 well under the threshold
+            @test progression_cost(hi, hi, W) > (1 - 1e-6) * W.qP        # ≈ qP well above it
             at = x0_for(P, 0.5W.Bp, 0.5W.Bp)
             @test isapprox(progression_cost(at[P.iN], at[P.iC], W), W.qP / 2; rtol=1e-12)   # half way at the threshold
             W0 = with_fields(W; qRT=0.0)
@@ -256,5 +257,45 @@ end
         @test relaxed_barrier(-0.5, μ, δ) > relaxed_barrier(0.0, μ, δ) > relaxed_barrier(δ, μ, δ)         # steep, finite outside
         @test isfinite(relaxed_barrier(-1.0, μ, δ))
         @test relaxed_barrier(1.0, μ, δ) == 0                                                            # no burden penalty: B_cancer = Inf gives z = 1
+    end
+
+    # PRD 2026-10-27: the four burden-penalty shapes at B_cancer ([cancer] barrier, swept by run_control_sweep.jl)
+    @testset "burden barrier shapes" begin
+        P = scenario_plant(:A)
+        for b in BARRIERS
+            W = default_weights(P; barrier=b)
+            @test W.barrier == b && W.Bc ≈ CFG["cancer"]["B_cancer_fraction_of_K"] * P.K
+            lo, at, hi = burden_penalty(0.1W.Bc, W), burden_penalty(W.Bc, W), burden_penalty(1.1W.Bc, W)
+            @test 0 <= lo < 0.01                                          # ≈ 0 well below the threshold
+            @test all(isfinite, (lo, at, hi)) && all(>=(0), (lo, at, hi))  # ≥ 0: the exact search can still prune
+            b == :none ? (@test hi == 0) : (@test hi > lo && hi > at)      # rises above it
+            g = ForwardDiff.derivative(t -> burden_penalty(t, W), 1.05W.Bc)
+            @test isfinite(g) && (b == :none || g > 0)                    # differentiable for SQP
+        end
+        @test burden_penalty(0.4P.K, default_weights(P)) == relaxed_barrier(1 - 0.4P.K / default_weights(P).Bc, CFG["weights"]["mu_cancer"], CFG["weights"]["barrier_delta"])
+        @test_throws ErrorException default_weights(P; barrier=:cubic)
+        # hard: any interval at or above B_cancer costs more than a whole look-ahead of every other term
+        Wh = default_weights(P; barrier=:hard)
+        @test burden_penalty(Wh.Bc, Wh) > 20 * (Wh.qP + Wh.qRT + Wh.qB + Wh.ru) && burden_penalty(Wh.Bc - 0.02P.K, Wh) < 1
+        # so the exact search avoids a crossing plan when one exists: from just under B_cancer, no drug crosses
+        # and the plan that stays under (if any) is chosen
+        x0 = x0_for(P, 0.25Wh.Bc, 0.2Wh.Bc)
+        sol = discrete_solve(x0, P, Δ, 3, LEVELS, Wh)
+        cross(U) = any(x -> x[P.iN] + x[P.iC] >= Wh.Bc, rollout(x0, U, P, Δ)[2:end])
+        plans = vec([[a, b, c] for a in LEVELS, b in LEVELS, c in LEVELS])
+        any(!cross(U) for U in plans) && @test !cross(sol.U)
+    end
+
+    @testset "look-ahead that ends with the run" begin
+        LOOK = Int.(CFG["schedule"]["lookahead_blocks"])
+        @test cut_blocks(LOOK, 1) == [1]                                   # the last decision plans one interval
+        @test all(sum(cut_blocks(LOOK, m)) == min(m, sum(LOOK)) for m in 1:20)
+        P = scenario_plant(:A); W = default_weights(P); n = round(Int, CFG["schedule"]["closed_loop_days"] / Δ)
+        x0 = x0_for(P, 50.0, 50.0)
+        cl = closed_loop(P, P, x0, Δ, n, LOOK, W; mode=:discrete, levels=LEVELS, shrink=true)
+        @test length(cl.U) == n && all(u -> any(isapprox(u, l) for l in LEVELS), cl.U)
+        # the last decision equals the exact one-interval problem from the state it starts in
+        xl = foldl((x, u) -> F(x, u, P, Δ), cl.U[1:end-1]; init=copy(x0))
+        @test cl.U[end] == discrete_solve(xl, P, Δ, [1], LEVELS, W).U[1]
     end
 end

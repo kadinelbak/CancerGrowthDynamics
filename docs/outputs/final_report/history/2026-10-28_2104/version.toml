@@ -1,0 +1,167 @@
+content_sha = "862827de6f57e2d3a072e3e3f583af360719c34f6614fb30ef08f2d5cc2bcf2b"
+id = "2026-10-28_2104"
+note = ""
+report_sha = "83421f5879b2721c83cb04919c6333c53696db9d2f98164a3e062d2a986cafab"
+report_shas = ["30523bdb1fe630e51f71c64d53c214902c919d7f2a2f6a0d221a3f4bdeb83308"]
+date = "2026-10-28 21:04"
+commit = "054d0c6"
+source = "build_final_report.jl"
+
+[[settings]]
+key = "rule_bic"
+label = "Model selection rule"
+value = "fewest parameters within 2 BIC"
+[[settings]]
+key = "weighting"
+label = "Residual weighting"
+value = "power: max(y, 50)^0.55"
+[[settings]]
+key = "s2_exclude"
+label = "Stage 2b series left out"
+value = "A2780cis 1 µM"
+[[settings]]
+key = "kill_coupled"
+label = "Kill coupled to growth (Norton–Simon)"
+value = "yes"
+[[settings]]
+key = "betaC_floor"
+label = "Resistant kill floor in coculture (× Stage 2b)"
+value = "0"
+[[settings]]
+key = "ec50"
+label = "EC50, A2780 / A2780cis (µM)"
+value = "1 / 8.34"
+[[settings]]
+key = "B_cancer"
+label = "B_cancer (burden penalty level)"
+value = "0.5 K"
+[[settings]]
+key = "B_prog"
+label = "B_prog (progression threshold)"
+value = "0.5 K"
+[[settings]]
+key = "barrier"
+label = "Burden barrier shape"
+value = "relaxed_log"
+[[settings]]
+key = "lookahead"
+label = "Look-ahead"
+value = "28 days (blocks 1, 1, 2, 2, 4, 4)"
+[[settings]]
+key = "to_end"
+label = "Look-ahead ends with the run"
+value = "yes"
+[[settings]]
+key = "run_days"
+label = "Control run lengths (days)"
+value = "14, 30, 60, 120"
+[[settings]]
+key = "objective"
+label = "Objective weights"
+value = "qP = 10, qRT = 10, qB = 0.1, qR = 0, qT = 1, ru = 0.1, terminal factor = 5"
+[[settings]]
+key = "B_tox"
+label = "Toxicity limit B_tox"
+value = "0.25"
+[[settings]]
+key = "doses"
+label = "Measured doses (µM)"
+value = "0, 0.62, 1, 1.47"
+
+[[results]]
+key = "carried:s1-a2780"
+label = "Carried model · s1-a2780"
+value = "logistic"
+[[results]]
+key = "carried:s1-a2780cis"
+label = "Carried model · s1-a2780cis"
+value = "theta_logistic"
+[[results]]
+key = "carried:s1b-a2780"
+label = "Carried model · s1b-a2780"
+value = "lr_second_capacity"
+[[results]]
+key = "carried:s1b-a2780cis"
+label = "Carried model · s1b-a2780cis"
+value = "lr_auc_loss"
+[[results]]
+key = "carried:s2-a2780"
+label = "Carried model · s2-a2780"
+value = "chain3_loss"
+[[results]]
+key = "carried:s2-a2780cis"
+label = "Carried model · s2-a2780cis"
+value = "chain3_loss"
+[[results]]
+key = "carried:s3"
+label = "Carried model · s3"
+value = "cc_full_noC"
+[[results]]
+key = "carried:s3b"
+label = "Carried model · s3b"
+value = "lrcc_K_alpha"
+[[results]]
+key = "carried:s4"
+label = "Carried model · s4"
+value = "s4_chi"
+[[results]]
+key = "mpc:A"
+label = "14-day MPC schedule · scenario A, 50:50 (µM)"
+value = "0.0 0.0 0.0 0.0 1.47 1.47 1.47"
+[[results]]
+key = "mpc_total:A"
+label = "14-day MPC N + C at the end · scenario A, 50:50"
+value = "3151"
+[[results]]
+key = "mpc_ttp:A"
+label = "14-day MPC time to progression · scenario A, 50:50"
+value = "day 6.5"
+[[results]]
+key = "mpc:B"
+label = "14-day MPC schedule · scenario B, 50:50 (µM)"
+value = "1.47 1.47 1.47 1.47 1.47 0.0 0.0"
+[[results]]
+key = "mpc_total:B"
+label = "14-day MPC N + C at the end · scenario B, 50:50"
+value = "547"
+[[results]]
+key = "mpc_ttp:B"
+label = "14-day MPC time to progression · scenario B, 50:50"
+value = "not progressed"
+
+[[chapters]]
+stamp = "2026-10-27 23:56"
+title = "1 · Data"
+[[chapters]]
+stamp = "2026-10-28 20:58"
+title = "2 · Compartment models (the models used)"
+[[chapters]]
+stamp = "2026-10-28 21:05"
+title = "3 · Bootstrapping"
+[[chapters]]
+stamp = "2026-10-28 21:05"
+title = "4 · Sensitivity analysis"
+[[chapters]]
+stamp = "2026-10-28 21:05"
+title = "5 · Validation"
+[[chapters]]
+stamp = "2026-10-28 21:07"
+title = "6 · Optimal control"
+[[chapters]]
+stamp = "2026-10-28 22:49"
+title = "7a · Optimal control over 30 days (cisplatin; beyond the data)"
+[[chapters]]
+stamp = "2026-10-28 23:18"
+title = "7b · Optimal control over 60 days (cisplatin; beyond the data)"
+[[chapters]]
+stamp = "2026-10-28 23:41"
+title = "7c · Control sweep: barriers, thresholds, run lengths"
+[[chapters]]
+stamp = "2026-10-28 22:39"
+title = "8 · Optimal control over 120 days: cisplatin and fasting"
+[[chapters]]
+stamp = "2026-10-28 23:41"
+title = "9 · Key findings, assumptions and limitations"
+[[chapters]]
+stamp = "2026-10-27 23:56"
+title = "10 · Mechanistic vs neural-network models"
