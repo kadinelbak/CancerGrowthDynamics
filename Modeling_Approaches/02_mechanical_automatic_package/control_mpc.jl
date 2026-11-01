@@ -61,9 +61,15 @@ with_fields(W::T; kw...) where {T} = T((haskey(kw, f) ? kw[f] : getfield(W, f) f
 # the objective weights (qB, qR, qT, ru, qP, qRT): w overrides them (a 4-vector keeps the default qP, qRT)
 function objective_weights(w)
     c = CFG["weights"]; p = CFG["progression"]
-    w === nothing && return (c["qB"], c["qR"], c["qT"], c["ru"], p["qP"], p["qRT"])
-    length(w) == 6 ? Tuple(Float64.(w)) : (Float64.(w)..., p["qP"], p["qRT"])
+    qB, qR, qT, ru, qP, qRT = w === nothing ? Float64.((c["qB"], c["qR"], c["qT"], c["ru"], p["qP"], p["qRT"])) :
+                              length(w) == 6 ? Tuple(Float64.(w)) : (Float64.(w)..., Float64(p["qP"]), Float64(p["qRT"]))
+    # time to progression first (user, 2026-11-01): with a progression term every other objective term is a
+    # tie-breaker, scaled by tiebreak_scale so that together they never outweigh a fraction of a day progressed
+    # (an objective without a progression term, qP = 0, is left as it is)
+    s = qP > 0 ? tiebreak_scale() : 1.0
+    (qB * s, qR * s, qT * s, ru * s, qP, qRT * s)
 end
+tiebreak_scale() = Float64(get(CFG["progression"], "tiebreak_scale", 1.0))
 # progression threshold B_prog and step width s (cells) for capacity K; prog_frac = 0 removes the term
 function progression_scale(K; prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]))
     (prog_frac > 0 ? prog_frac * K : Inf, Float64(CFG["progression"]["step_width_fraction_of_K"]) * K)
@@ -104,6 +110,24 @@ end
 # smooth step: ≈ 0 below the progression threshold, ≈ 1 above it (logistic of width s)
 progressed(N, C, W) = logistic((max(N, zero(N)) + max(C, zero(C)) - W.Bp) / W.sP)
 progression_cost(N, C, W) = W.qP * progressed(N, C, W)
+# Time spent progressed within one decision interval (user, 2026-11-01: maximise time to progression): the
+# interval is simulated in PROG_SUB pieces and the step σ is averaged over their ends, so qP·(fraction of
+# the interval at or above B_prog) is charged instead of σ at the interval's end only. With the default
+# rk4_step_days the pieces use the same RK4 steps as one F over the interval, so the state is unchanged.
+# Summed over a look-ahead this is qP/Δ × (days progressed), i.e. the look-ahead minus the time to progression
+# while the culture stays progressed. Used by the exact search (discrete_solve); the continuous SQP keeps
+# the end-of-interval form (its gradients need ℓ(x_{k+1}, u_k)).
+const PROG_SUB = Int(get(CFG["progression"], "substeps", 1))
+function step_progressed(x, u, P::Plant, Δ, W)
+    PROG_SUB <= 1 && (y = F(x, u, P, Δ); return (y, progression_cost(y[P.iN], y[P.iC], W)))
+    p = 0.0; h = Δ / PROG_SUB
+    for _ in 1:PROG_SUB
+        x = F(x, u, P, h); p += progressed(x[P.iN], x[P.iC], W)
+    end
+    (x, W.qP * p / PROG_SUB)
+end
+# stage cost of an interval ending in x with its time-averaged progression cost pc
+interval_cost(x, u, P::Plant, W, pc) = stage_cost(x, u, P, W) - progression_cost(x[P.iN], x[P.iC], W) + pc
 function stage_cost(x, u, P::Plant, W::Weights)
     N, C, T = x[P.iN], x[P.iC], x[P.iT]
     progression_cost(N, C, W) + burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.ru * (u / W.umax)^2 +
@@ -123,6 +147,15 @@ end
 function total_cost(x0, U, P::Plant, Δ, W::Weights)
     xs = rollout(x0, U, P, Δ)
     sum(stage_cost(xs[k+1], U[k], P, W) for k in eachindex(U)) + terminal_cost(xs[end], P, W)
+end
+# the cost the exact search minimises (per-interval schedule U): as total_cost, with the progression term
+# averaged over the interval (step_progressed). Equal to total_cost when substeps = 1.
+function plan_cost(x0, U, P::Plant, Δ, W::Weights)
+    x = copy(x0); J = 0.0
+    for u in U
+        x, pc = step_progressed(x, u, P, Δ, W); J += interval_cost(x, u, P, W, pc)
+    end
+    J + terminal_cost(x, P, W)
 end
 
 # The stage cost ℓ split into its terms, summed over the intervals of an applied schedule (the terminal
@@ -254,7 +287,7 @@ function discrete_solve(x0, P::Plant, Δ, H, levels, W::Weights; min_gap=0.0, cu
     blk = as_blocks(H); H = length(blk)
     (all(==(1), blk) || (min_gap <= 0 && cum <= 0)) || error("dose gaps and budgets need single-interval blocks")
     # `local`: a closure would otherwise share the warm-start block's `c` (Julia captures same-named outer locals)
-    step(x, u, k) = (local cb = 0.0; for _ in 1:blk[k]; x = F(x, u, P, Δ); cb += stage_cost(x, u, P, W); end; (x, cb))
+    step(x, u, k) = (local cb = 0.0; for _ in 1:blk[k]; local pc; x, pc = step_progressed(x, u, P, Δ, W); cb += interval_cost(x, u, P, W, pc); end; (x, cb))
     na = length(levels); best = Ref(Inf); bestU = zeros(H); U = zeros(H)
     gap_steps = ceil(Int, min_gap / Δ - 1e-9)
     allowed(u, k, last, used) = !(u > 0 && gap_steps > 0 && k - last <= gap_steps) && !(cum > 0 && used + u * Δ > cum + 1e-12)
@@ -318,10 +351,25 @@ end
 # Look-ahead H at every decision; shrink=true cuts it at the end of the run (control_config lookahead_to_end).
 # H: an Int (single intervals) or the look-ahead blocks (move blocking, discrete mode); continuous mode
 # plans every interval of the same look-ahead.
+#
+# Early stop (user, 2026-11-01: do not compute decisions once the result is known), on the true plant Pp:
+#   progression confirmed  N + C ≥ Bp at `confirm` successive decision times; the controller keeps
+#                          re-planning through all of them, so it has time to bring the culture back
+#   outlasted              no progression spell under way at day `settle_day` (the latest progression of the
+#                          comparators plus a margin, stop_rules), so MPC's lead is settled
+# After a stop no more plans are computed: the rest of the run follows the last plan (then its last dose) so
+# the arrays keep the run's length, and outcomes(…; t_stop) reads time to progression up to the stop only.
+# confirm = 0 and settle_day = Inf (the defaults) never stop.
+function stop_now(above, tot, t, Bp, confirm, settle_day)
+    confirm > 0 && above >= confirm && return "progression confirmed"
+    t >= settle_day - 1e-9 && above == 0 && tot < Bp && return "outlasted every comparator"
+    nothing
+end
 function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:continuous, levels=Float64[],
-                     shrink=false, cum=0.0, min_gap=0.0, u_init=0.5, noise=nothing)
+                     shrink=false, cum=0.0, min_gap=0.0, u_init=0.5, noise=nothing, Bp=Inf, confirm=0, settle_day=Inf)
     blk = mode == :continuous ? fill(1, sum(as_blocks(H))) : as_blocks(H); nb = length(blk)
     x = copy(x0); xm = copy(x0); applied = Float64[]; Uwarm = fill(min(u_init, W.umax), nb); used = 0.0; iters = Int[]
+    above = 0; stop_day = NaN; stop_reason = ""
     for k in 1:n_dec
         observe!(xm, x, Pm, Pp, noise, k)
         bk = shrink ? cut_blocks(blk, n_dec - k + 1) : blk; Hk = length(bk)
@@ -344,8 +392,19 @@ function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:c
         u = sol.U[1]; push!(applied, u); used += u * Δ
         x = F(x, u, Pp, Δ); xm = F(xm, u, Pm, Δ)
         Uwarm = vcat(sol.U[2:end], fill(sol.U[end], nb - Hk + 1))[1:nb]      # shift by one block (a bound only)
+        tot = x[Pp.iN] + x[Pp.iC]; above = tot >= Bp ? above + 1 : 0
+        r = k < n_dec ? stop_now(above, tot, k * Δ, Bp, confirm, settle_day) : nothing
+        if r !== nothing
+            plan = mode == :continuous ? collect(sol.U) : expand_blocks(sol.U, bk)
+            rest = length(plan) > 1 ? plan[2:end] : [u]
+            for j in 1:(n_dec - k)
+                uj = rest[min(j, length(rest))]; push!(applied, uj); x = F(x, uj, Pp, Δ)
+            end
+            stop_day = k * Δ; stop_reason = r
+            break
+        end
     end
-    (U=applied, iters=iters, x=x)
+    (U=applied, iters=iters, x=x, stop_day=stop_day, stop_reason=stop_reason)
 end
 
 # ── baseline policies (state feedback at decision times) ────────────────────
@@ -409,14 +468,50 @@ function time_to_progression(ts, tot, Bp; sustain=Float64(CFG["progression"]["su
 end
 
 # biologically interpretable outcomes of a schedule; days_over = days with N + C at or above B_cancer
-function outcomes(P::Plant, x0, U, Δ, W::Weights)
+# t_stop: the day a closed loop stopped computing (closed_loop: stop_day; NaN or Inf = it did not stop). Time
+# to progression is read up to that day only: a spell under way at the stop counts (it was confirmed), and
+# anything after it, where the schedule is no longer optimised, does not. N_prog, C_prog: the counts on the
+# day of progression (NaN without one), the counts that matter instead of those on an arbitrary last day.
+function progression_window(ts, tot, Bp, t_stop)
+    iend = isfinite(t_stop) ? max(2, searchsortedlast(ts, t_stop + 1e-9)) : length(ts)
+    tp = time_to_progression(ts[1:iend], tot[1:iend], Bp)
+    ip = isnan(tp.loss) ? 0 : searchsortedfirst(ts, tp.loss - 1e-9)
+    tp, ip
+end
+function outcomes(P::Plant, x0, U, Δ, W::Weights; t_stop=Inf)
     ts, xs = trajectory(x0, U, P, Δ)
     N = [x[P.iN] for x in xs]; C = [x[P.iC] for x in xs]; T = [x[P.iT] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)
-    tp = time_to_progression(ts, tot, W.Bp)
+    tp, ip = progression_window(ts, tot, W.Bp, t_stop)
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      max_total=maximum(tot), max_tox=maximum(T), cum_dose=sum(U) * Δ, cancer_violation=over !== nothing,
      tox_violation=maximum(T) >= W.Btox, day_over_bound=over === nothing ? NaN : ts[over], days_over=days_over,
-     ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days, ts=ts, N=N, C=C, T=T)
+     ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days, N_prog=ip > 0 ? N[ip] : NaN, C_prog=ip > 0 ? C[ip] : NaN,
+     stop_day=isfinite(t_stop) ? t_stop : NaN, ts=ts, N=N, C=C, T=T)
+end
+
+# Stopping rules from control_config.toml [progression]: `confirm` successive decision times at or above
+# B_prog confirm a progression; the run stops `settle_margin_days` after the latest progression among the
+# comparators (Inf when any comparator never progresses in the run, so MPC then runs to the end).
+stop_confirm(Δ) = Int(get(CFG["progression"], "confirm_decisions", ceil(Int, Float64(CFG["progression"]["sustain_days"]) / Δ - 1e-9) + 1))
+function settle_after(ttps)
+    t = collect(Float64, ttps)
+    (isempty(t) || any(isnan, t)) ? Inf : maximum(t) + Float64(get(CFG["progression"], "settle_margin_days", CFG["progression"]["sustain_days"]))
+end
+stop_kw(W, Δ, ttps=Float64[]; settle=true) = (Bp=W.Bp, confirm=stop_confirm(Δ), settle_day=settle ? settle_after(ttps) : Inf)
+tstop(cl) = isnan(cl.stop_day) ? Inf : cl.stop_day
+
+# report text for the 2026-11-01 objective and stopping rules (control_report.jl, control_fasting_report.jl)
+function stopping_note()
+    p = CFG["progression"]; Δ = Float64(CFG["schedule"]["decision_interval_days"])
+    "<p><b>Time to progression first, and runs stop once the answer is known</b> (user, 2026-11-01). The progression " *
+    "term charges the time spent at or above B_prog, averaged over $(get(p, "substeps", 1)) pieces of each interval, and every " *
+    "other term (burden, resistant cells, dose, toxicity, and in the fasting runs host weight and fasting) is multiplied by $(get(p, "tiebreak_scale", 1.0)), so it only breaks ties between plans that progress at the same time. " *
+    "The look-ahead is fixed (no end-of-run cost), so the final count is not a target. The comparators always run the whole " *
+    "run. An MPC run stops computing once progression is confirmed at $(stop_confirm(Δ)) successive decisions " *
+    "($(round(Int, (stop_confirm(Δ) - 1) * Δ)) days; the controller keeps re-planning through them to bring the culture back), " *
+    "or once it has gone $(get(p, "settle_margin_days", p["sustain_days"])) days past the latest comparator's progression " *
+    "without progressing; its time to progression is read up to that day (the CSV column control_stopped_day) and the " *
+    "rest of the run follows its last plan, not re-optimised. The run length is therefore a cap.</p>"
 end

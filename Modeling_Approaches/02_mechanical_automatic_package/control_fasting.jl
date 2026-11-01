@@ -168,15 +168,19 @@ function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Floa
     c = CFG["weights"]
     qB, qR, qT, ru, qP, qRT = objective_weights(w)
     Bp, sP = progression_scale(FP.K; prog_frac=prog_frac)
-    Weights2(qB, qR, qT, HCFG["qW"], ru, rv, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
+    sc = qP > 0 ? tiebreak_scale() : 1.0           # host weight and fasting costs are tie-breakers too (control_mpc.jl)
+    Weights2(qB, qR, qT, HCFG["qW"] * sc, ru, rv * sc, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
              bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
+# the soft burden penalty at B_cancer follows control_config [cancer] barrier: "none" (default since
+# 2026-11-01, as B_cancer = B_prog and the time-to-progression term already prices it) leaves it out
+const BURDEN_BARRIER2 = String(get(CFG["cancer"], "barrier", "relaxed_log")) != "none"
 function stage_cost2(x, w, FP::FPlant, W::Weights2)
     N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
     progression_cost(N, C, W) + burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.qW * wloss(x, FP, W)^2 +
         W.ru * (w[1] / W.umax)^2 + W.rv * w[2]^2 +
-        relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ) +
+        (BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : zero(N)) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ) +
         relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ)
 end
 terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (progression_cost(x[FP.iN], x[FP.iC], W) + burden_cost(x[FP.iN], x[FP.iC], W) +
@@ -189,6 +193,18 @@ function total_cost2(x0, U, FP, Δ, W)
     x = copy(x0); J = 0.0
     for k in axes(U, 1)
         x = F2(x, U[k, :], FP, Δ); J += stage_cost2(x, U[k, :], FP, W)
+    end
+    J + terminal_cost2(x, FP, W)
+end
+# the cost the exact search minimises: as total_cost2, with the progression term averaged over PROG_SUB pieces
+function plan_cost2(x0, U, FP, Δ, W)
+    x = copy(x0); J = 0.0
+    for k in axes(U, 1)
+        w = U[k, :]; pc = 0.0
+        for _ in 1:PROG_SUB
+            x = F2(x, w, FP, Δ / PROG_SUB); pc += progressed(x[FP.iN], x[FP.iC], W)
+        end
+        J += stage_cost2(x, w, FP, W) - progression_cost(x[FP.iN], x[FP.iC], W) + W.qP * pc / PROG_SUB
     end
     J + terminal_cost2(x, FP, W)
 end
@@ -297,7 +313,12 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
         local cb = 0.0; copyto!(tmp, x)          # `local`: not the warm-start block's `c` (closure capture)
         for j in 1:blk[k]
             vj = j == 1 ? v : 0.0
-            F2!(y, tmp, (u, vj), FP, Δ, buf); copyto!(tmp, y); cb += stage_cost2(y, (u, vj), FP, W)
+            # time spent progressed, averaged over PROG_SUB pieces of the interval (control_mpc.jl: step_progressed)
+            local pc = 0.0
+            for _ in 1:PROG_SUB
+                F2!(y, tmp, (u, vj), FP, Δ / PROG_SUB, buf); copyto!(tmp, y); pc += progressed(y[FP.iN], y[FP.iC], W)
+            end
+            cb += stage_cost2(y, (u, vj), FP, W) - progression_cost(y[FP.iN], y[FP.iC], W) + W.qP * pc / PROG_SUB
             run, gap = vj > 0 ? (run + 1, 0) : (0, gap + 1)
         end
         cb, run, gap
@@ -346,10 +367,13 @@ end
 # (× noise[k, :] when given; control_mpc.jl: observe!) and reconstructs the drug-effect and stress chains,
 # B, T, P and W by simulating its own model under the applied doses and fasting.
 # H: an Int (single intervals) or the look-ahead blocks (discrete mode); continuous mode plans every interval.
-function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mode=:discrete, shrink=false, noise=nothing, kw...)
+# Early stop as closed_loop (control_mpc.jl: stop_now): Bp, confirm, settle_day.
+function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mode=:discrete, shrink=false, noise=nothing,
+                      Bp=Inf, confirm=0, settle_day=Inf, kw...)
     blk = mode == :continuous ? fill(1, sum(as_blocks(H))) : as_blocks(H); nb = length(blk)
     x = copy(x0); xm = copy(x0); applied = zeros(n_dec, 2); run = 0; gap = 10^6
     Uwarm = repeat([mode == :discrete ? 0.0 : 0.5  0.0], nb)
+    above = 0; stop_day = NaN; stop_reason = ""
     for k in 1:n_dec
         observe!(xm, x, Pm, Pp, noise, k)
         bk = shrink ? cut_blocks(blk, n_dec - k + 1) : blk; Hk = length(bk)
@@ -368,8 +392,20 @@ function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mod
         run = w[2] > 0 ? run + 1 : 0; gap = w[2] > 0 ? 0 : gap + 1
         x = F2(x, w, Pp, Δ); xm = F2(xm, w, Pm, Δ)
         Uwarm = vcat(sol.U[2:end, :], repeat([sol.U[end, 1] 0.0], nb - Hk + 1))[1:nb, :]     # shift; pad fed (a bound only)
+        tot = x[Pp.iN] + x[Pp.iC]; above = tot >= Bp ? above + 1 : 0
+        r = k < n_dec ? stop_now(above, tot, k * Δ, Bp, confirm, settle_day) : nothing
+        if r !== nothing
+            # the rest follows the last plan, then its last dose, fed (no plan is computed after the stop)
+            plan = mode == :discrete ? expand_blocks2(sol.U, bk) : sol.U
+            for j in 1:(n_dec - k)
+                wj = j + 1 <= size(plan, 1) ? plan[j+1, :] : [plan[end, 1], 0.0]
+                applied[k+j, :] = wj; x = F2(x, wj, Pp, Δ)
+            end
+            stop_day = k * Δ; stop_reason = r
+            break
+        end
     end
-    (U=applied, x=x)
+    (U=applied, x=x, stop_day=stop_day, stop_reason=stop_reason)
 end
 
 # ── baseline schedules ────────────────────────────────────────────────────────
@@ -399,15 +435,16 @@ baseline_policies2(FP::FPlant, W::Weights2) = [
     ("Constant 1 µM + 48-h fast every 6 days", (x, k) -> [1.0, k % 3 == 1 ? 1.0 : 0.0]),
 ]
 
-function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2)
+function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2; t_stop=Inf)
     ts, xs = trajectory2(x0, U, FP, Δ)
     N = [x[FP.iN] for x in xs]; C = [x[FP.iC] for x in xs]; T = [x[FP.iT] for x in xs]
     Pr = [x[FP.iP] for x in xs]; Wt = [x[FP.iW] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)     # days with N + C ≥ B_cancer
-    tp = time_to_progression(ts, tot, W.Bp)
+    tp, ip = progression_window(ts, tot, W.Bp, t_stop)       # up to the closed loop's stop (control_mpc.jl)
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
-     ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days,
+     ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days, N_prog=ip > 0 ? N[ip] : NaN, C_prog=ip > 0 ? C[ip] : NaN,
+     stop_day=isfinite(t_stop) ? t_stop : NaN,
      max_total=maximum(tot), max_tox=maximum(T), min_weight=minimum(Wt), cum_dose=sum(U[:, 1]) * Δ, fast_days=sum(U[:, 2]) * Δ,
      cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin, days_over=days_over,
      ts=ts, N=N, C=C, T=T, P=Pr, W=Wt)

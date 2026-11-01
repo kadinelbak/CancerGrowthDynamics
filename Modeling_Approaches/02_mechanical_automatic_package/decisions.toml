@@ -137,3 +137,19 @@ decision = "Bootstrap optimiser runs get a work budget of 50× the evaluations o
 was = "no limit (one Stage 4 replicate ran for 11+ h)"
 by = "claude"
 where = "stages.toml bootstrap_work_factor; bootstrap_tools.jl bs_fit"
+
+[[decision]]
+date = "2026-11-01"
+area = "control"
+decision = "MPC maximises time to progression first: the cost is the time spent at or above B_prog (averaged over 8 pieces of each interval), and every other term (burden, resistant cells, dose, toxicity, host weight, fasting) is scaled by 0.001 so it only breaks ties. The look-ahead is fixed again (no end-of-run cost, so the final count is not a target) and the soft burden barrier at B_cancer (= B_prog) is off in the main runs (still in the sweep)."
+was = "smooth step at the end of each 2-day interval with tie-breakers of comparable size (qB 0.1, qT 1, ru 0.1, qRT 10 vs qP 10), look-ahead ending with the run, relaxed log barrier at B_cancer"
+by = "user"
+where = "control_config.toml [progression] substeps, tiebreak_scale; lookahead_to_end; [cancer] barrier; control_mpc.jl step_progressed"
+
+[[decision]]
+date = "2026-11-01"
+area = "control"
+decision = "Runs stop once the answer is known: an MPC run stops computing after progression is confirmed at 6 successive decisions (10 days, the controller re-planning throughout), or once it is 10 days past the latest comparator's progression without progressing; time to progression is read up to the stop. Comparators always run the whole run. Run lengths (14, 30, 60, 120 days) are caps."
+was = "every MPC run computed every decision to the end of the run"
+by = "user"
+where = "control_config.toml [progression] confirm_decisions, settle_margin_days; control_mpc.jl stop_now"

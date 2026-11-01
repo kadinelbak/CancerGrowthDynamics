@@ -115,12 +115,14 @@ function run_all2(FP, x0; n=NRUN, H=LOOK)
     for (name, pol) in baseline_policies2(FP, W)
         U = run_policy2(pol, FP, x0, Δ0, n); out[name] = (U=U, o=outcomes2(FP, x0, U, Δ0, W))
     end
-    t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, W; vlevels=[0.0])
-    out[MPC1] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W), secs=time() - t)
-    t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, W)
-    out[MPC2] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W), secs=time() - t)
-    t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, Wd; mode=:continuous)
-    out[MPCD] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W), secs=time() - t)
+    # each MPC stops once its progression is confirmed or once it has outlasted every comparator (control_mpc.jl)
+    sk = stop_kw(W, Δ0, [v.o.ttp for v in values(out)])
+    t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, W; vlevels=[0.0], sk...)
+    out[MPC1] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
+    t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, W; sk...)
+    out[MPC2] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
+    t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, Wd; mode=:continuous, sk...)
+    out[MPCD] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
     out
 end
 
@@ -141,7 +143,9 @@ main_of(scen, ratio) = only(filter(m -> m.scen == scen && m.ratio == ratio, fck[
 if !haskey(fck, :sweeps)
     r = ratios[2]; tasks = Any[]
     # Wo: the weights the outcomes are scored with (bound counts always at the default B_cancer)
-    mpc(FP, W; Wo=W, H=LOOK, kw...) = (x0 = x0_fast(FP, r.N0, r.C0); cl = closed_loop2(FP, FP, x0, Δ0, NRUN, H, W; kw...); (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, Wo)))
+    # sweep runs stop once progression is confirmed (no comparators to outlast)
+    mpc(FP, W; Wo=W, H=LOOK, kw...) = (x0 = x0_fast(FP, r.N0, r.C0); cl = closed_loop2(FP, FP, x0, Δ0, NRUN, H, W; stop_kw(Wo, Δ0; settle=false)..., kw...);
+                                      (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, Wo; t_stop=tstop(cl))))
     h0 = default_host()
     bc0 = Float64(CFG["cancer"]["B_cancer_fraction_of_K"]); tf0 = Float64(CFG["weights"]["terminal_factor"])
     # soft burden penalty, one setting at a time (the full B_cancer × terminal grid is in the 14-day report)
@@ -170,7 +174,7 @@ if !haskey(fck, :sweeps)
         end
         for (bc, tf) in pen
             lab = (bc > 0 ? "B_cancer = $(bc) K" : "no burden penalty") * ", terminal ×$(tf)"
-            push!(tasks, (kind="burden penalty", scen=scen, label=lab, f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; bc_frac=bc, tf=tf); Wo=weights2(FP)))))
+            push!(tasks, (kind="burden penalty", scen=scen, label=lab, f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; bc_frac=bc, tf=tf); Wo=weights2(FP)))))   # (the barrier follows [cancer] barrier)
         end
     end
     out = Vector{Any}(undef, length(tasks))
@@ -207,8 +211,9 @@ if !haskey(fck, :robust)
                 d[pn] = o === nothing ? nothing : summ(o)
             end
             if b <= NCL
-                c = try closed_loop2(FP0, FPb, m.x0, Δ0, NRUN, LOOK, W0; noise=obs_noise(b, NRUN)) catch; nothing end
-                d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes2(FPb, m.x0, c.U, Δ0, W0)), (U=c.U,))
+                sk = stop_kw(W0, Δ0, [d[pn] === nothing ? NaN : d[pn].ttp for pn in pols if !(pn in (MPC1, MPC2))])
+                c = try closed_loop2(FP0, FPb, m.x0, Δ0, NRUN, LOOK, W0; noise=obs_noise(b, NRUN), sk...) catch; nothing end
+                d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes2(FPb, m.x0, c.U, Δ0, W0; t_stop=tstop(c))), (U=c.U, stop=c.stop_reason))
             end
             draws[b] = d
         end
@@ -231,8 +236,8 @@ if !haskey(fck, :washout)
         T = tasks[i]; t = time(); m = main_of(T.scen, "50:50")
         FP = fast_plant(T.scen; koff=T.koff); W = weights2(FP)
         replay = Dict(pn => outcomes2(FP, m.x0, m.policies[pn].U, Δ0, W) for pn in ("Fasting only, 48 h every 6 days", "Constant 1 µM", MPC1, MPC2))
-        cl = closed_loop2(FP, FP, m.x0, Δ0, NRUN, LOOK, W)
-        out[i] = (scen=T.scen, koff=T.koff, replay=replay, U=cl.U, o=outcomes2(FP, m.x0, cl.U, Δ0, W))
+        cl = closed_loop2(FP, FP, m.x0, Δ0, NRUN, LOOK, W; stop_kw(W, Δ0; settle=false)...)
+        out[i] = (scen=T.scen, koff=T.koff, replay=replay, U=cl.U, o=outcomes2(FP, m.x0, cl.U, Δ0, W; t_stop=tstop(cl)))
         @printf("  washout %s k_off=%.1f [%.0fs]\n", T.scen, T.koff, time() - t); flush(stdout)
     end
     fck[:washout] = out; savef()
@@ -241,12 +246,13 @@ end
 # ── CSV ────────────────────────────────────────────────────────────────────────
 rows = NamedTuple[]
 for m in fck[:main], (pn, v) in m.policies
-    o = v.o
+    o = v.o; sr = get(v, :stop, "")
     push!(rows, (scenario=string(m.scen), ratio=m.ratio, policy=pn, dose_uM=join(round.(v.U[:, 1]; digits=3), " "), fasting=join(round.(v.U[:, 2]; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction, max_total=o.max_total,
                  max_toxicity=o.max_tox, min_weight=o.min_weight, cumulative_dose_uM_days=o.cum_dose, fasting_days=o.fast_days,
                  cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation, weight_bound_violated=o.weight_violation,
-                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed))
+                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed,
+                 N_at_progression=o.N_prog, C_at_progression=o.C_prog, control_stopped_day=o.stop_day, stop_reason=sr))
 end
 CSV.write(joinpath(FOUT, "fasting_outcomes.csv"), DataFrame(rows))
 println("Wrote $(joinpath(FOUT, "fasting_outcomes.csv"))")
