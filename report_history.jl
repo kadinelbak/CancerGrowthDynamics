@@ -95,6 +95,82 @@ function report_results(pkg=HPKG)
         haskey(r, "time_to_progression_day") && push!(out, ("mpc_ttp:$scen", "14-day MPC time to progression · scenario $scen, 50:50",
                                                             (v = tryparse(Float64, r["time_to_progression_day"]); v === nothing || !isfinite(v) ? "not progressed" : "day $(hfmt(round(v; digits=1)))")))
     end
+    append!(out, research_quality(pkg))
+    out
+end
+
+# research-quality metrics (user, 2026-11-01: "what metrics across the project are the strongest to maximize ...
+# can I measure them between reports"). Keys start with "q+:" (higher is better) or "q-:" (lower is better), and
+# the value starts with the number that is compared, so the history page can mark a change better or worse.
+# tools/seed_report_history.py --quality computes the same rows from git history for older versions.
+hnum(s) = (v = tryparse(Float64, string(s)); v === nothing ? NaN : v)
+hpct(a, b) = b == 0 ? "n/a" : "$(round(Int, 100a / b))% ($a of $b)"
+function hmedian(x)
+    isempty(x) && return NaN
+    y = sort(x); n = length(y); isodd(n) ? y[(n+1)÷2] : (y[n÷2] + y[n÷2+1]) / 2
+end
+# MPC beats a baseline: it progresses later, or at the same time (or never) with fewer cells at the end
+function mpc_beats(m, b, run_days)
+    ttp(r) = (v = hnum(get(r, "time_to_progression_day", "")); isfinite(v) ? v : run_days + 1)
+    tm, tb = ttp(m), ttp(b)
+    tm > tb + 1e-6 || (abs(tm - tb) <= 1e-6 && hnum(m["total_final"]) < hnum(b["total_final"]))
+end
+function mpc_wins(rows, groupkeys, run_days_of)
+    groups = Dict{Vector{String},Vector{Dict{String,String}}}()
+    for r in rows
+        push!(get!(groups, [get(r, k, "") for k in groupkeys], Dict{String,String}[]), r)
+    end
+    won = 0; n = 0
+    for (_, g) in groups
+        pol(name) = (i = findfirst(r -> get(r, "policy", "") == name, g); i === nothing ? nothing : g[i])
+        m = pol("MPC, measured doses only"); a = pol("No treatment"); c = pol("Constant 1 µM")
+        (m === nothing || a === nothing || c === nothing) && continue
+        n += 1; rd = run_days_of(m)
+        won += mpc_beats(m, a, rd) && mpc_beats(m, c, rd)
+    end
+    won, n
+end
+function research_quality(pkg=HPKG)
+    out = Tuple{String,String,String}[]
+    o = joinpath(pkg, "outputs")
+    v = [hnum(r["nrmse_heldout"]) for r in hcsv(joinpath(o, "zoo_analyses", "validation_blocked.csv")) if get(r, "status", "") == "completed"]
+    v = filter(isfinite, v)
+    isempty(v) || push!(out, ("q-:heldout", "Quality · held-out error, median NRMSE over blocked checks (lower is better)", "$(round(hmedian(v); digits=3)) (n = $(length(v)), worst $(round(maximum(v); digits=3)))"))
+    ce = hcsv(joinpath(o, "zoo_fits", "heldout_ce1.csv"))
+    i = findfirst(r -> startswith(get(r, "row", ""), "prediction"), ce)
+    i === nothing || push!(out, ("q-:heldout_ce1", "Quality · held-out coculture run (Ce1) NRMSE (lower is better)", string(round(hnum(ce[i]["nrmse"]); digits=3))))
+    pr = hcsv(joinpath(o, "zoo_analyses", "sensitivity_profile.csv"))
+    if !isempty(pr)
+        ok = count(r -> get(r, "status", "") == "identifiable", pr)
+        push!(out, ("q+:pinned", "Quality · parameters pinned by their profile (higher is better)", hpct(ok, length(pr)) *
+              (ok < length(pr) ? "; not pinned: " * join(["$(r["param"]) ($(r["group"]))" for r in pr if get(r, "status", "") != "identifiable"], ", ") : "")))
+    end
+    bs = [r for r in hcsv(joinpath(o, "zoo_analyses", "bootstrap_selection.csv")) if get(r, "optimal", "") == "true"]
+    if !isempty(bs)
+        p = [hnum(r["pct_chosen"]) for r in bs]; j = argmin(p)
+        push!(out, ("q+:stability", "Quality · selection stability, mean % of bootstrap refits that pick the carried model (higher is better)",
+                    "$(round(Int, sum(p) / length(p)))% (lowest $(round(Int, p[j]))%, $(bs[j]["group"]))"))
+    end
+    cc = [r for r in hcsv(joinpath(o, "control", "control_outcomes.csv")) if get(r, "environment", "") == "normal"]
+    if !isempty(cc)
+        w, n = mpc_wins(cc, ["scenario", "ratio"], _ -> 14.0)
+        n > 0 && push!(out, ("q+:robust", "Quality · 14-day MPC beats no treatment and constant 1 µM, scenarios × ratios (higher is better)", hpct(w, n)))
+    end
+    sw = [r for r in hcsv(joinpath(o, "control_sweep", "sweep_outcomes.csv")) if get(r, "environment", "normal") == "normal"]
+    if !isempty(sw)
+        w, n = mpc_wins(sw, ["data", "variant", "scenario", "ratio"], r -> (d = hnum(get(r, "run_days", "14")); isfinite(d) ? d : 14.0))
+        n > 0 && push!(out, ("q+:robust_sweep", "Quality · MPC beats both baselines across the control sweep (higher is better)", hpct(w, n)))
+    end
+    if !isempty(cc)
+        same = 0; tot = 0
+        for ratio in unique(get(r, "ratio", "") for r in cc)
+            f(sc) = (i = findfirst(r -> r["scenario"] == sc && r["ratio"] == ratio && r["policy"] == "MPC, measured doses only", cc); i === nothing ? nothing : split(cc[i]["schedule_uM"]))
+            a, b = f("A"), f("B")
+            (a === nothing || b === nothing || length(a) != length(b)) && continue
+            same += count(k -> hnum(a[k]) == hnum(b[k]), eachindex(a)); tot += length(a)
+        end
+        tot > 0 && push!(out, ("q+:agree", "Quality · scenario agreement, 14-day MPC dose blocks the same in A and B (higher is better)", hpct(same, tot)))
+    end
     out
 end
 

@@ -128,6 +128,36 @@ key = "mpc_ttp:B"
 label = "14-day MPC time to progression · scenario B, 50:50"
 value = "not progressed"
 
+[[results]]
+key = "q-:heldout"
+label = "Quality · held-out error, median NRMSE over blocked checks (lower is better)"
+value = "0.405 (n = 23, worst 1.074)"
+
+[[results]]
+key = "q-:heldout_ce1"
+label = "Quality · held-out coculture run (Ce1) NRMSE (lower is better)"
+value = "0.904"
+
+[[results]]
+key = "q+:pinned"
+label = "Quality · parameters pinned by their profile (higher is better)"
+value = "70% (16 of 23); not pinned: θ_C (s1-a2780cis), c_N (s1b-a2780), ζ_N^R (s1b-a2780), β_C (s2-a2780cis), d_C (s3), α_NC (s3b), α_CN (s3b)"
+
+[[results]]
+key = "q+:stability"
+label = "Quality · selection stability, mean % of bootstrap refits that pick the carried model (higher is better)"
+value = "77% (lowest 50%, s1b-a2780)"
+
+[[results]]
+key = "q+:robust"
+label = "Quality · 14-day MPC beats no treatment and constant 1 µM, scenarios × ratios (higher is better)"
+value = "83% (5 of 6)"
+
+[[results]]
+key = "q+:agree"
+label = "Quality · scenario agreement, 14-day MPC dose blocks the same in A and B (higher is better)"
+value = "0% (0 of 21)"
+
 [[chapters]]
 stamp = "2026-10-27 23:56"
 title = "1 · Data"

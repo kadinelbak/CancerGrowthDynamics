@@ -28,7 +28,7 @@ button.ghost,.btn.ghost{background:#fff;color:var(--accent)}button:disabled{opac
 .card h3{margin:0;font-size:18px}.card .meta{color:var(--muted);font-size:13px}
 .card ul{margin:6px 0 0;padding-left:18px}.card li{margin:2px 0}
 .badge{display:inline-block;font-size:12px;font-weight:650;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:2px;background:#eef3f5;color:var(--accent)}
-.badge.latest{background:var(--accent);color:#fff}
+.badge.latest{background:var(--accent);color:#fff}.badge.good{background:#dff3e6;color:#1d6b3a}.badge.bad{background:#fbe3e0;color:#9b2c1f}
 .area{display:inline-block;min-width:62px;font-size:12px;font-weight:650;color:#9a6700}
 @media (max-width:640px){.card{grid-template-columns:auto 1fr}.card .acts{grid-column:1/-1}}
 /* report view */
@@ -60,19 +60,29 @@ function decisionsBetween(older, newer) {
   return LOG.filter(d => d.date > lo && d.date <= hi);
 }
 // rows of a group across two versions: changed, added, unchanged
-function diff(older, newer, grp) {
+const isQ = k => /^q[+-]:/.test(k);
+function diff(older, newer, grp, keep = () => true) {
   const keys = new Map();
-  for (const v of [newer, older]) for (const r of ((v && v[grp]) || [])) if (!keys.has(r.key)) keys.set(r.key, r.label);
+  for (const v of [newer, older]) for (const r of ((v && v[grp]) || [])) if (!keys.has(r.key) && keep(r.key)) keys.set(r.key, r.label);
   const out = {changed: [], added: [], same: [], gone: []};
   for (const [k, label] of keys) {
     const a = val(older, grp, k), b = val(newer, grp, k);
-    if (b == null) out.gone.push({label, a});
-    else if (a == null) out.added.push({label, b});
-    else if (a !== b) out.changed.push({label, a, b});
-    else out.same.push({label, b});
+    if (b == null) out.gone.push({k, label, a});
+    else if (a == null) out.added.push({k, label, b});
+    else if (a !== b) out.changed.push({k, label, a, b});
+    else out.same.push({k, label, b});
   }
   return out;
 }
+const lead = x => { const m = String(x).match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : NaN; };
+function verdict(k, a, b) {
+  if (!isQ(k)) return '';
+  const x = lead(a), y = lead(b);
+  if (!isFinite(x) || !isFinite(y) || x === y) return `<span class='badge'>same</span>`;
+  const up = k[1] === '+' ? y > x : y < x;
+  return `<span class='badge ${up ? 'good' : 'bad'}'>${up ? 'better' : 'worse'}</span>`;
+}
+const shortQ = l => String(l).replace(/^Quality · /, '').replace(/ \((higher|lower) is better\)$/, '');
 const recorded = v => ((v && v.settings) || []).length > 0;
 
 // the short "major changes" description on each card
@@ -83,7 +93,8 @@ function summary(v) {
   if (!p) items.push(`<li class='mut'>First recorded version.</li>`);
   else if (!recorded(v) || !recorded(p)) items.push(`<li class='mut'>Settings not recorded for ${recorded(v) ? 'the version before' : 'this version'}.</li>`);
   else {
-    const s = diff(p, v, 'settings'), r = diff(p, v, 'results');
+    const s = diff(p, v, 'settings'), r = diff(p, v, 'results', k => !isQ(k)), q = diff(p, v, 'results', isQ);
+    if (q.changed.length) items.push(`<li>Quality: ${q.changed.map(x => `${esc(shortQ(x.label))} ${esc(lead(x.a))} → ${esc(lead(x.b))} ${verdict(x.k, x.a, x.b)}`).join('; ')}.</li>`);
     if (s.changed.length || s.added.length) items.push(`<li>Settings changed: ${s.changed.concat(s.added).map(x => esc(x.label)).join(', ')}.</li>`);
     else items.push(`<li class='mut'>Same settings as ${esc(p.id)}.</li>`);
     const nr = r.changed.length + r.added.length, tot = nr + r.same.length;
@@ -146,7 +157,7 @@ function grid(cols) {
 
 // ── preface: the modelling decisions of one version, or between two ────────────
 function changeTable(d, olderName, newerName) {
-  const rows = d.changed.map(x => `<tr class='chg'><td>${esc(x.label)}</td><td>${esc(x.b)}</td><td class='mut'>${esc(x.a)}</td></tr>`)
+  const rows = d.changed.map(x => `<tr class='chg'><td>${esc(x.label)} ${verdict(x.k, x.a, x.b)}</td><td>${esc(x.b)}</td><td class='mut'>${esc(x.a)}</td></tr>`)
     .concat(d.added.map(x => `<tr class='chg'><td>${esc(x.label)} <span class='badge'>new</span></td><td>${esc(x.b)}</td><td class='mut'>not recorded</td></tr>`))
     .concat(d.gone.map(x => `<tr><td>${esc(x.label)}</td><td class='mut'>not recorded</td><td class='mut'>${esc(x.a)}</td></tr>`));
   return rows.length ? `<div class='tscroll'><table><tr><th>What</th><th>${esc(newerName)}</th><th>${esc(olderName)}</th></tr>${rows.join('')}</table></div>` : '';
@@ -155,7 +166,7 @@ function sameTable(d, name) {
   return d.same.length ? `<details><summary>Unchanged (${d.same.length})</summary><div class='tscroll'><table><tr><th>What</th><th>${esc(name)}</th></tr>${d.same.map(x => `<tr><td>${esc(x.label)}</td><td>${esc(x.b)}</td></tr>`).join('')}</table></div></details>` : '';
 }
 function preface(older, newer, mode) {
-  const s = diff(older, newer, 'settings'), r = diff(older, newer, 'results');
+  const s = diff(older, newer, 'settings');
   const decs = decisionsBetween(older, newer);
   const between = older ? ALL.slice(idx(older) + 1, idx(newer)) : [];
   const oN = older ? older.id : '—', nN = newer.id;
@@ -164,20 +175,25 @@ function preface(older, newer, mode) {
     : `<h2>Modelling decisions: ${esc(oN)} → ${esc(nN)}</h2><p class='lead'>What differs between the two versions you picked${between.length ? `, across ${between.length} version${between.length > 1 ? 's' : ''} in between (${between.map(v => `<a href='#read/${esc(v.id)}'>${esc(v.id)}</a>`).join(', ')})` : ''}.</p>`;
   const decHtml = decs.length
     ? `<h3>Decisions made ${mode === 'read' ? 'for this version' : 'between them'} (${decs.length})</h3><div class='tscroll'><table><tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th></tr>${decs.map(d => `<tr><td class='nw'>${esc(d.date)}</td><td>${esc(d.area)}</td><td>${esc(d.decision)}</td><td class='mut'>${esc(d.was) || '—'}</td><td>${esc(d.by)}</td></tr>`).join('')}</table></div>`
-    : `<h3>Decisions</h3><p class='mut'>No decision in <code>decisions.toml</code> is dated ${older ? `between ${esc(day(older))} and ${esc(day(newer))}` : `on or before ${esc(day(newer))}`}.</p>`;
+    : `<h3>Decisions</h3><p class='mut'>No decision in <code>decisions.toml</code> is dated ${!older ? `on or before ${esc(day(newer))}` : day(older) === day(newer) ? `after ${esc(day(older))}, the day ${esc(oN)} was built` : `after ${esc(day(older))} and on or before ${esc(day(newer))}`}.</p>`;
+  const q = diff(older, newer, 'results', isQ);
+  const qrows = q.changed.concat(q.same, q.added);
+  const qHtml = qrows.length ? `<h3>Research quality</h3><p class='mut'>The metrics to push up (or down) from version to version: held-out error, parameters pinned, selection stability, control robustness and scenario agreement.</p><div class='tscroll'><table><tr><th>Metric</th><th>${esc(nN)}</th><th>${older ? esc(oN) : ''}</th></tr>${qrows.map(x => `<tr${x.a != null && x.a !== x.b ? " class='chg'" : ''}><td>${esc(shortQ(x.label))} <span class='mut'>(${x.k[1] === '+' ? 'higher' : 'lower'} is better)</span> ${!older ? '' : x.a == null ? "<span class='badge'>new</span>" : verdict(x.k, x.a, x.b)}</td><td>${esc(x.b)}</td><td class='mut'>${older ? (x.a == null ? 'not recorded' : esc(x.a)) : ''}</td></tr>`).join('')}</table></div>`
+    : `<h3>Research quality</h3><p class='mut'>Not recorded for this version.</p>`;
   let setHtml, resHtml;
   if (!recorded(newer) || (older && !recorded(older))) {
     setHtml = `<h3>Settings</h3><p class='mut'>Settings were not recorded for ${!recorded(newer) ? esc(nN) : esc(oN)}, so they cannot be compared.</p>`;
     resHtml = '';
   } else if (!older) {
     setHtml = `<h3>Settings</h3>${sameTable({same: (newer.settings || []).map(x => ({label: x.label, b: x.value}))}, nN).replace('<details>', '<details open>')}`;
-    resHtml = `<h3>Key results</h3>${sameTable({same: (newer.results || []).map(x => ({label: x.label, b: x.value}))}, nN)}`;
+    resHtml = `<h3>Key results</h3>${sameTable({same: (newer.results || []).filter(x => !isQ(x.key)).map(x => ({label: x.label, b: x.value}))}, nN)}`;
   } else {
+    const r = diff(older, newer, 'results', k => !isQ(k));
     const nS = s.changed.length + s.added.length + s.gone.length, nR = r.changed.length + r.added.length + r.gone.length;
     setHtml = `<h3>Settings: ${nS ? `${nS} changed` : 'none changed'}</h3>${changeTable(s, oN, nN)}${sameTable(s, nN)}`;
     resHtml = `<h3>Key results: ${nR ? `${nR} differ` : 'none differ'}</h3>${changeTable(r, oN, nN)}${sameTable(r, nN)}`;
   }
-  return `<section class='panel preface'>${head}${decHtml}${setHtml}${resHtml}</section>`;
+  return `<section class='panel preface'>${head}${decHtml}${qHtml}${setHtml}${resHtml}</section>`;
 }
 
 // an archived report, with its own decision and history panels hidden (the preface replaces them)
