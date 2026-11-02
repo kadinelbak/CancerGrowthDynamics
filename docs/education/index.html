@@ -45,7 +45,13 @@
         <h3><a href="pipeline-map.html">Pipeline map</a></h3>
         <p>Data → staged fitting → validation → optimal control → sweep and fasting → Final Report. Each stage with the model it carried, what passes forward, and the MPC loop step by step.</p>
         <ul><li>Stages 1, 2a, 2b, 3a, 3b, 4 and the 2-BIC rule</li><li>Validation checks and the research-quality metrics</li><li>The controller as it is designed on the current branch (marked “new”)</li></ul>
-        <span class="meta">Drawn from run_pipeline.jl, stages.toml, validation.toml and control_config.toml · 28 Oct 21:04 numbers</span>
+        <span class="meta">Drawn from run_pipeline.jl, stages.toml, validation.toml and control_config.toml · 2026-11-02_1106 numbers</span>
+      </article>
+      <article class="card">
+        <span class="tag">Slides · model, parameters, graph per stage</span>
+        <h3><a href="../outputs/results/staged.html">Staged presentation</a></h3>
+        <p>The model built one term at a time, read live from the latest run: untreated growth, the cisplatin term, the low-resource term, coculture untreated and treated, the full model; a comparison slide of the two lines after each; identifiability and sensitivity stage by stage; the control system equation by equation; the controller's results with and without fasting.</p>
+        <span class="meta">docs/outputs/results/staged.html · regenerate its data with build_staged.py after a run</span>
       </article>
       <article class="card">
         <span class="tag">Low level · 21 step cards with figures</span>

@@ -17,7 +17,7 @@
   const TABS = [
     ['home', 'Reports', 'index.html', p => p === ROOT.pathname || p === new URL(R('index.html')).pathname],
     ['summary', 'Summary', 'outputs/results/summary.html', p => /results\/summary\.html$/.test(p)],
-    ['presentation', 'Presentation', 'outputs/results/presentation.html', p => /results\/presentation\.html$/.test(p)],
+    ['presentation', 'Presentation', 'outputs/results/presentation.html', p => /results\/(presentation|staged)\.html$/.test(p)],
     ['explorer', 'Explorer', 'outputs/results/explorer.html', p => /results\/explorer\.html$/.test(p)],
     ['control', 'Optimal control', PKG + 'control/report.html', p => /\/outputs\/control(_\w+)?\/report\.html$/.test(p)],
     ['final', 'Final report', 'outputs/final_report/history/index.html', p => /\/final_report\//.test(p)],
