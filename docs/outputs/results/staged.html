@@ -49,6 +49,7 @@ table.t th{background:#eef3f6;font-weight:650}
 table.t td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 table.t tr.hi td{background:#e8f4fa}
 table.t.small{font-size:13px}table.t.small th,table.t.small td{padding:3px 6px}
+table.t.top3{margin-top:4px}table.t.top3 th,table.t.top3 td{padding:2px 6px}
 table.t.tiny{font-size:11.5px}table.t.tiny th,table.t.tiny td{padding:2px 5px}
 .ok{color:#0f766e;font-weight:650}.warn{color:#b45309;font-weight:650}.bad{color:#b91c1c;font-weight:650}
 .foot{position:absolute;left:64px;right:64px;bottom:18px;font-size:13px;color:#6b7782;display:flex;justify-content:space-between}
@@ -89,6 +90,11 @@ function card(m, o = {}) {
   const inh = (o.inherited !== false && m.inherited.length) ? `<p class="inh">Carried: ${m.inherited.map(p => `${texInline(p.sym)} = ${fmt(p.value)} (${esc(p.note)})`).join('; ')}</p>` : '';
   return `<div class="mcard opt"><div class="tag">${esc(o.tag || '')}</div><h3>${esc(o.title || m.label)}</h3>${o.note ? `<p class="note">${o.note}</p>` : ''}${eqs}${ps}${inh}</div>`;
 }
+// the three lowest-BIC candidates of a fit group: BIC, ΔBIC against the lowest, free parameters, bootstrap share
+function top3(g) {
+  const rows = [...g.ranking].sort((a, b) => a.bic - b.bic).slice(0, 3), best = rows[0].bic;
+  return `<div class="mcard" style="margin-top:10px"><div class="tag">Top 3 candidates by BIC (of ${g.ranking.length}) · carried = fewest parameters within ${RES.ruleBIC} BIC of the lowest · "chosen" = share of bootstrap resamples picking it</div><table class="t small top3"><tr><th>Model</th><th>k</th><th>BIC</th><th>ΔBIC</th><th>Chosen</th></tr>${rows.map(r => `<tr class="${r.name === g.optimal.name ? 'hi' : ''}"><td>${esc(r.name)}${r.name === g.optimal.name ? ' <b>(carried)</b>' : ''}</td><td class="num">${r.k}</td><td class="num">${r.bic.toFixed(1)}</td><td class="num">${(r.bic - best) === 0 ? '0' : '+' + (r.bic - best).toFixed(1)}</td><td class="num">${pctf(r.pick)}</td></tr>`).join('')}</table></div>`;
+}
 
 // ── data + fitted curves for one panel of a group, with the parts summed into totals when asked ──
 function stagePlot(g, o = {}) {
@@ -106,7 +112,7 @@ function stagePlot(g, o = {}) {
     const lab = o.label ? o.label(s) : s.name;
     if (!seen.has(lab)) { seen.add(lab); legend.push({ label: lab, color, kind: s.filled ? 'dot' : 'open' }); }
   }
-  let ymax = o.ymax || g.ymax;
+  let ymax = o.ymax || AX.ymax;
   if (o.totals) {
     for (const dashed of [false, true]) {
       const grp = ser.filter(s => !!s.dashed === dashed);
@@ -118,11 +124,11 @@ function stagePlot(g, o = {}) {
       lines.push({ t: opt.curve.t, y, color: TOT, dash: dashed ? '8,4' : '', width: 2.8 });
       legend.push({ label: dashed ? 'total (treated)' : 'total', color: TOT, kind: dashed ? 'open' : 'dot' });
     }
-    ymax = Math.ceil(ymax / 500) * 500;
+    ymax = Math.max(ymax, AX.ymax); ymax = Math.ceil(ymax / 500) * 500;
   }
   legend.push({ label: 'fitted model' + (o.noband ? '' : ' (95% band)'), color: '#555', kind: 'line' });
   const title = o.title !== undefined ? o.title : (g.panels[panel - 1] || g.title);
-  return `<div class="fig">${plotSVG({ w: o.w || 760, h: o.h || 470, xmax: g.xmax, ymax, title, points, excluded, lines, bands, legend })}${o.cap ? `<div class="cap">${o.cap}</div>` : ''}</div>`;
+  return `<div class="fig">${plotSVG({ w: o.w || 760, h: o.h || 430, xmax: AX.xmax, ymax, title, points, excluded, lines, bands, legend })}${o.cap ? `<div class="cap">${o.cap}</div>` : ''}</div>`;
 }
 
 // ── several groups' series drawn on one plot (for the comparison slides) ──
@@ -140,7 +146,7 @@ function overlay(title, entries, o = {}) {
     }
     legend.push({ label: e.label, color: e.color, kind: e.open ? 'open' : 'dot' });
   }
-  ymax = o.ymax || Math.ceil(ymax * 1.08 / 500) * 500;
+  ymax = o.ymax || AX.ymax; xmax = AX.xmax;
   return `<div class="fig">${plotSVG({ w: o.w || 760, h: o.h || 400, xmax, ymax, title, points, lines, legend })}${o.cap ? `<div class="cap">${o.cap}</div>` : ''}</div>`;
 }
 
@@ -198,6 +204,23 @@ if (!RES || !S) {
   const lrN = G('s1b-a2780'), lrC = G('s1b-a2780cis'), s3 = G('s3'), s3b = G('s3b'), s4 = G('s4');
   const m1N = s1N.optimal, m1C = s1C.optimal, m2N = s2N.optimal, m2C = s2C.optimal, mlN = lrN.optimal, mlC = lrC.optimal, m3 = s3.optimal, m3b = s3b.optimal, m4 = s4.optimal;
   const pick = (g, n) => g.optimal.params.find(p => p.name === n);
+  // one x range and one y range for every cell-count graph in the deck (user, 2026-11-02): the longest
+  // series sets x; the largest measured or fitted total (parts summed within a panel) sets y
+  window.AX = (() => {
+    let xmax = 0, ymax = 0;
+    for (const g of RES.groups) {
+      xmax = Math.max(xmax, g.xmax); ymax = Math.max(ymax, g.ymax);
+      if (!g.series.some(s => /sensitive|resistant/.test(s.name))) continue;   // parts of one well only (cocultures)
+      for (const panel of g.panels.map((_, i) => i + 1)) for (const dashed of [false, true]) {
+        const grp = g.series.filter(s => s.panel === panel && !!s.dashed === dashed);
+        if (!grp.length) continue;
+        const xs = grp[0].x.filter(x => grp.every(s => s.x.includes(x)));
+        xs.forEach(x => { ymax = Math.max(ymax, grp.reduce((a, s) => a + s.y[s.x.indexOf(x)], 0)); });
+        g.optimal.curve.t.forEach((_, i) => { ymax = Math.max(ymax, grp.reduce((a, s) => a + g.optimal.curve.y[String(s.state)][i], 0)); });
+      }
+    }
+    return { xmax, ymax: Math.ceil(ymax * 1.04 / 500) * 500 };
+  })();
   const hdl = S.headline, other = S.other;
 
   // ── 0 · title ──
@@ -208,11 +231,11 @@ if (!RES || !S) {
 
   // ── 1 · untreated growth ──
   stageSlide('1 · Untreated growth · sensitive line', 'A2780 alone: logistic growth with its own r and K',
-    card(m1N, { tag: `Stage 1 · ${esc(m1N.label)} · chosen in ${pctf(m1N.pick)} of bootstrap data sets`, title: 'Sensitive line N' }),
-    stagePlot(s1N, { title: 'A2780 untreated, 10% FBS', cap: 'Points: mean cells per well. Line: the fitted logistic. Band: 95% of the bootstrap refits.' }), '1a · A2780 untreated');
+    card(m1N, { g: s1N,  tag: `Stage 1 · ${esc(m1N.label)} · chosen in ${pctf(m1N.pick)} of bootstrap data sets`, title: 'Sensitive line N' }),
+    stagePlot(s1N, { title: 'A2780 untreated, 10% FBS', cap: 'Points: mean cells per well. Line: the fitted logistic. Band: 95% of the bootstrap refits.' }) + top3(s1N), '1a · A2780 untreated');
   stageSlide('1 · Untreated growth · resistant line', 'A2780cis alone: the same law, its own r and K',
-    card(m1C, { tag: `Stage 1 · ${esc(m1C.label)} · chosen in ${pctf(m1C.pick)} of bootstrap data sets`, title: 'Resistant line C' }),
-    stagePlot(s1C, { title: 'A2780cis untreated, 10% FBS' }), '1b · A2780cis untreated');
+    card(m1C, { g: s1C,  tag: `Stage 1 · ${esc(m1C.label)} · chosen in ${pctf(m1C.pick)} of bootstrap data sets`, title: 'Resistant line C' }),
+    stagePlot(s1C, { title: 'A2780cis untreated, 10% FBS' }) + top3(s1C), '1b · A2780cis untreated');
   stageSlide('1 · Comparison', 'Do the lines grow differently? r and K side by side',
     ivals('Growth rate r (per day)', [iv('A2780  r_N', pick(s1N, 'r_N'), SEN), iv('A2780cis  r_C', pick(s1C, 'r_C'), RESC)], { unit: 'per day', xmin: 0 }) +
     ivals('Carrying capacity K (cells)', [iv('A2780  K_N', pick(s1N, 'K_N'), SEN), iv('A2780cis  K_C', pick(s1C, 'K_C'), RESC)], { unit: 'mean cells per well', xmin: 0 }) +
@@ -224,11 +247,11 @@ if (!RES || !S) {
 
   // ── 2 · cisplatin term (Stage 2b) ──
   stageSlide('2 · Cisplatin term · sensitive line', 'A2780 under cisplatin: what the kill term looks like',
-    card(m2N, { tag: `Stage 2b · ${esc(m2N.label)} · chosen in ${pctf(m2N.pick)}`, title: 'Kill term added to the Stage 1 growth', hl: [0, 1], note: 'Highlighted: the drug effect builds through a 3-compartment delay A and kills in proportion to the growth factor (Norton–Simon). r and K are carried from stage 1.' }),
-    stagePlot(s2N, { title: 'A2780, three measured doses fitted jointly' }), '2a · A2780 cisplatin');
+    card(m2N, { g: s2N,  tag: `Stage 2b · ${esc(m2N.label)} · chosen in ${pctf(m2N.pick)}`, title: 'Kill term added to the Stage 1 growth', hl: [0, 1], note: 'Highlighted: the drug effect builds through a 3-compartment delay A and kills in proportion to the growth factor (Norton–Simon). r and K are carried from stage 1.' }),
+    stagePlot(s2N, { title: 'A2780, three measured doses fitted jointly' }) + top3(s2N), '2a · A2780 cisplatin');
   stageSlide('2 · Cisplatin term · resistant line', 'A2780cis under cisplatin: same mechanism, its own β and k',
-    card(m2C, { tag: `Stage 2b · ${esc(m2C.label)} · chosen in ${pctf(m2C.pick)}`, title: 'Kill term added to the Stage 1 growth', hl: [0, 1] }),
-    stagePlot(s2C, { title: 'A2780cis, three measured doses fitted jointly' }), '2b · A2780cis cisplatin');
+    card(m2C, { g: s2C,  tag: `Stage 2b · ${esc(m2C.label)} · chosen in ${pctf(m2C.pick)}`, title: 'Kill term added to the Stage 1 growth', hl: [0, 1] }),
+    stagePlot(s2C, { title: 'A2780cis, three measured doses fitted jointly' }) + top3(s2C), '2b · A2780cis cisplatin');
   stageSlide('2 · Comparison', 'How much weaker is the resistant line\'s response? β and k side by side',
     ivals('Kill strength β (per day per unit effect)', [iv('A2780  β_N', pick(s2N, 'β_N'), SEN), iv('A2780cis  β_C', pick(s2C, 'β_C'), RESC)], { unit: 'per day per µM of effect', xmin: 0 }) +
     ivals('Effect build-up rate k (per day)', [iv('A2780  k_N', pick(s2N, 'k_N'), SEN), iv('A2780cis  k_C', pick(s2C, 'k_C'), RESC)], { unit: 'per day (3-compartment chain: mean delay 3/k days)', xmin: 0 }) +
@@ -245,14 +268,14 @@ if (!RES || !S) {
     return { t: o.curve.t, y, color, label };
   };
   stageSlide('3 · Low-resource term · sensitive line', 'A2780 in 0.5% FBS: extra death at a constant rate',
-    card(mlN, { tag: `Stage 2a · ${esc(mlN.label)} · chosen in ${pctf(mlN.pick)}`, title: 'Low-resource term added to the Stage 1 growth', hl: [0], note: 'u_R is the low-resource level (0.955 for 0.5% FBS). Candidates ranged from an immediate loss to accumulation, damage and capacity changes; the rule kept the one-parameter immediate loss.' }),
-    stagePlot(lrN, { title: 'A2780, 0.5% FBS' }), '3a · A2780 low resource');
+    card(mlN, { g: lrN,  tag: `Stage 2a · ${esc(mlN.label)} · chosen in ${pctf(mlN.pick)}`, title: 'Low-resource term added to the Stage 1 growth', hl: [0], note: 'u_R is the low-resource level (0.955 for 0.5% FBS). Candidates ranged from an immediate loss to accumulation, damage and capacity changes; the rule kept the one-parameter immediate loss.' }),
+    stagePlot(lrN, { title: 'A2780, 0.5% FBS' }) + top3(lrN), '3a · A2780 low resource');
   stageSlide('3 · Low-resource term · resistant line', 'A2780cis in 0.5% FBS: an immediate loss plus a slow accumulating one',
-    card(mlC, { tag: `Stage 2a · ${esc(mlC.label)} · chosen in ${pctf(mlC.pick)}`, title: 'Low-resource term added to the Stage 1 growth', hl: mlC.tex.map((_, i) => i) }),
-    stagePlot(lrC, { title: 'A2780cis, 0.5% FBS' }), '3b · A2780cis low resource');
+    card(mlC, { g: lrC,  tag: `Stage 2a · ${esc(mlC.label)} · chosen in ${pctf(mlC.pick)}`, title: 'Low-resource term added to the Stage 1 growth', hl: mlC.tex.map((_, i) => i) }),
+    stagePlot(lrC, { title: 'A2780cis, 0.5% FBS' }) + top3(lrC), '3b · A2780cis low resource');
   {
     const rN = lrRatio(lrN, s1N, SEN, 'A2780'), rC = lrRatio(lrC, s1C, RESC, 'A2780cis');
-    const ratioPlot = `<div class="fig">${plotSVG({ w: 760, h: 360, xmax: Math.max(lrN.xmax, lrC.xmax), ymax: 1.2, yfmt: v => v.toFixed(1), ylabel: 'ratio', title: 'Fitted low-resource count ÷ what untreated growth would give', lines: [{ t: rN.t, y: rN.y, color: SEN }, { t: rC.t, y: rC.y, color: RESC }], legend: [{ label: 'A2780', color: SEN, kind: 'line' }, { label: 'A2780cis', color: RESC, kind: 'line' }] })}<div class="cap">1 = no effect of starvation. The ratio uses each line's own fitted start and Stage 1 r, K; the plot's y axis reads in these units rather than cells.</div></div>`;
+    const ratioPlot = `<div class="fig">${plotSVG({ w: 760, h: 360, xmax: AX.xmax, ymax: 1.2, yfmt: v => v.toFixed(1), ylabel: 'ratio', title: 'Fitted low-resource count ÷ what untreated growth would give', lines: [{ t: rN.t, y: rN.y, color: SEN }, { t: rC.t, y: rC.y, color: RESC }], legend: [{ label: 'A2780', color: SEN, kind: 'line' }, { label: 'A2780cis', color: RESC, kind: 'line' }] })}<div class="cap">1 = no effect of starvation. The ratio uses each line's own fitted start and Stage 1 r, K; the plot's y axis reads in these units rather than cells.</div></div>`;
     stageSlide('3 · Comparison', 'Which line suffers more from starvation? The immediate death rates side by side',
       ivals('Immediate low-resource death d^LR (per day at u_R = 1)', [iv('A2780  d_N^LR', pick(lrN, 'd_N^LR'), SEN), iv('A2780cis  d_C^LR', pick(lrC, 'd_C^LR'), RESC)], { unit: 'per day', xmin: 0 }) +
       ivals('Extra terms only the resistant line needed', [iv('A2780cis  d_C^acc (accumulated)', pick(lrC, 'd_C^acc'), RESC), iv('A2780cis  k_C^R (chain rate)', pick(lrC, 'k_C^R'), RESC)], { unit: 'per day', xmin: 0 }) +
@@ -267,8 +290,8 @@ if (!RES || !S) {
   const untreatedTex = m3.tex.map(t => t.replace(/-\\left\(1-\\frac\{[^}]*\}\{K\}\\right\)\\left\[[^\]]*\\right\]/, '')).filter(t => !/A_\{[NC],1\}/.test(t));
   const m3u = Object.assign({}, m3, { tex: untreatedTex, params: m3.params.filter(p => !/^β/.test(p.name)) });
   stageSlide('4 · Untreated coculture · two models, one well', 'Sensitive and resistant together: shared K, cross-crowding α, death d',
-    card(m3u, { tag: `Stage 3a · ${esc(m3.label)} · chosen in ${pctf(m3.pick)} · untreated part (Ce0)`, title: 'Two coupled equations', hl: [0, 1], note: 'Each line keeps its Stage 1 r. New here: one shared K, how much each line crowds the other (α_NC: effect of C on N; α_CN: effect of N on C) and a death rate per line. Ce0 and Ce1 (next slide) are fitted at once.' }),
-    stagePlot(s3, { pick: ce0, totals: true, label: coLabel, title: 'Untreated coculture, 50:50 start', cap: 'Parts: sensitive (blue) and resistant (orange) counts in the same well. Grey: their total, both measured (points) and fitted (sum of the two curves).' }), '4 · Coculture untreated');
+    card(m3u, { g: s3,  tag: `Stage 3a · ${esc(m3.label)} · chosen in ${pctf(m3.pick)} · untreated part (Ce0)`, title: 'Two coupled equations', hl: [0, 1], note: 'Each line keeps its Stage 1 r. New here: one shared K, how much each line crowds the other (α_NC: effect of C on N; α_CN: effect of N on C) and a death rate per line. Ce0 and Ce1 (next slide) are fitted at once.' }),
+    stagePlot(s3, { pick: ce0, totals: true, label: coLabel, title: 'Untreated coculture, 50:50 start', cap: 'Parts: sensitive (blue) and resistant (orange) counts in the same well. Grey: their total, both measured (points) and fitted (sum of the two curves).' }) + top3(s3), '4 · Coculture untreated');
   stageSlide('4 · Comparison', 'Who crowds whom, and who dies faster? α and d side by side',
     ivals('Cross-crowding α (1 = the other line counts like self)', [iv('C on N  α_NC', pick(s3, 'α_NC'), SEN), iv('N on C  α_CN', pick(s3, 'α_CN'), RESC)], { unit: 'dimensionless', xmin: 0 }) +
     ivals('Death in coculture d (per day)', [iv('A2780  d_N', pick(s3, 'd_N'), SEN), iv('A2780cis  d_C', pick(s3, 'd_C'), RESC)], { unit: 'per day', xmin: 0 }) +
@@ -278,8 +301,8 @@ if (!RES || !S) {
 
   // ── 5 · treated coculture (Ce1) ──
   stageSlide('5 · Treated coculture · two models, one well', 'Add 1 µM cisplatin to the coculture: each line keeps its Stage 2b kill mechanism, strength refitted',
-    card(m3, { tag: `Stage 3a · ${esc(m3.label)} · treated part (Ce1)`, title: 'The full Stage 3a system', hl: [0, 2], note: 'Highlighted: the Norton–Simon kill terms. β_N and β_C are refitted in coculture; β_C may fall to a floor of 0.1 × its monoculture value (decision B9), and the fit sits on that floor.' }),
-    stagePlot(s3, { pick: ce1, totals: true, label: coLabel, title: 'Coculture + 1 µM cisplatin, 50:50 start', cap: 'Open points and dashed lines: the treated wells. Grey dashed: total.' }), '5 · Coculture treated');
+    card(m3, { g: s3,  tag: `Stage 3a · ${esc(m3.label)} · treated part (Ce1)`, title: 'The full Stage 3a system', hl: [0, 2], note: 'Highlighted: the Norton–Simon kill terms. β_N and β_C are refitted in coculture; β_C may fall to a floor of 0.1 × its monoculture value (decision B9), and the fit sits on that floor.' }),
+    stagePlot(s3, { pick: ce1, totals: true, label: coLabel, title: 'Coculture + 1 µM cisplatin, 50:50 start', cap: 'Open points and dashed lines: the treated wells. Grey dashed: total.' }) + top3(s3), '5 · Coculture treated');
   stageSlide('5 · Comparison', 'Kill in coculture vs kill alone: β side by side',
     ivals('Sensitive kill β_N: monoculture vs coculture', [iv('alone (Stage 2b)  β_N', pick(s2N, 'β_N'), SEN), iv('coculture (Stage 3a)  β_N', pick(s3, 'β_N'), SEN)], { unit: 'per day per unit effect', xmin: 0 }) +
     ivals('Resistant kill β_C: monoculture vs coculture', [iv('alone (Stage 2b)  β_C', pick(s2C, 'β_C'), RESC), iv('coculture (Stage 3a)  β_C', pick(s3, 'β_C'), RESC)], { unit: 'per day per unit effect', xmin: 0 }) +
@@ -290,11 +313,11 @@ if (!RES || !S) {
 
   // ── 6 · everything together (Stage 3b, Stage 4) ──
   stageSlide('6 · Low resource in coculture', 'Stage 3b: the Stage 2a terms enter the coculture; only the sensitive strength ε_N is refitted',
-    card(m3b, { tag: `Stage 3b · ${esc(m3b.label)} · chosen in ${pctf(m3b.pick)} (weak: the 0-parameter inherit model wins ${pctf((sel('s3b').find(r => r.candidate === 'lrcc_inherit') || {}).pct_chosen)} of resamples)`, title: 'Coculture in 0.5% FBS, no drug', hl: [0] }),
-    stagePlot(s3b, { totals: true, title: 'Coculture, 0.5% FBS, 1:1 start' }), '6a · Coculture low resource');
+    card(m3b, { g: s3b,  tag: `Stage 3b · ${esc(m3b.label)} · chosen in ${pctf(m3b.pick)} (weak: the 0-parameter inherit model wins ${pctf((sel('s3b').find(r => r.candidate === 'lrcc_inherit') || {}).pct_chosen)} of resamples)`, title: 'Coculture in 0.5% FBS, no drug', hl: [0] }),
+    stagePlot(s3b, { totals: true, title: 'Coculture, 0.5% FBS, 1:1 start' }) + top3(s3b), '6a · Coculture low resource');
   stageSlide('6 · The full model', 'Stage 4: low resource and cisplatin together in coculture. Everything fitted before is kept; two interaction strengths are new',
-    card(m4, { tag: `Stage 4 · ${esc(m4.label)} · chosen in ${pctf(m4.pick)}`, title: 'The complete fitted system', hl: m4.tex.map((t, i) => /varepsilon/.test(t) ? i : -1).filter(i => i >= 0), note: 'ε^R scales the low-resource death when cisplatin is present (ε = 1 would mean the two stresses simply add).' }),
-    stagePlot(s4, { totals: true, title: 'Coculture 1:1, 0.5% FBS + 1 µM cisplatin', cap: 'One graph: both lines and their total under both stresses.' }), '6b · Full model');
+    card(m4, { g: s4,  tag: `Stage 4 · ${esc(m4.label)} · chosen in ${pctf(m4.pick)}`, title: 'The complete fitted system', hl: m4.tex.map((t, i) => /varepsilon/.test(t) ? i : -1).filter(i => i >= 0), note: 'ε^R scales the low-resource death when cisplatin is present (ε = 1 would mean the two stresses simply add).' }),
+    stagePlot(s4, { totals: true, title: 'Coculture 1:1, 0.5% FBS + 1 µM cisplatin', cap: 'One graph: both lines and their total under both stresses.' }) + top3(s4), '6b · Full model');
   stageSlide('6 · Comparison', 'Does starvation help or hinder the drug? ε side by side',
     ivals('Low-resource strength with 1 µM cisplatin, ε^R (1 = stresses add)', [iv('A2780  ε_N^R', pick(s4, 'ε_N^R'), SEN), iv('A2780cis  ε_C^R', pick(s4, 'ε_C^R'), RESC), iv('A2780 without drug (Stage 3b)  ε_N', pick(s3b, 'ε_N'), '#6b7280')], { unit: 'dimensionless', xmin: 0 }) +
     bul([`Sensitive line: ε_N^R = ${fmt(pick(s4, 'ε_N^R').value)} > 1, starvation and cisplatin reinforce each other.`,
