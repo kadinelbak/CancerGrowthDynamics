@@ -267,7 +267,7 @@ lookup(rows, key) = (i = findfirst(r -> r["key"] == key, rows); i === nothing ? 
 function rebase_archived(page)
     head, sep, rest = let i = findfirst("const PARTS", page); i === nothing ? (page, "", "") : (page[1:prevind(page, first(i))], "const PARTS", page[first(i)+length("const PARTS"):end]) end
     head = replace(head, "href='../../index.html'" => "href='../../../../index.html'", "href='../archive" => "href='../../../archive",
-                   "href='history/" => "href='../", "href='report.html'" => "href='../../report.html'")
+                   "href='history/" => "href='../", "action='history/" => "action='../", "href='report.html'" => "href='../../report.html'")
     rest = replace(rest, "<base href=\\\"../../" => "<base href=\\\"../../../../", "src:\"../../" => "src:\"../../../../")
     head * sep * rest
 end
@@ -323,7 +323,9 @@ $stalehtml<div class='tscroll'><table>$th$(join([row(k, l, v, "settings") for (k
 end
 
 # the version history on the Final Report page itself (user, 2026-10-30): every archived version, newest
-# first, with what changed in its settings against the version before it and a link to the archived copy
+# first; a version opens to show its modelling decisions (changed ones highlighted against the version
+# before), links to its archived report, and any two versions open side by side on history/index.html.
+# Each version also says whether any of its steps were reused from an earlier run (provenance, user 2026-11-02).
 function history_panel(id, settings; date=Dates.format(now(), "yyyy-mm-dd HH:MM"), commit=gitc("rev-parse", "--short", "HEAD"), provenance=nothing)
     vs = load_versions()
     cur = Dict{String,Any}("id" => id, "date" => date, "commit" => commit,
@@ -342,18 +344,34 @@ function history_panel(id, settings; date=Dates.format(now(), "yyyy-mm-dd HH:MM"
         isempty(new_) || push!(parts, "new: " * join(hesc_.(new_), ", "))
         isempty(parts) ? "<span class='mut'>same settings (results or chapters differ)</span>" : join(parts, "; ")
     end
+    function decisions(v, p; grp="settings")
+        a = get(v, grp, Any[])
+        isempty(a) && return "<p class='mut'>This version's $(grp == "settings" ? "settings were" : "key results were") not recorded.</p>"
+        b = p === nothing ? Any[] : get(p, grp, Any[])
+        trs = map(a) do r
+            pv = lookup(b, r["key"]); ch = pv !== nothing && pv != r["value"]
+            "<tr$(ch ? " class='chg'" : "")><td>$(hesc_(r["label"]))</td><td>$(hesc_(r["value"]))</td><td>$(pv === nothing ? "<span class='mut'>—</span>" : hesc_(pv))$(ch ? " <b class='tag'>changed</b>" : "")</td></tr>"
+        end
+        "<div class='tscroll'><table><tr><th>Setting</th><th>$(hesc_(v["id"]))</th><th>Version before$(p === nothing ? "" : " ($(hesc_(p["id"])))")</th></tr>$(join(trs))</table></div>"
+    end
     rows = String[]
     for i in length(vs):-1:1
         v = vs[i]; p = i > 1 ? vs[i-1] : nothing; this = v["id"] == id
-        link = this ? "<b>$(hesc_(v["id"]))</b> <span class='tag'>this page</span>" : "<a href='history/$(hesc_(v["id"]))/report.html'>$(hesc_(v["id"]))</a>"
+        open_ = this ? "<span class='tag'>this page</span>" : "<a href='history/$(hesc_(v["id"]))/report.html'>open this report</a>"
         pv_ = get(v, "provenance", nothing)
         ptag = pv_ === nothing || get(pv_, "recorded", false) !== true ? "<span class='mut'>provenance not recorded</span>" :
                get(pv_, "partly_reused", false) ? "<b class='tag'>partly reused</b> " * hesc_(get(pv_, "summary", "")) : "<span class='mut'>all steps new</span>"
-        push!(rows, "<tr$(this ? " class='chg'" : "")><td>$link</td><td>$(hesc_(get(v, "date", "")))</td><td><code>$(hesc_(get(v, "commit", "")))</code></td><td>$(changed(v, p))</td><td>$ptag</td></tr>")
+        push!(rows, "<details class='ver$(this ? " this" : "")'><summary><b>$(hesc_(v["id"]))</b> <span class='mut'>$(hesc_(get(v, "date", ""))) · <code>$(hesc_(get(v, "commit", "")))</code></span> — $(changed(v, p)) · $ptag</summary>" *
+                    "<div class='verbody'><p>$open_ · modelling decisions of this version:</p>$(decisions(v, p))" *
+                    "<details><summary>Key results of this version</summary>$(decisions(v, p; grp="results"))</details></div></details>")
     end
+    opts(sel) = join(["<option value='$(hesc_(v["id"]))'$(v["id"] == sel ? " selected" : "")>$(hesc_(v["id"]))</option>" for v in reverse(vs)])
+    older = length(vs) > 1 ? vs[end-1]["id"] : id
     """<section class='decisions' id='history'><h2>Report history</h2>
-<p class='lead'>Every Final Report version, newest first. Old versions are archived and never overwritten; open one to see that report as it was, or <a href='history/index.html'>compare any two versions</a> side by side.</p>
-<div class='tscroll'><table><tr><th>Version</th><th>Built</th><th>Commit</th><th>Settings against the version before</th><th>Data provenance</th></tr>$(join(rows))</table></div>
+<p class='lead'>Every Final Report version, newest first. Old versions are archived and never overwritten. Click a version to see its modelling decisions (highlighted where they changed from the version before) and open that report as it was. Each line ends with whether any step of that version was reused from an earlier run.</p>
+<form class='cmp' action='history/index.html' method='get'><b>Compare side by side:</b> <select name='a'>$(opts(older))</select> with <select name='b'>$(opts(id))</select>
+<input type='hidden' name='side' value='1'><button type='submit'>Open both</button> <a href='history/index.html'>all versions in one table</a></form>
+$(join(rows, "\n"))
 </section>"""
 end
 
