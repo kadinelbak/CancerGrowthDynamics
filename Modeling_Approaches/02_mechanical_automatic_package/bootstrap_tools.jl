@@ -90,13 +90,28 @@ end
 const EXTRA_STARTS = parse(Int, get(ENV, "EXTRA_STARTS",
                                     string(isdefined(Main, :selection_cfg) ? selection_cfg("extra_starts", 0) : 0)))
 const START_BIC_TOL = 0.01   # a start "reaches the best BIC" when within this of the best start
+# The seeded starts are drawn around the fixed starts (extra_starts_spread × below the smallest and above the
+# largest fixed start of each parameter, clipped to the bounds; 0 = the whole bounds) and each gets a work budget
+# of extra_starts_work_factor × the evaluations of the slowest fixed-start fit (0 = none): a start in a stiff
+# corner of the bounds is dropped instead of running for hours (first run 2026-11-02 stalled in Stage 1b).
+const EXTRA_SPREAD = Float64(isdefined(Main, :selection_cfg) ? selection_cfg("extra_starts_spread", 10) : 10)
+const EXTRA_WORK = Float64(isdefined(Main, :selection_cfg) ? selection_cfg("extra_starts_work_factor", 20) : 20)
 
-function lhs_starts(name, bounds, n)
+function lhs_starts(name, bounds, n, p0s=Vector{Float64}[]; spread=EXTRA_SPREAD)
     n <= 0 && return Vector{Float64}[]
     rng = Xoshiro(hash(name))
     d = length(bounds)
     u = [(randperm(rng, n) .- 1 .+ rand(rng, n)) ./ n for _ in 1:d]      # one stratified column per parameter
-    [[begin lo, hi = bounds[j]
+    box = map(1:d) do j
+        lo, hi = bounds[j]
+        if spread > 0 && !isempty(p0s)
+            a, b = extrema(p[j] for p in p0s)
+            lo, hi = a > 0 ? (max(lo, a / spread), min(hi, b * spread)) : (max(lo, a - spread * abs(b - a + 1e-12)), min(hi, b + spread * abs(b - a + 1e-12)))
+            hi > lo || ((lo, hi) = bounds[j])
+        end
+        (lo, hi)
+    end
+    [[begin lo, hi = box[j]
            logu = lo > 0 && hi / lo > 100
            logu ? exp(log(lo) + u[j][i] * (log(hi) - log(lo))) : lo + u[j][i] * (hi - lo)
       end for j in 1:d] for i in 1:n]
@@ -115,11 +130,16 @@ function fit_cand(c, datasets; extra=EXTRA_STARTS)
         return merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[], x0fit=Float64[], nstarts=0, nbest=0))
     end
     bounds = vcat(c.bounds, nx == 0 ? Tuple{Float64,Float64}[] : c.x0bounds)
-    starts = np == 0 ? [Float64[]] : vcat(c.p0s, lhs_starts(c.name, c.bounds, extra))
+    fixed = np == 0 ? [Float64[]] : c.p0s
+    seeded = np == 0 ? Vector{Float64}[] : lhs_starts(c.name, c.bounds, extra, c.p0s)
+    starts = vcat(fixed, seeded)
     best = (params=fill(NaN, np + nx), bic=Inf, sse=Inf)
-    bics = Float64[]
-    for p0 in starts
-        f = bs_fit(c.model, datasets, c.u0, vcat(p0, nx == 0 ? Float64[] : c.x0start), bounds; tag=c.name, u0_builder=builder)
+    bics = Float64[]; ev = Int[]
+    for (i, p0) in enumerate(starts)
+        # fixed starts run without a budget (as before); seeded ones get EXTRA_WORK × the slowest fixed-start fit
+        budget = i <= length(fixed) || EXTRA_WORK <= 0 || isempty(ev) ? 0 : max(round(Int, EXTRA_WORK * maximum(ev)), 10_000_000)
+        f = bs_fit(c.model, datasets, c.u0, vcat(p0, nx == 0 ? Float64[] : c.x0start), bounds; tag="$(c.name) start $i",
+                   u0_builder=builder, budget=budget, evals=(i <= length(fixed) ? ev : nothing))
         push!(bics, f.bic)
         f.bic < best.bic && (best = f)
     end
