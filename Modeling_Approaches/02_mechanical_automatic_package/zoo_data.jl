@@ -65,8 +65,6 @@ end
 # start pushed into the growth and drug parameters: θ_C 5.5, a slower r_C and a later kill); "all" = every
 # series; "auto" = the 3-fold rule only (the setting before 2026-11-02).
 const X0_FOLD = 3.0
-const X0_ESTIMATE = string(get(get(STAGE_CFG, "starting_values", Dict()), "estimate", "auto"))
-X0_ESTIMATE in ("auto", "mono", "all") || error("stages.toml [starting_values] estimate must be auto, mono or all, not $X0_ESTIMATE")
 function x0_info(s)
     k = findfirst(i -> s.x[i] > 0 && !s.bad[i], eachindex(s.x))
     k === nothing && error("series without measurements after day 0")
@@ -87,6 +85,8 @@ function constant_dose(name)
 end
 
 const STAGE_CFG = TOML.parsefile(STAGES_FILE)
+const X0_ESTIMATE = string(get(get(STAGE_CFG, "starting_values", Dict()), "estimate", "auto"))
+X0_ESTIMATE in ("auto", "mono", "all") || error("stages.toml [starting_values] estimate must be auto, mono or all, not $X0_ESTIMATE")
 # the two lines, their symbols and measured IC50 (stages.toml [lines])
 const LINE_CFG = STAGE_CFG["lines"]
 const LINES = [(line=L, sym=LINE_CFG[L]["sym"], ec50=Float64(LINE_CFG[L]["ec50"])) for L in ("A2780", "A2780cis")]
