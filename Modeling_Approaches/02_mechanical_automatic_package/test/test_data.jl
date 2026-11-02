@@ -13,14 +13,23 @@ const O = LegacyData
         sh = L == "A2780cis" && first(O.lrmono[L].x) < 0 ? 1.0 : (L == "A2780cis" && length(O.lrmono[L].x) < length(lrmono[L].x) ? 1.0 : 0.0)
         newd = Dict(zip(lrmono[L].x, lrmono[L].y))
         @test all(get(newd, t + sh, NaN) == v || get(newd, t, NaN) == v for (t, v) in zip(O.lrmono[L].x, O.lrmono[L].y))
-        # Stage 2b leaves out the series in its stages.toml `exclude` list (A2780cis 1 µM since 2026-10-27)
+        # Stage 2b leaves out the series in its stages.toml `exclude` list (the A2780cis 1 µM monoculture 2026-10-27
+        # to 2026-11-02; since then only its day-14 point is left out, by hand in sources.toml, see below)
         cut = [e for e in excluded_sources() if e.stage == "s2" && e.line == L]
         k = [i for i in eachindex(O.treated[L].files) if !any(e -> e.file == O.treated[L].files[i], cut)]
         @test length(k) == length(O.treated[L].files) - length(cut)
         @test treated[L].doses == O.treated[L].doses[k] && treated[L].files == O.treated[L].files[k]
         @test all(a[1] == b[1] && a[2] == b[2] for (a, b) in zip(treated[L].data, O.treated[L].data[k]))
     end
-    @test [(e.line, e.stage) for e in excluded_sources()] == [("A2780cis", "s2")]
+    @test isempty(excluded_sources())
+    # points left out by hand (sources.toml exclude_days): the A2780cis 1 µM day-14 count (user, 2026-11-02),
+    # marked in the tidy table so ZOO_NO_EXCLUDE=1 puts it back
+    me = manual_exclusions()
+    @test [(e.id, e.day) for e in me] == [("mono_treated_A2780cis_1.0", 14.0)]
+    @test all(startswith(e.reason, "left out (user") for e in me)
+    let s = series("mono_treated_A2780cis_1.0")
+        @test USE_EXCLUDE ? (s.bad[findfirst(==(14.0), s.x)] && !(14.0 in keep(s).x)) : (14.0 in keep(s).x)
+    end
     @test length(co_data) == length(O.co_data) == 6
     for (a, b, la, lb) in zip(co_data, O.co_data, COCULTURE_LAYOUT, O.COCULTURE_LAYOUT)
         @test a.S[1] == b.S[1] && a.S[2] == b.S[2] && a.R[1] == b.R[1] && a.R[2] == b.R[2]

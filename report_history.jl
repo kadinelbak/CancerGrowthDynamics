@@ -22,6 +22,10 @@ hfmt(x::AbstractString) = String(x)
 hfmt(x::AbstractVector) = join(hfmt.(x), ", ")
 hfmt(::Nothing) = "not set"
 
+# headline drug-response scenario (control_config.toml [scenarios].headline; user, 2026-11-02); "A" when the
+# table is absent, so versions from before the decision still parse
+headline_scenario(pkg=HPKG) = (f = joinpath(pkg, "control_config.toml"); isfile(f) ? String(get(get(TOML.parsefile(f), "scenarios", Dict()), "headline", "A")) : "A")
+
 # the settings that define a version: (key, label, value), in display order
 function report_settings(pkg=HPKG)
     sf, cf = joinpath(pkg, "stages.toml"), joinpath(pkg, "control_config.toml")
@@ -30,8 +34,13 @@ function report_settings(pkg=HPKG)
     sel = get(S, "selection", Dict()); sch = get(C, "schedule", Dict()); can = get(C, "cancer", Dict())
     prog = get(C, "progression", Dict()); w = get(C, "weights", Dict())
     rule = get(sel, "rule_bic", nothing)
+    hs = get(get(C, "scenarios", Dict()), "headline", nothing)
     wt = get(sel, "residual_weighting", "none")
     ex = get(stg("s2"), "exclude", Any[])
+    srcf = joinpath(pkg, "data", "sources.toml")
+    pts = isfile(srcf) ? [(get(s, "line", "?"), get(s, "exclude_days", Any[])) for s in get(TOML.parsefile(srcf), "source", Any[]) if !isempty(get(s, "exclude_days", Any[]))] : Any[]
+    x0m = get(get(S, "starting_values", Dict()), "estimate", "auto")
+    nst = get(sel, "extra_starts", 0)
     lines = get(S, "lines", Dict())
     Δ = Float64(get(sch, "decision_interval_days", 2.0))
     look = haskey(sch, "lookahead_blocks") ? "$(hfmt(sum(sch["lookahead_blocks"]) * Δ)) days (blocks $(hfmt(sch["lookahead_blocks"])))" :
@@ -43,9 +52,13 @@ function report_settings(pkg=HPKG)
     [("rule_bic", "Model selection rule", rule === nothing ? "not recorded" : "fewest parameters within $(hfmt(rule)) BIC"),
      ("weighting", "Residual weighting", wt == "power" ? "power: max(y, 50)^$(hfmt(get(sel, "weight_power", 0.55)))" : hfmt(wt)),
      ("s2_exclude", "Stage 2b series left out", isempty(ex) ? "none" : join(["$(get(e, "line", "?")) $(hfmt(get(e, "dose", "?"))) µM" for e in ex], "; ")),
+     ("points_excluded", "Single points left out (sources.toml exclude_days)", isempty(pts) ? "none" : join(["$(l) day $(hfmt(d))" for (l, d) in pts], "; ")),
+     ("x0_estimate", "Starting values estimated", x0m == "mono" ? "every monoculture series" : x0m == "all" ? "every series" : "only when the first count is far from the seeding"),
+     ("extra_starts", "Seeded extra starts per main fit", hfmt(nst)),
      ("kill_coupled", "Kill coupled to growth (Norton–Simon)", hfmt(get(stg("s2"), "kill_growth_coupled", false))),
      ("betaC_floor", "Resistant kill floor in coculture (× Stage 2b)", hfmt(get(stg("s3"), "betaC_floor", nothing))),
      ("ec50", "EC50, A2780 / A2780cis (µM)", isempty(lines) ? "not recorded" : "$(hfmt(get(get(lines, "A2780", Dict()), "ec50", nothing))) / $(hfmt(get(get(lines, "A2780cis", Dict()), "ec50", nothing)))"),
+     ("headline_scenario", "Headline drug-response scenario", hs === nothing ? "not set" : hs == "B" ? "B (monoculture kills for both lines)" : hs == "A" ? "A (Stage 3a coculture fit as selected)" : hfmt(hs)),
      ("B_cancer", "B_cancer (burden penalty level)", bc === nothing ? "not set" : bc > 0 ? "$(hfmt(bc)) K" : "none"),
      ("B_prog", "B_prog (progression threshold)", haskey(prog, "threshold_fraction_of_K") ? "$(hfmt(prog["threshold_fraction_of_K"])) K" : "no progression goal"),
      ("barrier", "Burden barrier shape", hfmt(get(can, "barrier", "relaxed_log"))),
@@ -85,14 +98,16 @@ function report_results(pkg=HPKG)
         get(r, "optimal", "") == "true" && push!(out, ("carried:" * r["group"], "Carried model · " * r["group"], r["candidate"]))
     end
     cc = hcsv(joinpath(pkg, "outputs", "control", "control_outcomes.csv"))
-    for scen in ("A", "B")
+    hl = headline_scenario(pkg)
+    for scen in (hl == "B" ? ("B", "A") : ("A", "B"))
+        tag = scen == hl ? " (main)" : ""
         i = findfirst(r -> get(r, "environment", "") == "normal" && get(r, "scenario", "") == scen && get(r, "ratio", "") == "50:50" &&
                            get(r, "policy", "") == "MPC, measured doses only", cc)
         i === nothing && continue
         r = cc[i]
-        push!(out, ("mpc:$scen", "14-day MPC schedule · scenario $scen, 50:50 (µM)", r["schedule_uM"]))
-        push!(out, ("mpc_total:$scen", "14-day MPC N + C at the end · scenario $scen, 50:50", string(round(Int, parse(Float64, r["total_final"])))))
-        haskey(r, "time_to_progression_day") && push!(out, ("mpc_ttp:$scen", "14-day MPC time to progression · scenario $scen, 50:50",
+        push!(out, ("mpc:$scen", "14-day MPC schedule · scenario $scen$tag, 50:50 (µM)", r["schedule_uM"]))
+        push!(out, ("mpc_total:$scen", "14-day MPC N + C at the end · scenario $scen$tag, 50:50", string(round(Int, parse(Float64, r["total_final"])))))
+        haskey(r, "time_to_progression_day") && push!(out, ("mpc_ttp:$scen", "14-day MPC time to progression · scenario $scen$tag, 50:50",
                                                             (v = tryparse(Float64, r["time_to_progression_day"]); v === nothing || !isfinite(v) ? "not progressed" : "day $(hfmt(round(v; digits=1)))")))
     end
     append!(out, research_quality(pkg))
@@ -155,6 +170,9 @@ function research_quality(pkg=HPKG)
     if !isempty(cc)
         w, n = mpc_wins(cc, ["scenario", "ratio"], _ -> 14.0)
         n > 0 && push!(out, ("q+:robust", "Quality · 14-day MPC beats no treatment and constant 1 µM, scenarios × ratios (higher is better)", hpct(w, n)))
+        hl = headline_scenario(pkg)
+        wm, nm = mpc_wins([r for r in cc if get(r, "scenario", "") == hl], ["scenario", "ratio"], _ -> 14.0)
+        nm > 0 && push!(out, ("q+:robust_main", "Quality · 14-day MPC beats no treatment and constant 1 µM, headline scenario $hl × ratios (higher is better)", hpct(wm, nm)))
     end
     sw = [r for r in hcsv(joinpath(o, "control_sweep", "sweep_outcomes.csv")) if get(r, "environment", "normal") == "normal"]
     if !isempty(sw)
@@ -172,6 +190,65 @@ function research_quality(pkg=HPKG)
         tot > 0 && push!(out, ("q+:agree", "Quality · scenario agreement, 14-day MPC dose blocks the same in A and B (higher is better)", hpct(same, tot)))
     end
     out
+end
+
+# data provenance (user, 2026-11-02, RP1: "If the data was reused from previous report please have that indicated.
+# A new report assumes new settings or a new optimal control/qualification."). Read from outputs/run_manifest.toml
+# (run_pipeline.jl) when a version is archived and stored in its version.toml as [provenance]:
+#   recorded, started, finished, commit, continued_from, resume, summary, partly_reused, and one [[provenance.steps]]
+#   per tracked step with status = "new" (run in this version) | "reused_unchanged" (control inputs unchanged; the step
+#   carries reused_from, written by run_control*.jl) | "reused_earlier" (run_pipeline.jl --from/--only: the step finished
+#   before this run started) | "resumed" (fits with --resume: unchanged fits/bootstraps reused) | "not_recorded".
+const PROV_STEPS = [("fits", "Fits"), ("analyses", "Analyses"), ("control14", "Control"), ("control_long", "Long control"),
+                    ("control30", "30-day control"), ("control60", "60-day control"), ("sweep", "Sweep"), ("sweep_all", "Sweep (all doses)")]
+function hwhen(s)
+    t = string(s)
+    try Dates.format(DateTime(t[1:min(19, end)]), "d u HH:MM") catch; t end
+end
+function report_provenance(pkg=HPKG)
+    none = Dict{String,Any}("recorded" => false, "partly_reused" => false, "summary" => "provenance not recorded", "steps" => Dict{String,Any}[])
+    mf = joinpath(pkg, "outputs", "run_manifest.toml")
+    isfile(mf) || return none
+    M = try TOML.parsefile(mf) catch; nothing end
+    M === nothing && return none
+    steps = get(M, "steps", Dict()); started = string(get(M, "started", "")); cont = string(get(M, "continued_from", ""))
+    resume = get(M, "resume", false) === true
+    recs = Dict{String,Any}[]; parts = String[]; reused = false
+    for (name, label) in PROV_STEPS
+        st = get(steps, name, nothing)
+        status = "not_recorded"; when = ""; text = "not recorded"
+        if st !== nothing
+            fin = string(get(st, "finished", ""))
+            if haskey(st, "reused_from")
+                status = "reused_unchanged"; when = string(st["reused_from"])
+                text = "reused from the run of $(hwhen(when)) (inputs unchanged)"
+            elseif !isempty(started) && !isempty(fin) && fin < started
+                status = "reused_earlier"; when = fin
+                text = "reused from an earlier run of $(hwhen(when)) (--from / --only)"
+            elseif name == "fits" && resume
+                status = "resumed"; when = fin
+                text = "resumed (--resume: unchanged fits and bootstraps reused from an earlier run)"
+            else
+                status = "new"; when = fin; text = "new in this version"
+            end
+        end
+        status in ("reused_unchanged", "reused_earlier", "resumed") && (reused = true)
+        push!(recs, Dict{String,Any}("step" => name, "label" => label, "status" => status, "when" => when, "detail" => text))
+        push!(parts, "$label: $text")
+    end
+    Dict{String,Any}("recorded" => true, "started" => started, "finished" => string(get(M, "finished", "")),
+                     "commit" => string(get(get(M, "git", Dict()), "commit", "")), "continued_from" => cont, "resume" => resume,
+                     "partly_reused" => reused, "summary" => join(parts, " · "), "steps" => recs)
+end
+# the provenance line shown at the top of the Final Report
+function provenance_html(prov)
+    (prov === nothing || get(prov, "recorded", false) !== true) &&
+        return "<p class='prov'><b>Data provenance:</b> <span class='mut'>provenance not recorded</span> (no run manifest when this version was built).</p>"
+    tag = get(prov, "partly_reused", false) ? " <b class='tag'>partly reused</b>" : " <b class='tag'>all steps new</b>"
+    "<p class='prov$(get(prov, "partly_reused", false) ? " warn" : "")'><b>Data provenance:</b>$tag $(hesc_(get(prov, "summary", ""))). " *
+    "Run started $(hesc_(hwhen(get(prov, "started", ""))))$(isempty(get(prov, "finished", "")) ? "" : ", finished " * hesc_(hwhen(prov["finished"])))" *
+    "$(isempty(get(prov, "commit", "")) ? "" : ", commit <code>" * hesc_(first(prov["commit"], 7)) * "</code>")." *
+    "$(get(prov, "partly_reused", false) ? " A new report assumes new settings or a new optimal control; read the reused steps as results of the earlier run." : "")</p>"
 end
 
 decision_log(pkg=HPKG) = (f = joinpath(pkg, "decisions.toml"); isfile(f) ? get(TOML.parsefile(f), "decision", Any[]) : Any[])
@@ -220,7 +297,7 @@ hesc_(s) = replace(string(s), "&" => "&amp;", "<" => "&lt;", ">" => "&gt;", "'" 
 
 # the decisions panel at the top of the Final Report: this version's settings and results against the
 # previous archived version, and the dated decision log
-function decisions_panel(id, settings, results, prev; chapters=Tuple{String,String}[])
+function decisions_panel(id, settings, results, prev; chapters=Tuple{String,String}[], provenance=nothing)
     previd = prev === nothing ? nothing : prev["id"]
     # chapters generated before the newest decision show results from older settings
     lastdec = maximum((get(d, "date", "") for d in decision_log()); init="")
@@ -238,6 +315,7 @@ function decisions_panel(id, settings, results, prev; chapters=Tuple{String,Stri
     nchg = prev === nothing ? 0 : count(r -> (pv = lookup(get(prev, "settings", Any[]), r[1]); pv !== nothing && pv != r[3]), settings)
     """<section class='decisions' id='decisions'><h2>Modelling decisions in this version</h2>
 <p class='lead'>Version <b>$(hesc_(id))</b>. Every setting that decides what is fitted and controlled, read from <code>stages.toml</code> and <code>control_config.toml</code>, next to the previous Final Report version$(previd === nothing ? "" : " ($(hesc_(previd)); $nchg setting$(nchg == 1 ? "" : "s") changed)"). Every version is archived and never overwritten: <a href='history/index.html'>compare all versions</a>.</p>
+$(provenance_html(provenance))
 $stalehtml<div class='tscroll'><table>$th$(join([row(k, l, v, "settings") for (k, l, v) in settings]))</table></div>
 <details><summary>Key results against the previous version ($(length(results)) rows)</summary><div class='tscroll'><table>$th$(join([row(k, l, v, "results") for (k, l, v) in results]))</table></div></details>
 <details><summary>Decision log ($(length(log)) decisions, newest first; <code>decisions.toml</code>)</summary><div class='tscroll'><table><tr><th>Date</th><th>Area</th><th>Decision</th><th>Was</th><th>By</th><th>Where</th></tr>$logrows</table></div></details>
@@ -246,10 +324,11 @@ end
 
 # the version history on the Final Report page itself (user, 2026-10-30): every archived version, newest
 # first, with what changed in its settings against the version before it and a link to the archived copy
-function history_panel(id, settings; date=Dates.format(now(), "yyyy-mm-dd HH:MM"), commit=gitc("rev-parse", "--short", "HEAD"))
+function history_panel(id, settings; date=Dates.format(now(), "yyyy-mm-dd HH:MM"), commit=gitc("rev-parse", "--short", "HEAD"), provenance=nothing)
     vs = load_versions()
     cur = Dict{String,Any}("id" => id, "date" => date, "commit" => commit,
                            "settings" => [Dict("key" => k, "label" => l, "value" => v) for (k, l, v) in settings])
+    provenance === nothing || (cur["provenance"] = provenance)
     any(v -> v["id"] == id, vs) || push!(vs, cur)
     sort!(vs; by=v -> v["id"])
     function changed(v, p)
@@ -267,18 +346,21 @@ function history_panel(id, settings; date=Dates.format(now(), "yyyy-mm-dd HH:MM"
     for i in length(vs):-1:1
         v = vs[i]; p = i > 1 ? vs[i-1] : nothing; this = v["id"] == id
         link = this ? "<b>$(hesc_(v["id"]))</b> <span class='tag'>this page</span>" : "<a href='history/$(hesc_(v["id"]))/report.html'>$(hesc_(v["id"]))</a>"
-        push!(rows, "<tr$(this ? " class='chg'" : "")><td>$link</td><td>$(hesc_(get(v, "date", "")))</td><td><code>$(hesc_(get(v, "commit", "")))</code></td><td>$(changed(v, p))</td></tr>")
+        pv_ = get(v, "provenance", nothing)
+        ptag = pv_ === nothing || get(pv_, "recorded", false) !== true ? "<span class='mut'>provenance not recorded</span>" :
+               get(pv_, "partly_reused", false) ? "<b class='tag'>partly reused</b> " * hesc_(get(pv_, "summary", "")) : "<span class='mut'>all steps new</span>"
+        push!(rows, "<tr$(this ? " class='chg'" : "")><td>$link</td><td>$(hesc_(get(v, "date", "")))</td><td><code>$(hesc_(get(v, "commit", "")))</code></td><td>$(changed(v, p))</td><td>$ptag</td></tr>")
     end
     """<section class='decisions' id='history'><h2>Report history</h2>
 <p class='lead'>Every Final Report version, newest first. Old versions are archived and never overwritten; open one to see that report as it was, or <a href='history/index.html'>compare any two versions</a> side by side.</p>
-<div class='tscroll'><table><tr><th>Version</th><th>Built</th><th>Commit</th><th>Settings against the version before</th></tr>$(join(rows))</table></div>
+<div class='tscroll'><table><tr><th>Version</th><th>Built</th><th>Commit</th><th>Settings against the version before</th><th>Data provenance</th></tr>$(join(rows))</table></div>
 </section>"""
 end
 
 gitc(args...) = try readchomp(Cmd(`git -C $(@__DIR__) $args`)) catch; "" end
 
 # archive a page under history/<id>/ with its version record
-function archive_version(id, page; settings, results, chapters, source, commit=gitc("rev-parse", "--short", "HEAD"), note="", content_sha="")
+function archive_version(id, page; settings, results, chapters, source, commit=gitc("rev-parse", "--short", "HEAD"), note="", content_sha="", provenance=nothing)
     d = joinpath(HIST, id); mkpath(d)
     write(joinpath(d, "report.html"), rebase_archived(page))
     rec = Dict{String,Any}("id" => id, "date" => Dates.format(now(), "yyyy-mm-dd HH:MM"), "commit" => commit, "source" => source, "note" => note,
@@ -286,6 +368,7 @@ function archive_version(id, page; settings, results, chapters, source, commit=g
                            "settings" => [Dict("key" => k, "label" => l, "value" => v) for (k, l, v) in settings],
                            "results" => [Dict("key" => k, "label" => l, "value" => v) for (k, l, v) in results],
                            "chapters" => [Dict("title" => t, "stamp" => s) for (t, s) in chapters])
+    provenance === nothing || (rec["provenance"] = provenance)
     open(io -> TOML.print(io, rec), joinpath(d, "version.toml"), "w")
     rec
 end

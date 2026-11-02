@@ -143,6 +143,10 @@ seeding = 30000
 fbs = 10.0
 schedule = "const_1"
 file = "New Datasets/A2780cis_IC50_1um_30k.csv"
+# user, 2026-11-02: the series is fitted again (it tracks 0.62 µM at 0.7–0.85 × untreated to day 12); only its
+# day-14 count (4,117, above untreated) is left out. 2026-10-27 to 2026-11-02 the whole series was left out.
+exclude_days = [14]
+exclude_reason = "2026-11-02: day-14 count above untreated, out of line with days 10–12"
 
 [[source]]
 id = "mono_treated_A2780cis_0.62"

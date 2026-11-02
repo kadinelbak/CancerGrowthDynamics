@@ -146,6 +146,7 @@ end
 
 # ── version and modelling decisions ─────────────────────────────────────────────
 settings = report_settings(); results = report_results()
+provenance = report_provenance()      # which steps ran in this version and which were reused (outputs/run_manifest.toml)
 content_sha = bytes2hex(sha256(join(parts) * hjson([collect(x) for x in settings]) * hjson([collect(x) for x in results]) * hjson(decision_log())))
 current = joinpath(OUT, "report.html")
 archive_unrecorded(current)                          # a report.html from before the history is kept, not lost
@@ -156,8 +157,8 @@ while !same && isdir(joinpath(HIST, version_id))     # two builds in one minute
     global version_id = version_id * "b"
 end
 prev = same ? (length(prev_all) > 1 ? prev_all[end-1] : nothing) : (isempty(prev_all) ? nothing : prev_all[end])
-DECISIONS = decisions_panel(version_id, settings, results, prev; chapters=chapter_stamps)
-HISTORY = history_panel(version_id, settings)
+DECISIONS = decisions_panel(version_id, settings, results, prev; chapters=chapter_stamps, provenance=provenance)
+HISTORY = history_panel(version_id, settings; provenance=provenance)
 
 page = """<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
@@ -254,7 +255,7 @@ if same
     end
     println("Unchanged since version $version_id: not archived again")
 else
-    archive_version(version_id, final; settings=settings, results=results, chapters=chapter_stamps, source="build_final_report.jl", content_sha=content_sha)
+    archive_version(version_id, final; settings=settings, results=results, chapters=chapter_stamps, source="build_final_report.jl", content_sha=content_sha, provenance=provenance)
     println("Archived as docs/outputs/final_report/history/$version_id/")
 end
 write_history_index()

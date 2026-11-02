@@ -119,7 +119,9 @@ for (name, what, dir, script, threaded, env) in STEPS
         println("[$(Dates.format(now(), "HH:MM"))] hold released, continuing with $name"); flush(stdout)
     end
     cmd = `$JL --startup-file=no $(threaded ? ["-t", string(THREADS)] : String[]) --project=$PKG $script`
-    cmd = setenv(Cmd(cmd; dir=dir), merge(Dict(ENV), env))
+    cmd = setenv(Cmd(cmd; dir=dir), merge(Dict(ENV), env, Dict("PIPELINE_STEP" => name)))
+    reuse_file = joinpath(PKG, "outputs", "reuse", "$name.toml")      # written by run_control*.jl when the step skipped its work (inputs unchanged)
+    rm(reuse_file; force=true)
     t0 = time(); println("\n[$(Dates.format(now(), "HH:MM"))] $name: $what  (log: outputs/logs/$name.log)"); flush(stdout)
     # one handle for both streams (two handles on the same path overwrite each other's output)
     ok = try
@@ -133,6 +135,12 @@ for (name, what, dir, script, threaded, env) in STEPS
     manifest["steps"][name] = Dict("ok" => ok, "seconds" => round(time() - t0; digits=1), "log" => "outputs/logs/$name.log",
                                    "env" => env, "finished" => string(now()), "commit" => git("rev-parse", "HEAD"),
                                    "uncommitted_changes" => !isempty(git("status", "--porcelain")))
+    if isfile(reuse_file)      # the step reused its last finished outputs: say so, with the earlier run's time and fingerprint
+        ru = try TOML.parsefile(reuse_file) catch; Dict{String,Any}() end
+        for k in ("reused_from", "reused_fingerprint")
+            haskey(ru, k) && (manifest["steps"][name][k] = ru[k])
+        end
+    end
     name == "data" && (manifest["data_sha256"] = data_files())
     if name == "fits" && ok      # fits that reached their safety time limit (0 = the run is reproducible)
         f = joinpath(PKG, "outputs", "zoo_fits", "time_limit_hits.csv")

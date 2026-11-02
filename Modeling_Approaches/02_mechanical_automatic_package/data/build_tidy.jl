@@ -100,6 +100,12 @@ function tidy_rows(src)
     end
     kb, kr = qc_flags(y[keep], qc_rules_of(src))
     bad[keep] .= kb; why[keep] .= kr
+    # points left out by hand (sources.toml exclude_days + exclude_reason): kept in the table, marked
+    # "left out (user ...)" so zoo_data.jl can put them back with ZOO_NO_EXCLUDE=1
+    for d in Float64.(get(src, "exclude_days", Float64[])), i in findall(==(d), day)
+        bad[i] && continue
+        bad[i] = true; why[i] = "left out (user, $(get(src, "exclude_reason", "no reason given")))"
+    end
     tags = (source_id=src["id"], experiment=src["experiment"], condition=src["condition"], line=src["line"], culture=src["culture"],
             ratio=string(src["ratio"]), run=src["run"], seeding=src["seeding"], fbs=Float64(src["fbs"]), schedule=src["schedule"],
             units=get(src, "units", "cells per image (mean of wells)"), file=src["file"], sheet=get(src, "sheet", ""))

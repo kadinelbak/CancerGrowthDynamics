@@ -5,7 +5,7 @@
 # A group is (id, datasets, u0, cands, ...). A candidate may carry its own `u0` (models with
 # hidden states such as resource or damaged cells); otherwise the group's u0 is used.
 
-using Random: Xoshiro
+using Random: Xoshiro, randperm
 using Statistics: median, quantile
 
 const PER_PARAM_BIC = 3.0   # a simpler model wins if at most this much BIC worse per removed parameter
@@ -83,32 +83,57 @@ function x0_fields(sys, infos)
     (x0nom=[x.nom for x in infos], x0est=obs[e], x0bounds=[(infos[i].lo, infos[i].hi) for i in e], x0start=[infos[i].start for i in e])
 end
 
+# Extra starts for the main fits (user 2026-11-02, decision F5): stages.toml [selection] extra_starts seeded
+# Latin-hypercube points over the parameter bounds, log-uniform for a positive range spanning more than 100×
+# (rates, EC50-like scales), uniform otherwise. Seeded from the candidate name so a rerun gives the same
+# starts. EXTRA_STARTS overrides the setting; 0 turns it off. Bootstrap refits never use these (bs_fit).
+const EXTRA_STARTS = parse(Int, get(ENV, "EXTRA_STARTS",
+                                    string(isdefined(Main, :selection_cfg) ? selection_cfg("extra_starts", 0) : 0)))
+const START_BIC_TOL = 0.01   # a start "reaches the best BIC" when within this of the best start
+
+function lhs_starts(name, bounds, n)
+    n <= 0 && return Vector{Float64}[]
+    rng = Xoshiro(hash(name))
+    d = length(bounds)
+    u = [(randperm(rng, n) .- 1 .+ rand(rng, n)) ./ n for _ in 1:d]      # one stratified column per parameter
+    [[begin lo, hi = bounds[j]
+           logu = lo > 0 && hi / lo > 100
+           logu ? exp(log(lo) + u[j][i] * (log(hi) - log(lo))) : lo + u[j][i] * (hi - lo)
+      end for j in 1:d] for i in 1:n]
+end
+
 # Fit one candidate from each of its starts and polish the best. Estimated starting values (x0est) are extra
 # parameters after the model parameters, counted in the BIC; the fitted starting state is stored as u0 and
 # `params` holds the model parameters only, so every later use (bootstrap, analyses, control) is unchanged.
-function fit_cand(c, datasets)
+# `nstarts` / `nbest`: starts tried and starts whose fit came within START_BIC_TOL of the best one
+# (run_zoo_fits.jl writes them to fit_starts.csv). `extra` = number of seeded starts added to the fixed ones.
+function fit_cand(c, datasets; extra=EXTRA_STARTS)
     np = length(c.pnames); est = hasproperty(c, :x0est) ? c.x0est : Int[]; nx = length(est)
     builder = nx == 0 ? nothing : (p -> (u = Vector{eltype(p)}(c.u0); u[est] .= p[np+1:end]; u))
     if np + nx == 0
         f = predict_candidate(c.name, c.label, c.model, datasets, c.u0)
-        return merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[], x0fit=Float64[]))
+        return merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[], x0fit=Float64[], nstarts=0, nbest=0))
     end
     bounds = vcat(c.bounds, nx == 0 ? Tuple{Float64,Float64}[] : c.x0bounds)
-    starts = np == 0 ? [Float64[]] : c.p0s
+    starts = np == 0 ? [Float64[]] : vcat(c.p0s, lhs_starts(c.name, c.bounds, extra))
     best = (params=fill(NaN, np + nx), bic=Inf, sse=Inf)
+    bics = Float64[]
     for p0 in starts
         f = bs_fit(c.model, datasets, c.u0, vcat(p0, nx == 0 ? Float64[] : c.x0start), bounds; tag=c.name, u0_builder=builder)
+        push!(bics, f.bic)
         f.bic < best.bic && (best = f)
     end
+    nbest = isfinite(best.bic) ? count(b -> b <= best.bic + START_BIC_TOL, bics) : 0
     if isfinite(best.bic)
         f = bs_fit(c.model, datasets, c.u0, best.params, bounds; tag=c.name, u0_builder=builder)
         f.bic < best.bic && (best = f)
     end
-    isfinite(best.bic) || return merge(c, (params=fill(NaN, np), bic=Inf, sse=Inf, se=fill(NaN, np), x0fit=fill(NaN, nx)))
+    isfinite(best.bic) || return merge(c, (params=fill(NaN, np), bic=Inf, sse=Inf, se=fill(NaN, np), x0fit=fill(NaN, nx),
+                                           nstarts=length(starts), nbest=0))
     u0 = builder === nothing ? c.u0 : Float64.(builder(best.params))
     pm = best.params[1:np]
     se = np == 0 ? Float64[] : (try param_se(c.model, datasets, u0, pm) catch; fill(NaN, np) end)
-    merge(c, (params=pm, bic=best.bic, sse=best.sse, se=se, u0=u0, x0fit=best.params[np+1:end]))
+    merge(c, (params=pm, bic=best.bic, sse=best.sse, se=se, u0=u0, x0fit=best.params[np+1:end], nstarts=length(starts), nbest=nbest))
 end
 
 function choose(bics, ks)

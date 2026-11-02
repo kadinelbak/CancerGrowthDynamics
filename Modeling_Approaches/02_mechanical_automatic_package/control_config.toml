@@ -7,6 +7,9 @@
 #               Numerical and reporting settings are labelled ASSUMPTION too (they are choices, not data).
 # Replace ASSUMPTION values with measurements when they exist.
 
+[scenarios]
+headline = "B"   # ASSUMPTION (user, 2026-11-02): B (monoculture kills for both lines) is the reported main result because a fully drug-inactive resistant line is not biologically plausible; A (Stage 3a coculture fit, resistant kill 0) is a sensitivity case
+
 [schedule]
 decision_interval_days = 2.0     # DATA: media are changed about every 2 days, so a new dose can start at each change
 horizon_days = 14.0              # DATA: the experiments run 14 days; also the look-ahead of every decision

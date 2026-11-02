@@ -29,6 +29,11 @@ const FPFILE = joinpath(SOUT, "inputs_" * replace(lowercase(DATA_LABEL), r"[^a-z
 let f = joinpath(SOUT, "sweep_outcomes.csv")
     if control_unchanged(FPFILE, FPRINT, f) && any(==(DATA_LABEL), string.(CSV.read(f, DataFrame; stringtype=String).data))
         println("Control inputs unchanged since the last finished sweep ($DATA_LABEL); reusing its rows in $f (CONTROL_FORCE=1 recomputes)")
+        # provenance (user, 2026-11-02): tell run_pipeline.jl this step reused its last finished outputs (it copies this into run_manifest.toml)
+        let step = get(ENV, "PIPELINE_STEP", "")
+            isempty(step) || (mkpath(joinpath(@__DIR__, "outputs", "reuse")); write(joinpath(@__DIR__, "outputs", "reuse", step * ".toml"),
+                "reused_from = \"$(Libc.strftime("%Y-%m-%dT%H:%M:%S", mtime(FPFILE)))\"\nreused_fingerprint = \"$FPRINT\"\n"))
+        end
         exit(0)
     end
 end
