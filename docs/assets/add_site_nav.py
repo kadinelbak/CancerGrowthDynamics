@@ -12,7 +12,8 @@ DOCS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MARK = "site-nav.js"
 PKG = "Modeling_Approaches/02_mechanical_automatic_package/outputs/"
 PAGES = ["index.html", "papers/index.html", "papers/from-culture-to-control/index.html",
-         "outputs/results/summary.html", "outputs/results/presentation.html", "outputs/results/explorer.html",
+         "education/index.html", "education/pipeline-map.html", "education/pipeline-equations.html",
+         "outputs/results/summary.html", "outputs/results/presentation.html", "outputs/results/staged.html", "outputs/results/explorer.html",
          "outputs/final_report/report.html", "outputs/final_report/history/index.html", "outputs/time_keeping/index.html",
          PKG + "control/report.html", PKG + "control_30d/report.html", PKG + "control_60d/report.html",
          PKG + "control_120d/report.html", PKG + "control_sweep/report.html", PKG + "findings/report.html",

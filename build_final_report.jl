@@ -264,7 +264,8 @@ println("Wrote docs/outputs/final_report/history/index.html ($(length(load_versi
 # the same top bar on every main page (docs/assets/site-nav.js; user, 2026-11-01). Regenerated reports lose the
 # script tag, so it is put back here, as docs/assets/add_site_nav.py does; pages that have it are left alone.
 const NAV_PAGES = ["index.html", "papers/index.html", "papers/from-culture-to-control/index.html",
-    "outputs/results/summary.html", "outputs/results/presentation.html", "outputs/results/explorer.html",
+    "education/index.html", "education/pipeline-map.html", "education/pipeline-equations.html",
+    "outputs/results/summary.html", "outputs/results/presentation.html", "outputs/results/staged.html", "outputs/results/explorer.html",
     "outputs/final_report/report.html", "outputs/final_report/history/index.html", "outputs/time_keeping/index.html",
     (joinpath(PKG, d, "report.html") for d in ("control", "control_30d", "control_60d", "control_120d", "control_sweep", "findings", "zoo_fits",
         "zoo_analyses/bootstrap", "zoo_analyses/sensitivity", "zoo_analyses/validation", "zoo_analyses/resistant_kill"))...]
@@ -279,4 +280,18 @@ function add_site_nav(rel)
     true
 end
 println("Site navigation bar added to $(count(add_site_nav, NAV_PAGES)) page(s)")
+
+# data for the staged presentation (docs/outputs/results/staged.html): profiles, sensitivity tables, controller
+# equations and figures, taken from the run outputs by build_staged.py (Python; skipped when it is not installed).
+let py = something(Sys.which("python3"), Sys.which("python"), nothing)
+    if py === nothing
+        println("staged.js not rebuilt: python3 not found (run docs/outputs/results/build_staged.py by hand)")
+    else
+        try
+            run(`$py $(joinpath(DOCS, "outputs", "results", "build_staged.py"))`)
+        catch err
+            println("staged.js not rebuilt: ", sprint(showerror, err))
+        end
+    end
+end
 isempty(missing_parts) || println("Missing: ", join(missing_parts, ", "))

@@ -121,13 +121,13 @@ function plotSVG(o) {
   if (o.title) p.push(`<text x="${L}" y="19" font-size="14" font-weight="700" fill="#17212b">${esc(o.title)}</text>`);
   for (let i = 0; i <= 4; i++) {
     const v = o.ymax * i / 4;
-    p.push(`<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}" stroke="#e8edf0"/><text x="${L - 6}" y="${sy(v) + 3}" font-size="10" text-anchor="end" fill="#52636b">${Math.round(v)}</text>`);
+    p.push(`<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}" stroke="#e8edf0"/><text x="${L - 6}" y="${sy(v) + 3}" font-size="10" text-anchor="end" fill="#52636b">${o.yfmt ? o.yfmt(v) : Math.round(v)}</text>`);
   }
   const step = o.xmax > 16 ? 5 : 2;
   for (let v = 0; v <= o.xmax + 1e-9; v += step) p.push(`<text x="${sx(v)}" y="${H - B + 14}" font-size="10" text-anchor="middle" fill="#52636b">${v}</text>`);
   p.push(`<line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="#667"/><line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="#667"/>`);
   p.push(`<text x="${(L + W - R) / 2}" y="${H - B + 28}" font-size="11" text-anchor="middle" fill="#52636b">Day</text>`);
-  p.push(`<text transform="translate(13 ${(T + H - B) / 2}) rotate(-90)" font-size="11" text-anchor="middle" fill="#52636b">Mean cells</text>`);
+  p.push(`<text transform="translate(13 ${(T + H - B) / 2}) rotate(-90)" font-size="11" text-anchor="middle" fill="#52636b">${esc(o.ylabel || 'Mean cells')}</text>`);
   for (const b of o.bands || []) {
     const up = [], dn = [];
     b.t.forEach((t, i) => { if (b.hi[i] != null && isFinite(b.hi[i])) up.push(`${sx(t).toFixed(1)},${sy(b.hi[i]).toFixed(1)}`); });
