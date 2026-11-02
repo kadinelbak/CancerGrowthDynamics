@@ -264,6 +264,7 @@ println("Wrote docs/outputs/final_report/history/index.html ($(length(load_versi
 # the same top bar on every main page (docs/assets/site-nav.js; user, 2026-11-01). Regenerated reports lose the
 # script tag, so it is put back here, as docs/assets/add_site_nav.py does; pages that have it are left alone.
 const NAV_PAGES = ["index.html", "papers/index.html", "papers/from-culture-to-control/index.html",
+    "education/index.html", "education/pipeline-map.html", "education/pipeline-equations.html",
     "outputs/results/summary.html", "outputs/results/presentation.html", "outputs/results/explorer.html",
     "outputs/final_report/report.html", "outputs/final_report/history/index.html", "outputs/time_keeping/index.html",
     (joinpath(PKG, d, "report.html") for d in ("control", "control_30d", "control_60d", "control_120d", "control_sweep", "findings", "zoo_fits",

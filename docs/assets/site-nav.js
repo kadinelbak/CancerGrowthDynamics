@@ -22,6 +22,7 @@
     ['control', 'Optimal control', PKG + 'control/report.html', p => /\/outputs\/control(_\w+)?\/report\.html$/.test(p)],
     ['final', 'Final report', 'outputs/final_report/history/index.html', p => /\/final_report\//.test(p)],
     ['papers', 'Papers', 'papers/index.html', p => /\/papers\//.test(p)],
+    ['education', 'Education', 'education/index.html', p => /\/education\//.test(p)],
   ];
   const CONTROL = [
     ['14 days', PKG + 'control/report.html', /\/outputs\/control\/report\.html$/],

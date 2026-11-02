@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Education · Cancer Growth Dynamics</title>
+  <link rel="stylesheet" href="../papers/assets/paper-reader.css">
+  <style>
+    main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 60px; }
+    h1 { margin: 14px 0 8px; font-size: 34px; }
+    h2 { margin: 34px 0 6px; font-size: 22px; }
+    .note { color: var(--muted); max-width: 820px; margin: 8px 0; }
+    .group-note { color: var(--muted); margin: 0 0 14px; max-width: 820px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .card .tag { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .card h3 { margin: 0; font-size: 18px; }
+    .card h3 a { color: var(--ink); text-decoration: none; }
+    .card h3 a:hover { color: var(--accent); }
+    .card p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+    .card ul { margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: var(--ink); }
+    .card li { margin: 2px 0; }
+    .card .meta { margin-top: auto; padding-top: 8px; font-size: 12.5px; color: var(--muted); }
+    .ext::after { content: " ↗"; font-size: 12px; }
+    .pill { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+    @media (max-width: 700px) { h1 { font-size: 28px; } main { padding: 20px 16px 48px; } }
+  </style>
+<script defer src="../assets/site-nav.js"></script>
+</head>
+<body>
+  <nav class="site-tabs" aria-label="Site">
+    <a class="site-name" href="../index.html">Cancer Growth Dynamics</a>
+    <a href="../index.html">Reports</a>
+    <a href="index.html" aria-current="page">Education</a>
+  </nav>
+  <main>
+    <h1>Education</h1>
+    <p class="note">Everything written to teach the project rather than report a run: how the pipeline works at two levels of detail, the literature reviews behind the models, the method explainers, and the teaching and review documents. Reports of results live under the other tabs.</p>
+
+    <h2>How the pipeline works</h2>
+    <p class="group-note">Start here. The map shows what feeds what; the equations page shows the exact rule or equation each step follows, with a small figure of the mechanism on every card.</p>
+    <div class="cards">
+      <article class="card">
+        <span class="tag">Overview · 4 flow diagrams</span>
+        <h3><a href="pipeline-map.html">Pipeline map</a></h3>
+        <p>Data → staged fitting → validation → optimal control → sweep and fasting → Final Report. Each stage with the model it carried, what passes forward, and the MPC loop step by step.</p>
+        <ul><li>Stages 1, 2a, 2b, 3a, 3b, 4 and the 2-BIC rule</li><li>Validation checks and the research-quality metrics</li><li>The controller as it is designed on the current branch (marked “new”)</li></ul>
+        <span class="meta">Drawn from run_pipeline.jl, stages.toml, validation.toml and control_config.toml · 28 Oct 21:04 numbers</span>
+      </article>
+      <article class="card">
+        <span class="tag">Low level · 21 step cards with figures</span>
+        <h3><a href="pipeline-equations.html">Pipeline equations</a></h3>
+        <p>For every step: a figure of the mechanism, inputs, the exact equations or rule, outputs, and where it lives in the code.</p>
+        <ul><li>Cell equation, kernel × action catalogue, Norton–Simon, carried models written out</li><li>Weights, BIC, optimiser, selection rule, two-pass block bootstrap</li><li>Profiles, Sobol, held-out NRMSE; plant, MPC cost, exact search, stop rules, fasting, sweep</li></ul>
+        <span class="meta">Figures computed from the carried parameters where they show real behaviour</span>
+      </article>
+      <article class="card">
+        <span class="tag">Run anatomy</span>
+        <h3><a href="../outputs/time_keeping/index.html">Time keeping</a></h3>
+        <p>What each step of a full run costs in time, from the 28 Oct run manifest, and the speed-ups since.</p>
+        <span class="meta">5.5 h measured · 6–8 h fresh · 2–3 h with control reused</span>
+      </article>
+    </div>
+
+    <h2>Literature reviews</h2>
+    <p class="group-note">The papers the models rest on, how they were chosen, and what they change in the equations.</p>
+    <div class="cards">
+      <article class="card">
+        <span class="tag">Literature review · 37 references</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_research_foundations.html">Research Foundations for the A2780 Modeling Program</a></h3>
+        <p>How to read the evidence, the foundational research selected, the biological grounding, every model and its research foundation, fitting and identifiability, and what must change before human-tumour simulation.</p>
+        <span class="meta">Bibliography at the end of the page</span>
+      </article>
+      <article class="card">
+        <span class="tag">Literature review · 31 references</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_future_research.html">A2780 Coculture Adaptive Therapy Research</a></h3>
+        <p>The core model, how the papers were selected, what the literature changes mathematically, and the minimum experimental program it implies.</p>
+        <span class="meta">Bibliography and evidence status at the end of the page</span>
+      </article>
+      <article class="card">
+        <span class="tag">Assumptions and limitations</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/findings/report.html">Key findings, assumptions register and limitations</a></h3>
+        <p>Every assumption the current results rest on, labelled data, literature or assumption, with the finding it affects.</p>
+        <span class="meta">Rebuilt with every pipeline run</span>
+      </article>
+    </div>
+
+    <h2>Method explainers</h2>
+    <p class="group-note">Reports that exist to compare approaches and explain a modelling choice, not to publish a result.</p>
+    <div class="cards">
+      <article class="card">
+        <span class="tag">Catalogue</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_model_registry.html">A2780 Model Registry</a></h3>
+        <p>Every model family in the zoo with its equations, parameters and where it is used.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Explainer</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_delay_compartment_combined_comparison.html">Delay and compartment models compared</a></h3>
+        <p>Why delayed drug effects are written as transit compartments, and how the time-delay and compartment forms differ on the same data.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Explainer</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_staged_model_comparison.html">Staged model comparison</a></h3>
+        <p>How the stages inherit from one another and what the comparison across stages shows; the sample-aware and reduced-stage variants are linked from it.</p>
+        <ul><li><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_sample_aware_staged_model_comparison.html">Sample-aware version</a></li><li><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_reduced_stage_comparison.html">Reduced-stage comparison</a></li><li><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_model_path_tournament.html">Conditional model tournament</a></li></ul>
+      </article>
+      <article class="card">
+        <span class="tag">Explainer</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_adaptive_treatment_simulations.html">Adaptive treatment simulations</a></h3>
+        <p>What adaptive therapy means for this two-line system before any optimiser is involved: fixed, periodic and threshold schedules side by side.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Plan</span>
+        <h3><a href="../Modeling_Approaches/02_mechanical_automatic_package/outputs/reports/a2780_low_resource_modeling_plan.html">Low-resource modeling plan</a></h3>
+        <p>How the low-resource (0.5% FBS) mechanisms were planned before they were fitted.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Side track</span>
+        <h3><a href="../outputs/nn_track/index.html">Neural-network track</a></h3>
+        <p>A learned kill term and its symbolic form, kept as a comparison to the mechanistic zoo.</p>
+      </article>
+    </div>
+
+    <h2>Teaching material</h2>
+    <div class="cards">
+      <article class="card">
+        <span class="tag">Class outline · Word</span>
+        <h3><a href="Outline_From_Culture_to_Control.docx">From Culture to Control: class outline</a></h3>
+        <p>The lecture outline that walks from the culture experiments to optimal control.</p>
+        <span class="meta">Downloads a .docx</span>
+      </article>
+      <article class="card">
+        <span class="tag">Interactive reader</span>
+        <h3><a href="../papers/index.html">Thesis draft with equation notes</a></h3>
+        <p>The honors-thesis draft as written, with an explanation behind every equation and definitions for key terms.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Slides</span>
+        <h3><a href="../outputs/results/presentation.html">Presentation</a></h3>
+        <p>Live slides of the staged fitting, built from the current results.</p>
+      </article>
+      <article class="card">
+        <span class="tag">One page</span>
+        <h3><a href="../outputs/results/summary.html">Summary</a></h3>
+        <p>The staged fitting on one page, with the explorer for the fits behind it.</p>
+      </article>
+    </div>
+
+    <h2>Review documents</h2>
+    <p class="group-note">Audits and design documents written during the project. They open in Claude and are private to the project owner until shared.</p>
+    <div class="cards">
+      <article class="card">
+        <span class="tag">Audit · 21 Oct 2026</span>
+        <h3><a class="ext" href="https://claude.ai/artifact/UTL1UxCH2gzhH83nVBiPfB">Pipeline audit: optimal control and fitting</a></h3>
+        <p>Root causes of unstable control schedules: the flat objective at the 80% plateau, the β_C sign hinge, the toxicity proxy that never binds, fitting gaps.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Design · 22 Oct 2026</span>
+        <h3><a class="ext" href="https://claude.ai/artifact/Nv6LZoCgvkyzKGtXcaFXNk">PRD: resistant-cell cisplatin kill in coculture</a></h3>
+        <p>Why the resistant kill is refitted down to zero in coculture and how the A/B scenarios came about.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Design · 27 Oct 2026</span>
+        <h3><a class="ext" href="https://claude.ai/artifact/FtP5UYyEefGoJ53MpwHZh1">PRD: control barrier and modeling sweep</a></h3>
+        <p>The sweep over barrier shapes, thresholds, run lengths and look-ahead that separates biology from modelling choices.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Review form · Nov 2026</span>
+        <h3><a class="ext" href="https://claude.ai/artifact/UqJjC62Y93Utr3kC9YJfVK">A2780 decision review</a></h3>
+        <p>Every modelling decision in one list, to be accepted or reconsidered.</p>
+      </article>
+      <article class="card">
+        <span class="tag">Publication plan</span>
+        <h3><a class="ext" href="https://claude.ai/artifact/5UqYqRWfsEpwdocdbUPdNF">Cancer Research Communications submission plan</a></h3>
+        <p>Target journal, limits, and the recommended split between the research paper and a software paper.</p>
+      </article>
+    </div>
+  </main>
+</body>
+</html>
