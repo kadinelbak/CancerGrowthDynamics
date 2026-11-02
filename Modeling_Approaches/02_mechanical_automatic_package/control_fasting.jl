@@ -216,7 +216,7 @@ function cost_terms2(FP::FPlant, x0, U, Δ, W::Weights2)
     for k in axes(U, 1)
         w = U[k, :]; x = F2(x, w, FP, Δ); N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
         z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (w[1] / W.umax)^2,
-               relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ), relaxed_barrier(1 - T / W.Btox, W.μT, W.δ),
+               BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : 0.0, relaxed_barrier(1 - T / W.Btox, W.μT, W.δ),
                W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ), progression_cost(N, C, W)]
     end
     (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6],

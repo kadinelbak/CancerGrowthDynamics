@@ -1,8 +1,8 @@
-steps_requested = ["final"]
-continued_from = "2026-10-28T20:55:35.526"
+steps_requested = ["tests", "final"]
+continued_from = "2026-11-01T18:49:38.246"
 threads = 10
-finished = "2026-10-28T21:06:32.293"
-started = "2026-10-28T21:03:13.233"
+finished = "2026-11-01T21:54:29.698"
+started = "2026-11-01T21:44:01.556"
 resume = false
 time_limit_hits = 875
 julia = "1.12.6"
@@ -20,10 +20,10 @@ finished = "2026-10-27T20:05:01.539"
 [steps.report60]
 log = "outputs/logs/report60.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 41.2
-finished = "2026-10-28T19:18:55.314"
+seconds = 41.5
+finished = "2026-11-01T20:28:34.120"
 
     [steps.report60.env]
     CONTROL_DAYS = "60"
@@ -31,10 +31,10 @@ finished = "2026-10-28T19:18:55.314"
 [steps.control30]
 log = "outputs/logs/control30.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 532.7
-finished = "2026-10-28T18:48:40.845"
+seconds = 1213.8
+finished = "2026-11-01T19:59:32.817"
 
     [steps.control30.env]
     REDO = "1"
@@ -65,20 +65,20 @@ finished = "2026-10-28T16:59:18.885"
 [steps.sweep_report]
 log = "outputs/logs/sweep_report.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 7.1
-finished = "2026-10-28T19:41:03.276"
+seconds = 7.2
+finished = "2026-11-01T20:51:28.973"
 
     [steps.sweep_report.env]
 
 [steps.alldoses]
 log = "outputs/logs/alldoses.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 659.8
-finished = "2026-10-28T19:29:55.095"
+seconds = 663.0
+finished = "2026-11-01T20:39:37.171"
 
     [steps.alldoses.env]
     ZOO_NO_EXCLUDE = "1"
@@ -88,42 +88,42 @@ finished = "2026-10-28T19:29:55.095"
 [steps.findings]
 log = "outputs/logs/findings.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 32.5
-finished = "2026-10-28T19:41:35.765"
+seconds = 32.4
+finished = "2026-11-01T20:52:01.407"
 
     [steps.findings.env]
+
+[steps.final]
+log = "outputs/logs/final.log"
+ok = true
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
+uncommitted_changes = true
+seconds = 280.8
+finished = "2026-11-01T21:54:29.687"
+
+    [steps.final.env]
 
 [steps.control60]
 log = "outputs/logs/control60.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 1730.6
-finished = "2026-10-28T19:18:14.118"
+seconds = 1658.5
+finished = "2026-11-01T20:27:52.647"
 
     [steps.control60.env]
     REDO = "1"
     CONTROL_DAYS = "60"
 
-[steps.final]
-log = "outputs/logs/final.log"
-ok = true
-commit = "054d0c634a786dba0c99d92db5c9c31ada4a0e58"
-uncommitted_changes = true
-seconds = 195.5
-finished = "2026-10-28T21:06:30.997"
-
-    [steps.final.env]
-
 [steps.sweep_all]
 log = "outputs/logs/sweep_all.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 310.7
-finished = "2026-10-28T19:40:56.204"
+seconds = 339.7
+finished = "2026-11-01T20:51:21.783"
 
     [steps.sweep_all.env]
     REDO = "1"
@@ -133,20 +133,20 @@ finished = "2026-10-28T19:40:56.204"
 [steps.report_long]
 log = "outputs/logs/report_long.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 43.6
-finished = "2026-10-28T18:39:48.107"
+seconds = 42.5
+finished = "2026-11-01T19:39:18.969"
 
     [steps.report_long.env]
 
 [steps.control_long]
 log = "outputs/logs/control_long.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 5514.5
-finished = "2026-10-28T18:39:04.535"
+seconds = 2069.8
+finished = "2026-11-01T19:38:36.411"
 
     [steps.control_long.env]
     REDO = "1"
@@ -165,10 +165,10 @@ finished = "2026-10-28T17:05:18.017"
 [steps.report30]
 log = "outputs/logs/report30.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 42.7
-finished = "2026-10-28T18:49:23.511"
+seconds = 41.3
+finished = "2026-11-01T20:00:14.088"
 
     [steps.report30.env]
     CONTROL_DAYS = "30"
@@ -176,10 +176,10 @@ finished = "2026-10-28T18:49:23.511"
 [steps.sweep]
 log = "outputs/logs/sweep.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 350.4
-finished = "2026-10-28T19:35:45.537"
+seconds = 364.9
+finished = "2026-11-01T20:45:42.068"
 
     [steps.sweep.env]
     REDO = "1"
@@ -187,20 +187,20 @@ finished = "2026-10-28T19:35:45.537"
 [steps.report14]
 log = "outputs/logs/report14.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 41.0
-finished = "2026-10-28T17:07:10.012"
+seconds = 41.3
+finished = "2026-11-01T19:04:06.639"
 
     [steps.report14.env]
 
 [steps.control14]
 log = "outputs/logs/control14.log"
 ok = true
-commit = "8b992083484314ed3999fed3407f5b7de15e3a6f"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 69.9
-finished = "2026-10-28T17:06:29.049"
+seconds = 823.9
+finished = "2026-11-01T19:03:24.074"
 
     [steps.control14.env]
     REDO = "1"
@@ -208,10 +208,10 @@ finished = "2026-10-28T17:06:29.049"
 [steps.tests]
 log = "outputs/logs/tests.log"
 ok = true
-commit = "054d0c634a786dba0c99d92db5c9c31ada4a0e58"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
-seconds = 453.4
-finished = "2026-10-28T21:03:11.248"
+seconds = 344.2
+finished = "2026-11-01T21:49:47.729"
 
     [steps.tests.env]
 
@@ -246,6 +246,6 @@ repo-url = "https://github.com/kadinelbak/GrowthParameterEstimation.jl.git"
 version = "0.4.1"
 
 [git]
-branch = "claude/project-thread-rw363r"
-commit = "054d0c634a786dba0c99d92db5c9c31ada4a0e58"
+branch = "claude/project-thread-iuaj3t"
+commit = "b3cf09860bf7b59f4edeb5aacc8a224f4ac032c5"
 uncommitted_changes = true
