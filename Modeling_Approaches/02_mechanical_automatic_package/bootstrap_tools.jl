@@ -5,7 +5,7 @@
 # A group is (id, datasets, u0, cands, ...). A candidate may carry its own `u0` (models with
 # hidden states such as resource or damaged cells); otherwise the group's u0 is used.
 
-using Random: Xoshiro
+using Random: Xoshiro, randperm
 using Statistics: median, quantile
 
 const PER_PARAM_BIC = 3.0   # a simpler model wins if at most this much BIC worse per removed parameter
@@ -83,32 +83,77 @@ function x0_fields(sys, infos)
     (x0nom=[x.nom for x in infos], x0est=obs[e], x0bounds=[(infos[i].lo, infos[i].hi) for i in e], x0start=[infos[i].start for i in e])
 end
 
+# Extra starts for the main fits (user 2026-11-02, decision F5): stages.toml [selection] extra_starts seeded
+# Latin-hypercube points over the parameter bounds, log-uniform for a positive range spanning more than 100×
+# (rates, EC50-like scales), uniform otherwise. Seeded from the candidate name so a rerun gives the same
+# starts. EXTRA_STARTS overrides the setting; 0 turns it off. Bootstrap refits never use these (bs_fit).
+const EXTRA_STARTS = parse(Int, get(ENV, "EXTRA_STARTS",
+                                    string(isdefined(Main, :selection_cfg) ? selection_cfg("extra_starts", 0) : 0)))
+const START_BIC_TOL = 0.01   # a start "reaches the best BIC" when within this of the best start
+# The seeded starts are drawn around the fixed starts (extra_starts_spread × below the smallest and above the
+# largest fixed start of each parameter, clipped to the bounds; 0 = the whole bounds) and each gets a work budget
+# of extra_starts_work_factor × the evaluations of the slowest fixed-start fit (0 = none): a start in a stiff
+# corner of the bounds is dropped instead of running for hours (first run 2026-11-02 stalled in Stage 1b).
+const EXTRA_SPREAD = Float64(isdefined(Main, :selection_cfg) ? selection_cfg("extra_starts_spread", 10) : 10)
+const EXTRA_WORK = Float64(isdefined(Main, :selection_cfg) ? selection_cfg("extra_starts_work_factor", 20) : 20)
+
+function lhs_starts(name, bounds, n, p0s=Vector{Float64}[]; spread=EXTRA_SPREAD)
+    n <= 0 && return Vector{Float64}[]
+    rng = Xoshiro(hash(name))
+    d = length(bounds)
+    u = [(randperm(rng, n) .- 1 .+ rand(rng, n)) ./ n for _ in 1:d]      # one stratified column per parameter
+    box = map(1:d) do j
+        lo, hi = bounds[j]
+        if spread > 0 && !isempty(p0s)
+            a, b = extrema(p[j] for p in p0s)
+            lo, hi = a > 0 ? (max(lo, a / spread), min(hi, b * spread)) : (max(lo, a - spread * abs(b - a + 1e-12)), min(hi, b + spread * abs(b - a + 1e-12)))
+            hi > lo || ((lo, hi) = bounds[j])
+        end
+        (lo, hi)
+    end
+    [[begin lo, hi = box[j]
+           logu = lo > 0 && hi / lo > 100
+           logu ? exp(log(lo) + u[j][i] * (log(hi) - log(lo))) : lo + u[j][i] * (hi - lo)
+      end for j in 1:d] for i in 1:n]
+end
+
 # Fit one candidate from each of its starts and polish the best. Estimated starting values (x0est) are extra
 # parameters after the model parameters, counted in the BIC; the fitted starting state is stored as u0 and
 # `params` holds the model parameters only, so every later use (bootstrap, analyses, control) is unchanged.
-function fit_cand(c, datasets)
+# `nstarts` / `nbest`: starts tried and starts whose fit came within START_BIC_TOL of the best one
+# (run_zoo_fits.jl writes them to fit_starts.csv). `extra` = number of seeded starts added to the fixed ones.
+function fit_cand(c, datasets; extra=EXTRA_STARTS)
     np = length(c.pnames); est = hasproperty(c, :x0est) ? c.x0est : Int[]; nx = length(est)
     builder = nx == 0 ? nothing : (p -> (u = Vector{eltype(p)}(c.u0); u[est] .= p[np+1:end]; u))
     if np + nx == 0
         f = predict_candidate(c.name, c.label, c.model, datasets, c.u0)
-        return merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[], x0fit=Float64[]))
+        return merge(c, (params=Float64[], bic=f.bic, sse=f.sse, se=Float64[], x0fit=Float64[], nstarts=0, nbest=0))
     end
     bounds = vcat(c.bounds, nx == 0 ? Tuple{Float64,Float64}[] : c.x0bounds)
-    starts = np == 0 ? [Float64[]] : c.p0s
+    fixed = np == 0 ? [Float64[]] : c.p0s
+    seeded = np == 0 ? Vector{Float64}[] : lhs_starts(c.name, c.bounds, extra, c.p0s)
+    starts = vcat(fixed, seeded)
     best = (params=fill(NaN, np + nx), bic=Inf, sse=Inf)
-    for p0 in starts
-        f = bs_fit(c.model, datasets, c.u0, vcat(p0, nx == 0 ? Float64[] : c.x0start), bounds; tag=c.name, u0_builder=builder)
+    bics = Float64[]; ev = Int[]
+    for (i, p0) in enumerate(starts)
+        # fixed starts run without a budget (as before); seeded ones get EXTRA_WORK × the slowest fixed-start fit
+        budget = i <= length(fixed) || EXTRA_WORK <= 0 || isempty(ev) ? 0 : max(round(Int, EXTRA_WORK * maximum(ev)), 10_000_000)
+        f = bs_fit(c.model, datasets, c.u0, vcat(p0, nx == 0 ? Float64[] : c.x0start), bounds; tag="$(c.name) start $i",
+                   u0_builder=builder, budget=budget, evals=(i <= length(fixed) ? ev : nothing))
+        push!(bics, f.bic)
         f.bic < best.bic && (best = f)
     end
+    nbest = isfinite(best.bic) ? count(b -> b <= best.bic + START_BIC_TOL, bics) : 0
     if isfinite(best.bic)
         f = bs_fit(c.model, datasets, c.u0, best.params, bounds; tag=c.name, u0_builder=builder)
         f.bic < best.bic && (best = f)
     end
-    isfinite(best.bic) || return merge(c, (params=fill(NaN, np), bic=Inf, sse=Inf, se=fill(NaN, np), x0fit=fill(NaN, nx)))
+    isfinite(best.bic) || return merge(c, (params=fill(NaN, np), bic=Inf, sse=Inf, se=fill(NaN, np), x0fit=fill(NaN, nx),
+                                           nstarts=length(starts), nbest=0))
     u0 = builder === nothing ? c.u0 : Float64.(builder(best.params))
     pm = best.params[1:np]
     se = np == 0 ? Float64[] : (try param_se(c.model, datasets, u0, pm) catch; fill(NaN, np) end)
-    merge(c, (params=pm, bic=best.bic, sse=best.sse, se=se, u0=u0, x0fit=best.params[np+1:end]))
+    merge(c, (params=pm, bic=best.bic, sse=best.sse, se=se, u0=u0, x0fit=best.params[np+1:end], nstarts=length(starts), nbest=nbest))
 end
 
 function choose(bics, ks)
@@ -143,12 +188,25 @@ function bootstrap(g; B, seed=20260927)
         end
         println("    $(g.id): bootstrap work budget per optimiser run = $(factor)× a refit ($((any(ks .> 0) ? minimum(budget[ks .> 0]) : 0))–$(maximum(budget)) evaluations)"); flush(stdout)
     end
+    # Two-pass bootstrap (user, 2026-11-01: faster reruns without losing rigour). Pass 1 refits every candidate
+    # to the first `screen` replicates; pass 2 refits, on the remaining B − screen, only the candidates that pass 1
+    # had inside its selection band (within RULE_BIC of the lowest BIC) at least once, plus the carried model
+    # (candidate 1) and the replicate generator.
+    # A dropped candidate scores Inf (never chosen) in pass 2. Being picked in 0 of `screen` replicates bounds how
+    # often it would be picked at 1 − 0.05^(1/screen) (95%; ≈ 7.2% for 40). The screen is decided from the
+    # replicates themselves, not from the BIC gap on the data (a Stage 3b candidate 34 BIC behind was still picked
+    # in 21% of replicates). stages.toml [selection] bootstrap_screen; BOOT_SCREEN overrides; 0 = every candidate
+    # gets all B replicates (the behaviour before 2026-11-01).
+    screen = parse(Int, get(ENV, "BOOT_SCREEN", string(isdefined(Main, :selection_cfg) ? selection_cfg("bootstrap_screen", 40) : 40)))
+    screen = screen <= 0 || screen >= B ? B : screen
+    active = trues(nc)
     done = Threads.Atomic{Int}(0)
-    Threads.@threads :dynamic for b in 1:B
+    function replicate!(b)
         rng = Xoshiro(seed + b)
         ds = [hasproperty(d, :w) ? (x=d.x, y=bs_resample(rng, yh, e, d.w), state_index=d.state_index, w=d.w) :
                                    (x=d.x, y=bs_resample(rng, yh, e), state_index=d.state_index) for (d, yh, e) in zip(g.datasets, yhat, resid)]
         for (j, c) in enumerate(cands)
+            active[j] || continue                         # bic stays Inf, parameters NaN
             if ks[j] == 0
                 bic[b, j] = predict_candidate(c.name, c.label, c.model, ds, cu0(c, g)).bic
             else
@@ -159,11 +217,37 @@ function bootstrap(g; B, seed=20260927)
         n = Threads.atomic_add!(done, 1) + 1
         n % 25 == 0 && (println("    $(g.id): $n / $B replicates"); flush(stdout))
     end
+    Threads.@threads :dynamic for b in 1:screen
+        replicate!(b)
+    end
+    if screen < B
+        # kept: every candidate inside the selection band (within RULE_BIC of the lowest BIC) of any screened
+        # replicate, so it could have been picked by the per-line rule or by a paired-line (joint) rule, plus the
+        # lowest-BIC candidate and the per-parameter pick
+        band = isdefined(Main, :RULE_BIC) ? Float64(Main.RULE_BIC) : 2.0
+        seen = falses(nc)
+        for b in 1:screen
+            m = minimum(x for x in bic[b, :] if isfinite(x); init=Inf)
+            isfinite(m) || continue
+            seen .|= [isfinite(x) && x <= m + band for x in bic[b, :]]
+            seen[argmin(bic[b, :])] = true
+            seen[choose(bic[b, :], ks)] = true
+        end
+        seen[1] = true                                    # the carried model: its intervals and bands use all B
+        seen[findfirst(c -> c === ref, cands)] = true     # the candidate the replicates are generated from
+        active .= seen
+        println("    $(g.id): screened after $screen replicates; $(count(active)) of $nc candidates continue to $B" *
+                (all(active) ? "" : " (dropped: " * join([cands[j].name for j in 1:nc if !active[j]], ", ") * ")")); flush(stdout)
+        Threads.@threads :dynamic for b in screen+1:B
+            replicate!(b)
+        end
+    end
+    nboot = [active[j] ? B : screen for j in 1:nc]
     winner = [argmin(bic[b, :]) for b in 1:B]
     pick = [choose(bic[b, :], ks) for b in 1:B]
     selected = argmax([count(==(j), pick) for j in 1:nc])
     (cands=cands, ks=ks, ref=ref, bic=bic, pars=pars, winner=winner, pick=pick, selected=selected, budget=budget,
-     orig_pick=choose([c.bic for c in cands], ks))
+     orig_pick=choose([c.bic for c in cands], ks), screen=screen, nboot=nboot)
 end
 
 # 95% band of candidate j's bootstrap fits (default: the selected model), every state it has

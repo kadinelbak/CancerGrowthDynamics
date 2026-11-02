@@ -47,6 +47,10 @@ const BC_FRAC = CFG["cancer"]["B_cancer_fraction_of_K"]
 # the carried drug model (Stage 2b), for the drug-response-shape section
 const DRUG_HILL = zgroup("s2-a2780").cands[1].sys.lines[1].action == :hill
 const DRUG_SHAPE = DRUG_HILL ? "Hill" : "linear" * (ns_on(zgroup("s2-a2780").cands[1].sys.lines[1]) ? " (Norton–Simon)" : "")
+# headline drug-response scenario (control_config.toml [scenarios].headline, user 2026-11-02): listed first, marked "(main result)"
+const HEADLINE = String(get(get(CFG, "scenarios", Dict{String,Any}()), "headline", "A"))
+const SCENS = HEADLINE == "B" ? (:B, :A) : (:A, :B)
+scen_tag(scen) = string(scen) == HEADLINE ? "main result" : "sensitivity case"
 main_of(scen, ratio) = only(filter(m -> m.scen == scen && m.ratio == ratio, FC[:main]))
 pol_order(m) = [p for p in POL_ORDER if haskey(m.policies, p)]
 # withtip(html, text, better; warn=...) lives in info_tips.jl
@@ -300,7 +304,7 @@ function scen_section(scen)
     pr = [(label=pn, color=polcol(pn), dash=poldash(pn), t=ts, y=m.policies[pn].o.P) for pn in shown]
     ratios = join(["<h4>Seeding ratio $r</h4>" * outcome_table(main_of(scen, r)) for r in ("25:75", "50:50", "75:25")])
     pts = [(label=pn, color=polcol(pn), x=m.policies[pn].o.cum_dose, tot=m.policies[pn].o.total_final, C=m.policies[pn].o.C_final) for pn in pol_order(m)]
-    """<section class='panel' id='scen-$scen'><h3>Scenario $(hesc(m.name))</h3>
+    """<section class='panel' id='scen-$scen'><h3>Scenario $(hesc(m.name)) <small>· $(scen_tag(scen))</small></h3>
 <div class='grid'>
 <div>$(withtip(ts_svg("Total N + C, 50:50 start", tot; hline=(W.Bc, "B_cancer"), ymax=ceil(max(W.Bc * 1.15, maximum(maximum(s.y) for s in tot) * 1.05); sigdigits=2)), "Total cells under each policy. The dashed orange line is B_cancer ($(BC_FRAC) of K), where the soft burden penalty rises steeply. The shaded region is after day 14.", :lower; warn=[:extrapolation, :soft_penalty]))</div>
 <div>$(withtip(pareto_svg("Final cells vs cumulative dose, every policy (50:50)", pts), T_PARETO, "Lower and further left is better (fewer cells for less drug)."))</div>
@@ -319,7 +323,7 @@ mrange(v) = any(isnan, v) || isempty(v) ? "—" : "$(cells(median(v))) ($(cells(
 function robust_section()
     secs = String[]; rows = String[]; prows = String[]
     q(v, p) = isempty(v) ? NaN : quantile(v, p)
-    for scen in (:A, :B)
+    for scen in SCENS
         R = FC[:robust][scen]; ts = R.ts; m = main_of(scen, "50:50")
         bandof(M) = (t=ts, y=[median(M[i, :]) for i in axes(M, 1)], lo=[q(M[i, :], 0.025) for i in axes(M, 1)], hi=[q(M[i, :], 0.975) for i in axes(M, 1)])
         band(pn, f) = bandof(hcat([f(d[pn]) for d in R.draws if get(d, pn, nothing) !== nothing]...))
@@ -367,7 +371,7 @@ function washout_section()
     mC0 = only(filter(M -> !M.input_D, fast_plant(:A).spec[2].mods))
     k0 = mC0.kernel_chain > 0 ? mC0.k : 0.0
     rows = String[]
-    for scen in (:A, :B)
+    for scen in SCENS
         m = main_of(scen, "50:50")
         base = (koff="$(fmt(k0)) (fitted)", fo=m.policies["Fasting only, 48 h every 6 days"].o, mp=m.policies[MPC2].o, re=m.policies[MPC2].o, U=m.policies[MPC2].U)
         variants = vcat([base], [(koff=fmt(w.koff), fo=w.replay["Fasting only, 48 h every 6 days"], mp=w.replay[MPC2], re=w.o, U=w.U) for w in FC[:washout] if w.scen == scen])
@@ -456,7 +460,7 @@ function best_fixed(m, f; higher=false)
 end
 function key_findings()
     out = String[]
-    for scen in (:A, :B)
+    for scen in SCENS
         m = main_of(scen, "50:50"); P = m.policies
         mp = P[MPC2].o; m1 = P[MPC1].o; c1 = P["Constant 1 µM"].o
         U = P[MPC2].U; fdays = [@sprintf("%g–%g", (k - 1) * Δ0, k * Δ0) for k in axes(U, 1) if U[k, 2] > 0]
@@ -526,14 +530,14 @@ function write_report()
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>$nav
 <h1>Optimal control over $DSTR days: cisplatin and fasting</h1>
 <div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control_fasting.jl</code> and <code>control_fasting_report.jl</code>. Model-predictive control now chooses two things at every media change (every 2 days) for $DSTR days: the cisplatin dose and whether the next 2 days are run in low resource ("fasting", 0.5% FBS). The goal is the same as in the 14-day report: the longest time to progression (keep N + C under B_prog = $(CFG["progression"]["threshold_fraction_of_K"]) K, 80% confluence), with the resistant cells left at the end of each look-ahead priced and a soft burden penalty above B_cancer; MPC minimises this weighted cost. Fasting has a host cost (body weight, with a 5% weight-loss limit) and a host benefit (protection of healthy tissue from the drug), both informed by the fasting-and-chemotherapy literature. Every run starts from the nominal seeding (100 cells split by the ratio). The look-ahead is $(LOOK_DAYS) days at every decision, also near day $DSTR (the plan runs past it), re-planned every 2 days, so the schedule is the first $NRUN decisions of a continuing policy. Scenarios A and B are as in the <a href='../control/report.html'>14-day report</a>.</p>
+$(stopping_note())
 <h3>Key findings (50:50 start) $(tip("Auto-generated from the runs below; each metric is compared with the fixed policy that is best on that metric.", :none))</h3>$(key_findings())</div>
 <p class='warnline'><b>Read first</b> $(warn([:extrapolation, :not_patient_days, W_UPPER, W_HOST, W_UNTESTED])) <span class='muted'>click each ⚠; all caveats are listed in full under <a href='#limits'>What the data do not support</a>.</span></p>
 $(model_section())
 $(checks_section())
 <h2>Results $(tip("For each scenario: plots from the 50:50 start, then outcome tables for all three seeding ratios. Policies: five fed baselines (as in the 14-day report), three fixed fasting schedules in the style of the clinical studies, MPC without fasting, MPC with fasting (measured levels, solved exactly) and a continuous demonstration.", :none))</h2>
 $(snapshot_section())
-$(scen_section(:A))
-$(scen_section(:B))
+$(join([scen_section(sc) for sc in SCENS]))
 $(washout_section())
 $(haskey(FC, :robust) ? robust_section() : "<p class='muted'>Robustness runs not finished yet.</p>")
 $(haskey(FC, :sweeps) ? sweep_section() : "<p class='muted'>Sweeps not finished yet.</p>")
@@ -554,7 +558,7 @@ function at_day(v, d)
 end
 function snapshot_section()
     rows = String[]
-    for scen in (:A, :B)
+    for scen in SCENS
         m = main_of(scen, "50:50")
         for pn in SNAP_POLS
             haskey(m.policies, pn) || continue

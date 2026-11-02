@@ -203,7 +203,12 @@ function fcrit95(ν)
     t^2
 end
 profile_threshold(n, k) = (ν = max(n - k, 1); n * log(1 + fcrit95(ν) / ν))
-at_bound(c, i) = (lo = c.bounds[i][1]; hi = c.bounds[i][2]; tol = 1e-3 * (hi - lo); c.params[i] - lo <= tol || hi - c.params[i] <= tol)
+# at a search bound: within 0.1% of the estimate's own size (user, 2026-11-02, F6 of the decision review: the old
+# tolerance of 0.1% of the whole range was 1.0 for c in 0–1000, so c_N = 0.53 counted as "at bound" and was never profiled)
+function at_bound(c, i)
+    lo, hi = c.bounds[i]; est = c.params[i]
+    est - lo <= 1e-3 * max(abs(est), abs(lo)) + 1e-9 || hi - est <= 1e-3 * max(abs(est), abs(hi))
+end
 function profile_jobs(gs)
     jobs = NamedTuple[]
     gidx = Dict(g.id => j for (j, g) in enumerate(groups))

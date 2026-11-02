@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Time keeping</title>
+<!-- Hand-written 2026-11-01 from outputs/run_manifest.toml (the 28 Oct 2026 run on kadin-main-sys, 10 threads,
+     Julia 1.12.6), run_pipeline.jl, run_zoo_fits.jl, zoo_analyses.jl, stages.toml, validation.toml and
+     control_config.toml, and the output CSVs of that run. Update when the pipeline changes.
+     Updated 2026-11-01 for the two-pass bootstrap and the reuse of unchanged control runs (estimates, not yet measured). -->
+<style>
+:root{--ink:#17212b;--muted:#52636b;--accent:#176b87;--line:#d9e2e6;--page:#f4f7f8;--panel:#fff;--soft:#eef5f6}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1180px;margin:auto;padding:22px 16px 48px}h1{color:#124b6e;margin:6px 0 6px;font-size:30px}h2{color:#124b6e;margin:28px 0 8px;font-size:21px}
+.lead{color:var(--muted);max-width:900px;margin:0 0 10px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}.tile b{display:block;font-size:24px;color:#124b6e}.tile span{color:var(--muted);font-size:13px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 0;margin:10px 0;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:8px 12px;border-bottom:1px solid #e5eaec;text-align:left;vertical-align:top}
+th{background:#eef3f5;font-size:13px}td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tr.sub td{background:#f7fafb;font-weight:700;color:#124b6e}tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+.bar{display:inline-block;height:8px;border-radius:4px;background:var(--accent);vertical-align:middle;margin-right:6px}
+.mut{color:var(--muted)}code{background:#eef3f5;padding:1px 4px;border-radius:4px;font-size:13px}
+ul{margin:6px 0 0;padding-left:20px}li{margin:3px 0}
+</style>
+<script defer src="../../assets/site-nav.js"></script>
+</head><body><main>
+<h1>Time keeping</h1>
+<p class="lead">What a full rerun of the pipeline (<code>julia run_pipeline.jl</code>) computes, step by step, with how long each step took in the last full run and what to expect from a fresh one. Measured times come from <code>outputs/run_manifest.toml</code>: the run of 27–28 Oct 2026 on kadin-main-sys with 10 threads (Julia 1.12.6). Counts come from that run's outputs and the config files.</p>
+
+<div class="tiles">
+  <div class="tile"><b>≈ 5.5 h</b><span>measured, last full run (all 19 steps)</span></div>
+  <div class="tile"><b>4–5.5 h</b><span>estimate for a fresh rerun now (was 6–8 h before the two speed-ups below)</span></div>
+  <div class="tile"><b>2–3 h</b><span>estimate when the carried models come out unchanged, so the control results are reused</span></div>
+  <div class="tile"><b>132</b><span>candidate models fitted, in 9 groups</span></div>
+  <div class="tile"><b>≈ 15,000–18,500</b><span>model refits in all now (was ≈ 29,000)</span></div>
+  <div class="tile"><b>≈ 2.4 h</b><span>optimal control, all run lengths and the sweep</span></div>
+</div>
+
+<h2>Two speed-ups added 1 Nov 2026</h2>
+<ul>
+<li><b>Two-pass bootstrap.</b> Every candidate gets the first <b>40</b> bootstrap replicates. A candidate that never comes within 2 BIC of the best in any of those 40 (the selection rule's own band), and is not the carried model, the original pick or the generating model, is dropped for the remaining 160. The kept candidates get all <b>200</b>. A dropped candidate was picked in none of 40 replicates, so its true pick rate is below about 7.5% (95% bound, 3 / 40); the bootstrap report marks it as screened out. The selection stability of the kept models is computed on all 200, as before. Setting: <code>bootstrap_screen</code> in <code>stages.toml</code>, or <code>BOOT_SCREEN</code>; <code>BOOT_SCREEN=0</code> turns it off.</li>
+<li><b>Control results reused when nothing they read has changed.</b> Each control step (14, 30, 60, 120 days and both sweeps) writes a fingerprint of its inputs: the control code and configs, the data, the package versions, each stage's carried model and its bootstrap draws, and the Ce0 crowding fit. The next run skips the step and keeps its outputs when the fingerprint matches. A refit that changes no carried model or draw costs no control time; any change reruns it. <code>julia run_pipeline.jl --recompute-control</code> (or <code>CONTROL_FORCE=1</code>) always reruns.</li>
+</ul>
+<p class="mut">The first run after this change has no fingerprints yet, so it runs every control step once. Neither change has been timed yet; the estimates below assume about 45–65 of the 132 candidates pass the screen, based on how often each candidate came within 2 BIC of the best in the 28 Oct bootstrap.</p>
+
+<h2>Step by step</h2>
+<div class="panel"><table>
+<tr><th>Step</th><th>What it computes</th><th class="n">Last run (28 Oct)</th><th class="n">Fresh rerun now (estimate)</th></tr>
+<tr class="sub"><td colspan="4">Data</td></tr>
+<tr><td><code>data</code>, <code>checks</code></td><td>Build the tidy table from the raw sources, then check it reproduces them.</td><td class="n">44 s</td><td class="n">&lt; 1 min</td></tr>
+<tr class="sub"><td colspan="4">Model fitting</td></tr>
+<tr><td><code>fits</code></td><td><b>132 candidate models</b> in 9 groups (Stage 1: 3 + 3; 1b: 29 + 29; 2b: 20 + 20; 3a: 12; 3b: 7; 4: 9), each fitted from about 3 starting points (≈ 400 optimiser runs). Then the model bootstrap, which gives the selection stability and the uncertainty bands. On 28 Oct that was <b>200 replicates × 132 candidates = 26,400 refits</b>; with the two-pass screen it is 40 × 132 = 5,280 plus 160 × the kept candidates, about <b>12,500–15,700 refits</b>. Each bootstrap optimiser run has a work budget of 50× one refit's evaluations; in the last run 875 runs hit it and were dropped for that replicate.</td><td class="n">2 h 37 min<br><span class="mut">resumed, part of the bootstrap reused</span></td><td class="n">1.5–2.5 h<br><span class="mut">was 3–4.5 h</span></td></tr>
+<tr><td><code>alldoses</code></td><td>The same 132 candidates refitted with the A2780cis 1 µM monoculture kept in (the variant the sweep compares against). Point fits only, no bootstrap.</td><td class="n">11 min</td><td class="n">10–15 min</td></tr>
+<tr class="sub"><td colspan="4">Uncertainty, sensitivity and validation</td></tr>
+<tr><td><code>analyses</code></td><td>For the 9 carried models: block bootstrap, <b>9 × 200 = 1,800 refits</b>; profile likelihood for <b>23 parameters</b> on a 9-point grid with 3 starts (<b>≈ 620 refits</b>); local sensitivity of 23 parameters; global (Sobol) sensitivity with N = 16,384 samples per group (77 indices). Validation: <b>22 blocked held-out checks</b> on the 9 carried models (9 forecasts that fit days ≤ 10 and predict the rest, 5 leave-one-dose-out, 3 + 3 leave-one-ratio-out, 2 leave-one-run-out, each a refit), plus the held-out Ce1 coculture prediction and the intermittent-schedule prediction.</td><td class="n">6 min</td><td class="n">6–15 min</td></tr>
+<tr class="sub"><td colspan="4">Optimal control</td></tr>
+<tr><td><code>control14</code></td><td>14-day control: 2 media (normal, low resource) × 2 scenarios (A, B) × 3 seeding ratios × 7 policies = <b>84 runs</b>. MPC re-plans every 2 days (7 decisions, 28-day look-ahead). Fixed schedules are replayed on 200 bootstrap parameter sets and MPC is run closed-loop on 40.</td><td class="n">1 min 10 s</td><td class="n">1–2 min<br><span class="mut">0 if inputs unchanged</span></td></tr>
+<tr><td><code>control30</code></td><td>The same over 30 days (15 decisions per MPC run; beyond the data).</td><td class="n">8 min 53 s</td><td class="n">9–12 min<br><span class="mut">0 if inputs unchanged</span></td></tr>
+<tr><td><code>control60</code></td><td>The same over 60 days (30 decisions per MPC run).</td><td class="n">28 min 51 s</td><td class="n">30–40 min<br><span class="mut">0 if inputs unchanged</span></td></tr>
+<tr><td><code>control_long</code></td><td>120 days with two controls, cisplatin dose and fasting (60 decisions, each choosing a dose and a medium), with the body-weight and healthy-tissue limits; read off at days 14, 30, 60 and 120. The slowest control step.</td><td class="n">1 h 32 min</td><td class="n">1.5–2 h<br><span class="mut">0 if inputs unchanged</span></td></tr>
+<tr><td><code>sweep</code>, <code>sweep_all</code></td><td>The control sweep: 23 variants (4 barrier shapes × run lengths, thresholds, look-ahead modes, objectives, and the pre-27-Oct settings) on both data variants × 2 scenarios × 3 ratios × 6 policies = <b>1,656 runs</b>.</td><td class="n">11 min</td><td class="n">11–15 min<br><span class="mut">0 if inputs unchanged</span></td></tr>
+<tr class="sub"><td colspan="4">Reports and checks</td></tr>
+<tr><td>Reports</td><td>14-, 30-, 60- and 120-day control reports, the sweep report and the key-findings report.</td><td class="n">3 min 29 s</td><td class="n">3–4 min</td></tr>
+<tr><td><code>tests</code></td><td>Control, stage and validation tests against the new results (the regression reference is regenerated separately with <code>test/make_reference.jl</code> if the fits changed).</td><td class="n">7 min 33 s</td><td class="n">7–9 min</td></tr>
+<tr><td><code>final</code></td><td>The Final Report: all chapters in one page, the new version archived with its settings, key results and research-quality metrics, and the version list rebuilt.</td><td class="n">3 min 16 s</td><td class="n">3–4 min</td></tr>
+<tr class="tot"><td>Total</td><td>19 steps</td><td class="n">5 h 31 min</td><td class="n">4–5.5 h<br><span class="mut">2–3 h with control reused</span></td></tr>
+</table></div>
+
+<h2>Where the time goes</h2>
+<div class="panel"><table>
+<tr><th>Part</th><th>Share of the last run</th><th class="n">Time</th></tr>
+<tr><td>Model fits and bootstrap</td><td><span class="bar" style="width:245px"></span>51%</td><td class="n">2 h 48 min</td></tr>
+<tr><td>Optimal control, 120-day dose + fasting</td><td><span class="bar" style="width:134px"></span>28%</td><td class="n">1 h 32 min</td></tr>
+<tr><td>Optimal control, 14/30/60 days and the sweep</td><td><span class="bar" style="width:72px"></span>15%</td><td class="n">50 min</td></tr>
+<tr><td>Analyses, tests, reports and data</td><td><span class="bar" style="width:29px"></span>6%</td><td class="n">21 min</td></tr>
+</table></div>
+
+<h2>How the estimates were made</h2>
+<ul>
+<li>The 28 Oct column is the old pipeline; the estimate column includes the two speed-ups above. Fresh-rerun estimates scale the measured times. The fit step of the last run was resumed (<code>ZOO_RESUME=1</code>, <code>ZOO_REUSE_BOOT=1</code>), so the bootstrap checkpoints that were already finished were reused. A run with nothing reused redoes every bootstrap replicate, which would have taken 3–4.5 h before the screen; with it, about half the bootstrap refits remain.</li>
+<li>Times scale roughly with threads for <code>fits</code>, <code>analyses</code>, the control steps and the sweep. With 4 threads instead of 10, expect about 2–2.5× longer (now about 9–13 h, or 5–7 h with control reused).</li>
+<li>A reduced run, <code>BOOT_B=40 GSA_N=2048</code>, cuts the bootstrap 5× and the Sobol samples 8×. The fit step drops to about 40–60 min and the whole run to about 4 h, which is dominated by the 120-day control.</li>
+<li>Resume a stopped run with <code>julia run_pipeline.jl --from &lt;step&gt;</code>. Finished bootstrap groups are checkpointed in <code>outputs/zoo_fits/boot_checkpoints</code> and reused with <code>ZOO_RESUME=1</code>.</li>
+<li>Counts of refits on 28 Oct: 400 point-fit runs + 26,400 bootstrap refits + 1,800 block-bootstrap refits + ≈ 620 profile refits + 22 validation refits ≈ 29,200 (now about 15,000–18,500 with the screen). The control runs are simulations and MPC optimisations, not model fits; each MPC run is re-optimised at every decision, which is why the longer runs cost far more than the 14-day one.</li>
+</ul>
+</main></body></html>

@@ -146,6 +146,7 @@ end
 
 # ── version and modelling decisions ─────────────────────────────────────────────
 settings = report_settings(); results = report_results()
+provenance = report_provenance()      # which steps ran in this version and which were reused (outputs/run_manifest.toml)
 content_sha = bytes2hex(sha256(join(parts) * hjson([collect(x) for x in settings]) * hjson([collect(x) for x in results]) * hjson(decision_log())))
 current = joinpath(OUT, "report.html")
 archive_unrecorded(current)                          # a report.html from before the history is kept, not lost
@@ -156,8 +157,8 @@ while !same && isdir(joinpath(HIST, version_id))     # two builds in one minute
     global version_id = version_id * "b"
 end
 prev = same ? (length(prev_all) > 1 ? prev_all[end-1] : nothing) : (isempty(prev_all) ? nothing : prev_all[end])
-DECISIONS = decisions_panel(version_id, settings, results, prev; chapters=chapter_stamps)
-HISTORY = history_panel(version_id, settings)
+DECISIONS = decisions_panel(version_id, settings, results, prev; chapters=chapter_stamps, provenance=provenance)
+HISTORY = history_panel(version_id, settings; provenance=provenance)
 
 page = """<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
@@ -254,9 +255,28 @@ if same
     end
     println("Unchanged since version $version_id: not archived again")
 else
-    archive_version(version_id, final; settings=settings, results=results, chapters=chapter_stamps, source="build_final_report.jl", content_sha=content_sha)
+    archive_version(version_id, final; settings=settings, results=results, chapters=chapter_stamps, source="build_final_report.jl", content_sha=content_sha, provenance=provenance)
     println("Archived as docs/outputs/final_report/history/$version_id/")
 end
 write_history_index()
 println("Wrote docs/outputs/final_report/history/index.html ($(length(load_versions())) versions)")
+
+# the same top bar on every main page (docs/assets/site-nav.js; user, 2026-11-01). Regenerated reports lose the
+# script tag, so it is put back here, as docs/assets/add_site_nav.py does; pages that have it are left alone.
+const NAV_PAGES = ["index.html", "papers/index.html", "papers/from-culture-to-control/index.html",
+    "outputs/results/summary.html", "outputs/results/presentation.html", "outputs/results/explorer.html",
+    "outputs/final_report/report.html", "outputs/final_report/history/index.html", "outputs/time_keeping/index.html",
+    (joinpath(PKG, d, "report.html") for d in ("control", "control_30d", "control_60d", "control_120d", "control_sweep", "findings", "zoo_fits",
+        "zoo_analyses/bootstrap", "zoo_analyses/sensitivity", "zoo_analyses/validation", "zoo_analyses/resistant_kill"))...]
+function add_site_nav(rel)
+    f = joinpath(DOCS, rel); isfile(f) || return false
+    html = read(f, String)
+    occursin("site-nav.js", first(html, 20000)) && return false
+    src = replace(relpath(joinpath(DOCS, "assets", "site-nav.js"), dirname(f)), '\\' => '/')
+    tag = "<script defer src=\"$src\"></script>\n"
+    m = findfirst(r"</head\s*>"i, html)
+    write(f, m === nothing ? tag * html : html[1:prevind(html, first(m))] * tag * html[first(m):end])
+    true
+end
+println("Site navigation bar added to $(count(add_site_nav, NAV_PAGES)) page(s)")
 isempty(missing_parts) || println("Missing: ", join(missing_parts, ", "))

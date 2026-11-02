@@ -36,13 +36,22 @@ function nominal_seed(src)
     total * parse(Float64, src["line"] == "A2780" ? m[1] : m[2]) / 100
 end
 
-# one source's series from the time origin on, sorted by t; nom = its nominal seeding
+# Points and series left out of the fits. ZOO_NO_EXCLUDE=1 ignores every stage `exclude` list (stages.toml) and
+# every point a source leaves out by hand (sources.toml `exclude_days`, marked "left out (user ...)" in the tidy
+# table), so the fit with every measured point stays available as a sensitivity variant. QC exclusions
+# (imaging artefacts, qc_rules.toml) are never switched off.
+const USE_EXCLUDE = get(ENV, "ZOO_NO_EXCLUDE", "0") != "1"
+const MANUAL_PREFIX = "left out (user"
+
+# one source's series from the time origin on, sorted by t; nom = its nominal seeding; culture = mono or co
 function series(id)
     d = sort(MEAS[(MEAS.source_id .== id) .& (MEAS.t .>= 0), :], :t)
     nrow(d) > 0 || error("no rows for source $id in measurements.csv")
-    (x=Vector{Float64}(d.t), y=Vector{Float64}(d.value), bad=Vector{Bool}(d.excluded),
-     why=String[coalesce(w, "") for w in d.exclude_reason], se=Vector{Union{Missing,Float64}}(d.sem),
-     sd=Vector{Union{Missing,Float64}}(d.sd), nom=nominal_seed(source(id)))
+    why = String[coalesce(w, "") for w in d.exclude_reason]
+    bad = Vector{Bool}(d.excluded)
+    USE_EXCLUDE || (bad = bad .& .!startswith.(why, MANUAL_PREFIX))
+    (x=Vector{Float64}(d.t), y=Vector{Float64}(d.value), bad=bad, why=why, se=Vector{Union{Missing,Float64}}(d.sem),
+     sd=Vector{Union{Missing,Float64}}(d.sd), nom=nominal_seed(source(id)), culture=string(source(id)["culture"]))
 end
 
 # Starting value of a series (user, 2026-10-07): the nominal seeding, unless the first measured count is
@@ -51,12 +60,16 @@ end
 # such a series was seeded or imaged at a different effective density and its starting value is estimated
 # (a free parameter in that stage's fits, counted in the BIC), between nom/10 and 3 × the larger of nom and
 # the first count.
+# stages.toml [starting_values] estimate (user, 2026-11-02): "mono" = every monoculture series gets an estimated
+# start whatever its first count (the A2780cis monocultures start 20–60% apart on day 1, an offset the fixed
+# start pushed into the growth and drug parameters: θ_C 5.5, a slower r_C and a later kill); "all" = every
+# series; "auto" = the 3-fold rule only (the setting before 2026-11-02).
 const X0_FOLD = 3.0
 function x0_info(s)
     k = findfirst(i -> s.x[i] > 0 && !s.bad[i], eachindex(s.x))
     k === nothing && error("series without measurements after day 0")
     y1 = s.y[k]; nom = s.nom; f = X0_FOLD^s.x[k]
-    est = y1 > f * nom || y1 < nom / f
+    est = y1 > f * nom || y1 < nom / f || X0_ESTIMATE == "all" || (X0_ESTIMATE == "mono" && get(s, :culture, "") == "mono")
     lo, hi = nom / 10, 3 * max(nom, y1)
     (nom=nom, est=est, y1=y1, day1=s.x[k], start=clamp(sqrt(nom * y1), 1.01lo, 0.99hi), lo=lo, hi=hi)
 end
@@ -72,6 +85,8 @@ function constant_dose(name)
 end
 
 const STAGE_CFG = TOML.parsefile(STAGES_FILE)
+const X0_ESTIMATE = string(get(get(STAGE_CFG, "starting_values", Dict()), "estimate", "auto"))
+X0_ESTIMATE in ("auto", "mono", "all") || error("stages.toml [starting_values] estimate must be auto, mono or all, not $X0_ESTIMATE")
 # the two lines, their symbols and measured IC50 (stages.toml [lines])
 const LINE_CFG = STAGE_CFG["lines"]
 const LINES = [(line=L, sym=LINE_CFG[L]["sym"], ec50=Float64(LINE_CFG[L]["ec50"])) for L in ("A2780", "A2780cis")]
@@ -84,9 +99,9 @@ lrmono = Dict(L.line => (s = series(only_source(condition="low_resource", cultur
               for L in LINES)
 
 # Series a stage leaves out of its fit: the stage's `exclude` list in stages.toml, each entry a set of tags
-# that must all match (`dose` = the constant dose in µM). ZOO_NO_EXCLUDE=1 ignores every list (the
-# original fit, kept as a sensitivity variant: user, 2026-10-27, dropped the A2780cis 1 µM monoculture).
-const USE_EXCLUDE = get(ENV, "ZOO_NO_EXCLUDE", "0") != "1"
+# that must all match (`dose` = the constant dose in µM). ZOO_NO_EXCLUDE=1 ignores every list (2026-10-27 to
+# 2026-11-02 the A2780cis 1 µM monoculture was left out here; since 2026-11-02 only its day-14 point is, by
+# hand, in sources.toml). Single points left out by hand are listed by manual_exclusions() for the reports.
 function excluded(st, s)
     USE_EXCLUDE || return false
     any(get(st, "exclude", Any[])) do e
@@ -98,6 +113,9 @@ end
 # the excluded sources of every stage, for the reports: [(stage, id, line, file)]
 excluded_sources() = [(stage=st["id"], id=s["id"], line=s["line"], file=basename(s["file"]))
                       for st in STAGE_CFG["stage"] for s in SOURCES if haskey(st, "data") && excluded(st, s)]
+# the points left out by hand (sources.toml exclude_days), as they stand in the tidy table: [(id, line, day, reason)]
+manual_exclusions() = [(id=r.source_id, line=r.line, day=r.day, reason=coalesce(r.exclude_reason, ""))
+                       for r in eachrow(MEAS) if r.excluded && startswith(coalesce(r.exclude_reason, ""), MANUAL_PREFIX)]
 
 treated = Dict(L.line => begin
                    st2 = STAGE_CFG["stage"][findfirst(s -> s["id"] == "s2", STAGE_CFG["stage"])]

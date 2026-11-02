@@ -114,7 +114,8 @@ end
 
         @testset "scenario $scen: cost is linear in the burden, with the resistance premium (no progression term)" begin
             x = x0_for(P, 1000.0, 500.0); x2 = x0_for(P, 2000.0, 1000.0)
-            c(x) = stage_cost(x, 0.0, P, default_weights(P; w=[1.0, 1.0, 0.0, 0.0, 0.0, 0.0])) - relaxed_barrier(1 - (x[P.iN] + x[P.iC]) / W.Bc, W.μC, W.δ) - relaxed_barrier(1.0, W.μT, W.δ)
+            Wc = default_weights(P; w=[1.0, 1.0, 0.0, 0.0, 0.0, 0.0])
+            c(x) = stage_cost(x, 0.0, P, Wc) - burden_penalty(x[P.iN] + x[P.iC], Wc) - relaxed_barrier(1.0, W.μT, W.δ)
             @test isapprox(c(x2), 2c(x); rtol=1e-12)                                   # doubling every count doubles the burden cost
             @test isapprox(c(x), (1000 + 2 * 500) / P.K; rtol=1e-12)                    # qR = 1: a resistant cell counts twice
         end
@@ -151,16 +152,16 @@ end
         @testset "scenario $scen: blocked (move-blocking) search equals brute force over blocked plans" begin
             x0 = x0_for(P, 300.0, 300.0); blk = [1, 2]
             sol = discrete_solve(x0, P, Δ, blk, LEVELS, W)
-            brute = minimum(total_cost(x0, expand_blocks([a, b], blk), P, Δ, W) for a in LEVELS, b in LEVELS)
+            brute = minimum(plan_cost(x0, expand_blocks([a, b], blk), P, Δ, W) for a in LEVELS, b in LEVELS)
             @test isapprox(sol.J, brute; rtol=1e-10)
-            @test isapprox(total_cost(x0, expand_blocks(sol.U, blk), P, Δ, W), sol.J; rtol=1e-10)   # the cost counts every interval
+            @test isapprox(plan_cost(x0, expand_blocks(sol.U, blk), P, Δ, W), sol.J; rtol=1e-10)   # the cost counts every interval
             @test discrete_solve(x0, P, Δ, [1, 1], LEVELS, W).J ≈ discrete_solve(x0, P, Δ, 2, LEVELS, W).J   # single blocks = no blocking
         end
 
         @testset "scenario $scen: discrete search equals brute force" begin
             x0 = x0_for(P, 300.0, 300.0); H = 3
             sol = discrete_solve(x0, P, Δ, H, LEVELS, W)
-            brute = minimum(total_cost(x0, [a, b, c], P, Δ, W) for a in LEVELS, b in LEVELS, c in LEVELS)
+            brute = minimum(plan_cost(x0, [a, b, c], P, Δ, W) for a in LEVELS, b in LEVELS, c in LEVELS)
             @test isapprox(sol.J, brute; rtol=1e-10)
             @test isapprox(discrete_solve(x0, P, Δ, H, LEVELS, W; Uinit=[1.47, 0.0, 0.62]).J, brute; rtol=1e-10)   # a warm-start bound never changes the optimum
         end
@@ -175,7 +176,7 @@ end
             # over [0, 1.47] µM the measured doses are a subset; the time-to-progression step makes the cost non-convex,
             # so SQP (local) is started at the exact discrete optimum, as the continuous closed loop does, and must not end above it
             H = 4; d4 = discrete_solve(x0, P, Δ, H, LEVELS, W); s4 = sqp_solve(x0, d4.U, P, Δ, W)
-            @test s4.J <= d4.J * (1 + 1e-6) + 1e-9
+            @test s4.J <= total_cost(x0, d4.U, P, Δ, W) * (1 + 1e-6) + 1e-9   # SQP's own (end-of-interval) cost
             # first-order optimality: the projected gradient vanishes at the SQP solution (normal medium only: the
             # low-resource plant has a kink in ε(u) at u = 1 µM, where SQP may stop at a non-smooth point)
             if normal
@@ -272,7 +273,9 @@ end
             g = ForwardDiff.derivative(t -> burden_penalty(t, W), 1.05W.Bc)
             @test isfinite(g) && (b == :none || g > 0)                    # differentiable for SQP
         end
-        @test burden_penalty(0.4P.K, default_weights(P)) == relaxed_barrier(1 - 0.4P.K / default_weights(P).Bc, CFG["weights"]["mu_cancer"], CFG["weights"]["barrier_delta"])
+        Wl = default_weights(P; barrier=:relaxed_log)
+        @test burden_penalty(0.4P.K, Wl) == relaxed_barrier(1 - 0.4P.K / Wl.Bc, CFG["weights"]["mu_cancer"], CFG["weights"]["barrier_delta"])
+        @test default_weights(P).barrier == Symbol(CFG["cancer"]["barrier"])   # "none" since 2026-11-01
         @test_throws ErrorException default_weights(P; barrier=:cubic)
         # hard: any interval at or above B_cancer costs more than a whole look-ahead of every other term
         Wh = default_weights(P; barrier=:hard)
@@ -284,6 +287,36 @@ end
         cross(U) = any(x -> x[P.iN] + x[P.iC] >= Wh.Bc, rollout(x0, U, P, Δ)[2:end])
         plans = vec([[a, b, c] for a in LEVELS, b in LEVELS, c in LEVELS])
         any(!cross(U) for U in plans) && @test !cross(sol.U)
+    end
+
+    # user, 2026-11-01: time to progression first, and no MPC decisions once the result is known
+    @testset "time-to-progression objective and early stop" begin
+        P = scenario_plant(:A); W = default_weights(P); x0 = x0_for(P, 300.0, 300.0); LOOK = Int.(CFG["schedule"]["lookahead_blocks"])
+        # the progression cost of an interval is the time-averaged step: between 0 and qP, and with one
+        # piece it is the end-of-interval form
+        y, pc = step_progressed(x0, 0.0, P, Δ, W)
+        @test isapprox(y, F(x0, 0.0, P, Δ); rtol=1e-10)
+        @test 0 <= pc <= W.qP
+        @test plan_cost(x0, [0.0, 1.0], P, Δ, W) >= 0
+        @test CFG["progression"]["tiebreak_scale"] < 1 && W.qB ≈ CFG["weights"]["qB"] * CFG["progression"]["tiebreak_scale"]
+        @test default_weights(P; w=[1.0, 1.0, 1.0, 0.1, 0.0, 0.0]).qB == 1.0      # no progression term: not scaled
+        # progression confirmed: stops after `confirm` successive decisions above B_prog; arrays keep the run length
+        n = round(Int, 30 / Δ); s = nominal_seeding("50:50"); x1 = x0_for(P, s.N0, s.C0)
+        cl = closed_loop(P, P, x1, Δ, n, LOOK, W; mode=:discrete, levels=LEVELS, stop_kw(W, Δ)...)
+        @test length(cl.U) == n
+        if cl.stop_reason == "progression confirmed"
+            o = outcomes(P, x1, cl.U, Δ, W; t_stop=tstop(cl))
+            @test o.ttp <= cl.stop_day && o.stop_day == cl.stop_day && isfinite(o.N_prog)
+            # the last stop_confirm decisions were all at or above B_prog
+            xs = rollout(x1, cl.U, P, Δ); k = round(Int, cl.stop_day / Δ)
+            @test all(xs[j+1][P.iN] + xs[j+1][P.iC] >= W.Bp for j in k-stop_confirm(Δ)+1:k)
+        end
+        # outlasted: with every comparator progressed by day 2, a run under B_prog on day 12 stops there
+        cl2 = closed_loop(P, P, x1, Δ, n, LOOK, W; mode=:discrete, levels=LEVELS, Bp=Inf, confirm=0, settle_day=12.0)
+        @test cl2.stop_reason == "outlasted every comparator" && cl2.stop_day == 12.0 && length(cl2.U) == n
+        @test settle_after([5.0, NaN]) == Inf && settle_after([5.0, 7.0]) == 7.0 + CFG["progression"]["settle_margin_days"]
+        # no stopping rule: the old behaviour
+        @test isnan(closed_loop(P, P, x1, Δ, 3, 3, W; mode=:discrete, levels=LEVELS).stop_day)
     end
 
     @testset "look-ahead that ends with the run" begin

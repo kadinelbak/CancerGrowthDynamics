@@ -66,6 +66,12 @@
       font-weight: 700;
       margin-top: 16px;
     }
+    a.sublink {
+      display: inline-block;
+      margin: 16px 0 0 12px;
+      color: var(--accent);
+      font-size: 14px;
+    }
     .details {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -87,13 +93,46 @@
       gap: 6px 16px;
     }
     .older a { color: var(--muted); }
+    .site-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 4px;
+      padding: 0 20px;
+      height: 50px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+    .site-tabs a {
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 15px;
+      border-bottom: 3px solid transparent;
+    }
+    .site-tabs a:hover { color: var(--ink); }
+    .site-tabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+    .site-tabs .site-name { color: var(--ink); padding-left: 0; margin-right: 12px; font-size: 16px; }
+    @media (max-width: 900px) {
+      .site-tabs .site-name { display: none; }
+    }
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
       h1 { font-size: 28px; }
     }
   </style>
+<script defer src="assets/site-nav.js"></script>
 </head>
 <body>
+  <nav class="site-tabs" aria-label="Site">
+    <a class="site-name" href="index.html">Cancer Growth Dynamics</a>
+    <a href="index.html" aria-current="page">Reports</a>
+    <a href="papers/index.html">Papers</a>
+  </nav>
   <header>
     <h1>Cancer Growth Dynamics Reports</h1>
     <p class="note">Shareable A2780 modeling reports and interactive simulation tools for lab review. These pages are research artifacts, not clinical decision tools.</p>
@@ -128,21 +167,17 @@
         <div>
           <span class="tag">All details · New data</span>
           <h2>Final Report</h2>
-          <p>The full analysis as chapters of one page: the data, the compartment models used at every stage (with every candidate, including the low resource + cisplatin Stage 4), bootstrapping, sensitivity analysis, validation, optimal control of the cisplatin schedule (sequential MPC with a toxicity proxy), and a 120-day version (read off at days 14, 30, 60 and 120) in which fasting is a second control, with a weight limit and protection of healthy tissue.</p>
+          <p>Opens on the list of every version with what changed in each; read one, or pick two to compare. The full analysis as chapters of one page: the data, the compartment models used at every stage (with every candidate, including the low resource + cisplatin Stage 4), bootstrapping, sensitivity analysis, validation, optimal control of the cisplatin schedule (sequential MPC with a toxicity proxy), and a 120-day version (read off at days 14, 30, 60 and 120) in which fasting is a second control, with a weight limit and protection of healthy tissue.</p>
         </div>
-        <a class="button" href="outputs/final_report/report.html">Open Final Report</a>
+        <div><a class="button" href="outputs/final_report/history/index.html">Open Final Report</a><a class="sublink" href="outputs/final_report/report.html">Skip to the latest version</a></div>
       </article>
-    </section>
-    <section class="details">
-      <h2>How To Use</h2>
-      <p>Start with the <b>Summary</b> for the current answer at each stage, use the <b>Presentation</b> in lab meetings, and the <b>Explorer</b> to see what each parameter does. The <b>Final Report</b> holds every detailed analysis, including every candidate of the model zoo. Every current model is autonomous (no term uses time), so it can be driven by any dose schedule; the <a href="Modeling_Approaches/02_mechanical_automatic_package/outputs/control/report.html">optimal-control report</a> does exactly that. Summary, Presentation and Explorer refresh automatically whenever <code>run_zoo_fits.jl</code> finishes a full run.</p>
-      <p class="note">These pages are research artifacts, not clinical decision tools.</p>
     </section>
     <footer class="older">
       <span>Older reports:</span>
       <a href="outputs/archive_time/index.html">Time-based models (archive)</a>
       <a href="outputs/old_data_report/report.html">Legacy A2780 report hub</a>
       <a href="outputs/nn_track/index.html">Neural network / UDE track</a>
+      <a href="outputs/time_keeping/index.html">Time keeping</a>
     </footer>
   </main>
 </body>

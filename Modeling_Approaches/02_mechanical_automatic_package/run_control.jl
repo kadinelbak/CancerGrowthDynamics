@@ -11,8 +11,13 @@
 #                 MPC looks ahead lookahead_blocks (move blocking; [1,1,2,2,4,4] = 28 days in 6 decisions);
 #                 with control_config lookahead_to_end (default since 2026-10-27) the look-ahead stops at the
 #                 end of the run, otherwise it is fixed at every decision (CONTROL_LOOKAHEAD_TO_END=0/1 overrides)
-#   objective     time to progression (control_config [progression]): intervals at N + C ≥ B_prog (K/2) cost qP,
-#                 resistant cells at the end of the look-ahead cost qRT·C/K
+#   objective     time to progression (control_config [progression]): time spent at N + C ≥ B_prog (K/2) costs qP
+#                 per interval (averaged over substeps); everything else (resistant cells at the end of the
+#                 look-ahead, burden, dose, toxicity) is a tie-breaker scaled by tiebreak_scale (user, 2026-11-01)
+#   stopping      (user, 2026-11-01) every comparator runs the whole run (cheap); each MPC run stops computing
+#                 once progression is confirmed at confirm_decisions successive decisions, or once it has
+#                 outlasted every comparator by settle_margin_days (control_mpc.jl: stop_now); its time to
+#                 progression is read up to the stop, so the run length is only a cap
 #   sweeps        weights, soft burden penalty (B_cancer) × terminal factor, toxicity (r_H, s_B, B_tox),
 #                 horizon, decision interval, integration step, 28-day extrapolation
 #   robustness    every schedule re-simulated on the open-loop bootstrap draws; closed-loop MPC (observes
@@ -29,6 +34,19 @@ const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["clo
 const COUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")),
                       DAYS == Float64(CFG["schedule"]["closed_loop_days"]) ? "control" : "control_$(round(Int, DAYS))d"); mkpath(COUT)
 const CKP = joinpath(COUT, "control_state.jls")
+# skip when nothing this run reads has changed since its last finished run (control_model.jl: control_fingerprint)
+const FPRINT = control_fingerprint(@__FILE__, "CONTROL_DAYS" => DAYS,
+    "CONTROL_LOOKAHEAD_TO_END" => get(ENV, "CONTROL_LOOKAHEAD_TO_END", ""))
+const FPFILE = joinpath(COUT, "inputs.sha256")
+if control_unchanged(FPFILE, FPRINT, joinpath(COUT, "control_outcomes.csv"))
+    println("Control inputs unchanged since the last finished run; reusing $(joinpath(COUT, "control_outcomes.csv")) (CONTROL_FORCE=1 recomputes)")
+    # provenance (user, 2026-11-02): tell run_pipeline.jl this step reused its last finished outputs (it copies this into run_manifest.toml)
+    let step = get(ENV, "PIPELINE_STEP", "")
+        isempty(step) || (mkpath(joinpath(@__DIR__, "outputs", "reuse")); write(joinpath(@__DIR__, "outputs", "reuse", step * ".toml"),
+            "reused_from = \"$(Libc.strftime("%Y-%m-%dT%H:%M:%S", mtime(FPFILE)))\"\nreused_fingerprint = \"$FPRINT\"\n"))
+    end
+    exit(0)
+end
 cck = (isfile(CKP) && get(ENV, "REDO", "0") != "1") ? deserialize(CKP) : Dict{Symbol,Any}()
 savec() = serialize(CKP, cck)
 
@@ -63,10 +81,11 @@ function run_all_policies(P, x0; Δ=Δ0, n=NRUN, H=LOOK)
     for (name, pol) in baseline_policies(P, W)
         U = run_policy(pol, P, x0, Δ, n); out[name] = (U=U, o=outcomes(P, x0, U, Δ, W))
     end
-    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, W; mode=:discrete, levels=LEVELS, shrink=SHRINK)
-    out["MPC, measured doses only"] = (U=cl.U, o=outcomes(P, x0, cl.U, Δ, W), secs=time() - t)
-    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, Wd; mode=:continuous, shrink=SHRINK)
-    out["MPC demonstration (continuous, ≤ $(UMAX_DEMO) µM)"] = (U=cl.U, o=outcomes(P, x0, cl.U, Δ, W), secs=time() - t, iters=cl.iters)
+    sk = stop_kw(W, Δ, [v.o.ttp for v in values(out)])          # stop once progressed, or once past every comparator
+    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, W; mode=:discrete, levels=LEVELS, shrink=SHRINK, sk...)
+    out["MPC, measured doses only"] = (U=cl.U, o=outcomes(P, x0, cl.U, Δ, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
+    t = time(); cl = closed_loop(P, P, x0, Δ, n, H, Wd; mode=:continuous, shrink=SHRINK, sk...)
+    out["MPC demonstration (continuous, ≤ $(UMAX_DEMO) µM)"] = (U=cl.U, o=outcomes(P, x0, cl.U, Δ, W; t_stop=tstop(cl)), secs=time() - t, iters=cl.iters, stop=cl.stop_reason)
     out
 end
 
@@ -85,9 +104,10 @@ end
 
 # ── sweeps (normal medium, 50:50, data-supported MPC) ─────────────────────────
 # Wo: the weights the outcomes are scored with (bound counts always at the default B_cancer)
+# (sweep runs stop once progression is confirmed; they have no comparators to outlast)
 function mpc_outcome(P, x0, W; Wo=W, Δ=Δ0, n=NRUN, H=LOOK, mode=:discrete)
-    cl = closed_loop(P, P, x0, Δ, n, H, W; mode=mode, levels=LEVELS, shrink=SHRINK)
-    (U=cl.U, o=outcomes(P, x0, cl.U, Δ, Wo))
+    cl = closed_loop(P, P, x0, Δ, n, H, W; mode=mode, levels=LEVELS, shrink=SHRINK, stop_kw(Wo, Δ; settle=false)...)
+    (U=cl.U, o=outcomes(P, x0, cl.U, Δ, Wo; t_stop=tstop(cl)))
 end
 if !haskey(cck, :sweeps)
     r = ratios_normal[2]
@@ -100,7 +120,8 @@ if !haskey(cck, :sweeps)
         # soft burden penalty: where it starts (0 = none) × the terminal weight; scored against the default B_cancer
         for bc in CFG["cancer"]["B_cancer_sweep"], tf in CFG["cancer"]["terminal_factor_sweep"]
             lab = (bc > 0 ? "B_cancer = $(bc) K" : "no burden penalty") * ", terminal ×$(tf)"
-            push!(tasks, (kind="burden penalty", scen=scen, label=lab, f=() -> mpc_outcome(P, x0, default_weights(P; bc_frac=Float64(bc), tf=Float64(tf)); Wo=W0)))
+            # the relaxed log barrier explicitly: the default barrier is "none" since 2026-11-01
+            push!(tasks, (kind="burden penalty", scen=scen, label=lab, f=() -> mpc_outcome(P, x0, default_weights(P; bc_frac=Float64(bc), tf=Float64(tf), barrier=:relaxed_log); Wo=W0)))
         end
         base = default_tox()
         for v in CFG["toxicity"]["r_H_sweep"]
@@ -176,8 +197,10 @@ if !haskey(cck, :robust)
                 d[pn] = o === nothing ? nothing : summ(o)
             end
             if b <= NCL
-                c = try closed_loop(P0, Pb, m.x0, Δ0, NRUN, LOOK, W0; mode=:discrete, levels=LEVELS, noise=noise, shrink=SHRINK) catch; nothing end
-                d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes(Pb, m.x0, c.U, Δ0, Wb)), (U=c.U,))
+                # stops once progressed on plant b, or once past every comparator on the same draw
+                sk = stop_kw(Wb, Δ0, [d[pn] === nothing ? NaN : d[pn].ttp for pn in pols if pn != "MPC, measured doses only"])
+                c = try closed_loop(P0, Pb, m.x0, Δ0, NRUN, LOOK, W0; mode=:discrete, levels=LEVELS, noise=noise, shrink=SHRINK, sk...) catch; nothing end
+                d[CL_NAME] = c === nothing ? nothing : merge(summ(outcomes(Pb, m.x0, c.U, Δ0, Wb; t_stop=tstop(c))), (U=c.U, stop=c.stop_reason))
             end
             draws[b] = d
         end
@@ -192,12 +215,14 @@ end
 # ── CSV of every main-run outcome ─────────────────────────────────────────────
 rows = NamedTuple[]
 for m in cck[:main], (pn, v) in m.policies
-    o = v.o
+    o = v.o; sr = get(v, :stop, "")
     push!(rows, (environment=string(m.env), scenario=string(m.scen), ratio=m.ratio, policy=pn, schedule_uM=join(round.(v.U; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction,
                  max_total=o.max_total, max_toxicity=o.max_tox, cumulative_dose_uM_days=o.cum_dose,
                  cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation,
-                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed))
+                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed,
+                 N_at_progression=o.N_prog, C_at_progression=o.C_prog, control_stopped_day=o.stop_day, stop_reason=sr))
 end
 CSV.write(joinpath(COUT, "control_outcomes.csv"), DataFrame(rows))
 println("Wrote $(joinpath(COUT, "control_outcomes.csv"))")
+write(FPFILE, FPRINT)

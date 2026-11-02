@@ -80,7 +80,7 @@ end
             for a in levels, b in levels, c in levels
                 vs = (a[2], b[2], c[2])
                 any(vs[i] > 0 && vs[i+1] > 0 for i in 1:2) && continue              # max 1 consecutive, min gap 1
-                U = [a[1] a[2]; b[1] b[2]; c[1] c[2]]; J = total_cost2(x0, U, FP, Δ, W)
+                U = [a[1] a[2]; b[1] b[2]; c[1] c[2]]; J = plan_cost2(x0, U, FP, Δ, W)
                 J < best && (best = J; bestU = U)
             end
             s = discrete_solve2(x0, FP, Δ, H, W)
@@ -95,13 +95,13 @@ end
             levels = [(u, v) for v in (0.0, 1.0) for u in Float64.(CFG["dose"]["levels_data"])]
             for a in levels, b in levels
                 a[2] > 0 && b[2] > 0 && continue                                          # max 1 consecutive, min gap 1
-                U = [a[1] a[2]; b[1] b[2]; b[1] 0.0]; J = total_cost2(x0, U, FP, Δ, W)      # block 2: dose held, fed in its 2nd interval
+                U = [a[1] a[2]; b[1] b[2]; b[1] 0.0]; J = plan_cost2(x0, U, FP, Δ, W)      # block 2: dose held, fed in its 2nd interval
                 best = min(best, J)
             end
             @test discrete_solve2(x0, FP, Δ, blk, W).J ≈ best rtol = 1e-10
             @test expand_blocks2([1.0 1.0; 0.62 1.0], blk) == [1.0 1.0; 0.62 1.0; 0.62 0.0]       # blocked plan → intervals
             sb = discrete_solve2(x0, FP, Δ, blk, W)
-            @test total_cost2(x0, expand_blocks2(sb.U, blk), FP, Δ, W) ≈ sb.J rtol = 1e-10
+            @test plan_cost2(x0, expand_blocks2(sb.U, blk), FP, Δ, W) ≈ sb.J rtol = 1e-10
         end
 
         @testset "scenario $scen: SQP respects bounds and does not increase the cost" begin

@@ -31,6 +31,18 @@ Each step runs in its own process with its log in `outputs/logs/`. `outputs/run_
 records the git commit, Julia and package versions, thread count, SHA-256 of every data file and the
 time and exit code of each step. A full run takes about 5–6 hours on 20 threads.
 
+**Reused data are flagged.** A control step whose inputs are unchanged skips its work and writes
+`outputs/reuse/<step>.toml`; `run_pipeline.jl` copies it into the step's `reused_from` (time of the run whose outputs
+are reused) in the manifest. When the Final Report is built, `report_history.jl` reads the manifest and records a
+`[provenance]` section in `version.toml` (each of fits, analyses, control, long control, 30/60-day control and sweeps:
+new in this version, reused with unchanged inputs, reused from an earlier run via `--from`/`--only`, or resumed with
+`--resume`). It is shown at the top of the Final Report and on the history card, which carries a "partly reused" tag if
+anything was reused. Versions built without a manifest show "provenance not recorded".
+
+**Headline scenario.** `control_config.toml` `[scenarios] headline` (user, 2026-11-02: `"B"`) names the main
+drug-response scenario. Both scenarios are still computed; the control, sweep and fasting reports list the headline first
+as "main result" and the other as "sensitivity case", and the Final Report history adds a `q+:robust_main` row.
+
 **Reproducibility.** Data selection, stages and hold-outs are configuration; bootstrap replicates and
 multistarts are seeded; optimisers stop on iteration caps only (BFGS 1500, Nelder–Mead 2500) — there is no
 wall-clock limit (since 2026-10-07), so results do not depend on machine load, threads or sleep.
@@ -81,6 +93,14 @@ Options in `stages.toml [selection]` (defaults reproduce the reference run):
   models within one scheme only.
 - `bootstrap_generator = "most_complex" | "selected"`: which candidate generates the bootstrap replicates.
 
+`[starting_values] estimate = "mono"` estimates the day-0 count of every monoculture series as an extra
+parameter (counted in the BIC) instead of fixing it at the nominal seeding; `"auto"` estimates it only when
+the first count is far from the seeding, `"all"` also for cocultures (user 2026-11-02; `outputs/zoo_fits/starting_values.csv`).
+`[selection] extra_starts = 20` adds seeded Latin-hypercube starts to the fixed starts of every main fit
+(`EXTRA_STARTS` overrides, 0 = off), drawn within `extra_starts_spread` (10×) of the fixed starts and each limited
+to `extra_starts_work_factor` (20×) the work of the slowest fixed-start fit, so a start in a stiff corner is dropped
+rather than run for hours; `outputs/zoo_fits/fit_starts.csv` lists per candidate how many starts reached the best BIC.
+
 A coculture candidate with `kill_growth_coupled = true` multiplies each line's drug kill by its growth
 factor (Norton–Simon: 1 − x for logistic, 1 − x^θ for theta-logistic growth, x = crowding/K).
 
@@ -96,9 +116,9 @@ STAGES_TOML=sens/stages.toml SOURCES_TOML=sens/sources.toml DATA_TABLE=sens/meas
 |---|---|---|---|
 | s1 | 1 | untreated monocultures | growth law per line |
 | s1b | 2a | low-resource monocultures | Stage 1 growth + every low-resource mechanism (A/B shared-structure test) |
-| s2 | 2b | treated monocultures, 3 doses jointly | Stage 1 growth + every cisplatin mechanism; one structure shared by both lines |
-| s3 | 3a | untreated (Ce0) + 1 µM (Ce1) cocultures | both lines, shared K; the resistant kill may be refitted down to 0 or dropped ("_noC" candidates, user 2026-10-06) |
-| s3b | 3b | low-resource cocultures | both lines with their Stage 2a mechanisms |
+| s2 | 2b | treated monocultures, 4 doses jointly (A2780cis 1 µM day 14 left out, `sources.toml exclude_days`) | Stage 1 growth + every cisplatin mechanism; one structure shared by both lines |
+| s3 | 3a | untreated (Ce0) + 1 µM (Ce1) cocultures | both lines, shared K; the resistant kill is refitted but kept at or above `betaC_floor` × its Stage 2b value (user 2026-11-02; no "_noC" candidates) |
+| s3b | 3b | low-resource cocultures | both lines with their Stage 2a mechanisms; K and the crowding coefficients are taken from Stage 3a, only the resource sensitivities ε may be refitted (user 2026-11-02) |
 | s4 | 4 | low resource + 1 µM coculture | both mechanisms per line, inherited; a few refitted parameters |
 
 At every stage the carried model is the candidate with the fewest free parameters within 2 BIC of

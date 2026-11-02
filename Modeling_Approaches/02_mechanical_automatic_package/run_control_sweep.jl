@@ -22,6 +22,21 @@ using Base.Threads
 const SOUT = joinpath(@__DIR__, "outputs", "control_sweep"); mkpath(SOUT)
 const DATA_LABEL = get(ENV, "SWEEP_DATA", "without A2780cis 1 µM")
 const SKP = joinpath(SOUT, "sweep_state_" * replace(lowercase(DATA_LABEL), r"[^a-z0-9]+" => "_") * ".jls")
+# skip when nothing this data choice's sweep reads has changed since its last finished run and its rows are
+# still in the CSV (control_model.jl: control_fingerprint; the run script itself is hashed too)
+const FPRINT = control_fingerprint(@__FILE__, "SWEEP_DATA" => DATA_LABEL)
+const FPFILE = joinpath(SOUT, "inputs_" * replace(lowercase(DATA_LABEL), r"[^a-z0-9]+" => "_") * ".sha256")
+let f = joinpath(SOUT, "sweep_outcomes.csv")
+    if control_unchanged(FPFILE, FPRINT, f) && any(==(DATA_LABEL), string.(CSV.read(f, DataFrame; stringtype=String).data))
+        println("Control inputs unchanged since the last finished sweep ($DATA_LABEL); reusing its rows in $f (CONTROL_FORCE=1 recomputes)")
+        # provenance (user, 2026-11-02): tell run_pipeline.jl this step reused its last finished outputs (it copies this into run_manifest.toml)
+        let step = get(ENV, "PIPELINE_STEP", "")
+            isempty(step) || (mkpath(joinpath(@__DIR__, "outputs", "reuse")); write(joinpath(@__DIR__, "outputs", "reuse", step * ".toml"),
+                "reused_from = \"$(Libc.strftime("%Y-%m-%dT%H:%M:%S", mtime(FPFILE)))\"\nreused_fingerprint = \"$FPRINT\"\n"))
+        end
+        exit(0)
+    end
+end
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const LOOK = Int.(CFG["schedule"]["lookahead_blocks"])
 const LEVELS = Float64.(CFG["dose"]["levels_data"])
@@ -32,6 +47,7 @@ const MPC = "MPC, measured doses only"
 const D0 = (barrier=String(CFG["cancer"]["barrier"]), threshold=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]),
             days=Float64(CFG["schedule"]["closed_loop_days"]), to_end=Bool(CFG["schedule"]["lookahead_to_end"]),
             objective="time to progression", w=nothing)
+# (the tie-breaker weights of the entries with qP > 0 are scaled by [progression] tiebreak_scale, control_mpc.jl)
 const OBJECTIVES = [("time to progression", nothing),
                     ("burden-weighted (qB = qR = 1, no progression term)", [1.0, 1.0, 1.0, 0.1, 0.0, 0.0]),
                     ("no terminal resistant cost (qRT = 0)", [0.1, 0.0, 1.0, 0.1, 10.0, 0.0]),
@@ -67,10 +83,13 @@ function run_variant(v, scen, r)
     for (name, pol) in baseline_policies(P, W)
         pols[name] = run_policy(pol, P, x0, Δ0, n)
     end
+    res = Dict{String,Any}(name => (U=U, o=outcomes(P, x0, U, Δ0, W)) for (name, U) in pols)
+    # MPC stops once progression is confirmed or once it has outlasted every comparator (control_mpc.jl: stop_now)
     t = time()
-    pols[MPC] = closed_loop(P, P, x0, Δ0, n, LOOK, W; mode=:discrete, levels=LEVELS, shrink=v.to_end).U
+    cl = closed_loop(P, P, x0, Δ0, n, LOOK, W; mode=:discrete, levels=LEVELS, shrink=v.to_end, stop_kw(W, Δ0, [x.o.ttp for x in values(res)])...)
     secs = time() - t
-    (K=P.K, Bc=W.Bc, secs=secs, res=Dict(name => (U=U, o=outcomes(P, x0, U, Δ0, W)) for (name, U) in pols))
+    res[MPC] = (U=cl.U, o=outcomes(P, x0, cl.U, Δ0, W; t_stop=tstop(cl)), stop=cl.stop_reason)
+    (K=P.K, Bc=W.Bc, secs=secs, res=res)
 end
 
 const V = variants()
@@ -104,7 +123,9 @@ for (v, s, r) in tasks, (pn, x) in sort(collect(st[key(v, s, r)].res); by=first)
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction,
                  max_total=o.max_total, max_toxicity=o.max_tox, cumulative_dose_uM_days=o.cum_dose,
                  cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation,
-                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed))
+                 first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed,
+                 N_at_progression=get(o, :N_prog, NaN), C_at_progression=get(o, :C_prog, NaN),
+                 control_stopped_day=get(o, :stop_day, NaN), stop_reason=get(x, :stop, "")))
 end
 new = DataFrame(rows)
 f = joinpath(SOUT, "sweep_outcomes.csv")
@@ -115,3 +136,4 @@ if isfile(f)                                      # keep the rows of the other d
 end
 CSV.write(f, new)
 println("Wrote $f ($(nrow(new)) rows)")
+write(FPFILE, FPRINT)

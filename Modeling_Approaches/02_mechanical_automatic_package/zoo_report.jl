@@ -68,8 +68,11 @@ function joint_html(g)
     tbl = "<div class='tscroll'><table><tr>$(thtip("Shared structure", "A mechanism structure used by both lines, each with its own rates.", :none))$(thtip("BIC A2780", "BIC of this structure fitted to the A2780 data.", :lower))$(thtip("BIC A2780cis", "BIC of this structure fitted to the A2780cis data.", :lower))$(thtip("Joint BIC", "Sum of the two lines' BICs. The selection rule (fewest parameters within 2 BIC of the lowest) is applied to this.", :lower))$(thtip("Joint k", "Free parameters of both lines together.", "Lower is better (fewer parameters), as long as the fit stays within 2 BIC."))</tr>$top</table></div>"
     if g.kind == :s2
         ex = [e for e in excluded_sources() if e.stage == "s2"]
-        exn = isempty(ex) ? "" : "<div class='note'><b>Left out of this fit</b> (user, 2026-10-27; stages.toml <code>exclude</code>): " *
-              join(["$(hesc(e.line)) $(hesc(e.file))" for e in ex], ", ") * ". The A2780cis 1 µM monoculture shows no kill by day 14 (it ends above untreated), so A2780cis is fitted on the other doses. The fit with every dose is kept as a sensitivity variant (<code>ZOO_NO_EXCLUDE=1</code>).</div>"
+        exn = isempty(ex) ? "" : "<div class='note'><b>Left out of this fit</b> (stages.toml <code>exclude</code>): " *
+              join(["$(hesc(e.line)) $(hesc(e.file))" for e in ex], ", ") * ". The fit with every series is kept as a sensitivity variant (<code>ZOO_NO_EXCLUDE=1</code>).</div>"
+        mx = isdefined(Main, :manual_exclusions) ? manual_exclusions() : NamedTuple[]
+        isempty(mx) || (exn *= "<div class='note'><b>Single points left out</b> (sources.toml <code>exclude_days</code>; user 2026-11-02, decision D5): " *
+              join(["$(hesc(m.line)) $(hesc(m.id)) day $(fmt(m.day)) ($(hesc(m.reason)))" for m in mx], "; ") * ". Every other point of these series is fitted; <code>ZOO_NO_EXCLUDE=1</code> puts them back.</div>")
         return exn * "<div class='note'><b>Shared mechanism (both lines).</b> A2780cis is derived from A2780, and cisplatin kills both through DNA damage followed by delayed death; resistance changes the rates (less uptake, glutathione, faster repair, more damage tolerance), not the mechanism. So both lines use one structure with their own rates: the rule is applied to the joint BIC (sum of the two lines' BICs, each fitted with its own error variance) and joint k. Chosen: <b>$(hesc(info.pick.label))</b> (joint BIC $(fmt(info.pick.bic)), k = $(info.pick.k)).</div>$tbl"
     end
     A, B = info.A, info.B
@@ -90,6 +93,9 @@ function write_zoo_report(groups, results)
               @sprintf("<td class='num'>%.1f</td><td class='num'>%s</td></tr>", c.bic, hasb ? @sprintf("%.0f%%", pct(r.pick, 1)) : "—"))
         trs = join([begin
                         low = hasb ? @sprintf("%.0f%% / %.0f%%", pct(r.pick, j), pct(r.winner, j)) : "—"
+                        # two-pass bootstrap: a candidate dropped after the screen was refitted to `screen` replicates only
+                        hasb && hasproperty(r, :nboot) && r.nboot[j] < size(r.bic, 1) &&
+                            (low *= "<div class='muted' style='font-size:11px'>screened out after $(r.nboot[j]) replicates (picked in under $(round(Int, 100 * (1 - 0.05^(1 / r.nboot[j]))))%, 95% bound)</div>")
                         "<tr$(j == 1 ? " class='win'" : "")><td><b>$(hesc(x.label))</b>" * join(["<div class='eq glance'>\\[$t\\]</div>" for t in zoo_tex(g, x)]) *
                         "</td><td>$(hesc(x.family))</td><td class='num'>$(length(x.params))</td>" *
                         @sprintf("<td class='num'>%.2f</td><td class='num'>%+.2f</td><td class='num'>%s</td></tr>", x.bic, x.bic - c.bic, low)
@@ -112,7 +118,7 @@ function write_zoo_report(groups, results)
               thtip("Family", "The delay mechanism the model uses: immediate, effect compartment, transit compartments, second order, accumulation, or damaged cells.", :none) *
               thtip("k", "Free parameters fitted at this stage; values carried over from earlier stages are not counted.", "Lower is better (fewer parameters), as long as the fit stays within 2 BIC.") * thtip("BIC", ZT_BIC, :lower) *
               thtip("ΔBIC vs optimal", "BIC minus the BIC of the carried model. Negative = fits slightly better but needs more parameters (within 2 BIC the rule prefers fewer); positive = fits worse.", "Lower means a better fit, but within 2 of 0 the carried model wins by having fewer parameters; above +2 is clearly worse.") *
-              thtip("Bootstrap: chosen / lowest BIC", "First number: share of the bootstrap data sets in which the selection rule picks this model. Second: share in which it has the lowest BIC outright.", :higher) * "</tr>$trs</table></div>" *
+              thtip("Bootstrap: chosen / lowest BIC", "First number: share of the bootstrap data sets in which the selection rule picks this model. Second: share in which it has the lowest BIC outright. Two-pass bootstrap: every candidate gets the first 40 data sets (stages.toml bootstrap_screen); only those inside the selection band at least once get the rest, so a screened-out candidate shows 0% with a 95% upper bound.", :higher) * "</tr>$trs</table></div>" *
               joint_html(g) * "<h4>Optimal model: $(hesc(c.label))$(tip("The carried model's equations. N, C: sensitive (A2780) and resistant (A2780cis) counts; V: viable, non-damaged cells; A or S: delay compartments driven by the dose D or the low-resource level u_R. Parameter values are in the table below.", :none))</h4>" * join(["<div class='eq'>\\[$t\\]</div>" for t in zoo_tex(g, c)]) *
               "<div class='tscroll'><table class='params'><tr>" * thtip("Parameter", "Parameters fitted at this stage. Rows under 'Carried over / fixed' come from earlier stages and are held at their values.", :none) *
               thtip("Estimate", "Value fitted to the data.", :none) *

@@ -33,6 +33,44 @@ const ZOO_STATE = deserialize(get(ENV, "ZOO_STATE", joinpath(@__DIR__, "outputs"
 const AN_STATE = deserialize(get(ENV, "AN_STATE", joinpath(@__DIR__, "outputs", "zoo_analyses", "analyses_state.jls")))
 zgroup(id) = ZOO_STATE.groups[findfirst(g -> g.id == id, ZOO_STATE.groups)]
 
+# ── reuse of finished control runs (2026-11-01) ──────────────────────────────────────────────────────────
+# A control step (run_control.jl, run_control_fasting.jl, run_control_sweep.jl) is skipped when everything it
+# reads is unchanged since its last finished run: the control code and configs, the data, the package
+# versions, and the parts of the fitted states it uses (each group's carried model and its bootstrap draws,
+# the Ce0 crowding fit). A refit that leaves the carried models and draws the same therefore costs no control
+# time; anything else reruns. CONTROL_FORCE=1 (run_pipeline.jl --recompute-control) always recomputes.
+# The fingerprint is a SHA-256 written next to the outputs after a successful run.
+const CONTROL_CODE = ["control_model.jl", "control_mpc.jl", "control_fasting.jl", "zoo_common.jl", "zoo_models.jl",
+                      "zoo_data.jl", "bootstrap_tools.jl", "stage_names.jl", "control_config.toml", "stages.toml",
+                      "Manifest.toml", joinpath("data", "schedules.toml"), joinpath("data", "measurements.csv")]
+function control_fingerprint(script::AbstractString, extra::Pair...)
+    io = IOBuffer()
+    for f in vcat(CONTROL_CODE, basename(script))
+        fp = joinpath(@__DIR__, f)
+        write(io, f, 0x00, isfile(fp) ? read(fp) : UInt8[], 0x00)
+    end
+    for g in ZOO_STATE.groups
+        c = g.cands[1]
+        write(io, string(g.id), 0x00, string(c.name), 0x00, join(string.(c.pnames), ","), 0x00, Float64.(c.params))
+        if hasproperty(c, :fixedcc)     # sorted: a Dict's order is not stable between sessions
+            fc = c.fixedcc isa AbstractDict ? sort!([string(k) => v for (k, v) in c.fixedcc]; by=first) : c.fixedcc
+            write(io, repr(fc), 0x00)
+        end
+        if haskey(ZOO_STATE.results, g.id)
+            P = ZOO_STATE.results[g.id].res.pars[1]
+            write(io, Int64(size(P, 1)), Int64(size(P, 2)), Float64.(vec(P)))
+        end
+    end
+    write(io, repr(ZOO_STATE.B), 0x00, Float64.(AN_STATE[:validation].ce1[1].params))
+    for (k, v) in extra
+        write(io, string(k), "=", string(v), 0x00)
+    end
+    bytes2hex(sha256(take!(io)))
+end
+# true when `fpfile` holds this fingerprint and every output in `outs` exists (and CONTROL_FORCE is not 1)
+control_unchanged(fpfile, fp, outs...) = get(ENV, "CONTROL_FORCE", "0") != "1" && isfile(fpfile) &&
+    strip(read(fpfile, String)) == fp && all(isfile, outs)
+
 # resistant kill β_C of the carried Stage 3 model, and where it comes from: refitted, dropped (the
 # "no resistant cisplatin term" candidates fix it at 0) or inherited from Stage 2b
 function stage3_betaC()

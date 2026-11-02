@@ -27,6 +27,13 @@ ec50 = 1.0              # µM, measured cisplatin IC50 of A2780 (the Hill kill's
 sym = "C"
 ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-10-02; was 1 µM for both lines before)
 
+# Starting values (user, 2026-11-02; zoo_data.jl x0_info): "mono" estimates the day-0 count of every monoculture series
+# as a free parameter (bounds nom/10 to 3 × max(nom, first count), counted in the BIC); cocultures keep the 3-fold
+# rule. The A2780cis monocultures start 20–60% apart on day 1 (untreated 80, 0.62 and 1 µM about 118 for a nominal
+# 100), an offset the fixed start pushed into r_C, θ_C (5.5) and the drug delay. "auto" = the 3-fold rule only.
+[starting_values]
+estimate = "mono"
+
 [selection]
 rule_bic = 2.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC); was 3.0 until 2026-10-27 (user)
 # Residual weights (review, 2026-10-07): one pooled variance model for every series, scale = max(y, 50)^0.55
@@ -42,6 +49,22 @@ bootstrap_generator = "selected"
 # (2026-10-28, after one Stage 4 replicate ran for 11+ h). A count, not a time limit, so results stay
 # reproducible; runs over budget are discarded for that replicate and listed in time_limit_hits.csv. 0 = none.
 bootstrap_work_factor = 50
+# Multistart (user, 2026-11-02, F5 of the decision review): on top of the fixed starts of each candidate, extra_starts
+# seeded Latin-hypercube starts inside the bounds (log-uniform over a range spanning more than 100×) for the main
+# fits only; the bootstrap keeps one start at the estimate. fit_starts.csv lists, per candidate, how many starts
+# reached the best BIC (within 0.01). EXTRA_STARTS overrides; 0 = the fixed starts only (the setting before).
+extra_starts = 20
+# where and how long the seeded starts run (bootstrap_tools.jl lhs_starts, fit_cand): each parameter is drawn within
+# extra_starts_spread × below/above its fixed starts (clipped to the bounds; 0 = the whole bounds), and each seeded
+# start may use extra_starts_work_factor × the evaluations of the slowest fixed-start fit (0 = no budget)
+extra_starts_spread = 10
+extra_starts_work_factor = 20
+# Two-pass bootstrap (user, 2026-11-01): every candidate is refitted to the first bootstrap_screen replicates; the
+# remaining ones go only to candidates that were within rule_bic of the lowest BIC in at least one screened
+# replicate (so the per-line and paired-line rules could pick them), plus the carried model. A candidate
+# never picked in 40 replicates would be picked in under ~7% (95% bound); in the 28 Oct run 75 of 132 candidates
+# were never picked in all 200, so this roughly halves the bootstrap refits. 0 = every candidate gets all B.
+bootstrap_screen = 40
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
@@ -98,10 +121,10 @@ kind = "mechanism"
 stage_label = "2 Treated monoculture"
 title = "Stage 2 · {line} treated (measured doses jointly)"
 data = { condition = "treated", culture = "mono" }
-# user, 2026-10-27: the A2780cis 1 µM monoculture shows no kill by day 14 (it ends above untreated at 20k and
-# 30k), so A2780cis is fitted on 0.62 and 1.47 µM; A2780 keeps all three doses. ZOO_NO_EXCLUDE=1 refits with
-# it (the original fit, kept as a sensitivity variant)
-exclude = [{ line = "A2780cis", dose = 1.0 }]
+# user, 2026-11-02 (D5 of the decision review): the A2780cis 1 µM monoculture is fitted again; it tracks the 0.62 µM
+# series at 0.7–0.85 × untreated from day 10, and only its day-14 count (4,117, above untreated) is left out, by
+# hand in data/sources.toml (exclude_days). 2026-10-27 to 2026-11-02 the whole series was left out here
+# (exclude = [{ line = "A2780cis", dose = 1.0 }]). ZOO_NO_EXCLUDE=1 refits with every point (sensitivity variant).
 input = "D"
 catalogue = "DRUG_ZOO"
 inherits = { growth = "s1" }
@@ -118,11 +141,14 @@ line = "coculture"
 data = { culture = "co", condition = ["Ce0", "Ce1"] }
 input = "D"
 inherits = { growth = "s1", mechanism = "s2" }
-# The resistant kill β_C may be refitted down to 0, and the "no resistant cisplatin term" candidates
-# (fixed βC = 0) compete under the selection rule (user, 2026-10-06; replaces the 2026-10-01 floor of
-# 0.5 × Stage 2b). Every sensitivity variant put β_C on whatever floor it had. In monoculture (Stage 2b)
-# the A2780cis kill stays: dropping it costs +59 weighted BIC there.
-betaC_floor = 0.0
+# The resistant kill β_C keeps a cisplatin term in coculture (user, 2026-11-02, B9 of the decision review: "they
+# should still have the kill term, but it is understandable if it is very small or undetectable"): a refitted β_C
+# may go down to betaC_floor × its Stage 2b value, and the "no resistant cisplatin term" candidates (fixed βC = 0,
+# 2026-10-06 to 2026-11-02) are gone. 0.1 is the upper end of the 2026-10-28 bootstrap interval (0–0.1 × the
+# monoculture kill); 2026-10-01 to 2026-10-06 the floor was 0.5. In monoculture (Stage 2b) the A2780cis kill
+# stays: dropping it costs +59 weighted BIC there. The control headline is scenario B (monoculture kills for both
+# lines, user 2026-11-02), so this floor matters for scenario A and the Stage 4 inheritance only.
+betaC_floor = 0.1
   [[stage.candidate]]
   name = "cc_K"
   label = "Shared K, one-for-one crowding, drug mechanisms from Stage 2"
@@ -156,27 +182,6 @@ betaC_floor = 0.0
   label = "Shared K + crowding + death, both kill strengths refitted (resistant kill may reach 0)"
   free = ["K", "αNC", "αCN", "dN", "dC", "βN", "βC"]
 
-  [[stage.candidate]]
-  name = "cc_K_alpha_betaN_noC"
-  label = "Shared K + crowding, sensitive kill refitted, no resistant cisplatin term"
-  free = ["K", "αNC", "αCN", "βN"]
-  fixed = { "βC" = 0.0 }
-  [[stage.candidate]]
-  name = "cc_K_alpha_noC"
-  label = "Shared K + crowding, sensitive kill from Stage 2, no resistant cisplatin term"
-  free = ["K", "αNC", "αCN"]
-  fixed = { "βC" = 0.0 }
-  [[stage.candidate]]
-  name = "cc_K_alpha_deathN_betaN_noC"
-  label = "Shared K + crowding + sensitive death, sensitive kill refitted, no resistant cisplatin term"
-  free = ["K", "αNC", "αCN", "dN", "βN"]
-  fixed = { "βC" = 0.0 }
-  [[stage.candidate]]
-  name = "cc_full_noC"
-  label = "Shared K + crowding + death, sensitive kill refitted, no resistant cisplatin term"
-  free = ["K", "αNC", "αCN", "dN", "dC", "βN"]
-  fixed = { "βC" = 0.0 }
-
 # ── 3b · low-resource cocultures, shared K ───────────────────────────────────
 [[stage]]
 id = "s3b"
@@ -187,40 +192,38 @@ line = "LR coculture"
 data = { culture = "co", condition = "low_resource" }
 input = "R"
 inherits = { growth = "s1", mechanism = "s1b" }
+# user, 2026-11-02 (B14 of the decision review): the same two lines share the same wells, so their crowding (K, α_NC,
+# α_CN) is the Stage 3a value in low resource too (fixed_from = "s3"); starvation acts only through each line's
+# Stage 2a mechanism, whose strength ε may be refitted per line. The free-K/α candidates (2026-10 to 2026-11-02:
+# lrcc_K, lrcc_K_alpha, lrcc_K_alphaCN, lrcc_K_alpha_eps, lrcc_K_alpha_noLR, lrcc_K_alphaCN_noLR) are gone: with
+# A2780cis near zero from day 5, α_NC multiplied an empty count and ran to 4.3 against its bound of 5.
 # fixed: values of parameters that are not refitted; fixed_from: take K, αNC, αCN from that stage's
 # carried model; noinput: switch the low-resource effect off (a "no effect" comparison)
   [[stage.candidate]]
-  name = "lrcc_K"
-  label = "Shared K, one-for-one crowding, low-resource mechanisms from Stage 1b"
-  free = ["K"]
-  [[stage.candidate]]
-  name = "lrcc_K_alpha"
-  label = "Shared K + asymmetric crowding, low-resource mechanisms from Stage 1b"
-  free = ["K", "αNC", "αCN"]
-  [[stage.candidate]]
-  name = "lrcc_K_alphaCN"
-  label = "Shared K, resistant crowded by sensitive only (α_NC = 0)"
-  free = ["K", "αCN"]
-  fixed = { "αNC" = 0.0 }
-  [[stage.candidate]]
-  name = "lrcc_K_alpha_eps"
-  label = "Shared K + crowding, low-resource strength refitted per line"
-  free = ["K", "αNC", "αCN", "εN", "εC"]
+  name = "lrcc_inherit"
+  label = "K and α from Stage 3, low-resource mechanisms from Stage 1b as fitted (nothing refitted)"
+  free = []
+  fixed_from = "s3"
   [[stage.candidate]]
   name = "lrcc_eps"
   label = "K and α from Stage 3, low-resource strength refitted per line"
   free = ["εN", "εC"]
   fixed_from = "s3"
   [[stage.candidate]]
-  name = "lrcc_K_alpha_noLR"
-  label = "Shared K + asymmetric crowding, no low-resource effect"
-  free = ["K", "αNC", "αCN"]
-  noinput = true
+  name = "lrcc_epsN"
+  label = "K and α from Stage 3, sensitive low-resource strength refitted"
+  free = ["εN"]
+  fixed_from = "s3"
   [[stage.candidate]]
-  name = "lrcc_K_alphaCN_noLR"
-  label = "Shared K, α_NC = 0, no low-resource effect"
-  free = ["K", "αCN"]
-  fixed = { "αNC" = 0.0 }
+  name = "lrcc_epsC"
+  label = "K and α from Stage 3, resistant low-resource strength refitted"
+  free = ["εC"]
+  fixed_from = "s3"
+  [[stage.candidate]]
+  name = "lrcc_noLR"
+  label = "K and α from Stage 3, no low-resource effect"
+  free = []
+  fixed_from = "s3"
   noinput = true
 
 # ── 4 · low resource + cisplatin coculture (both mechanisms per line) ────────
@@ -233,17 +236,13 @@ title = "Stage 4 · low resource + cisplatin coculture (1:1)"
 line = "combination"
 data = { condition = "combination" }
 inherits = { drug = "s3", lowres = "s3b", resistant_kill = "s2" }
-# crowd: crowding (K, α) from the drug stage (s3) or the low-resource stage (s3b); reskill: reset the
-# resistant kill to its Stage 2b value (only offered when Stage 3a refitted β_C)
+# crowd: crowding (K, α) from the drug stage (s3) or the low-resource stage (s3b; the same values since
+# 2026-11-02, so the s4_inherited_3bcrowd candidate is gone); reskill: reset the resistant kill to its Stage 2b
+# value (only offered when Stage 3a refitted β_C)
   [[stage.candidate]]
   name = "s4_inherited"
   label = "Everything inherited: Stage 3 drug model and crowding + Stage 3b low-resource mechanisms"
   crowd = "s3"
-  free = []
-  [[stage.candidate]]
-  name = "s4_inherited_3bcrowd"
-  label = "Everything inherited, crowding from Stage 3b (shared K, one-for-one)"
-  crowd = "s3b"
   free = []
   [[stage.candidate]]
   name = "s4_reskill"

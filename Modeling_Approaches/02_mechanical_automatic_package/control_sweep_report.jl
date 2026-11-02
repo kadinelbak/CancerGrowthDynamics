@@ -14,6 +14,10 @@ const SDOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_autom
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const DATA_DAYS = Float64(CFG["schedule"]["data_days"])
 const MPC = "MPC, measured doses only"
+# headline drug-response scenario (control_config.toml [scenarios].headline, user 2026-11-02): listed first, marked "(main result)"
+const HEADLINE = String(get(get(CFG, "scenarios", Dict{String,Any}()), "headline", "A"))
+scen_order(v) = sort(string.(unique(v)); by=x -> x == HEADLINE ? 0 : 1)
+scen_tag(x) = string(x) == HEADLINE ? " (main result)" : " (sensitivity case)"
 const COMPARATORS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)"]
 const LEVELS = Float64.(CFG["dose"]["levels_data"])
 const DOSE_COL = ["#f3f4f6", "#9ecae1", "#3182bd", "#08306b"]       # 0, 0.62, 1.0, 1.47 µM
@@ -76,7 +80,7 @@ function verdict(df, data, scen)
     thr = m[in.(m.axis, Ref(("default", "threshold"))), :]
     ch(g) = isempty(g) ? "no runs" : (n = [length(unique(g[g.ratio .== r, :schedule_uM])) for r in unique(g.ratio)];
                                        all(==(1), n) ? "does not change" : "changes at $(count(>(1), n)) of $(length(n)) starting ratios")
-    "<li>Scenario $(hesc(scen)): the 14-day MPC schedule <b>$(ch(bar))</b> across the $(length(unique(bar.barrier))) barrier shapes, and <b>$(ch(thr))</b> across thresholds $(join(sort(unique(thr.threshold_fraction_of_K)), ", ")) K.</li>"
+    "<li>Scenario $(hesc(scen))$(scen_tag(scen)): the 14-day MPC schedule <b>$(ch(bar))</b> across the $(length(unique(bar.barrier))) barrier shapes, and <b>$(ch(thr))</b> across thresholds $(join(sort(unique(thr.threshold_fraction_of_K)), ", ")) K.</li>"
 end
 
 f = joinpath(SOUT, "sweep_outcomes.csv")
@@ -86,11 +90,11 @@ if isempty(df)
     push!(secs, "<div class='intro'><p class='muted'>Not run yet: <code>julia -t 12 --project=. run_control_sweep.jl</code>.</p></div>")
 else
     for data in unique(df.data)
-        push!(secs, "<h2>Data: $(hesc(data))</h2><div class='intro'><ul>" * join([verdict(df, data, s) for s in unique(df.scenario)]) * "</ul></div>")
-        for scen in unique(df.scenario), r in unique(df.ratio)
+        push!(secs, "<h2>Data: $(hesc(data))</h2><div class='intro'><ul>" * join([verdict(df, data, s) for s in scen_order(df.scenario)]) * "</ul></div>")
+        for scen in scen_order(df.scenario), r in unique(df.ratio)
             sub = df[(df.data .== data) .& (df.scenario .== scen) .& (df.ratio .== r), :]
             isempty(sub) && continue
-            push!(secs, "<details$(r == "50:50" ? " open" : "")><summary>Scenario $(hesc(scen)) · $(hesc(r)) start</summary><div class='panel'>" *
+            push!(secs, "<details$(r == "50:50" ? " open" : "")><summary>Scenario $(hesc(scen))$(scen_tag(scen)) · $(hesc(r)) start</summary><div class='panel'>" *
                         "<h3>MPC schedule per variant</h3>" * heatmap(sub[sub.policy .== MPC, :]) * "<h3>Outcomes</h3>" * outcome_table(sub) * "</div></details>")
         end
     end

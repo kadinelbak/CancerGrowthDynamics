@@ -7,6 +7,9 @@
 #               Numerical and reporting settings are labelled ASSUMPTION too (they are choices, not data).
 # Replace ASSUMPTION values with measurements when they exist.
 
+[scenarios]
+headline = "B"   # ASSUMPTION (user, 2026-11-02): B (monoculture kills for both lines) is the reported main result because a fully drug-inactive resistant line is not biologically plausible; A (Stage 3a coculture fit, resistant kill 0) is a sensitivity case
+
 [schedule]
 decision_interval_days = 2.0     # DATA: media are changed about every 2 days, so a new dose can start at each change
 horizon_days = 14.0              # DATA: the experiments run 14 days; also the look-ahead of every decision
@@ -27,7 +30,7 @@ rk4_step_days = 0.05             # ASSUMPTION (numerical setting): fixed RK4 ste
 # and may spend dose on a final kill; the resistant cells left at the end are still priced (qRT). With false
 # (2026-10-07 to 2026-10-27) every decision plans the full lookahead_blocks ahead, past the end of the run if
 # need be, so a run's schedule is the first decisions of a continuing policy. The sweep runs both.
-lookahead_to_end = true          # ASSUMPTION (user, 2026-10-27; false before)
+lookahead_to_end = false         # ASSUMPTION (user, 2026-11-01: no end-of-run effect, so the final count cannot be gamed; true 2026-10-27 to 2026-11-01, false before)
 run_days = [14.0, 30.0, 60.0]    # ASSUMPTION (user, 2026-10-27): run lengths of the control sweep (run_control_sweep.jl); days after 14 are beyond the data
 
 [dose]
@@ -70,7 +73,7 @@ B_cancer_sweep = [0.5, 0.6, 0.65, 0.7, 0.8, 0.0]    # ASSUMPTION: sensitivity of
 # Shape of the burden penalty at B_cancer (PRD 2026-10-27, control_mpc.jl burden_penalty): relaxed_log (the
 # relaxed log barrier above), quadratic (exterior penalty, zero below B_cancer), hard (a near-wall costing about
 # hard_weight on crossing) or none. All four are compared by run_control_sweep.jl.
-barrier = "relaxed_log"          # ASSUMPTION: the shape used by run_control.jl
+barrier = "none"                 # ASSUMPTION (user, 2026-11-01: time to progression only; B_cancer = B_prog, so the progression term already prices it; "relaxed_log" before); the other shapes stay in the sweep
 barrier_sweep = ["relaxed_log", "quadratic", "hard", "none"]   # ASSUMPTION
 hard_weight = 1000.0             # ASSUMPTION (numerical): cost of crossing the hard wall, far above every other term (q_P = 10 per interval)
 hard_width_fraction_of_K = 0.001 # ASSUMPTION (numerical): width of the hard wall's smooth step, 0.1% of K (the wall is ≈ hw at B_cancer, < 1 from 2% of K below it)
@@ -106,6 +109,18 @@ threshold_fraction_of_K = 0.5    # ASSUMPTION (user, 2026-10-27: K/2, the same l
 step_width_fraction_of_K = 0.02  # ASSUMPTION (numerical): width s of the smooth step, 2% of K (σ goes from 0.12 to 0.88 over ±4% of K)
 qP = 10.0                        # ASSUMPTION: cost of one decision interval spent progressed; dominates the other terms (swept)
 qRT = 10.0                       # ASSUMPTION: terminal cost of the resistant cells, qRT·C/K at the end of the look-ahead (swept 0 / 10 / 30)
+# Time to progression first (user, 2026-11-01). The progression cost is the time spent at or above B_prog,
+# averaged over `substeps` pieces of each decision interval; every other term of the objective is multiplied
+# by tiebreak_scale, so they only break ties between plans with the same time to progression.
+substeps = 8                     # ASSUMPTION (numerical): 0.25-day pieces of a 2-day interval (the RK4 steps are unchanged)
+tiebreak_scale = 0.001           # ASSUMPTION: tie-breakers (burden, resistant cells, dose, toxicity, host weight, fasting) at 1/1000 of their [weights] values
+# Stopping (user, 2026-11-01): no MPC decisions are computed once the result is known. A run stops when
+# progression is confirmed at confirm_decisions successive decision times (the controller keeps trying to
+# bring the culture back through all of them), or when MPC has gone settle_margin_days past the latest
+# progression among the comparators without progressing (its time to progression is then "beyond that day").
+# Comparators always run to the end of the run (simulation only). Run lengths are therefore caps.
+confirm_decisions = 6            # ASSUMPTION: 6 decision times = 10 days above B_prog, the same span as sustain_days
+settle_margin_days = 10.0        # ASSUMPTION: how far MPC must outlast the last comparator to progress
 sustain_days = 10.0              # ASSUMPTION (reporting): time to progression = start of the first spell at or above B_prog lasting ≥ this many days (or to the end of the run); shorter excursions that treatment reverses do not count
 
 [weights]
