@@ -400,6 +400,16 @@ for g in groups
 end
 CSV.write(joinpath(ZOO_DIR, "starting_values.csv"), isempty(x0_rows) ? DataFrame(group=String[]) : DataFrame(x0_rows))
 
+# multistart record of the main fits (decision F5): starts tried per candidate (fixed + seeded Latin hypercube,
+# bootstrap_tools.jl fit_cand) and how many of them reached the best BIC (within START_BIC_TOL)
+start_rows = NamedTuple[]
+for g in groups, c in g.cands
+    hasproperty(c, :nstarts) || continue
+    push!(start_rows, (group=g.id, candidate=c.name, k=length(c.params), bic=c.bic, starts=c.nstarts, starts_at_best=c.nbest,
+                       share_at_best=c.nstarts == 0 ? NaN : c.nbest / c.nstarts, carried=c.name == g.cands[1].name))
+end
+CSV.write(joinpath(ZOO_DIR, "fit_starts.csv"), isempty(start_rows) ? DataFrame(group=String[]) : DataFrame(start_rows))
+
 # bootstrap optimiser runs that went over their work budget (bootstrap_tools.jl); limit = evaluations, not seconds
 CSV.write(joinpath(ZOO_DIR, "time_limit_hits.csv"),
           isempty(LIMIT_HITS) ? DataFrame(fit=String[], optimizer=String[], seconds=Float64[], limit=Float64[]) : DataFrame(LIMIT_HITS))

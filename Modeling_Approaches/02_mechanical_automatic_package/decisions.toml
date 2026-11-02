@@ -153,3 +153,75 @@ decision = "Runs stop once the answer is known: an MPC run stops computing after
 was = "every MPC run computed every decision to the end of the run"
 by = "user"
 where = "control_config.toml [progression] confirm_decisions, settle_margin_days; control_mpc.jl stop_now"
+
+[[decision]]
+date = "2026-11-02"
+area = "data"
+decision = "The A2780cis 1 µM monoculture is back in Stage 2b; only its day-14 count (above untreated, out of line with days 10–12) is left out, as a single-point exclusion recorded in sources.toml."
+was = "the whole 1 µM series left out of Stage 2b (user 2026-10-27)"
+by = "user"
+where = "data/sources.toml exclude_days, exclude_reason; data/build_tidy.jl; stages.toml s2 exclude removed"
+
+[[decision]]
+date = "2026-11-02"
+area = "fitting"
+decision = "The day-0 count of every monoculture series is estimated as an extra parameter (counted in the BIC) instead of fixed at the nominal seeding; cocultures keep the nominal seeding unless the first count is far off. A quick check on A2780cis gave starts of 37 (untreated) and about 59 (treated), BIC better by 18 (Stage 1) and 10 (Stage 2b), θ_C 5.5 → 1.7."
+was = "nominal seeding, estimated only when the first count was more than 2× off"
+by = "user"
+where = "stages.toml [starting_values] estimate; zoo_data.jl x0_info"
+
+[[decision]]
+date = "2026-11-02"
+area = "fitting"
+decision = "In the coculture stage the resistant cisplatin kill is refitted but may not fall below 0.1× its Stage 2b value (the upper end of the bootstrap interval), and the no-resistant-kill candidates are dropped: resistant cells that are completely inactive to the drug make no biological sense."
+was = "refitted down to 0 or dropped (_noC candidates, user 2026-10-06)"
+by = "user"
+where = "stages.toml s3 betaC_floor = 0.1; s3 candidates"
+
+[[decision]]
+date = "2026-11-02"
+area = "control"
+decision = "Scenario B (each line keeps its monoculture cisplatin kill) is the headline case of every control, sweep and fasting report; scenario A (coculture fit as selected) is reported as a sensitivity case."
+was = "A and B reported side by side with A first"
+by = "user"
+where = "control_config.toml [scenarios] headline; control_report.jl, control_sweep_report.jl, control_fasting_report.jl, report_history.jl"
+
+[[decision]]
+date = "2026-11-02"
+area = "fitting"
+decision = "Stage 3b (low-resource cocultures) takes K and both crowding coefficients from Stage 3a and refits at most the resource sensitivities ε; the A2780cis line dies out by about day 5 under 0.5% FBS, so α_NC was unidentifiable (4.31, one-sided) rather than biology."
+was = "K, α_NC and α_CN refitted on the low-resource cocultures"
+by = "user"
+where = "stages.toml s3b candidates (lrcc_inherit, lrcc_eps, lrcc_epsN, lrcc_epsC, lrcc_noLR); s4 inherits"
+
+[[decision]]
+date = "2026-11-02"
+area = "fitting"
+decision = "Every main fit runs from its 3 fixed starts plus 20 seeded Latin-hypercube starts over the bounds (log-uniform for wide positive ranges); the report records per candidate how many starts reached the best BIC. Bootstrap refits keep their single start."
+was = "3 fixed starts per candidate"
+by = "user"
+where = "stages.toml [selection] extra_starts; bootstrap_tools.jl fit_cand, lhs_starts; outputs/zoo_fits/fit_starts.csv"
+
+[[decision]]
+date = "2026-11-02"
+area = "fitting"
+decision = "A parameter counts as on a bound when it is within 0.1% of the bound's own value (not 0.1% of the range), so wide-range parameters such as c (0–1000) are profiled when they sit near a bound; the bounds themselves are unchanged."
+was = "within 0.1% of the bound range, which flagged c_N = 0.53 as on its lower bound and skipped its profile"
+by = "user"
+where = "zoo_analyses.jl at_bound"
+
+[[decision]]
+date = "2026-11-02"
+area = "fitting"
+decision = "The second-order resource exponent ζ is bounded at or above 1 (1–5), so the low-resource effect cannot be made steeper than linear below the carrying capacity by a sub-unit power sitting on a bound."
+was = "ζ in 0.05–5 with ζ_N on the lower bound"
+by = "user"
+where = "zoo_models.jl SLOT_BOUNDS, SLOT_STARTS"
+
+[[decision]]
+date = "2026-11-02"
+area = "reporting"
+decision = "Every report version says which steps and data were reused from an earlier run (control fingerprints, resumed fits) instead of recomputed, with the run they came from."
+was = "reuse not visible in the reports"
+by = "user"
+where = "run_control*.jl outputs/reuse/; run_pipeline.jl manifest; report_history.jl report_provenance"

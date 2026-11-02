@@ -31,6 +31,11 @@ const FPRINT = control_fingerprint(@__FILE__, "CONTROL_DAYS" => DAYS)
 const FPFILE = joinpath(FOUT, "inputs.sha256")
 if control_unchanged(FPFILE, FPRINT, joinpath(FOUT, "fasting_outcomes.csv"))
     println("Control inputs unchanged since the last finished run; reusing $(joinpath(FOUT, "fasting_outcomes.csv")) (CONTROL_FORCE=1 recomputes)")
+    # provenance (user, 2026-11-02): tell run_pipeline.jl this step reused its last finished outputs (it copies this into run_manifest.toml)
+    let step = get(ENV, "PIPELINE_STEP", "")
+        isempty(step) || (mkpath(joinpath(@__DIR__, "outputs", "reuse")); write(joinpath(@__DIR__, "outputs", "reuse", step * ".toml"),
+            "reused_from = \"$(Libc.strftime("%Y-%m-%dT%H:%M:%S", mtime(FPFILE)))\"\nreused_fingerprint = \"$FPRINT\"\n"))
+    end
     exit(0)
 end
 fck = (isfile(FCK) && get(ENV, "REDO", "0") != "1") ? deserialize(FCK) : Dict{Symbol,Any}()

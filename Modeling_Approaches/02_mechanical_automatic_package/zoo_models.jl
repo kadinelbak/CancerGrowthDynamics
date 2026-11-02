@@ -446,9 +446,12 @@ const LR_ZOO = vcat(zoo_grid(:R), [
 ])
 @assert all(ncompartments(c[4], c[5]) <= MAX_COMPARTMENTS for c in vcat(DRUG_ZOO, LR_ZOO))
 
+# ζ ≥ 1 (user, 2026-11-02, P5 of the decision review): the second-order effect is critically damped or overdamped,
+# so it rises and settles without oscillating (ζ_N sat on its old lower bound of 0.05, an effect that rang like an
+# undamped spring to bend through one dip in the A2780 low-serum counts)
 const SLOT_BOUNDS = Dict(:β => (0.0, 50.0), :k => (1e-3, 20.0), :h => (0.1, 10.0), :δ => (1e-3, 10.0), :τ => (1e-3, 10.0),
-                         :ω => (1e-3, 20.0), :ζ => (0.05, 5.0), :d0 => (0.0, 50.0), :c => (0.0, 1000.0), :ρr => (0.0, 20.0),
+                         :ω => (1e-3, 20.0), :ζ => (1.0, 5.0), :d0 => (0.0, 50.0), :c => (0.0, 1000.0), :ρr => (0.0, 20.0),
                          :ρK => (1e-3, 3.0), :rLR => (1e-4, 5.0), :γ => (0.0, 10.0), :κ => (0.0, 10.0), :ε => (0.0, 5.0), :d => (0.0, 3.0))
 const SLOT_STARTS = Dict(:β => [0.3, 1.0, 0.05], :k => [0.5, 2.0, 0.1], :h => [2.0, 1.0, 4.0], :δ => [0.5, 2.0, 0.1], :τ => [0.5, 2.0, 0.1],
-                         :ω => [0.5, 2.0, 0.2], :ζ => [1.0, 0.5, 2.0], :d0 => [0.3, 0.05, 1.0], :c => [1.0, 5.0, 0.2], :ρr => [1.0, 2.0, 0.5],
+                         :ω => [0.5, 2.0, 0.2], :ζ => [1.0, 2.0, 4.0], :d0 => [0.3, 0.05, 1.0], :c => [1.0, 5.0, 0.2], :ρr => [1.0, 2.0, 0.5],
                          :ρK => [0.8, 0.3, 1.2], :rLR => [0.5, 0.1, 1.0], :γ => [0.1, 0.5, 0.02], :κ => [0.1, 0.5, 0.01], :ε => [1.0, 0.5, 2.0], :d => [0.1, 0.02, 0.5])

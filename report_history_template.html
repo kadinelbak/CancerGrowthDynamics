@@ -96,6 +96,7 @@ function qClass(k, x, older) {
 }
 const LEGEND = `<p class='mut legend'><span style='background:#1d6b3a;color:#fff'>best of all versions</span><span style='background:#dff3e6'>better than the older version</span><span style='background:#fff3c4'>worse than the older version</span><span style='background:#e6f0fb'>changed (settings and results with no better or worse)</span></p>`;
 const shortQ = l => String(l).replace(/^Quality · /, '').replace(/ \((higher|lower) is better\)$/, '');
+const prov = v => { const p = v.provenance; return (!p || p.recorded === false) ? "<span class='mut'>provenance not recorded</span>" : (p.partly_reused ? "<span class='badge bad'>partly reused</span> " : "<span class='badge good'>all steps new</span> ") + esc(p.summary || ''); };
 const recorded = v => ((v && v.settings) || []).length > 0;
 
 // the short "major changes" description on each card
@@ -130,6 +131,7 @@ function listView() {
   <input type='checkbox' class='pick' aria-label='Select ${esc(v.id)} to compare'>
   <div><h3>${esc(v.id)}${i === 0 ? "<span class='badge latest'>latest</span>" : ''}</h3>
   <div class='meta'>Built ${esc(v.date)}${v.commit ? ' · commit <code>' + esc(v.commit) + '</code>' : ''} · ${(v.chapters || []).length || 'chapters not recorded'}${(v.chapters || []).length ? ' chapters' : ''}</div>
+  <div class='meta'>${prov(v)}</div>
   ${summary(v)}</div>
   <div class='acts'><a class='btn' href='#read/${esc(v.id)}'>Read</a></div>
 </article>`).join('')}</div>
