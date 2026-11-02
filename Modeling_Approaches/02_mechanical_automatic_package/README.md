@@ -97,8 +97,9 @@ Options in `stages.toml [selection]` (defaults reproduce the reference run):
 parameter (counted in the BIC) instead of fixing it at the nominal seeding; `"auto"` estimates it only when
 the first count is far from the seeding, `"all"` also for cocultures (user 2026-11-02; `outputs/zoo_fits/starting_values.csv`).
 `[selection] extra_starts = 20` adds seeded Latin-hypercube starts to the fixed starts of every main fit
-(`EXTRA_STARTS` overrides, 0 = off); `outputs/zoo_fits/fit_starts.csv` lists per candidate how many starts
-reached the best BIC.
+(`EXTRA_STARTS` overrides, 0 = off), drawn within `extra_starts_spread` (10×) of the fixed starts and each limited
+to `extra_starts_work_factor` (20×) the work of the slowest fixed-start fit, so a start in a stiff corner is dropped
+rather than run for hours; `outputs/zoo_fits/fit_starts.csv` lists per candidate how many starts reached the best BIC.
 
 A coculture candidate with `kill_growth_coupled = true` multiplies each line's drug kill by its growth
 factor (Norton–Simon: 1 − x for logistic, 1 − x^θ for theta-logistic growth, x = crowding/K).

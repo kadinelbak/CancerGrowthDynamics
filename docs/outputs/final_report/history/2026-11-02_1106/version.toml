@@ -1,0 +1,273 @@
+content_sha = "2462dd9747a5f6fb3be6d94e947f4dd71506f5c2b473100734c986ee1d06e7f6"
+id = "2026-11-02_1106"
+note = ""
+report_sha = "9fd71b7b16bd32fae18ad94d1c414a938a41e8b8c753e3d3ca4114330bd67d34"
+date = "2026-11-02 11:06"
+commit = "0aa4aaf"
+source = "build_final_report.jl"
+
+[provenance]
+summary = "Fits: reused from an earlier run of 2 Nov 04:26 (--from / --only) · Analyses: reused from an earlier run of 2 Nov 04:30 (--from / --only) · Control: reused from an earlier run of 2 Nov 04:41 (--from / --only) · Long control: reused from an earlier run of 2 Nov 05:07 (--from / --only) · 30-day control: reused from an earlier run of 2 Nov 05:24 (--from / --only) · 60-day control: reused from an earlier run of 2 Nov 05:51 (--from / --only) · Sweep: reused from an earlier run of 2 Nov 06:44 (--from / --only) · Sweep (all doses): reused from an earlier run of 2 Nov 06:50 (--from / --only)"
+commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+partly_reused = true
+continued_from = "2026-11-02T02:10:33.728"
+started = "2026-11-02T10:41:33.578"
+finished = ""
+resume = false
+recorded = true
+
+    [[provenance.steps]]
+    label = "Fits"
+    step = "fits"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 04:26 (--from / --only)"
+    when = "2026-11-02T04:26:15.605"
+    [[provenance.steps]]
+    label = "Analyses"
+    step = "analyses"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 04:30 (--from / --only)"
+    when = "2026-11-02T04:30:32.109"
+    [[provenance.steps]]
+    label = "Control"
+    step = "control14"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 04:41 (--from / --only)"
+    when = "2026-11-02T04:41:37.478"
+    [[provenance.steps]]
+    label = "Long control"
+    step = "control_long"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 05:07 (--from / --only)"
+    when = "2026-11-02T05:07:10.930"
+    [[provenance.steps]]
+    label = "30-day control"
+    step = "control30"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 05:24 (--from / --only)"
+    when = "2026-11-02T05:24:29.751"
+    [[provenance.steps]]
+    label = "60-day control"
+    step = "control60"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 05:51 (--from / --only)"
+    when = "2026-11-02T05:51:41.777"
+    [[provenance.steps]]
+    label = "Sweep"
+    step = "sweep"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 06:44 (--from / --only)"
+    when = "2026-11-02T06:44:53.697"
+    [[provenance.steps]]
+    label = "Sweep (all doses)"
+    step = "sweep_all"
+    status = "reused_earlier"
+    detail = "reused from an earlier run of 2 Nov 06:50 (--from / --only)"
+    when = "2026-11-02T06:50:24.393"
+
+[[settings]]
+key = "rule_bic"
+label = "Model selection rule"
+value = "fewest parameters within 2 BIC"
+[[settings]]
+key = "weighting"
+label = "Residual weighting"
+value = "power: max(y, 50)^0.55"
+[[settings]]
+key = "s2_exclude"
+label = "Stage 2b series left out"
+value = "none"
+[[settings]]
+key = "points_excluded"
+label = "Single points left out (sources.toml exclude_days)"
+value = "A2780cis day 14"
+[[settings]]
+key = "x0_estimate"
+label = "Starting values estimated"
+value = "every monoculture series"
+[[settings]]
+key = "extra_starts"
+label = "Seeded extra starts per main fit"
+value = "20"
+[[settings]]
+key = "kill_coupled"
+label = "Kill coupled to growth (Norton–Simon)"
+value = "yes"
+[[settings]]
+key = "betaC_floor"
+label = "Resistant kill floor in coculture (× Stage 2b)"
+value = "0.1"
+[[settings]]
+key = "ec50"
+label = "EC50, A2780 / A2780cis (µM)"
+value = "1 / 8.34"
+[[settings]]
+key = "headline_scenario"
+label = "Headline drug-response scenario"
+value = "B (monoculture kills for both lines)"
+[[settings]]
+key = "B_cancer"
+label = "B_cancer (burden penalty level)"
+value = "0.5 K"
+[[settings]]
+key = "B_prog"
+label = "B_prog (progression threshold)"
+value = "0.5 K"
+[[settings]]
+key = "barrier"
+label = "Burden barrier shape"
+value = "none"
+[[settings]]
+key = "lookahead"
+label = "Look-ahead"
+value = "28 days (blocks 1, 1, 2, 2, 4, 4)"
+[[settings]]
+key = "to_end"
+label = "Look-ahead ends with the run"
+value = "no"
+[[settings]]
+key = "run_days"
+label = "Control run lengths (days)"
+value = "14, 30, 60, 120"
+[[settings]]
+key = "objective"
+label = "Objective weights"
+value = "qP = 10, qRT = 10, qB = 0.1, qR = 0, qT = 1, ru = 0.1, terminal factor = 5"
+[[settings]]
+key = "B_tox"
+label = "Toxicity limit B_tox"
+value = "0.25"
+[[settings]]
+key = "doses"
+label = "Measured doses (µM)"
+value = "0, 0.62, 1, 1.47"
+
+[[results]]
+key = "carried:s1-a2780"
+label = "Carried model · s1-a2780"
+value = "logistic"
+[[results]]
+key = "carried:s1-a2780cis"
+label = "Carried model · s1-a2780cis"
+value = "logistic"
+[[results]]
+key = "carried:s1b-a2780"
+label = "Carried model · s1b-a2780"
+value = "lr_imm_loss"
+[[results]]
+key = "carried:s1b-a2780cis"
+label = "Carried model · s1b-a2780cis"
+value = "lr_imm_plus_chain3_loss"
+[[results]]
+key = "carried:s2-a2780"
+label = "Carried model · s2-a2780"
+value = "chain3_loss"
+[[results]]
+key = "carried:s2-a2780cis"
+label = "Carried model · s2-a2780cis"
+value = "chain3_loss"
+[[results]]
+key = "carried:s3"
+label = "Carried model · s3"
+value = "cc_full"
+[[results]]
+key = "carried:s3b"
+label = "Carried model · s3b"
+value = "lrcc_epsN"
+[[results]]
+key = "carried:s4"
+label = "Carried model · s4"
+value = "s4_eps"
+[[results]]
+key = "mpc:B"
+label = "14-day MPC schedule · scenario B (main), 50:50 (µM)"
+value = "0.0 0.0 1.47 1.0 0.62 0.62 0.0"
+[[results]]
+key = "mpc_total:B"
+label = "14-day MPC N + C at the end · scenario B (main), 50:50"
+value = "1456"
+[[results]]
+key = "mpc_ttp:B"
+label = "14-day MPC time to progression · scenario B (main), 50:50"
+value = "not progressed"
+[[results]]
+key = "mpc:A"
+label = "14-day MPC schedule · scenario A, 50:50 (µM)"
+value = "0.0 0.0 0.0 0.0 0.0 0.0 0.0"
+[[results]]
+key = "mpc_total:A"
+label = "14-day MPC N + C at the end · scenario A, 50:50"
+value = "3958"
+[[results]]
+key = "mpc_ttp:A"
+label = "14-day MPC time to progression · scenario A, 50:50"
+value = "day 7.3"
+[[results]]
+key = "q-:heldout"
+label = "Quality · held-out error, median NRMSE over blocked checks (lower is better)"
+value = "0.398 (n = 23, worst 0.924)"
+[[results]]
+key = "q-:heldout_ce1"
+label = "Quality · held-out coculture run (Ce1) NRMSE (lower is better)"
+value = "1.05"
+[[results]]
+key = "q+:pinned"
+label = "Quality · parameters pinned by their profile (higher is better)"
+value = "86% (19 of 22); not pinned: d_C^acc (s1b-a2780cis), k_C^R (s1b-a2780cis), β_C (s3)"
+[[results]]
+key = "q+:stability"
+label = "Quality · selection stability, mean % of bootstrap refits that pick the carried model (higher is better)"
+value = "73% (lowest 8%, s3b)"
+[[results]]
+key = "q+:robust"
+label = "Quality · 14-day MPC beats no treatment and constant 1 µM, scenarios × ratios (higher is better)"
+value = "17% (1 of 6)"
+[[results]]
+key = "q+:robust_main"
+label = "Quality · 14-day MPC beats no treatment and constant 1 µM, headline scenario B × ratios (higher is better)"
+value = "33% (1 of 3)"
+[[results]]
+key = "q+:robust_sweep"
+label = "Quality · MPC beats both baselines across the control sweep (higher is better)"
+value = "25% (66 of 264)"
+[[results]]
+key = "q+:agree"
+label = "Quality · scenario agreement, 14-day MPC dose blocks the same in A and B (higher is better)"
+value = "33% (7 of 21)"
+
+[[chapters]]
+stamp = "2026-10-27 23:56"
+title = "1 · Data"
+[[chapters]]
+stamp = "2026-11-02 09:26"
+title = "2 · Compartment models (the models used)"
+[[chapters]]
+stamp = "2026-11-02 09:30"
+title = "3 · Bootstrapping"
+[[chapters]]
+stamp = "2026-11-02 09:30"
+title = "4 · Sensitivity analysis"
+[[chapters]]
+stamp = "2026-11-02 09:30"
+title = "5 · Validation"
+[[chapters]]
+stamp = "2026-11-02 09:42"
+title = "6 · Optimal control"
+[[chapters]]
+stamp = "2026-11-02 10:25"
+title = "7a · Optimal control over 30 days (cisplatin; beyond the data)"
+[[chapters]]
+stamp = "2026-11-02 10:52"
+title = "7b · Optimal control over 60 days (cisplatin; beyond the data)"
+[[chapters]]
+stamp = "2026-11-02 11:50"
+title = "7c · Control sweep: barriers, thresholds, run lengths"
+[[chapters]]
+stamp = "2026-11-02 10:07"
+title = "8 · Optimal control over 120 days: cisplatin and fasting"
+[[chapters]]
+stamp = "2026-11-02 11:51"
+title = "9 · Key findings, assumptions and limitations"
+[[chapters]]
+stamp = "2026-10-27 23:56"
+title = "10 · Mechanistic vs neural-network models"
