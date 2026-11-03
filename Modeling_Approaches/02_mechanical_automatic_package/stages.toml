@@ -141,13 +141,13 @@ line = "coculture"
 data = { culture = "co", condition = ["Ce0", "Ce1"] }
 input = "D"
 inherits = { growth = "s1", mechanism = "s2" }
-# The resistant kill β_C keeps a cisplatin term in coculture (user, 2026-11-02, B9 of the decision review: "they
-# should still have the kill term, but it is understandable if it is very small or undetectable"): a refitted β_C
-# may go down to betaC_floor × its Stage 2b value, and the "no resistant cisplatin term" candidates (fixed βC = 0,
-# 2026-10-06 to 2026-11-02) are gone. 0.1 is the upper end of the 2026-10-28 bootstrap interval (0–0.1 × the
-# monoculture kill); 2026-10-01 to 2026-10-06 the floor was 0.5. In monoculture (Stage 2b) the A2780cis kill
-# stays: dropping it costs +59 weighted BIC there. The control headline is scenario B (monoculture kills for both
-# lines, user 2026-11-02), so this floor matters for scenario A and the Stage 4 inheritance only.
+# Treatment is NOT refitted in coculture (user, 2026-11-03): both lines keep their Stage 2b kill (β, k) unchanged
+# in the treated cocultures (Ce1). Only the coculture terms are refitted, on Ce0 and Ce1 jointly: shared K, the
+# crowding coefficients α_NC, α_CN and the extra coculture deaths d_N, d_C. They may shrink to 0 but never turn
+# negative (bounds in [coculture]), so a line can be released from crowding but not helped by the other line.
+# The crowding values are the same in treated and untreated wells, so the drug effect cannot hide in them.
+# 2026-11-02 to 2026-11-03 β_N and β_C were refitted here (β_C floored at 0.1 × Stage 2b, it sat on the floor);
+# before that β_C could reach 0. betaC_floor is kept for the record but no candidate frees β any more.
 betaC_floor = 0.1
   [[stage.candidate]]
   name = "cc_K"
@@ -158,29 +158,17 @@ betaC_floor = 0.1
   label = "Shared K + asymmetric crowding, drug mechanisms from Stage 2"
   free = ["K", "αNC", "αCN"]
   [[stage.candidate]]
-  name = "cc_K_alpha_betaN"
-  label = "Shared K + crowding, sensitive kill strength refitted"
-  free = ["K", "αNC", "αCN", "βN"]
+  name = "cc_K_alpha_deathN"
+  label = "Shared K + crowding + sensitive coculture death, drug mechanisms from Stage 2"
+  free = ["K", "αNC", "αCN", "dN"]
   [[stage.candidate]]
-  name = "cc_K_alpha_beta"
-  label = "Shared K + crowding, both kill strengths refitted (resistant kill may reach 0)"
-  free = ["K", "αNC", "αCN", "βN", "βC"]
+  name = "cc_K_alpha_deathC"
+  label = "Shared K + crowding + resistant coculture death, drug mechanisms from Stage 2"
+  free = ["K", "αNC", "αCN", "dC"]
   [[stage.candidate]]
   name = "cc_K_alpha_death"
-  label = "Shared K + crowding + coculture death"
+  label = "Shared K + crowding + coculture death, drug mechanisms from Stage 2"
   free = ["K", "αNC", "αCN", "dN", "dC"]
-  [[stage.candidate]]
-  name = "cc_K_alpha_deathN_betaN"
-  label = "Shared K + crowding + sensitive death, sensitive kill refitted"
-  free = ["K", "αNC", "αCN", "dN", "βN"]
-  [[stage.candidate]]
-  name = "cc_K_alpha_deathN_beta"
-  label = "Shared K + crowding + sensitive death, both kill strengths refitted (resistant kill may reach 0)"
-  free = ["K", "αNC", "αCN", "dN", "βN", "βC"]
-  [[stage.candidate]]
-  name = "cc_full"
-  label = "Shared K + crowding + death, both kill strengths refitted (resistant kill may reach 0)"
-  free = ["K", "αNC", "αCN", "dN", "dC", "βN", "βC"]
 
 # ── 3b · low-resource cocultures, shared K ───────────────────────────────────
 [[stage]]

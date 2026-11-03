@@ -225,3 +225,11 @@ decision = "Every report version says which steps and data were reused from an e
 was = "reuse not visible in the reports"
 by = "user"
 where = "run_control*.jl outputs/reuse/; run_pipeline.jl manifest; report_history.jl report_provenance"
+
+[[decision]]
+date = "2026-11-03"
+area = "fitting"
+decision = "In the treated cocultures (Stage 3a) the cisplatin kill of both lines is kept at its Stage 2b monoculture value, not refitted. Only the coculture terms (shared K, crowding α_NC and α_CN, extra coculture deaths d_N and d_C) are refitted on Ce0 and Ce1 jointly; they may shrink to 0 but not turn negative, and take the same value with and without drug."
+was = "β_N and β_C refitted in coculture, β_C floored at 0.1 × Stage 2b (it sat on the floor, 0.049)"
+by = "user"
+where = "stages.toml s3 candidates (cc_K, cc_K_alpha, cc_K_alpha_deathN, cc_K_alpha_deathC, cc_K_alpha_death)"
