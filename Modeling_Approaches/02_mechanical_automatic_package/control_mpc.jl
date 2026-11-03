@@ -55,6 +55,7 @@ struct Weights
     Bc::Float64; Btox::Float64; umax::Float64; K::Float64
     qP::Float64; Bp::Float64; sP::Float64; qRT::Float64      # progression weight, threshold, step width; terminal resistant weight
     barrier::Symbol; hw::Float64; hs::Float64                 # burden penalty shape at B_cancer ([cancer] barrier); hard-wall weight and width (cells)
+    BpN::Float64; BpC::Float64                                # per-line thresholds (cells) of the "lines" progression rule; Inf with the "total" rule
 end
 # a copy of a weight struct with some fields replaced, e.g. with_fields(W; Bc=…)
 with_fields(W::T; kw...) where {T} = T((haskey(kw, f) ? kw[f] : getfield(W, f) for f in fieldnames(T))...)
@@ -74,6 +75,23 @@ tiebreak_scale() = Float64(get(CFG["progression"], "tiebreak_scale", 1.0))
 function progression_scale(K; prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]))
     (prog_frac > 0 ? prog_frac * K : Inf, Float64(CFG["progression"]["step_width_fraction_of_K"]) * K)
 end
+# Per-line progression thresholds (control_config [progression] rule = "lines", user 2026-11-03): the resistant
+# line at resistant_threshold_fraction_of_K × K, the sensitive line at sensitive_threshold_fraction × its untreated
+# plateau (or × K). plateauN: the untreated sensitive-only plateau of the plant, in cells. (Inf, Inf) with the
+# "total" rule or when prog_frac = 0 (no progression term).
+prog_rule() = Symbol(get(CFG["progression"], "rule", "total"))
+function line_thresholds(K, plateauN; prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]))
+    (prog_rule() === :lines && prog_frac > 0) || return (Inf, Inf)
+    p = CFG["progression"]
+    ref = String(get(p, "sensitive_threshold_of", "plateau")) == "K" ? K : plateauN
+    (Float64(p["sensitive_threshold_fraction"]) * ref, Float64(p["resistant_threshold_fraction_of_K"]) * K)
+end
+# untreated sensitive-only plateau: N after `days` days without drug from 5% of K, no resistant cells
+function sensitive_plateau(P::Plant; days=400.0)
+    x = x0_for(P, 0.05P.K, 0.0)
+    for _ in 1:round(Int, days / 2); x = F(x, 0.0, P, 2.0); end
+    x[P.iN]
+end
 # bc_frac: B_cancer as a fraction of K (0 = no burden penalty); tf: terminal factor (both swept in the report)
 function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]),
                          bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
@@ -83,9 +101,10 @@ function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=no
     barrier in BARRIERS || error("unknown burden barrier $barrier (one of $(join(BARRIERS, ", ")))")
     qB, qR, qT, ru, qP, qRT = objective_weights(w)
     Bp, sP = progression_scale(P.K; prog_frac=prog_frac)
+    BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(P.K, sensitive_plateau(P); prog_frac=prog_frac) : (Inf, Inf)
     Weights(qB, qR, qT, ru, tf, c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
             bc_frac > 0 ? bc_frac * P.K : Inf, Btox, umax, P.K, qP, Bp, sP, qRT,
-            barrier, Float64(get(cc, "hard_weight", 1000.0)), Float64(get(cc, "hard_width_fraction_of_K", 0.001)) * P.K)
+            barrier, Float64(get(cc, "hard_weight", 1000.0)), Float64(get(cc, "hard_width_fraction_of_K", 0.001)) * P.K, BpN, BpC)
 end
 
 # tumour burden plus the resistance premium, linear in the counts (≥ 0, so the exact search can prune)
@@ -107,8 +126,16 @@ function burden_penalty(tot, W)
     ex = max(tot / W.Bc - 1, zero(tot))
     W.barrier === :quadratic ? W.μC / (2 * W.δ^2) * ex^2 : W.hw * (logistic((tot - W.Bc) / W.hs + 6) + ex)
 end
-# smooth step: ≈ 0 below the progression threshold, ≈ 1 above it (logistic of width s)
-progressed(N, C, W) = logistic((max(N, zero(N)) + max(C, zero(C)) - W.Bp) / W.sP)
+# smooth step: ≈ 0 below the progression threshold, ≈ 1 above it (logistic of width s). "lines" rule: a smooth
+# OR of the two per-line steps, 1 − (1 − σ_N)(1 − σ_C), so it is ≈ 1 when either line is over its threshold.
+uses_lines(W) = isfinite(W.BpC)
+function progressed(N, C, W)
+    N⁺ = max(N, zero(N)); C⁺ = max(C, zero(C))
+    uses_lines(W) || return logistic((N⁺ + C⁺ - W.Bp) / W.sP)
+    1 - (1 - logistic((N⁺ - W.BpN) / W.sP)) * (1 - logistic((C⁺ - W.BpC) / W.sP))
+end
+# progression index: ≥ 1 exactly when the culture is progressed (stop rules and time to progression)
+prog_index(N, C, W) = uses_lines(W) ? max(N / W.BpN, C / W.BpC) : (N + C) / W.Bp
 progression_cost(N, C, W) = W.qP * progressed(N, C, W)
 # Time spent progressed within one decision interval (user, 2026-11-01: maximise time to progression): the
 # interval is simulated in PROG_SUB pieces and the step σ is averaged over their ends, so qP·(fraction of
@@ -353,7 +380,7 @@ end
 # plans every interval of the same look-ahead.
 #
 # Early stop (user, 2026-11-01: do not compute decisions once the result is known), on the true plant Pp:
-#   progression confirmed  N + C ≥ Bp at `confirm` successive decision times; the controller keeps
+#   progression confirmed  progressed (prog_index ≥ 1) at `confirm` successive decision times; the controller keeps
 #                          re-planning through all of them, so it has time to bring the culture back
 #   outlasted              no progression spell under way at day `settle_day` (the latest progression of the
 #                          comparators plus a margin, stop_rules), so MPC's lead is settled
@@ -392,8 +419,8 @@ function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:c
         u = sol.U[1]; push!(applied, u); used += u * Δ
         x = F(x, u, Pp, Δ); xm = F(xm, u, Pm, Δ)
         Uwarm = vcat(sol.U[2:end], fill(sol.U[end], nb - Hk + 1))[1:nb]      # shift by one block (a bound only)
-        tot = x[Pp.iN] + x[Pp.iC]; above = tot >= Bp ? above + 1 : 0
-        r = k < n_dec ? stop_now(above, tot, k * Δ, Bp, confirm, settle_day) : nothing
+        z = isfinite(Bp) ? prog_index(x[Pp.iN], x[Pp.iC], W) : 0.0; above = z >= 1 ? above + 1 : 0
+        r = k < n_dec ? stop_now(above, z, k * Δ, 1.0, confirm, settle_day) : nothing
         if r !== nothing
             plan = mode == :continuous ? collect(sol.U) : expand_blocks(sol.U, bk)
             rest = length(plan) > 1 ? plan[2:end] : [u]
@@ -438,7 +465,7 @@ baseline_policies(P::Plant, W::Weights) = [
     ("Threshold adaptive (Zhang-style)", threshold_policy(P, W)),
 ]
 
-# Time to progression on a trajectory (progression: N + C ≥ B_prog):
+# Time to progression on a trajectory (tot ≥ Bp; callers pass the progression index and Bp = 1):
 #   first      the first day the burden reaches B_prog (NaN: never within the run)
 #   loss       time to progression: the start of the first spell at or above B_prog that lasts at least
 #              `sustain` days, or runs to the end of the run (NaN: none, i.e. not progressed). A brief
@@ -483,7 +510,7 @@ function outcomes(P::Plant, x0, U, Δ, W::Weights; t_stop=Inf)
     N = [x[P.iN] for x in xs]; C = [x[P.iC] for x in xs]; T = [x[P.iT] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)
-    tp, ip = progression_window(ts, tot, W.Bp, t_stop)
+    tp, ip = progression_window(ts, prog_index.(N, C, Ref(W)), 1.0, t_stop)   # N + C ≥ B_prog, or either line over its threshold
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      max_total=maximum(tot), max_tox=maximum(T), cum_dose=sum(U) * Δ, cancer_violation=over !== nothing,
      tox_violation=maximum(T) >= W.Btox, day_over_bound=over === nothing ? NaN : ts[over], days_over=days_over,
@@ -513,5 +540,9 @@ function stopping_note()
     "($(round(Int, (stop_confirm(Δ) - 1) * Δ)) days; the controller keeps re-planning through them to bring the culture back), " *
     "or once it has gone $(get(p, "settle_margin_days", p["sustain_days"])) days past the latest comparator's progression " *
     "without progressing; its time to progression is read up to that day (the CSV column control_stopped_day) and the " *
-    "rest of the run follows its last plan, not re-optimised. The run length is therefore a cap.</p>"
+    "rest of the run follows its last plan, not re-optimised. The run length is therefore a cap.</p>" *
+    (prog_rule() === :lines ? "<p><b>Progression rule</b> (user, 2026-11-03): the culture counts as progressed when the resistant line reaches " *
+     "$(p["resistant_threshold_fraction_of_K"]) K <i>or</i> the sensitive line reaches $(p["sensitive_threshold_fraction"]) × " *
+     "$(String(get(p, "sensitive_threshold_of", "plateau")) == "K" ? "K" : "its untreated plateau") (not N + C ≥ $(p["threshold_fraction_of_K"]) K as before). " *
+     "The cost uses the smooth OR \\(1-(1-\\sigma_N)(1-\\sigma_C)\\) of the two steps.</p>" : "")
 end

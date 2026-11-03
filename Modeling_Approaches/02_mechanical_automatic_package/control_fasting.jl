@@ -160,6 +160,13 @@ struct Weights2
     μC::Float64; μT::Float64; μW::Float64; δ::Float64
     Bc::Float64; Btox::Float64; Wmin::Float64; umax::Float64; K::Float64
     qP::Float64; Bp::Float64; sP::Float64; qRT::Float64      # time to progression (control_mpc.jl)
+    BpN::Float64; BpC::Float64                                # per-line thresholds of the "lines" rule (control_mpc.jl line_thresholds)
+end
+# untreated, unfasted sensitive-only plateau of the fasting plant (normal medium)
+function sensitive_plateau(FP::FPlant; days=400.0)
+    x = x0_fast(FP, 0.05FP.K, 0.0)
+    for _ in 1:round(Int, days / 2); x = F2(x, [0.0, 0.0], FP, 2.0); end
+    x[FP.iN]
 end
 # bc_frac: B_cancer as a fraction of K (0 = no soft burden penalty); tf: terminal factor (both swept)
 function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Float64(HCFG["W_min"]), w=nothing, rv=Float64(FCFG["rv"]),
@@ -168,9 +175,10 @@ function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Floa
     c = CFG["weights"]
     qB, qR, qT, ru, qP, qRT = objective_weights(w)
     Bp, sP = progression_scale(FP.K; prog_frac=prog_frac)
+    BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(FP.K, sensitive_plateau(FP); prog_frac=prog_frac) : (Inf, Inf)
     sc = qP > 0 ? tiebreak_scale() : 1.0           # host weight and fasting costs are tie-breakers too (control_mpc.jl)
     Weights2(qB, qR, qT, HCFG["qW"] * sc, ru, rv * sc, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
-             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT)
+             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT, BpN, BpC)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
 # the soft burden penalty at B_cancer follows control_config [cancer] barrier: "none" (default since
@@ -392,8 +400,8 @@ function closed_loop2(Pm::FPlant, Pp::FPlant, x0, Δ, n_dec, H, W::Weights2; mod
         run = w[2] > 0 ? run + 1 : 0; gap = w[2] > 0 ? 0 : gap + 1
         x = F2(x, w, Pp, Δ); xm = F2(xm, w, Pm, Δ)
         Uwarm = vcat(sol.U[2:end, :], repeat([sol.U[end, 1] 0.0], nb - Hk + 1))[1:nb, :]     # shift; pad fed (a bound only)
-        tot = x[Pp.iN] + x[Pp.iC]; above = tot >= Bp ? above + 1 : 0
-        r = k < n_dec ? stop_now(above, tot, k * Δ, Bp, confirm, settle_day) : nothing
+        z = isfinite(Bp) ? prog_index(x[Pp.iN], x[Pp.iC], W) : 0.0; above = z >= 1 ? above + 1 : 0
+        r = k < n_dec ? stop_now(above, z, k * Δ, 1.0, confirm, settle_day) : nothing
         if r !== nothing
             # the rest follows the last plan, then its last dose, fed (no plan is computed after the stop)
             plan = mode == :discrete ? expand_blocks2(sol.U, bk) : sol.U
@@ -441,7 +449,7 @@ function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2; t_stop=Inf)
     Pr = [x[FP.iP] for x in xs]; Wt = [x[FP.iW] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)     # days with N + C ≥ B_cancer
-    tp, ip = progression_window(ts, tot, W.Bp, t_stop)       # up to the closed loop's stop (control_mpc.jl)
+    tp, ip = progression_window(ts, prog_index.(N, C, Ref(W)), 1.0, t_stop)       # up to the closed loop's stop (control_mpc.jl)
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days, N_prog=ip > 0 ? N[ip] : NaN, C_prog=ip > 0 ? C[ip] : NaN,
      stop_day=isfinite(t_stop) ? t_stop : NaN,

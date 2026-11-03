@@ -139,11 +139,24 @@ end
 
         @testset "scenario $scen: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end" begin
             # placed in step widths from B_prog, so the check holds for any threshold (K/2 since 2026-10-27)
-            lo = (W.Bp - 15W.sP) / 2; hi = (W.Bp + 15W.sP) / 2; above = x0_for(P, W.Bp, W.Bp)
-            @test progression_cost(lo, lo, W) < 1e-6 * W.qP              # ≈ 0 well under the threshold
-            @test progression_cost(hi, hi, W) > (1 - 1e-6) * W.qP        # ≈ qP well above it
-            at = x0_for(P, 0.5W.Bp, 0.5W.Bp)
-            @test isapprox(progression_cost(at[P.iN], at[P.iC], W), W.qP / 2; rtol=1e-12)   # half way at the threshold
+            above = x0_for(P, W.Bp, W.Bp)
+            if uses_lines(W)
+                # "lines" rule (user, 2026-11-03): resistant at its threshold OR sensitive at its threshold
+                lN = W.BpN - 15W.sP; lC = W.BpC - 15W.sP; hN = W.BpN + 15W.sP; hC = W.BpC + 15W.sP
+                @test progression_cost(lN, lC, W) < 1e-5 * W.qP            # both lines under: ≈ 0
+                @test progression_cost(lN, hC, W) > (1 - 1e-5) * W.qP      # resistant over: progressed
+                @test progression_cost(hN, lC, W) > (1 - 1e-5) * W.qP      # sensitive over: progressed
+                @test isapprox(progression_cost(W.BpN - 40W.sP, W.BpC, W), W.qP / 2; rtol=1e-6)   # half way at the resistant threshold
+                @test W.BpC == CFG["progression"]["resistant_threshold_fraction_of_K"] * P.K
+                @test 0 < W.BpN < sensitive_plateau(P)                   # reachable without treatment
+                @test prog_index(W.BpN, 0.0, W) == 1.0 && prog_index(0.0, W.BpC, W) == 1.0
+            else
+                lo = (W.Bp - 15W.sP) / 2; hi = (W.Bp + 15W.sP) / 2
+                @test progression_cost(lo, lo, W) < 1e-6 * W.qP              # ≈ 0 well under the threshold
+                @test progression_cost(hi, hi, W) > (1 - 1e-6) * W.qP        # ≈ qP well above it
+                at = x0_for(P, 0.5W.Bp, 0.5W.Bp)
+                @test isapprox(progression_cost(at[P.iN], at[P.iC], W), W.qP / 2; rtol=1e-12)   # half way at the threshold
+            end
             W0 = with_fields(W; qRT=0.0)
             @test isapprox(terminal_cost(above, P, W) - terminal_cost(above, P, W0), W.qRT * above[P.iC] / W.K; rtol=1e-12)
             @test W.Bp == CFG["progression"]["threshold_fraction_of_K"] * P.K
@@ -309,7 +322,7 @@ end
             @test o.ttp <= cl.stop_day && o.stop_day == cl.stop_day && isfinite(o.N_prog)
             # the last stop_confirm decisions were all at or above B_prog
             xs = rollout(x1, cl.U, P, Δ); k = round(Int, cl.stop_day / Δ)
-            @test all(xs[j+1][P.iN] + xs[j+1][P.iC] >= W.Bp for j in k-stop_confirm(Δ)+1:k)
+            @test all(prog_index(xs[j+1][P.iN], xs[j+1][P.iC], W) >= 1 for j in k-stop_confirm(Δ)+1:k)
         end
         # outlasted: with every comparator progressed by day 2, a run under B_prog on day 12 stops there
         cl2 = closed_loop(P, P, x1, Δ, n, LOOK, W; mode=:discrete, levels=LEVELS, Bp=Inf, confirm=0, settle_day=12.0)

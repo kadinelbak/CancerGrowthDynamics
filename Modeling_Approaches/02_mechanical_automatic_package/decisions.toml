@@ -233,3 +233,11 @@ decision = "In the treated cocultures (Stage 3a) the cisplatin kill of both line
 was = "β_N and β_C refitted in coculture, β_C floored at 0.1 × Stage 2b (it sat on the floor, 0.049)"
 by = "user"
 where = "stages.toml s3 candidates (cc_K, cc_K_alpha, cc_K_alpha_deathN, cc_K_alpha_deathC, cc_K_alpha_death)"
+
+[[decision]]
+date = "2026-11-03"
+area = "control"
+decision = "Progression is reached when the resistant line reaches K/2 or the sensitive line reaches 85% of its untreated plateau (the user proposed 0.8 K, which the sensitive line cannot reach: its untreated coculture plateau is about 0.76 K). The controller still maximises time to progression; the cost uses the smooth OR of the two per-line steps."
+was = "progression = N + C ≥ K/2 (2026-10-27 to 2026-11-03; 0.8 K before)"
+by = "user"
+where = "control_config.toml [progression] rule, resistant_threshold_fraction_of_K, sensitive_threshold_of, sensitive_threshold_fraction; control_mpc.jl line_thresholds, progressed, prog_index; control_fasting.jl weights2"
