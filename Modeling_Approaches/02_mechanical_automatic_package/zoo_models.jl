@@ -30,6 +30,14 @@
 #   :sep_r     r_eff = r + (r_LR − r)w/u_R
 #   :resource  R consumed at c·E·R·X/1000 (R(0) = 1); growth × R, death β(1 − R)
 #   :toxin     W made at E·X/1000, cleared at κ; death γ·W
+#
+# Coculture modifiers (optional L.cc, Stage 3a; see cc_terms below). They change how a line's drug
+# effect and death depend on the other line in the same well (Y = its count, K = shared capacity):
+#   kill factor φ      the drug kill is φ × its monoculture value (φ = 1: transportable)
+#   protection ρ       the drug kill is divided by 1 + ρ·Y/K (the other line shields this one)
+#   cytostatic γ       growth × max(1 − γ·E_cs, 0), Strobl-style; E_cs = dose (immediate) or the line's
+#                      own drug-effect state (the Stage 2b delay chain)
+#   interference η     extra death η·Y/K per viable cell (contact or secreted competition)
 
 const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d, :EC50)
 # EC50 has no default: every line sets its own (a Hill line without one is an error, see build_system)
@@ -204,7 +212,36 @@ ns_on(L) = hasproperty(L, :ns) && L.ns
     error("Norton–Simon coupling needs logistic or theta-logistic growth")
 end
 
-function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}) where {T}
+# ── coculture modifiers (L.cc) ────────────────────────────────────────────────
+# L.cc = (kf, pr, cs, csimm, di): Slots for the kill factor φ (default 1), protection ρ (0), cytostatic γ (0)
+# and interference η (0); csimm = true: the cytostatic effect follows the dose at once, false: it follows
+# the line's drug-effect state (the delay chain of its drug module). Lines without cc are unchanged.
+const CC_NEUTRAL = (kf=Slot(0, 1.0), pr=Slot(0, 0.0), cs=Slot(0, 0.0), csimm=true, di=Slot(0, 0.0))
+cc_on(L) = hasproperty(L, :cc) && L.cc !== nothing
+# the drug-effect state E of module M at hidden offset o (dose × ε for an immediate kernel)
+@inline function drug_exposure(u, o, M, w, p, ::Type{T}) where {T}
+    z = zero(T); w = w * sv(M.s.ε, p, T)
+    nc = ncell(M.action); nk = nker(M.kernel); ko = o + nc
+    nk == 0 && return w
+    chainlen(M.kernel) > 0 && return max(u[ko+nk], z)
+    max(u[ko+1], z)                              # comp1, second, auc
+end
+# (kill multiplier, growth multiplier, extra death per viable cell) of a line with coculture modifiers;
+# M: its drug module at hidden offset o, w: dose, other: count of the other line, K: shared capacity
+@inline function cc_terms(L, u, o, M, p, w, other, K, ::Type{T}) where {T}
+    z = zero(T)
+    cc_on(L) || return one(T), one(T), z
+    c = L.cc; y = max(other, z) / K
+    fk = sv(c.kf, p, T) / (1 + sv(c.pr, p, T) * y)
+    γ = sv(c.cs, p, T)
+    g = γ == 0 ? one(T) : max(1 - γ * (c.csimm ? w * sv(M.s.ε, p, T) : drug_exposure(u, o, M, w, p, T)), z)
+    fk, g, sv(c.di, p, T) * y
+end
+freeze_cc(c, p) = merge(c, (kf=freeze_slot(c.kf, p), pr=freeze_slot(c.pr, p), cs=freeze_slot(c.cs, p), di=freeze_slot(c.di, p)))
+freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
+
+# other: count of the other line in the well (coculture modifiers only; 0 in monoculture)
+function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}; other=zero(T)) where {T}
     s = L.s; z = zero(T)
     X = max(u[xi+1], z)
     cells = z
@@ -216,17 +253,20 @@ function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}) where {T}
     # Norton–Simon: the kill is scaled by the growth factor; for the damaged-cell actions the transfer into the
     # damaged compartment is scaled (the module's own capacity is K, as no drug action changes K)
     ns = ns_on(L) && L.input == :D
+    # coculture modifiers: kill factor fk (on the loss or the transfer into damaged cells), growth factor gm, death di
+    fk, gm, di = L.input == :D ? cc_terms(L, u, o, L, p, w, other, K, T) : (one(T), one(T), z)
     ks = ns && L.action in (:damage, :transit) ? growth_factor(L.growth, crowd / K, θ) : one(T)
-    reff, Keff, loss, out = module_effect!(du, u, o, L, p, w, X, V, r, K, T; ks=ks)
+    reff, Keff, loss, out = module_effect!(du, u, o, L, p, w, X, V, r, K, T; ks=ks*fk)
+    loss *= fk
     ns && (loss *= growth_factor(L.growth, crowd / Keff, θ))
-    du[xi+1] = growth_term(L.growth, reff, V, crowd / Keff, θ) - (sv(s.d, p, T) + loss)*V - out
+    du[xi+1] = growth_term(L.growth, gm*reff, V, crowd / Keff, θ) - (sv(s.d, p, T) + di + loss)*V - out
     nothing
 end
 
 # A line with several modules (L.extra). Growth-rate and capacity effects multiply, losses and
 # outflows add. Drug-module losses are scaled by (1 + χ·u_R/0.955) when the line has an interaction
 # slot L.chi: χ is the relative change of the cisplatin kill at 0.5% FBS (drug × low resource).
-function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}) where {T}
+function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}; other=zero(T)) where {T}
     mods = modules(L); z = zero(T)
     X = max(u[xi+1], z)
     cells = z; off = o
@@ -240,13 +280,19 @@ function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}) where {T}
     s = L.s; r = sv(s.r, p, T); K = sv(s.K, p, T); θ = sv(s.θ, p, T)
     reff, Keff, loss, out = r, K, sv(s.d, p, T), z
     χ = hasproperty(L, :chi) ? sv(L.chi, p, T) : z
+    # coculture modifiers act through the first drug module (the line's own module, L itself, at offset o)
+    fk, gm, di = L.input == :D ? cc_terms(L, u, o, L, p, T(env.D), other, K, T) : (one(T), one(T), z)
+    cc_on(L) && any(M -> M.input == :D && M.action in (:damage, :transit), mods) &&
+        error("coculture modifiers with a damaged-cell drug action are only implemented for single-module lines")
+    reff *= gm; loss += di
+    χf = fk
     off = o
     if !ns_on(L)
         for M in mods
             w = M.input == :D ? T(env.D) : T(env.R)
             re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T)
             reff *= re / r; Keff *= Ke / K
-            loss += M.input == :D ? lo * (1 + χ * T(env.R) / T(U_R)) : lo
+            loss += M.input == :D ? χf * lo * (1 + χ * T(env.R) / T(U_R)) : lo
             out += ou; off += mwidth(M)
         end
     else                                     # Norton–Simon: drug losses scaled by the growth factor
@@ -257,7 +303,7 @@ function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}) where {T}
             w = M.input == :D ? T(env.D) : T(env.R)
             re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T)
             reff *= re / r; Keff *= Ke / K
-            M.input == :D ? (dloss += lo * (1 + χ * T(env.R) / T(U_R))) : (loss += lo)
+            M.input == :D ? (dloss += χf * lo * (1 + χ * T(env.R) / T(U_R))) : (loss += lo)
             out += ou; off += mwidth(M)
         end
         loss += dloss * growth_factor(L.growth, crowd / Keff, θ)
@@ -273,16 +319,17 @@ function make_system_model(sys)
             env = (D=input_at(envs.D, t), R=input_at(envs.R, t), lines=envs.lines)      # inputs at time t
             for (j, l) in enumerate(env.lines)
                 xi = sys.xi[e][j]; L = sys.lines[l]
-                crowd = max(u[xi+1], zero(T))
+                crowd = max(u[xi+1], zero(T)); other = zero(T)
                 for (m, lm) in enumerate(env.lines)
                     m == j && continue
-                    crowd += sv(sys.alpha[l][lm], p, T) * max(u[sys.xi[e][m]+1], zero(T))
+                    y = max(u[sys.xi[e][m]+1], zero(T))
+                    crowd += sv(sys.alpha[l][lm], p, T) * y; other += y
                 end
                 if hasproperty(L, :extra)
-                    line_rhs_multi!(du, u, xi, sys.hb[e][j], L, p, env, crowd, T)
+                    line_rhs_multi!(du, u, xi, sys.hb[e][j], L, p, env, crowd, T; other=other)
                 else
                     w = L.input == :D ? T(env.D) : T(env.R)
-                    line_rhs!(du, u, xi, sys.hb[e][j], L, p, w, crowd, T)
+                    line_rhs!(du, u, xi, sys.hb[e][j], L, p, w, crowd, T; other=other)
                 end
             end
         end
@@ -294,7 +341,7 @@ end
 
 const GREEK = Dict("θ" => "\\theta", "ρ" => "\\rho", "β" => "\\beta", "λ" => "\\lambda", "α" => "\\alpha", "δ" => "\\delta",
                    "γ" => "\\gamma", "κ" => "\\kappa", "τ" => "\\tau", "ω" => "\\omega", "ζ" => "\\zeta", "ε" => "\\varepsilon",
-                   "χ" => "\\chi")
+                   "χ" => "\\chi", "η" => "\\eta", "φ" => "\\phi")
 function ptex(n)
     base, rest = n, ""
     if occursin("^", n)
@@ -376,6 +423,11 @@ function line_tex(L, X, crowd, Ksym)
     mods = modules(L)
     V = any(M -> M.action in (:damage, :transit), mods) ? "V_{$X}" : X
     parts = [module_tex(M, X, V) for M in mods]
+    # a cytostatic effect that follows the delay chain keeps the chain even when the kill is off (β = 0)
+    if cc_on(L) && !(L.cc.csimm) && !(L.cc.cs.i == 0 && L.cc.cs.v == 0) && isempty(parts[1].lines) && nker(L.kernel) > 0
+        q = module_tex(merge(L, (s=merge(L.s, (β=Slot(0, 1.0),)),)), X, V)
+        parts[1] = merge(parts[1], (lines=q.lines,))
+    end
     r = ptex(slot_name(:r, X, L.input)); K = Ksym; th = ptex(slot_name(:θ, X, L.input))
     for q in parts
         r = q.rfun(r); K = q.Kfun(K)
@@ -383,12 +435,23 @@ function line_tex(L, X, crowd, Ksym)
     frac = "\\frac{$crowd}{$K}"
     G = L.growth == :logistic ? "$r\\,$V\\left(1-$frac\\right)" :
         L.growth == :theta ? "$r\\,$V\\left[1-\\left($frac\\right)^{$th}\\right]" : "$r\\,$V\\,\\ln\\left(\\frac{$K}{$crowd}\\right)"
+    # coculture modifiers (L.cc): Y = the other line
+    Y = X == "N" ? "C" : "N"
+    cc = cc_on(L) ? L.cc : CC_NEUTRAL
+    has(sl, dflt) = !(sl.i == 0 && sl.v == dflt)
+    if has(cc.cs, 0.0)
+        Ecs = cc.csimm ? "D" : (chainlen(L.kernel) > 0 ? "A_{$X,$(chainlen(L.kernel))}" : L.kernel == :none ? "D" : "A_{$X}")
+        G = "\\left(1-\\gamma_{$X}^{cs}\\,$Ecs\\right)_+" * G
+    end
     rhs = G
     (L.s.d.i > 0 || L.s.d.v != 0) && (rhs *= "-$(ptex(slot_name(:d, X, L.input)))\\,$V")
+    has(cc.di, 0.0) && (rhs *= "-\\eta_{$X}\\frac{$Y}{$Ksym}\\,$V")
+    kf = (has(cc.kf, 1.0) ? "\\phi_{$X}" : "") * (has(cc.pr, 0.0) ? "\\frac{1}{1+\\rho_{$X}$Y/$Ksym}" : "")
     chi = hasproperty(L, :chi) && !isoff(L.chi)
     nsf = !ns_on(L) ? "" : L.growth == :theta ? "\\left[1-\\left($frac\\right)^{$th}\\right]" : "\\left(1-$frac\\right)"
     for q in parts, lo in q.losses
         lo = (chi && q.input == :D) ? "-\\left(1+\\chi_{$X}\\,\\hat u_R\\right)\\left[$(lo[2:end])\\right]" : lo
+        lo = (kf != "" && q.input == :D) ? "-$kf\\left[$(lo[2:end])\\right]" : lo
         rhs *= (nsf != "" && q.input == :D) ? "-$nsf\\left[$(lo[2:end])\\right]" : lo
     end
     lines = reduce(vcat, [q.lines for q in parts]; init=String[])

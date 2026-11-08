@@ -25,6 +25,7 @@
 #   BOOT_WORK_FACTOR  bootstrap work budget, × the evaluations of one refit (default stages.toml, 50; 0 = none)
 #   BOOT_SCREEN       two-pass bootstrap: every candidate gets the first BOOT_SCREEN replicates, the rest go only
 #                     to candidates inside the selection band at least once (default stages.toml, 40; 0 = all get B)
+#   ZOO_REFIT=1       refit every candidate instead of reusing its saved fit (fit_cache/, see cached_fit)
 #   ZOO_REUSE_BOOT=1  reuse the bootstrap of every group whose candidates and fits are unchanged
 #                     since the last zoo_state.jls (same names, BICs and parameters)
 
@@ -102,9 +103,101 @@ const DRYRUN = get(ENV, "DRYRUN", "0") == "1"
 const DRY_PREV = DRYRUN ? deserialize(joinpath(ZOO_DIR, "zoo_state.jls")) : nothing
 const DRY_BUILT = Dict{String,Any}()
 function fit_stage(cands, ds, gid; fitter=fit_zoo)
-    DRYRUN || return fitter(cands, ds)
+    DRYRUN || return cached_fit(cands, ds, gid, fitter)
     DRY_BUILT[gid] = cands
     DRY_PREV.groups[findfirst(g -> g.id == gid, DRY_PREV.groups)].cands
+end
+
+# ── saved fits per candidate (user, 2026-11-08) ───────────────────────────────
+# Adding a candidate must not refit the others: every fitted candidate is saved to fit_cache/<group>.jls,
+# keyed by everything that decides its fit (name, label, free parameters, bounds, starts, fixed values and
+# inherited mechanisms in its lines, crowding, inputs, starting states, the data, the multistart settings and
+# the fitting code in bootstrap_tools.jl). A candidate whose key is saved is not refitted. The cache is seeded
+# from the fits in the last zoo_state.jls, so the first run after this change already reuses them. A change
+# upstream (e.g. a new Stage 2b kill) changes the inherited values in the key, so later stages refit as needed.
+#   ZOO_REFIT=1   ignore the saved fits and refit every candidate (the saved fits are then replaced)
+const FIT_CACHE_ON = get(ENV, "ZOO_REFIT", "0") != "1"
+const FIT_CACHE_DIR = joinpath(ZOO_DIR, "fit_cache")
+const FIT_FIELDS = (:params, :bic, :sse, :se, :u0, :x0fit, :nstarts, :nbest)
+const FIT_CODE_HASH = bytes2hex(sha256(read(joinpath(@__DIR__, "bootstrap_tools.jl"))))
+# the nominal starting states with the estimated ones masked (a fitted row holds its estimates there)
+function masked_u0(c)
+    u = Vector{Float64}(c.u0)
+    hasproperty(c, :x0est) && (u[c.x0est] .= NaN)
+    u
+end
+function cand_key(c, ds)
+    parts = [c.name, c.label, c.family, repr(c.pnames), repr(c.bounds), repr(c.p0s), repr(c.sys.lines), repr(c.sys.alpha),
+             repr(c.sys.envs), repr(masked_u0(c)), repr(get(c, :x0nom, nothing)), repr(get(c, :x0est, nothing)),
+             repr(get(c, :x0bounds, nothing)), repr(get(c, :x0start, nothing)), repr(ds),
+             string(EXTRA_STARTS), string(EXTRA_WORK), string(EXTRA_SPREAD), FIT_CODE_HASH]
+    bytes2hex(sha256(join(parts, "\0")))
+end
+fit_record(r) = merge((name=r.name,), NamedTuple{FIT_FIELDS}(Tuple(getfield(r, k) for k in FIT_FIELDS)))
+fit_values(rec) = NamedTuple{FIT_FIELDS}(Tuple(getfield(rec, k) for k in FIT_FIELDS))
+const FIT_SEED = Ref{Any}(nothing)
+# fits of the last finished run (zoo_state.jls), by group id
+function seed_fits(gid)
+    if FIT_SEED[] === nothing
+        FIT_SEED[] = Dict{String,Any}()
+        f = joinpath(ZOO_DIR, "zoo_state.jls")
+        if isfile(f)
+            st = try deserialize(f) catch err; @warn "saved fits: zoo_state.jls not readable" err; nothing end
+            st === nothing || for g in st.groups
+                FIT_SEED[][g.id] = (cands=g.cands, ds=g.datasets)
+            end
+        end
+    end
+    get(FIT_SEED[], gid, nothing)
+end
+# saved as plain TOML (outputs/zoo_fits/fit_cache/<group>.toml, committed with the run's outputs), so any
+# machine with the repository reuses the fits
+function read_fit_cache(f)
+    isfile(f) || return Dict{String,Any}()
+    d = try TOML.parsefile(f) catch err; @warn "saved fits not readable" f err; return Dict{String,Any}() end
+    Dict{String,Any}(k => (name=string(get(v, "name", "")), params=Float64.(v["params"]), bic=Float64(v["bic"]), sse=Float64(v["sse"]), se=Float64.(v["se"]),
+                           u0=Float64.(v["u0"]), x0fit=Float64.(v["x0fit"]), nstarts=Int(v["nstarts"]), nbest=Int(v["nbest"]))
+                     for (k, v) in d if k != "about")
+end
+function load_fit_cache(gid)
+    cache = read_fit_cache(joinpath(FIT_CACHE_DIR, "$gid.toml"))
+    sd = seed_fits(gid)
+    if sd !== nothing
+        for r in sd.cands
+            k = try cand_key(r, sd.ds) catch; continue end
+            haskey(cache, k) || (cache[k] = fit_record(r))
+        end
+    end
+    cache
+end
+function cached_fit(cands, ds, gid, fitter)
+    FIT_CACHE_ON || isempty(cands) || return save_fits(gid, fitter(cands, ds), ds, Dict{String,Any}())
+    cache = load_fit_cache(gid)
+    ks = [cand_key(c, ds) for c in cands]
+    hit = [haskey(cache, k) && isfinite(cache[k].bic) for k in ks]
+    todo = cands[.!hit]
+    @printf("  %s: %d of %d candidates reused from saved fits, %d fitted\n", gid, count(hit), length(cands), length(todo)); flush(stdout)
+    fresh = isempty(todo) ? Any[] : fitter(todo, ds)
+    save_fits(gid, fresh, ds, cache)
+    rows = sort!(vcat(Any[merge(c, fit_values(cache[k])) for (c, k, h) in zip(cands, ks, hit) if h], collect(Any, fresh)); by=r -> r.bic)
+    fitter === fit_zoo ? rows : order_rule(rows)
+end
+function save_fits(gid, rows, ds, cache)
+    for r in rows
+        cache[cand_key(r, ds)] = fit_record(r)
+    end
+    try
+        mkpath(FIT_CACHE_DIR)
+        d = Dict{String,Any}("about" => "Saved fits of group $gid (run_zoo_fits.jl cached_fit), keyed by a SHA-256 of each candidate's structure, data and fitting settings.")
+        for (k, r) in cache
+            d[k] = Dict{String,Any}("name" => r.name, "params" => collect(r.params), "bic" => r.bic, "sse" => r.sse, "se" => collect(r.se),
+                                    "u0" => collect(r.u0), "x0fit" => collect(r.x0fit), "nstarts" => r.nstarts, "nbest" => r.nbest)
+        end
+        open(io -> TOML.print(io, d; sorted=true), joinpath(FIT_CACHE_DIR, "$gid.toml"), "w")
+    catch err
+        @warn "saved fits not written" gid err
+    end
+    rows
 end
 
 # ── per-line stages: growth laws, then mechanisms on top of the carried growth ─
@@ -150,7 +243,12 @@ end
 
 const CC_BOUNDS = Dict(Symbol(k) => (Float64(v[1]), Float64(v[2])) for (k, v) in STAGE_CFG["coculture"]["bounds"])
 const CC_PNAME = Dict(:K => "K", :αNC => "α_NC", :αCN => "α_CN", :βN => "β_N", :βC => "β_C",
-                      :dN => "d_N", :dC => "d_C", :εN => "ε_N", :εC => "ε_C")
+                      :dN => "d_N", :dC => "d_C", :εN => "ε_N", :εC => "ε_C",
+                      # coculture modifiers (zoo_models.jl L.cc, 2026-11-08): kill factor φ (one shared or per line),
+                      # protection ρ, cytostatic γ^cs, interference η, and a refitted delay rate k (cytostatic-only variants)
+                      :φ => "φ", :φN => "φ_N", :φC => "φ_C", :ρN => "ρ_N", :ρC => "ρ_C", :γN => "γ_N^cs", :γC => "γ_C^cs",
+                      :ηN => "η_N", :ηC => "η_C", :kN => "k_N", :kC => "k_C")
+const CC_MOD_KEYS = (:φ, :φN, :φC, :ρN, :ρC, :γN, :γC, :ηN, :ηC)
 
 # Rebuild a line from its fitted mechanism row: mechanism values fixed, growth from Stage 1,
 # K replaced by the coculture K; `refit` names mechanism slots that are fitted again here.
@@ -167,13 +265,14 @@ end
 
 # fixed: values used for K / α when not fitted; noinput: switch the low-resource input off;
 # betaC_floor: a refitted resistant kill stays ≥ this fraction of its inherited value
+# cytostatic: "imm" (the cytostatic effect follows the dose) or "delay" (it follows each line's Stage 2b delay chain)
 function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=Dict{Symbol,Float64}(), noinput=false,
-                 family="Coculture", betaC_floor=0.0, kill_growth_coupled=false, x0=nothing)
+                 family="Coculture", betaC_floor=0.0, kill_growth_coupled=false, x0=nothing, cytostatic="imm")
     idx = Dict(k => i for (i, k) in enumerate(free))
     slot(k, v) = haskey(idx, k) ? Slot(idx[k], 0.0) : Slot(0, get(fixed, k, v))
     Kslot = slot(:K, NaN)
     lf(ks) = Dict(s => idx[k] for (k, s) in ks if haskey(idx, k))
-    fN = lf([(:βN, :β), (:dN, :d), (:εN, :ε)]); fC = lf([(:βC, :β), (:dC, :d), (:εC, :ε)])
+    fN = lf([(:βN, :β), (:dN, :d), (:εN, :ε), (:kN, :k)]); fC = lf([(:βC, :β), (:dC, :d), (:εC, :ε), (:kC, :k)])
     # fixed line values from the candidate (e.g. βC = 0: no resistant cisplatin term) override the inherited ones
     fixline(ks) = Dict{Symbol,Float64}(s => Float64(fixed[k]) for (k, s) in ks if haskey(fixed, k) && !haskey(idx, k))
     xN = merge(noinput ? Dict(:ε => 0.0) : Dict{Symbol,Float64}(), fixline([(:βN, :β), (:dN, :d), (:εN, :ε)]))
@@ -182,14 +281,28 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
     LC = cc_line(rows[2], growth["A2780cis"], Kslot, fC, xC, LINES[2].ec50)
     # Norton–Simon: each line's drug kill scales with its growth factor (crowded cells die less)
     kill_growth_coupled && (LN = merge(LN, (ns=true,)); LC = merge(LC, (ns=true,)))
+    # coculture modifiers (only on candidates that use them, so the earlier candidates are rebuilt exactly)
+    if any(k -> k in free || haskey(fixed, k), CC_MOD_KEYS)
+        cytostatic in ("imm", "delay") || error("$name: cytostatic must be \"imm\" or \"delay\"")
+        kf(k) = haskey(idx, :φ) ? Slot(idx[:φ], 0.0) : slot(k, 1.0)
+        mk(X) = (kf=kf(Symbol("φ$X")), pr=slot(Symbol("ρ$X"), 0.0), cs=slot(Symbol("γ$X"), 0.0), csimm=cytostatic == "imm",
+                 di=slot(Symbol("η$X"), 0.0))
+        LN = merge(LN, (cc=mk("N"),)); LC = merge(LC, (cc=mk("C"),))
+    end
     alpha = [[Slot(0, 1.0), slot(:αNC, 1.0)], [slot(:αCN, 1.0), Slot(0, 1.0)]]
-    inh(k, row) = (i = findfirst(==(:β), row.slots); i === nothing ? 0.5 : row.params[i])
+    inh(k, row) = (i = findfirst(==(k), row.slots); i === nothing ? (k == :k ? 1.0 : 0.5) : row.params[i])
     start = Dict(:K => 1.1datasets_max, :αNC => 1.0, :αCN => 1.0, :βN => inh(:β, rows[1]), :βC => inh(:β, rows[2]),
-                 :dN => 0.05, :dC => 0.05, :εN => 1.0, :εC => 1.0)
+                 :dN => 0.05, :dC => 0.05, :εN => 1.0, :εC => 1.0,
+                 :φ => 1.0, :φN => 1.0, :φC => 1.0, :ρN => 0.5, :ρC => 0.5, :γN => 0.1, :γC => 0.1, :ηN => 0.05, :ηC => 0.05,
+                 :kN => inh(:k, rows[1]), :kC => inh(:k, rows[2]))
     alt = Dict(:K => 1.6datasets_max, :αNC => 0.5, :αCN => 1.5, :βN => 0.5start[:βN], :βC => 0.75start[:βC],
-               :dN => 0.2, :dC => 0.01, :εN => 0.5, :εC => 2.0)
+               :dN => 0.2, :dC => 0.01, :εN => 0.5, :εC => 2.0,
+               :φ => 0.5, :φN => 0.5, :φC => 0.5, :ρN => 2.0, :ρC => 2.0, :γN => 0.4, :γC => 0.4, :ηN => 0.2, :ηC => 0.2,
+               :kN => 0.5start[:kN], :kC => 0.5start[:kC])
     alt2 = Dict(:K => 0.8datasets_max, :αNC => 1.5, :αCN => 0.5, :βN => 2start[:βN] + 0.05, :βC => 2start[:βC] + 0.05,
-                :dN => 0.01, :dC => 0.2, :εN => 2.0, :εC => 0.5)
+                :dN => 0.01, :dC => 0.2, :εN => 2.0, :εC => 0.5,
+                :φ => 0.2, :φN => 0.2, :φC => 0.2, :ρN => 8.0, :ρC => 8.0, :γN => 0.8, :γC => 0.8, :ηN => 0.01, :ηC => 0.01,
+                :kN => 2start[:kN], :kC => 2start[:kC])
     bounds = [k == :K ? (CC_BOUNDS[:K][1] * datasets_max, CC_BOUNDS[:K][2] * datasets_max) :
               k == :βC ? (betaC_floor * start[:βC], CC_BOUNDS[:βC][2]) : CC_BOUNDS[k] for k in free]
     make_cand(name, label, family, [LN, LC], envs, alpha, X0, [CC_PNAME[k] for k in free], bounds,
@@ -213,7 +326,8 @@ function coculture_rows(st)
                  end
                  make_cc(c["name"], c["label"], Symbol[Symbol(x) for x in c["free"]], mech, growth, envs, X0, ymax; fixed=fx,
                          noinput=get(c, "noinput", false), betaC_floor=Float64(get(st, "betaC_floor", 0.0)),
-                         kill_growth_coupled=get(c, "kill_growth_coupled", get(st, "kill_growth_coupled", false)), x0=x0)
+                         kill_growth_coupled=get(c, "kill_growth_coupled", get(st, "kill_growth_coupled", false)), x0=x0,
+                         cytostatic=get(c, "cytostatic", "imm"), family=get(c, "family", "Coculture"))
              end for c in st["candidate"]]
     obs = sys_obs(cands[1].sys)
     ds = reduce(vcat, [[dataset(keep(e.N), obs[2i-1]), dataset(keep(e.C), obs[2i])] for (i, e) in enumerate(E)])

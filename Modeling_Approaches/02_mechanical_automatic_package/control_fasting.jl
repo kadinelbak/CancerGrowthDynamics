@@ -98,12 +98,13 @@ function fast_rhs_ref!(du, x, w, FP::FPlant)       # reference: the zoo right-ha
     envc = (D=T(u), R=T(U_R) * v)
     for (j, l) in enumerate(env.lines)
         xi = S.xi[1][j]; L = S.lines[l]
-        crowd = max(x[xi+1], zero(T))
+        crowd = max(x[xi+1], zero(T)); other = zero(T)
         for (m, lm) in enumerate(env.lines)
             m == j && continue
-            crowd += sv(S.alpha[l][lm], p, T) * max(x[S.xi[1][m]+1], zero(T))
+            y = max(x[S.xi[1][m]+1], zero(T))
+            crowd += sv(S.alpha[l][lm], p, T) * y; other += y
         end
-        line_rhs_multi!(du, x, xi, S.hb[1][j], L, p, envc, crowd, T)
+        line_rhs_multi!(du, x, xi, S.hb[1][j], L, p, envc, crowd, T; other=other)
     end
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
     du[FP.iB] = tp.s_B * u - tp.d_B * Bd

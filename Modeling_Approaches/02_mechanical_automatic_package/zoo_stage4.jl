@@ -12,8 +12,9 @@
 # The model carried forward is chosen by the same rule as every stage (fewest free parameters within
 # 2 BIC of the lowest). Include after zoo_common.jl, zoo_models.jl, bootstrap_tools.jl, zoo_selection.jl.
 
-freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
-freeze_line(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple(freeze_slot(getfield(L.s, k), p) for k in keys(L.s))),))
+# freeze_slot, freeze_cc: zoo_models.jl. Coculture modifiers (L.cc) of the Stage 3a lines are frozen too.
+freeze_line(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple(freeze_slot(getfield(L.s, k), p) for k in keys(L.s))),),
+                          cc_on(L) ? (cc=freeze_cc(L.cc, p),) : NamedTuple())
 
 # (name, label, crowding source, resistant kill on, free parameters) from the combination stage of stages.toml
 const S4_SPECS = let st = only(s for s in TOML.parsefile(STAGES_FILE)["stage"] if s["kind"] == "combination")
