@@ -230,6 +230,7 @@ function mechanism_rows(st, L, g)
     # damaged cells) not tied to growth ("_unc"), and with partial coupling, growth factor^p_X fitted ("_nsp")
     entry(n) = (i = findfirst(c -> c[1] == n, zoo); i === nothing ? error("$(st["id"]): no catalogue entry $n") : zoo[i])
     if ns
+        cands = Any[cands...]   # "_unc" lines carry no ns field, so the vector must hold both shapes
         unc = [(e = entry(n); (e[1] * "_unc", e[2] * " (kill not tied to growth)", "Kill not tied to growth", e[4], e[5], e[6]))
                for n in get(st, "uncoupled", String[])]
         nsp = [(e = entry(n); (e[1] * "_nsp", e[2] * " (partly tied to growth, fitted exponent)", "Kill partly tied to growth", e[4], e[5], vcat(e[6], [:pn])))
