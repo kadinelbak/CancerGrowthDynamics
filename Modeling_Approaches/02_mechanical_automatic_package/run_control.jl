@@ -186,7 +186,7 @@ if !haskey(cck, :robust)
             if Pb === nothing
                 draws[b] = nothing; continue
             end
-            Wb = with_fields(default_weights(Pb); Bc=W0.Bc, Bp=W0.Bp)   # the same thresholds as the nominal plan
+            Wb = with_fields(default_weights(Pb); Bc=W0.Bc, Bp=W0.Bp, BpN=W0.BpN, BpC=W0.BpC)   # the same thresholds as the nominal plan
             noise = obs_noise(b, NRUN)
             d = Dict{String,Any}("b" => b)
             for pn in pols

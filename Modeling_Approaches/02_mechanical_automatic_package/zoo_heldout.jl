@@ -59,14 +59,25 @@ const HO = VAL["heldout"]
 g3 = gid(HO["group"]); c3 = g3.cands[1]
 βof(c) = c.params[findfirst(==(:β), c.slots)]
 βN2 = βof(gid("$(HO["drug_from"])-a2780").cands[1]); βC2 = βof(gid("$(HO["drug_from"])-a2780cis").cands[1])
+kof(c) = (i = findfirst(==(:k), c.slots); i === nothing ? nothing : c.params[i])
+kN2 = kof(gid("$(HO["drug_from"])-a2780").cands[1]); kC2 = kof(gid("$(HO["drug_from"])-a2780cis").cands[1])
+# the monoculture drug response: Stage 2b kill (and delay rate, where Stage 3a refitted it), and no coculture drug
+# modifier (kill factor, protection, cytostatic effect: zoo_models.jl L.cc); interference η stays (it acts in Ce0 too)
+function mono_drug_line(L, β, k)
+    s = merge(L.s, (β=Slot(0, β),))
+    k !== nothing && L.s.k.i > 0 && (s = merge(s, (k=Slot(0, k),)))
+    L2 = merge(L, (s=s,))
+    cc_on(L2) ? merge(L2, (cc=merge(L2.cc, (kf=Slot(0, 1.0), pr=Slot(0, 0.0), cs=Slot(0, 0.0))),)) : L2
+end
 function heldout_ce1_sys(βN, βC)
     LN, LC = c3.sys.lines
-    LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βN),)),)); LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βC),)),))
-    build_system([LN2, LC2], c3.sys.envs, c3.sys.alpha)
+    build_system([mono_drug_line(LN, βN, kN2), mono_drug_line(LC, βC, kC2)], c3.sys.envs, c3.sys.alpha)
 end
 heldout_ce1_model(βN, βC) = make_system_model(heldout_ce1_sys(βN, βC))
 # largest parameter index any slot of a system reads (lines, their extra modules, crowding)
 max_free_index(sys) = maximum(vcat([q.i for L in sys.lines for M in modules(L) for q in values(M.s) if q isa Slot],
+                                   [q.i for L in sys.lines if cc_on(L) for q in values(L.cc) if q isa Slot],
+                                   [q.i for L in sys.lines if sw_on(L) for q in values(L.sw) if q isa Slot],
                                    [q.i for row in sys.alpha for q in row if q isa Slot]); init=0)
 tag_match(s, sel) = all(string(get(s, k, "")) == string(v) for (k, v) in sel)
 const HO_TAGS = dataset_tags(HO["group"])

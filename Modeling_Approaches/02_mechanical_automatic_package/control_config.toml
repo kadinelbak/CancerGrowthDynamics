@@ -105,6 +105,16 @@ closed_loop_draws = 40           # ASSUMPTION (runtime): bootstrap sets with clo
 # Cancer Res 69:4894). At the end of the look-ahead qRT·C/K prices the resistant cells left behind, which drive
 # the next, untreatable progression. Reported outcomes: the first day at B_prog and the time to progression (the
 # start of the first spell above B_prog that lasts sustain_days or to the end of the run).
+# Progression rule (user, 2026-11-03): "lines" = progressed when the RESISTANT line reaches
+# resistant_threshold_fraction_of_K × K OR the SENSITIVE line reaches sensitive_threshold_fraction × its
+# reference (sensitive_threshold_of = "plateau": the untreated sensitive-only plateau of the same plant, found by
+# simulation; "K": the shared K). "total" = N + C ≥ threshold_fraction_of_K × K (2026-10-27 to 2026-11-03).
+# The total rule could not tell a sensitive-heavy culture from a resistant-heavy one, and in scenario B neither
+# MPC nor constant 1 µM ever reached K/2, so tie-breakers chose the schedule.
+rule = "lines"                   # ASSUMPTION (user, 2026-11-03)
+resistant_threshold_fraction_of_K = 0.5   # ASSUMPTION (user, 2026-11-03): resistant cells at K/2
+sensitive_threshold_of = "plateau"        # ASSUMPTION (2026-11-03): "plateau" or "K"; the user proposed 0.8 K, which the sensitive line cannot reach (its untreated coculture plateau is about 0.76 K)
+sensitive_threshold_fraction = 0.85       # ASSUMPTION (2026-11-03): 85% of the untreated sensitive plateau (about 0.65 K in the 2026-11-02 fit)
 threshold_fraction_of_K = 0.5    # ASSUMPTION (user, 2026-10-27: K/2, the same level as B_cancer; 0.8 = "80% confluence" before): the untreated plateau (0.71–0.84 K) sat right at 0.8 K, which made the objective flat
 step_width_fraction_of_K = 0.02  # ASSUMPTION (numerical): width s of the smooth step, 2% of K (σ goes from 0.12 to 0.88 over ±4% of K)
 qP = 10.0                        # ASSUMPTION: cost of one decision interval spent progressed; dominates the other terms (swept)

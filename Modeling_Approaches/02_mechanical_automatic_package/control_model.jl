@@ -99,6 +99,9 @@ struct LineSpec
     mods::Vector{ModSpec}
     ns::Bool                    # Norton–Simon: drug losses × growth factor (zoo_models.jl growth_factor)
     chi::Float64                # drug × low-resource interaction χ: drug losses × (1 + χ·u_R/U_R) (zoo line_rhs_multi!)
+    # coculture modifiers (zoo_models.jl L.cc; neutral 1, 0, 0, true, 0 for lines without them): kill factor φ,
+    # protection ρ, cytostatic γ (immediate or through the first drug module's delay), interference η
+    kf::Float64; pr::Float64; cs::Float64; csimm::Bool; di::Float64
 end
 const FAST_KERNELS = (:none, :comp1, :chain2, :chain3, :second, :auc)
 # iε: positions in p of free low-resource strengths (control_fasting.jl); none in normal medium
@@ -107,6 +110,7 @@ function line_specs(S, p, iε)
     for (j, l) in enumerate(S.envs[1].lines)
         L = S.lines[l]; xi = S.xi[1][j]; off = S.hb[1][j]
         L.growth in (:logistic, :theta) || error("growth law $(L.growth) not supported in the fast plant")
+        sw_on(L) && error("phenotype switching (L.sw) not supported in the fast plant")
         mods = ModSpec[]
         for M in modules(L)
             ncell(M.action) == 0 && naux(M.action) == 0 || error("action $(M.action) not supported in the fast plant")
@@ -121,9 +125,12 @@ function line_specs(S, p, iε)
             off += mwidth(M)
         end
         m = 3 - j
+        cc = cc_on(L) ? L.cc : CC_NEUTRAL
+        (cc_on(L) && L.input != :D) && error("coculture modifiers on a line whose own module is not the drug module")
         push!(out, LineSpec(xi + 1, S.xi[1][m] + 1, sv(S.alpha[l][S.envs[1].lines[m]], p, Float64), L.growth == :logistic,
                             sv(L.s.r, p, Float64), sv(L.s.K, p, Float64), sv(L.s.θ, p, Float64), sv(L.s.d, p, Float64), mods, ns_on(L),
-                            hasproperty(L, :chi) ? sv(L.chi, p, Float64) : 0.0))
+                            hasproperty(L, :chi) ? sv(L.chi, p, Float64) : 0.0,
+                            sv(cc.kf, p, Float64), sv(cc.pr, p, Float64), sv(cc.cs, p, Float64), cc.csimm, sv(cc.di, p, Float64)))
     end
     out
 end
@@ -132,8 +139,9 @@ end
 function spec_cells_rhs!(du, x, u, uR, f, spec, εv, koff, v)
     T = promote_type(eltype(x), typeof(u), typeof(uR)); z = zero(T)
     @inbounds for L in spec
-        X = max(x[L.ix], z); crowd = X + L.α * max(x[L.other], z)
+        X = max(x[L.ix], z); Y = max(x[L.other], z); crowd = X + L.α * Y
         Keff = T(L.K); loss = T(L.d); dloss = z                   # dloss: drug-module losses (Norton–Simon scales these)
+        Ecs = z; first_drug = true                                # cytostatic exposure: the first drug module's dose or effect state
         for M in L.mods
             ε = M.εj == 0 ? T(M.ε) : 1 + (εv[M.εj] - 1) * f
             wi = (M.input_D ? T(u) : T(uR)) * ε
@@ -154,6 +162,9 @@ function spec_cells_rhs!(du, x, u, uR, f, spec, εv, koff, v)
                 du[o+1] = x[o+2]; du[o+2] = M.ω^2 * (wi - x[o+1]) - 2M.ζ * M.ω * x[o+2]
                 E = max(x[o+1], z)
             end
+            if M.input_D && first_drug
+                Ecs = L.csimm ? wi : E; first_drug = false
+            end
             if M.action == :hill
                 lo = E > 0 ? M.β * E^M.h / (T(M.ec50)^M.h + E^M.h) : z
                 M.input_D ? (dloss += lo) : (loss += lo)
@@ -165,9 +176,13 @@ function spec_cells_rhs!(du, x, u, uR, f, spec, εv, koff, v)
             end
         end
         q = max(crowd / Keff, z)
+        y = Y / T(L.K)                              # coculture modifiers (neutral unless Stage 3a carries them)
+        dloss *= L.kf / (1 + L.pr * y)
+        loss += L.di * y
+        gm = L.cs == 0 ? one(T) : max(1 - L.cs * Ecs, z)
         dloss *= 1 + L.chi * T(uR) / T(U_R)        # drug × low-resource interaction (0 unless Stage 4 carries χ)
         loss += L.ns ? dloss * (L.logistic ? max(1 - q, z) : max(1 - q^L.θ, z)) : dloss
-        du[L.ix] = L.r * X * (L.logistic ? 1 - q : 1 - q^L.θ) - loss * X
+        du[L.ix] = gm * L.r * X * (L.logistic ? 1 - q : 1 - q^L.θ) - loss * X
     end
     nothing
 end
@@ -245,6 +260,11 @@ function scenario_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default
         ce0 = AN_STATE[:validation].ce1[1].params; n = length(ce0)
         p = b === nothing ? copy(ce0) : ZOO_STATE.results["s3"].res.pars[1][b, 1:n] .* (ce0 ./ c3.params[1:n])
         setdraw!(fixed_N, :β, "s2-a2780"); setdraw!(fixed_C, :β, "s2-a2780cis")
+        # monoculture drug response: the Stage 2b delay rate (where Stage 3a refitted it) and no coculture drug
+        # modifier (kill factor, protection, cytostatic effect; zoo_heldout.jl mono_drug_line does the same)
+        LN.s.k.i > 0 && setdraw!(fixed_N, :k, "s2-a2780"); LC.s.k.i > 0 && setdraw!(fixed_C, :k, "s2-a2780cis")
+        nodrugcc(L) = cc_on(L) ? merge(L, (cc=merge(L.cc, (kf=Slot(0, 1.0), pr=Slot(0, 0.0), cs=Slot(0, 0.0))),)) : L
+        LN, LC = nodrugcc(LN), nodrugcc(LC)
         name = "B: monoculture drug response for both lines, crowding from untreated cocultures"
     end
     any(isnan, p) && return nothing
@@ -274,16 +294,17 @@ function zoo_cells_rhs!(du, x, u, P::Plant, T)
     S = P.sys; env = S.envs[1]
     for (j, l) in enumerate(env.lines)
         xi = S.xi[1][j]; L = S.lines[l]
-        crowd = max(x[xi+1], zero(T))
+        crowd = max(x[xi+1], zero(T)); other = zero(T)
         for (m, lm) in enumerate(env.lines)
             m == j && continue
-            crowd += sv(S.alpha[l][lm], P.p, T) * max(x[S.xi[1][m]+1], zero(T))
+            y = max(x[S.xi[1][m]+1], zero(T))
+            crowd += sv(S.alpha[l][lm], P.p, T) * y; other += y
         end
         if hasproperty(L, :extra)          # Stage 4 lines: drug module + low-resource module
-            line_rhs_multi!(du, x, xi, S.hb[1][j], L, P.p, (D=u, R=env.R), crowd, T)
+            line_rhs_multi!(du, x, xi, S.hb[1][j], L, P.p, (D=u, R=env.R), crowd, T; other=other)
         else
             w = L.input == :D ? T(u) : T(env.R)
-            line_rhs!(du, x, xi, S.hb[1][j], L, P.p, w, crowd, T)
+            line_rhs!(du, x, xi, S.hb[1][j], L, P.p, w, crowd, T; other=other)
         end
     end
     nothing
