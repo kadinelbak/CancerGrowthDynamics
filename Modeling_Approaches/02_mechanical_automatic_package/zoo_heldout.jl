@@ -121,6 +121,19 @@ function heldout_ce1()
     f = gfit(m, D[CE0], U0_CE1, c3.params[HO_RI], c3.bounds[HO_RI]; starts=4)
     pred = evaluate(m, D[CE1], U0_CE1, f.params)
     ce1 = [(variant="cisplatin from Stage 2 for both lines", params=f.params, fit_ce0=evaluate(m, D[CE0], U0_CE1, f.params), pred=pred)]
+    # fix review X9 (user, 2026-11-09): separate the starting values from the dynamics. (a) The same prediction
+    # started from the full fit's estimated Ce1 starts (anchored on the day-1 counts) instead of the nominal
+    # seeding. (b) One Ce1 ratio held out at a time: the carried Stage 3 model, coculture drug terms included, is
+    # refitted to Ce0 and the other two Ce1 ratios and predicts the held-out one (scored on that ratio only).
+    push!(ce1, (variant="as above, started from the full fit's estimated (day-1 anchored) Ce1 starts", params=f.params,
+                fit_ce0=evaluate(m, D[CE0], c3.u0, f.params), pred=evaluate(m, D[CE1], c3.u0, f.params)))
+    for rt in unique(string(get(HO_TAGS[k], "ratio", "")) for k in CE1)
+        out = [k for k in CE1 if string(get(HO_TAGS[k], "ratio", "")) == rt]
+        train = [k for k in eachindex(D) if !(k in out)]
+        fr = gfit(c3.model, D[train], c3.u0, c3.params, c3.bounds; starts=4)
+        push!(ce1, (variant="Ce1 $rt held out: the Stage 3 model (its coculture drug terms too) fitted to Ce0 and the other Ce1 ratios",
+                    params=fr.params[HO_RI], fit_ce0=evaluate(c3.model, D[CE0], c3.u0, fr.params), pred=evaluate(c3.model, D[out], c3.u0, fr.params)))
+    end
     full = evaluate(c3.model, D[CE1], c3.u0, c3.params)          # in-sample: the full fit with its own starts
     # reference with no drug model: the same Ce0-fitted growth and crowding, no drug term
     HO["baseline"] == "logistic" || error("validation.toml heldout.baseline: only \"logistic\" is implemented")
@@ -138,6 +151,8 @@ function write_heldout_csv(r, dir)
     row(name, rmse, wrmse, params, lo, hi, nt) = (row=name, rmse=rmse, nrmse=rmse / m1, wrmse=wrmse, n=n1, params=params, diff_lo=lo, diff_hi=hi, note=nt)
     rows = [row("prediction (crowding from Ce0, kills from Stage 2b)", p.pred.rmse, get(p.pred, :wrmse, NaN),
                 join(["$(n)=$(v)" for (n, v) in zip(c3.pnames[HO_RI], p.params)], "; "), NaN, NaN, "Ce1 starts: " * note),
+            [row(v.variant, v.pred.rmse, get(v.pred, :wrmse, NaN), join(["$(n)=$(x)" for (n, x) in zip(c3.pnames[HO_RI], v.params)], "; "),
+                 NaN, NaN, "nRMSE uses the mean of all Ce1 data") for v in r.ce1[2:end]]...,
             row("in-sample (Stage 3a fitted with Ce1)", r.ce1_full.rmse, get(r.ce1_full, :wrmse, NaN), "", NaN, NaN, ""),
             row("untreated reference (same crowding, no drug)", r.ce1_baseline_rmse, bev === nothing ? NaN : bev.wrmse, "", NaN, NaN, "")]
     b === nothing || push!(rows, row("prediction minus untreated reference (RMSE difference)", b.diff, NaN, "", b.lo, b.hi,

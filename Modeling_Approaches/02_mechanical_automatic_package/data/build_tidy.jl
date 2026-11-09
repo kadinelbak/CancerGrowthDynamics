@@ -6,7 +6,7 @@
 
 import Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
-using CSV, DataFrames, XLSX, TOML
+using CSV, DataFrames, XLSX, TOML, Statistics
 
 const PKG_DIR  = normpath(joinpath(@__DIR__, ".."))
 const ROOT     = normpath(joinpath(PKG_DIR, "..", ".."))
@@ -113,6 +113,39 @@ function tidy_rows(src)
      for i in eachindex(y)]
 end
 
+# Terminal collapse (qc_rules.toml [terminal_collapse], fix review X4, user 2026-11-09): on one of the last
+# `last_days` measured days of a coculture well, one line falls below `frac` × the median of its previous `window`
+# kept points while the other line rises above that median / `frac` (each by more than `floor` cells). Opposite
+# moves of the two lines of one well on the same late day are an image artefact (well detachment, focus), not
+# biology: both points are excluded, kept in the table and marked. Monocultures are never flagged by this rule.
+function terminal_collapse!(df, well)
+    haskey(QC, "terminal_collapse") || return df
+    R = QC["terminal_collapse"]; frac, floor, win, lastn = R["frac"], R["floor"], Int(R["window"]), Int(R["last_days"])
+    for w in unique(well[i] for i in eachindex(well) if df.culture[i] != "mono")
+        rows = [i for i in eachindex(well) if well[i] == w]
+        lines = unique(df.line[rows]); length(lines) == 2 || continue
+        days = sort(unique(df.day[rows])); late = days[max(end - lastn + 1, 1):end]
+        ref(l, d) = (k = [i for i in rows if df.line[i] == l && df.day[i] < d && !df.excluded[i] && df.t[i] > 0];
+                     sort!(k; by=i -> df.day[i]); length(k) < win ? NaN : median(df.value[k[end-win+1:end]]))
+        for d in late
+            at = Dict(l => findfirst(i -> df.line[i] == l && df.day[i] == d, rows) for l in lines)
+            any(isnothing, values(at)) && continue
+            i1, i2 = rows[at[lines[1]]], rows[at[lines[2]]]
+            (df.excluded[i1] || df.excluded[i2]) && continue
+            m1, m2 = ref(lines[1], d), ref(lines[2], d)
+            (isnan(m1) || isnan(m2)) && continue
+            drop(i, m) = df.value[i] < frac * m && m - df.value[i] > floor
+            rise(i, m) = df.value[i] > m / frac && df.value[i] - m > floor
+            if (drop(i1, m1) && rise(i2, m2)) || (rise(i1, m1) && drop(i2, m2))
+                for i in (i1, i2)
+                    df.excluded[i] = true; df.exclude_reason[i] = R["description"]
+                end
+            end
+        end
+    end
+    df
+end
+
 function build_tidy()
     ids = [s["id"] for s in SOURCES]
     length(unique(ids)) == length(ids) || error("duplicate source ids in sources.toml")
@@ -128,6 +161,7 @@ function build_tidy()
         k === nothing && continue
         df.excluded[i] = true; df.exclude_reason[i] = why[k] * " (flagged in the other line of the same well)"
     end
+    terminal_collapse!(df, well)
     CSV.write(OUT, df)
     println("Wrote $OUT: $(nrow(df)) rows from $(length(SOURCES)) sources, $(count(df.excluded)) excluded")
     df

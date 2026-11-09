@@ -70,8 +70,15 @@ function x0_info(s)
     k === nothing && error("series without measurements after day 0")
     y1 = s.y[k]; nom = s.nom; f = X0_FOLD^s.x[k]
     est = y1 > f * nom || y1 < nom / f || X0_ESTIMATE == "all" || (X0_ESTIMATE == "mono" && get(s, :culture, "") == "mono")
-    lo, hi = nom / 10, 3 * max(nom, y1)
-    (nom=nom, est=est, y1=y1, day1=s.x[k], start=clamp(sqrt(nom * y1), 1.01lo, 0.99hi), lo=lo, hi=hi)
+    t1 = s.x[k]
+    if X0_ANCHOR == "day1"          # band anchored on the first measured count (fix review X2, 2026-11-09)
+        lo, hi = y1 / (X0_DAY1_FOLD * exp(X0_DAY1_RMAX * t1)), X0_DAY1_FOLD * y1
+        start = clamp(y1 * exp(-0.5 * t1), 1.01lo, 0.99hi)
+    else
+        lo, hi = nom / 10, 3 * max(nom, y1)
+        start = clamp(sqrt(nom * y1), 1.01lo, 0.99hi)
+    end
+    (nom=nom, est=est, y1=y1, day1=t1, start=start, lo=lo, hi=hi)
 end
 
 # a schedule as (breakpoint times, doses); a constant schedule is a single step at t = 0
@@ -86,6 +93,10 @@ end
 
 const STAGE_CFG = TOML.parsefile(STAGES_FILE)
 const X0_ESTIMATE = string(get(get(STAGE_CFG, "starting_values", Dict()), "estimate", "auto"))
+const X0_ANCHOR = string(get(get(STAGE_CFG, "starting_values", Dict()), "anchor", "nominal"))
+X0_ANCHOR in ("nominal", "day1") || error("stages.toml [starting_values] anchor must be nominal or day1, not $X0_ANCHOR")
+const X0_DAY1_FOLD = Float64(get(get(STAGE_CFG, "starting_values", Dict()), "day1_fold", 3.0))
+const X0_DAY1_RMAX = Float64(get(get(STAGE_CFG, "starting_values", Dict()), "day1_rmax", 1.0))
 X0_ESTIMATE in ("auto", "mono", "all") || error("stages.toml [starting_values] estimate must be auto, mono or all, not $X0_ESTIMATE")
 # the two lines, their symbols and measured IC50 (stages.toml [lines])
 const LINE_CFG = STAGE_CFG["lines"]

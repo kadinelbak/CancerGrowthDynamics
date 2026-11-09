@@ -32,7 +32,15 @@ ec50 = 8.34             # µM, measured cisplatin IC50 of A2780cis (user, 2026-1
 # rule. The A2780cis monocultures start 20–60% apart on day 1 (untreated 80, 0.62 and 1 µM about 118 for a nominal
 # 100), an offset the fixed start pushed into r_C, θ_C (5.5) and the drug delay. "auto" = the 3-fold rule only.
 [starting_values]
-estimate = "mono"
+# fix review X2 (user, 2026-11-09): day 0 is the nominal seeding, never measured, and plates differ in imaging
+# scale (low-resource day-1 counts 3–16 × nominal, others 0.4–2 ×), so every series' start is estimated ("all";
+# was "mono" since 2026-11-02) inside a band anchored on its first measured count y1 at day t1:
+# [y1 / (day1_fold · e^(day1_rmax · t1)), day1_fold · y1] (anchor = "day1"; "nominal" = the old 0.1 × nominal to
+# 3 × max(nominal, y1) band, which let Stage 3b run 2 · 1:3 sit at 2.5 cells against a day-1 count of 159)
+estimate = "all"
+anchor = "day1"
+day1_fold = 3.0
+day1_rmax = 1.0
 
 [selection]
 rule_bic = 2.0          # carried model: fewest free parameters within rule_bic of the lowest BIC (ties: lower BIC); was 3.0 until 2026-10-27 (user)
@@ -129,6 +137,11 @@ input = "D"
 catalogue = "DRUG_ZOO"
 inherits = { growth = "s1" }
 joint_rule = "shared"
+# fix review X6 / X13 (user, 2026-11-09): the coupled catalogue entries are joined by the same mechanisms with the
+# kill not tied to growth ("_unc"; for the damage entries this is an arrested state: cells stop dividing, stay
+# counted and take space, and die at δ) and with partial coupling, growth factor^p fitted in [0, 1] ("_nsp")
+uncoupled = ["chain2_loss", "chain3_loss", "comp_loss", "chain2_damage", "comp_damage"]
+partial = ["chain2_loss", "chain3_loss"]
 
 # ── 3a · untreated (Ce0) and treated (Ce1) cocultures, shared K ──────────────
 [[stage]]
@@ -216,6 +229,39 @@ betaC_floor = 0.1
   label = "Shared K + crowding + coculture death, kill factor per line"
   family = "Coculture kill factor"
   free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC"]
+  # fix review X1 (user, 2026-11-09): K at the monoculture capacity (mean Stage 1 K of the two lines), so it is the
+  # level the wells reach (the free-K death model put K at 5,477, above any count), and density-dependent
+  # suppression η·Y/K in place of the constant coculture deaths (it switches off when the drug removes the other line)
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha"
+  label = "K at monoculture capacity + crowding"
+  family = "Coculture K at monoculture capacity"
+  free = ["αNC", "αCN"]
+  K_mono = true
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_phiNC"
+  label = "K at monoculture capacity + crowding, kill factor per line"
+  family = "Coculture K at monoculture capacity"
+  free = ["αNC", "αCN", "φN", "φC"]
+  K_mono = true
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_death_phiNC"
+  label = "K at monoculture capacity + crowding + constant coculture death, kill factor per line"
+  family = "Coculture K at monoculture capacity"
+  free = ["αNC", "αCN", "dN", "dC", "φN", "φC"]
+  K_mono = true
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_intNC"
+  label = "K at monoculture capacity + crowding + density-dependent suppression"
+  family = "Coculture K at monoculture capacity"
+  free = ["αNC", "αCN", "ηN", "ηC"]
+  K_mono = true
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_intNC_phiNC"
+  label = "K at monoculture capacity + crowding + density-dependent suppression, kill factor per line"
+  family = "Coculture K at monoculture capacity"
+  free = ["αNC", "αCN", "ηN", "ηC", "φN", "φC"]
+  K_mono = true
   # phenotype switching (2026-11-09): sensitive cells switch at a low rate into a resistant-like state that keeps
   # the sensitive label (counted as A2780) but grows at r_C and feels the resistant Stage 2b kill β_C;
   # spontaneous μ0 (also in untreated wells) or drug-induced μD × the sensitive drug-effect state
@@ -447,6 +493,24 @@ inherits = { growth = "s1", mechanism = "s1b" }
   name = "lrcc_epsC"
   label = "K and α from Stage 3, resistant low-resource strength refitted"
   free = ["εC"]
+  fixed_from = "s3"
+  # fix review X3 / X7 (user, 2026-11-09): K refitted, K at the monoculture capacity, and the resistant low-resource
+  # kill (d_C^acc, k_C^R of Stage 1b) refitted on the six low-resource cocultures, where A2780cis dies in every well
+  [[stage.candidate]]
+  name = "lrcc_epsN_K"
+  label = "α from Stage 3, K and sensitive low-resource strength refitted"
+  free = ["εN", "K"]
+  fixed_from = "s3"
+  [[stage.candidate]]
+  name = "lrcc_epsN_Kmono"
+  label = "α from Stage 3, K at the monoculture capacity, sensitive low-resource strength refitted"
+  free = ["εN"]
+  fixed_from = "s3"
+  K_mono = true
+  [[stage.candidate]]
+  name = "lrcc_epsN_resLR"
+  label = "K and α from Stage 3, sensitive strength and resistant low-resource kill refitted"
+  free = ["εN", "βC", "kC"]
   fixed_from = "s3"
   [[stage.candidate]]
   name = "lrcc_noLR"

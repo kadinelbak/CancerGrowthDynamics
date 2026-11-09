@@ -83,3 +83,42 @@ end
     fz = freeze_sw(LNs.sw, [0.02, 0.1])
     @test fz.μ0 == Slot(0, 0.02) && fz.μD == Slot(0, 0.1)
 end
+
+# fix review 2026-11-09: Norton–Simon exponent p (X13), interference in a low-resource line (X3) and a
+# damaged-cell (arrested) drug module with coculture modifiers in a multi-module line (X6)
+@testset "kill coupling exponent, LR interference, arrested multi-module" begin
+    fx(r, β, k, d) = Dict(:r => r, :K => PR.K, :β => β, :k => k, :d => d, :EC50 => 1.0)
+    mk(pn) = (L = merge(line_spec(:logistic, :chain3, :loss, :D; fixed=merge(fx(PR.rN, PR.βN, PR.kN, 0.0), Dict(:pn => pn))), (ns=true,));
+              build_system([L], [(D=1.0, R=0.0, lines=[1])], [[Slot(0, 1.0)]]))
+    u = [1200.0, 0.3, 0.5, 0.6]; q = 1200 / PR.K; E = 0.6
+    full = rhs(mk(1.0), u); none = rhs(mk(0.0), u); half = rhs(mk(0.5), u)
+    @test full[1] ≈ PR.rN * 1200 * (1 - q) - PR.βN * E * (1 - q) * 1200 rtol = 1e-12
+    @test none[1] ≈ PR.rN * 1200 * (1 - q) - PR.βN * E * 1200 rtol = 1e-12
+    @test half[1] ≈ PR.rN * 1200 * (1 - q) - PR.βN * E * sqrt(1 - q) * 1200 rtol = 1e-12
+    @test nspow(0.0, 0.5) == 0.0 && nspow(0.3, 1.0) == 0.3 && nspow(0.0, 0.0) == 1.0
+    # uncoupled kill: a steady level below K, K(1 − βE/r)
+    @test isapprox(PR.rN * (1 - (1 - PR.βN * E / PR.rN)) - PR.βN * E, 0.0; atol=1e-12)
+    # interference acts in a low-resource (input R) line too
+    LRl(η) = merge(line_spec(:logistic, :none, :loss, :R; fixed=Dict(:r => 0.8, :K => PR.K, :β => 0.1, :EC50 => 1.0)),
+                   (cc=(kf=Slot(0, 1.0), pr=Slot(0, 0.0), cs=Slot(0, 0.0), csimm=true, di=Slot(0, η)),))
+    sysR(η) = build_system([LRl(0.0), LRl(η)], [(D=0.0, R=U_R, lines=[1, 2])], [[Slot(0, 1.0), Slot(0, 1.0)], [Slot(0, 1.0), Slot(0, 1.0)]])
+    uR = [1000.0, 500.0]
+    @test rhs(sysR(0.2), uR)[2] - rhs(sysR(0.0), uR)[2] ≈ -0.2 * 1000 / PR.K * 500 rtol = 1e-12
+    # arrested (damaged-cell) drug module + low-resource module + kill factor: single- and multi-module agree
+    # when the low-resource module is switched off
+    LD = merge(line_spec(:logistic, :chain2, :damage, :D; fixed=Dict(:r => 0.8, :K => PR.K, :β => 0.7, :δ => 0.05, :k => 0.9, :EC50 => 1.0)),
+               (cc=(kf=Slot(0, 0.5), pr=Slot(0, 0.0), cs=Slot(0, 0.0), csimm=true, di=Slot(0, 0.0)),))
+    Mlr = line_spec(:logistic, :none, :loss, :R; fixed=Dict(:r => 0.8, :K => PR.K, :β => 0.0, :EC50 => 1.0))
+    s1 = build_system([LD], [(D=1.0, R=0.0, lines=[1])], [[Slot(0, 1.0)]])
+    s2 = build_system([merge(LD, (extra=Any[Mlr], chi=Slot(0, 0.0)))], [(D=1.0, R=0.0, lines=[1])], [[Slot(0, 1.0)]])
+    u1 = [1500.0, 200.0, 0.4, 0.5]
+    @test rhs(s2, u1) ≈ rhs(s1, u1) rtol = 1e-12
+    @test rhs(s1, u1)[2] ≈ 0.5 * 0.7 * 0.5 * (1500 - 200) - 0.05 * 200 rtol = 1e-12     # φ·β·E·V − δ·D, uncoupled
+    # Norton–Simon linear kill + low-resource loss module + χ: the multi-module right-hand side written out
+    Lk = merge(line_spec(:logistic, :chain2, :loss, :D; fixed=Dict(:r => 0.8, :K => PR.K, :β => 0.6, :k => 0.9, :EC50 => 1.0)),
+               (ns=true, cc=(kf=Slot(0, 0.5), pr=Slot(0, 0.0), cs=Slot(0, 0.0), csimm=true, di=Slot(0, 0.0))))
+    Mr = line_spec(:logistic, :none, :loss, :R; fixed=Dict(:r => 0.8, :K => PR.K, :β => 0.2, :EC50 => 1.0))
+    sm = build_system([merge(Lk, (extra=Any[Mr], chi=Slot(0, 0.3)))], [(D=1.0, R=U_R, lines=[1])], [[Slot(0, 1.0)]])
+    um = [1500.0, 0.4, 0.5]; q = 1500 / PR.K
+    @test rhs(sm, um)[1] ≈ 0.8 * 1500 * (1 - q) - (0.2 * U_R + 0.5 * 0.6 * 0.5 * (1 + 0.3) * (1 - q)) * 1500 rtol = 1e-12
+end

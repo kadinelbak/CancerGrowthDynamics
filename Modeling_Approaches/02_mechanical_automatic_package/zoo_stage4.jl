@@ -54,7 +54,8 @@ function stage4_cands(c3, c3b, βC2)
         χN = haskey(idx, :χ) ? Slot(idx[:χ], 0.0) : sl(:χN, 0.0)
         χC = haskey(idx, :χ) ? Slot(idx[:χ], 0.0) : sl(:χC, 0.0)
         lines = [merge(LN, (extra=Any[mN], chi=χN)), merge(LC, (extra=Any[mC], chi=χC))]
-        S4_NS && (lines = [merge(l, (ns=true,)) for l in lines])
+        # Norton–Simon only where the Stage 3 line has it (a Stage 2b winner may be an uncoupled variant, 2026-11-09)
+        S4_NS && (lines = [ns_on(l3) ? merge(l, (ns=true,)) : l for (l, l3) in zip(lines, (LN3, LC3))])
         alpha = crowd == :S3 ? a3 : a3b
         sys = build_system(lines, [(D=COMBO_DOSE, R=U_R, lines=[1, 2])], alpha)
         model = make_system_model(sys)
