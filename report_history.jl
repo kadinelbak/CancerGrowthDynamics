@@ -400,13 +400,21 @@ function archive_version(id, page; settings, results, chapters, source, commit=g
     rec
 end
 
+# a file's modification time on the local clock (unix2datetime alone gives UTC, while version dates use now())
+local_mtime(path) = unix2datetime(mtime(path)) + Minute(round(Int, (datetime2unix(now()) - time()) / 60))
+
+# the site-nav script tag that add_site_nav puts into the live page after its hash was recorded
+strip_site_nav(html) = replace(html, r"<script defer src=[\"'][^\"']*site-nav\.js[\"']></script>\n?" => "")
+
 # a report.html that is in no version yet (built before the history existed, or by an older script) is
 # archived as it is, before it is replaced
 function archive_unrecorded(current)
     isfile(current) || return
-    sha = bytes2hex(open(sha256, current))
-    any(v -> get(v, "report_sha", "") == sha || sha in get(v, "report_shas", String[]), load_versions()) && return
-    id = Dates.format(unix2datetime(mtime(current)), "yyyy-mm-dd_HHMM") * "_unrecorded"
+    html = read(current, String)
+    shas = (bytes2hex(sha256(html)), bytes2hex(sha256(strip_site_nav(html))))   # a page that only gained the nav bar is not new
+    any(v -> any(sha -> get(v, "report_sha", "") == sha || sha in get(v, "report_shas", String[]), shas), load_versions()) && return
+    sha = shas[1]
+    id = Dates.format(local_mtime(current), "yyyy-mm-dd_HHMM") * "_unrecorded"
     page = read(current, String)
     archive_version(id, page; settings=Tuple{String,String,String}[], results=Tuple{String,String,String}[], chapters=Tuple{String,String}[],
                     source="archived before replacement; settings not recorded", commit="")

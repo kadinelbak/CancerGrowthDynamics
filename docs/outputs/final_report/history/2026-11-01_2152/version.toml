@@ -1,4 +1,4 @@
-note = ""
+note = "Fits from 28 Oct with the control rerun of 1 Nov."
 commit = "b3cf098"
 source = "build_final_report.jl"
 id = "2026-11-01_2152"
