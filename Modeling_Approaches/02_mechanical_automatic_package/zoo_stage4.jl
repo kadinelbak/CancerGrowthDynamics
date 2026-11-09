@@ -14,7 +14,7 @@
 
 # freeze_slot, freeze_cc: zoo_models.jl. Coculture modifiers (L.cc) of the Stage 3a lines are frozen too.
 freeze_line(L, p) = merge(L, (s=NamedTuple{keys(L.s)}(Tuple(freeze_slot(getfield(L.s, k), p) for k in keys(L.s))),),
-                          cc_on(L) ? (cc=freeze_cc(L.cc, p),) : NamedTuple())
+                          cc_on(L) ? (cc=freeze_cc(L.cc, p),) : NamedTuple(), sw_on(L) ? (sw=freeze_sw(L.sw, p),) : NamedTuple())
 
 # (name, label, crowding source, resistant kill on, free parameters) from the combination stage of stages.toml
 const S4_SPECS = let st = only(s for s in TOML.parsefile(STAGES_FILE)["stage"] if s["kind"] == "combination")

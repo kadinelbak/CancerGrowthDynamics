@@ -265,3 +265,19 @@ decision = "Scenario B and the held-out Ce1 prediction use the monoculture drug 
 was = ""
 by = "review"
 where = "control_model.jl scenario_plant; zoo_heldout.jl mono_drug_line; validation.toml heldout.refit"
+
+[[decision]]
+date = "2026-11-09"
+area = "interpretation"
+decision = "A resistant kill factor near 0 in coculture is read as 'no detectable resistant kill at 1 µM' only. The monoculture resistant kill is driven by the 1.47 µM series (A2780cis at 1 µM ended above untreated), so it does not contradict resistant cells dying at higher doses; the monoculture kill is not set to 0."
+was = "open question how a resistant kill near 0 squares with the monoculture kill"
+by = "user"
+where = "paper Results / Discussion wording; no code change"
+
+[[decision]]
+date = "2026-11-09"
+area = "fitting"
+decision = "Stage 3a adds phenotype-switching candidates: sensitive cells switch at a low rate (spontaneous μ0, or drug-induced μD × the sensitive drug-effect state) into a resistant-like state that keeps the sensitive label (counted as A2780), grows at r_C and feels the resistant Stage 2b kill β_C. ASSUMPTION: the two lines are told apart by a label that switching does not change."
+was = ""
+by = "user"
+where = "stages.toml s3 candidates (family Coculture switching); zoo_models.jl L.sw (line_rhs!); run_zoo_fits.jl make_cc"

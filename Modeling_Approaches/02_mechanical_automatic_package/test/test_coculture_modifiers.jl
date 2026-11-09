@@ -54,3 +54,32 @@ const U = [1200.0, 800.0, 0.3, 0.5, 0.6, 0.2, 0.4, 0.45]
     fz = freeze_cc(ccN, p)
     @test fz.kf == Slot(0, 0.6) && fz.pr == Slot(0, 2.0) && fz.cs == Slot(0, 0.3) && fz.di == Slot(0, 0.05) && fz.csimm == false
 end
+
+# phenotype switching (L.sw): sensitive cells switch into Z, counted in N, growing at r_C and killed by β_C
+@testset "phenotype switching" begin
+    fx(r, β, k, d) = Dict(:r => r, :K => PR.K, :β => β, :k => k, :d => d, :EC50 => 1.0)
+    LN = merge(line_spec(:logistic, :chain3, :loss, :D; fixed=fx(PR.rN, PR.βN, PR.kN, PR.dN)), (ns=true,))
+    LC = merge(line_spec(:logistic, :chain3, :loss, :D; fixed=fx(PR.rC, PR.βC, PR.kC, PR.dC)), (ns=true,))
+    alpha = [[Slot(0, 1.0), Slot(0, PR.αNC)], [Slot(0, PR.αCN), Slot(0, 1.0)]]
+    sw0 = (μ0=Slot(0, 0.0), μD=Slot(0, 0.0), r=LC.s.r, β=LC.s.β)
+    LNs = merge(LN, (sw=merge(sw0, (μ0=Slot(1, 0.0), μD=Slot(2, 0.0))),))
+    sys0 = build_system([LN, LC], [(D=1.0, R=0.0, lines=[1, 2])], alpha)
+    sys = build_system([LNs, LC], [(D=1.0, R=0.0, lines=[1, 2])], alpha)
+    @test sys.n == sys0.n + 1
+    # N's block: [A_N1..A_N3, Z]; C's block follows
+    u = [1200.0, 800.0, 0.3, 0.5, 0.6, 150.0, 0.2, 0.4, 0.45]
+    du = rhs(sys, u, [0.02, 0.1])
+    # no switching and no switched cells: identical to the line without sw
+    u0 = copy(u); u0[6] = 0.0
+    @test rhs(sys, u0, [0.0, 0.0])[[1, 2, 3, 4, 5, 7, 8, 9]] ≈ rhs(sys0, u0[[1, 2, 3, 4, 5, 7, 8, 9]]) rtol = 1e-12
+    N, C, Z = u[1], u[2], u[6]; S = N - Z; EN = u[5]
+    qN = (N + PR.αNC * C) / PR.K; μ = 0.02 + 0.1 * EN
+    dS = PR.rN * S * (1 - qN) - (PR.dN + PR.βN * EN * (1 - qN) + μ) * S
+    dZ = PR.rC * Z * (1 - qN) - (PR.dN + PR.βC * EN * (1 - qN)) * Z + μ * S
+    @test du[6] ≈ dZ rtol = 1e-12
+    @test du[1] ≈ dS + dZ rtol = 1e-12
+    tex = join(line_tex(LNs, "N", "N+\\alpha_{NC}C", "K"), "\n")
+    @test occursin("Z_{N}", tex) && occursin("\\mu_D", tex) && occursin("\\beta_{C}", tex)
+    fz = freeze_sw(LNs.sw, [0.02, 0.1])
+    @test fz.μ0 == Slot(0, 0.02) && fz.μD == Slot(0, 0.1)
+end
