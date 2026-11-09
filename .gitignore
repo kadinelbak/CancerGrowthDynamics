@@ -16,3 +16,6 @@ Processed_Datasets/
 **/*.jls
 Modeling_Approaches/02_mechanical_automatic_package/outputs/*.log
 Modeling_Approaches/02_mechanical_automatic_package/outputs/logs/
+Modeling_Approaches/02_mechanical_automatic_package/tools/sysimage/a2780_sysimage.*
+Modeling_Approaches/02_mechanical_automatic_package/tools/sysimage/manifest.sha256
+Modeling_Approaches/02_mechanical_automatic_package/tools/sysimage/Manifest.toml

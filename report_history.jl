@@ -230,7 +230,16 @@ function report_provenance(pkg=HPKG)
                 text = "resumed (--resume: unchanged fits and bootstraps reused from an earlier run)"
             else
                 status = "new"; when = fin; text = "new in this version"
+                # saved fits and bootstraps reused unchanged inside the fitting step (since 2026-11-08 / 2026-11-09)
+                if name == "fits" && haskey(st, "fits_total")
+                    nb = length(get(st, "bootstraps_reused", []))
+                    text *= " ($(get(st, "fits_reused", 0)) of $(st["fits_total"]) candidate fits and $nb of $(get(st, "bootstraps_total", 0)) " *
+                            "bootstraps reused unchanged)"
+                    (get(st, "fits_reused", 0) > 0 || nb > 0) && (reused = true)
+                end
             end
+        elseif name == "control60"
+            status = "not_run"; text = "not run (only with --control60)"
         end
         status in ("reused_unchanged", "reused_earlier", "resumed") && (reused = true)
         push!(recs, Dict{String,Any}("step" => name, "label" => label, "status" => status, "when" => when, "detail" => text))
