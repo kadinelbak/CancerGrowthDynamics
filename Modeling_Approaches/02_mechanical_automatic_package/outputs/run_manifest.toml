@@ -1,29 +1,29 @@
 steps_requested = ["tests", "final"]
-continued_from = "2026-11-02T02:10:33.728"
+continued_from = "2026-11-08T22:20:44.705"
 threads = 12
-finished = "2026-11-02T11:08:16.784"
-started = "2026-11-02T10:41:33.578"
+finished = "2026-11-08T22:47:42.312"
+started = "2026-11-08T22:21:46.820"
 resume = false
-time_limit_hits = 50
+time_limit_hits = 11
 julia = "1.12.6"
 
 [steps.checks]
 log = "outputs/logs/checks.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "cbacbc3770015790591f9f95389649ca3c2d1cce"
 uncommitted_changes = true
-seconds = 30.4
-finished = "2026-11-02T02:11:20.964"
+seconds = 30.6
+finished = "2026-11-08T11:17:53.390"
 
     [steps.checks.env]
 
 [steps.report60]
 log = "outputs/logs/report60.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 42.2
-finished = "2026-11-02T05:52:23.983"
+seconds = 42.6
+finished = "2026-11-08T22:13:12.212"
 
     [steps.report60.env]
     CONTROL_DAYS = "60"
@@ -31,52 +31,55 @@ finished = "2026-11-02T05:52:23.983"
 [steps.control30]
 log = "outputs/logs/control30.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 996.3
-finished = "2026-11-02T05:24:29.751"
+seconds = 687.0
+finished = "2026-11-08T21:49:15.207"
 
     [steps.control30.env]
     REDO = "1"
+    CONTROL_FORCE = "1"
     CONTROL_DAYS = "30"
 
 [steps.data]
 log = "outputs/logs/data.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
-uncommitted_changes = true
-seconds = 13.6
-finished = "2026-11-02T02:10:49.252"
+commit = "cbacbc3770015790591f9f95389649ca3c2d1cce"
+uncommitted_changes = false
+seconds = 13.5
+finished = "2026-11-08T11:17:21.426"
 
     [steps.data.env]
 
 [steps.fits]
 log = "outputs/logs/fits.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "cbacbc3770015790591f9f95389649ca3c2d1cce"
 uncommitted_changes = true
-seconds = 8094.6
-finished = "2026-11-02T04:26:15.605"
+seconds = 1502.1
+finished = "2026-11-08T11:42:55.534"
 
     [steps.fits.env]
+    ZOO_RESUME = "1"
+    ZOO_REUSE_BOOT = "1"
 
 [steps.sweep_report]
 log = "outputs/logs/sweep_report.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 7.4
-finished = "2026-11-02T06:50:31.832"
+seconds = 7.5
+finished = "2026-11-08T22:20:43.103"
 
     [steps.sweep_report.env]
 
 [steps.alldoses]
 log = "outputs/logs/alldoses.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "ed5d3e91d66ba55a6398e2751e90fa65ec88b432"
 uncommitted_changes = true
-seconds = 2817.8
-finished = "2026-11-02T06:39:21.819"
+seconds = 2225.7
+finished = "2026-11-08T16:31:44.400"
 
     [steps.alldoses.env]
     ZOO_NO_EXCLUDE = "1"
@@ -86,87 +89,90 @@ finished = "2026-11-02T06:39:21.819"
 [steps.findings]
 log = "outputs/logs/findings.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 31.2
-finished = "2026-11-02T06:51:03.079"
+seconds = 30.6
+finished = "2026-11-08T22:21:17.248"
 
     [steps.findings.env]
-
-[steps.control60]
-log = "outputs/logs/control60.log"
-ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
-uncommitted_changes = true
-seconds = 1590.7
-finished = "2026-11-02T05:51:41.777"
-
-    [steps.control60.env]
-    REDO = "1"
-    CONTROL_DAYS = "60"
 
 [steps.final]
 log = "outputs/logs/final.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 286.9
-finished = "2026-11-02T11:08:16.773"
+seconds = 284.5
+finished = "2026-11-08T22:47:42.302"
 
     [steps.final.env]
+
+[steps.control60]
+log = "outputs/logs/control60.log"
+ok = true
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
+uncommitted_changes = true
+seconds = 1341.6
+finished = "2026-11-08T22:12:25.972"
+
+    [steps.control60.env]
+    REDO = "1"
+    CONTROL_FORCE = "1"
+    CONTROL_DAYS = "60"
 
 [steps.sweep_all]
 log = "outputs/logs/sweep_all.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 330.7
-finished = "2026-11-02T06:50:24.393"
+seconds = 216.9
+finished = "2026-11-08T22:20:32.081"
 
     [steps.sweep_all.env]
     REDO = "1"
+    CONTROL_FORCE = "1"
     ZOO_STATE = "/home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/sensitivity/all_doses/zoo_state.jls"
     SWEEP_DATA = "all doses"
 
 [steps.report_long]
 log = "outputs/logs/report_long.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 42.5
-finished = "2026-11-02T05:07:53.462"
+seconds = 43.5
+finished = "2026-11-08T21:37:44.659"
 
     [steps.report_long.env]
 
 [steps.control_long]
 log = "outputs/logs/control_long.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 1492.0
-finished = "2026-11-02T05:07:10.930"
+seconds = 1330.4
+finished = "2026-11-08T21:36:57.646"
 
     [steps.control_long.env]
     REDO = "1"
+    CONTROL_FORCE = "1"
 
 [steps.analyses]
 log = "outputs/logs/analyses.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "cbacbc3770015790591f9f95389649ca3c2d1cce"
 uncommitted_changes = true
-seconds = 256.5
-finished = "2026-11-02T04:30:32.109"
+seconds = 194.9
+finished = "2026-11-08T11:46:10.476"
 
     [steps.analyses.env]
-    REDO = "1"
+    CONTROL_FORCE = "1"
 
 [steps.report30]
 log = "outputs/logs/report30.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 41.3
-finished = "2026-11-02T05:25:11.069"
+seconds = 42.0
+finished = "2026-11-08T21:50:00.775"
 
     [steps.report30.env]
     CONTROL_DAYS = "30"
@@ -174,42 +180,44 @@ finished = "2026-11-02T05:25:11.069"
 [steps.sweep]
 log = "outputs/logs/sweep.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 331.9
-finished = "2026-11-02T06:44:53.697"
+seconds = 215.9
+finished = "2026-11-08T22:16:51.623"
 
     [steps.sweep.env]
     REDO = "1"
+    CONTROL_FORCE = "1"
 
 [steps.report14]
 log = "outputs/logs/report14.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 41.5
-finished = "2026-11-02T04:42:18.947"
+seconds = 41.9
+finished = "2026-11-08T21:14:43.695"
 
     [steps.report14.env]
 
 [steps.control14]
 log = "outputs/logs/control14.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 665.4
-finished = "2026-11-02T04:41:37.478"
+seconds = 335.7
+finished = "2026-11-08T21:13:58.173"
 
     [steps.control14.env]
     REDO = "1"
+    CONTROL_FORCE = "1"
 
 [steps.tests]
 log = "outputs/logs/tests.log"
 ok = true
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
-seconds = 1313.1
-finished = "2026-11-02T11:03:28.779"
+seconds = 1267.9
+finished = "2026-11-08T22:42:56.682"
 
     [steps.tests.env]
 
@@ -244,6 +252,6 @@ repo-url = "https://github.com/kadinelbak/GrowthParameterEstimation.jl.git"
 version = "0.4.1"
 
 [git]
-branch = "claude/project-thread-iuaj3t"
-commit = "0aa4aaf23e7531112b9ef451d7b223ecb1be24d9"
+branch = "claude/project-thread-u8vnid"
+commit = "df1be8d0625aaed0a1ed040bebcd11e284d59b46"
 uncommitted_changes = true
