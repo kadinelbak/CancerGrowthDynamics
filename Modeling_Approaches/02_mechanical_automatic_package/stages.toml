@@ -68,7 +68,7 @@ bootstrap_screen = 40
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
-bounds = { K = [0.5, 20.0], "αNC" = [0.0, 5.0], "αCN" = [0.0, 5.0], "βN" = [0.0, 10.0], "βC" = [0.0, 10.0], dN = [0.0, 3.0], dC = [0.0, 3.0], "εN" = [0.0, 5.0], "εC" = [0.0, 5.0] }
+bounds = { K = [0.5, 20.0], "αNC" = [0.0, 5.0], "αCN" = [0.0, 5.0], "βN" = [0.0, 10.0], "βC" = [0.0, 10.0], dN = [0.0, 3.0], dC = [0.0, 3.0], "εN" = [0.0, 5.0], "εC" = [0.0, 5.0], "φ" = [0.0, 5.0], "φN" = [0.0, 5.0], "φC" = [0.0, 5.0], "ρN" = [0.0, 50.0], "ρC" = [0.0, 50.0], "γN" = [0.0, 1.0], "γC" = [0.0, 1.0], "ηN" = [0.0, 3.0], "ηC" = [0.0, 3.0], kN = [0.001, 20.0], kC = [0.001, 20.0], "μ0" = [0.0, 0.5], "μD" = [0.0, 2.0] }
 
 # ── 1 · untreated monocultures ────────────────────────────────────────────────
 [[stage]]
@@ -169,6 +169,247 @@ betaC_floor = 0.1
   name = "cc_K_alpha_death"
   label = "Shared K + crowding + coculture death, drug mechanisms from Stage 2"
   free = ["K", "αNC", "αCN", "dN", "dC"]
+  # ── coculture interaction models (user, 2026-11-08) ─────────────────────────────────────────────
+  # Each asks whether the Stage 2b kill carries over to coculture unchanged. "Stand-alone" versions sit on
+  # shared K with one-for-one crowding; the others add asymmetric crowding (and, where noted, the coculture
+  # deaths). Delay: the kill factor and the protection act on the Stage 2b kill, so they inherit its
+  # 3-compartment delay; the cytostatic effect is offered immediate ("imm", follows the dose) and delayed
+  # ("delay", follows each line's Stage 2b chain), and its cytostatic-only variants can refit the delay rate.
+  # No new compartments: every line keeps at most 3 (MAX_COMPARTMENTS).
+  [[stage.candidate]]
+  name = "cc_K_phi"
+  label = "Shared K, one kill factor for both lines (stand-alone)"
+  family = "Coculture kill factor"
+  free = ["K", "φ"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_phi"
+  label = "Shared K + crowding, one kill factor for both lines"
+  family = "Coculture kill factor"
+  free = ["K", "αNC", "αCN", "φ"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_phiN"
+  label = "Shared K + crowding, sensitive kill factor"
+  family = "Coculture kill factor"
+  free = ["K", "αNC", "αCN", "φN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_phiC"
+  label = "Shared K + crowding, resistant kill factor"
+  family = "Coculture kill factor"
+  free = ["K", "αNC", "αCN", "φC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_phiNC"
+  label = "Shared K + crowding, kill factor per line"
+  family = "Coculture kill factor"
+  free = ["K", "αNC", "αCN", "φN", "φC"]
+  [[stage.candidate]]
+  name = "cc_K_phiNC"
+  label = "Shared K, kill factor per line (stand-alone)"
+  family = "Coculture kill factor"
+  free = ["K", "φN", "φC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phi"
+  label = "Shared K + crowding + coculture death, one kill factor"
+  family = "Coculture kill factor"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φ"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiNC"
+  label = "Shared K + crowding + coculture death, kill factor per line"
+  family = "Coculture kill factor"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC"]
+  # phenotype switching (2026-11-09): sensitive cells switch at a low rate into a resistant-like state that keeps
+  # the sensitive label (counted as A2780) but grows at r_C and feels the resistant Stage 2b kill β_C;
+  # spontaneous μ0 (also in untreated wells) or drug-induced μD × the sensitive drug-effect state
+  [[stage.candidate]]
+  name = "cc_K_alpha_sw0"
+  label = "Shared K + crowding, spontaneous switching of sensitive cells to a resistant state"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_swD"
+  label = "Shared K + crowding, drug-induced switching of sensitive cells to a resistant state"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "μD"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_sw0"
+  label = "Shared K + crowding + coculture death, spontaneous switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_swD"
+  label = "Shared K + crowding + coculture death, drug-induced switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "μD"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiN_sw0"
+  label = "Shared K + crowding + coculture death, sensitive kill factor, spontaneous switching (resistant kill kept)"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiN_swD"
+  label = "Shared K + crowding + coculture death, sensitive kill factor, drug-induced switching (resistant kill kept)"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "μD"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiNC_sw0"
+  label = "Best coculture model (death + kill factor per line) plus spontaneous switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiNC_swD"
+  label = "Best coculture model (death + kill factor per line) plus drug-induced switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC", "μD"]
+  [[stage.candidate]]
+  name = "cc_K_protN"
+  label = "Shared K, resistant cells shield sensitive cells from the drug (stand-alone)"
+  family = "Coculture protection"
+  free = ["K", "ρN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_protN"
+  label = "Shared K + crowding, resistant cells shield sensitive cells"
+  family = "Coculture protection"
+  free = ["K", "αNC", "αCN", "ρN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_protC"
+  label = "Shared K + crowding, sensitive cells shield resistant cells"
+  family = "Coculture protection"
+  free = ["K", "αNC", "αCN", "ρC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_protNC"
+  label = "Shared K + crowding, each line shields the other"
+  family = "Coculture protection"
+  free = ["K", "αNC", "αCN", "ρN", "ρC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_protNC"
+  label = "Shared K + crowding + coculture death, each line shields the other"
+  family = "Coculture protection"
+  free = ["K", "αNC", "αCN", "dN", "dC", "ρN", "ρC"]
+  [[stage.candidate]]
+  name = "cc_K_csN_imm"
+  label = "Shared K, drug also slows sensitive growth, immediate (stand-alone)"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "γN"]
+  cytostatic = "imm"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csN_imm"
+  label = "Shared K + crowding, drug also slows sensitive growth, immediate"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN"]
+  cytostatic = "imm"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csC_imm"
+  label = "Shared K + crowding, drug also slows resistant growth, immediate"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γC"]
+  cytostatic = "imm"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNC_imm"
+  label = "Shared K + crowding, drug also slows growth of both lines, immediate"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN", "γC"]
+  cytostatic = "imm"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNonly_imm"
+  label = "Shared K + crowding, drug only slows sensitive growth (no kill in coculture), immediate"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN"]
+  cytostatic = "imm"
+  fixed = { "βN" = 0.0, "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNConly_imm"
+  label = "Shared K + crowding, drug only slows growth of both lines (no kill in coculture), immediate"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN", "γC"]
+  cytostatic = "imm"
+  fixed = { "βN" = 0.0, "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_csN_delay"
+  label = "Shared K, drug also slows sensitive growth, through the Stage 2b delay (stand-alone)"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "γN"]
+  cytostatic = "delay"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csN_delay"
+  label = "Shared K + crowding, drug also slows sensitive growth, through the Stage 2b delay"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN"]
+  cytostatic = "delay"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csC_delay"
+  label = "Shared K + crowding, drug also slows resistant growth, through the Stage 2b delay"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γC"]
+  cytostatic = "delay"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNC_delay"
+  label = "Shared K + crowding, drug also slows growth of both lines, through the Stage 2b delay"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN", "γC"]
+  cytostatic = "delay"
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNonly_delay"
+  label = "Shared K + crowding, drug only slows sensitive growth (no kill in coculture), through the Stage 2b delay"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN"]
+  cytostatic = "delay"
+  fixed = { "βN" = 0.0, "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNConly_delay"
+  label = "Shared K + crowding, drug only slows growth of both lines (no kill in coculture), through the Stage 2b delay"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN", "γC"]
+  cytostatic = "delay"
+  fixed = { "βN" = 0.0, "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNonly_delayk"
+  label = "Shared K + crowding, drug only slows sensitive growth, delay rate refitted"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN", "kN"]
+  cytostatic = "delay"
+  fixed = { "βN" = 0.0, "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_alpha_csNConly_delayk"
+  label = "Shared K + crowding, drug only slows growth of both lines, delay rates refitted"
+  family = "Cytostatic drug (Strobl)"
+  free = ["K", "αNC", "αCN", "γN", "γC", "kN", "kC"]
+  cytostatic = "delay"
+  fixed = { "βN" = 0.0, "βC" = 0.0 }
+  [[stage.candidate]]
+  name = "cc_K_intN"
+  label = "Shared K, resistant cells kill sensitive cells (stand-alone)"
+  family = "Interference competition"
+  free = ["K", "ηN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_intN"
+  label = "Shared K + crowding, resistant cells kill sensitive cells"
+  family = "Interference competition"
+  free = ["K", "αNC", "αCN", "ηN"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_intC"
+  label = "Shared K + crowding, sensitive cells kill resistant cells"
+  family = "Interference competition"
+  free = ["K", "αNC", "αCN", "ηC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_intNC"
+  label = "Shared K + crowding, each line kills the other"
+  family = "Interference competition"
+  free = ["K", "αNC", "αCN", "ηN", "ηC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_phiNC_intNC"
+  label = "Shared K + crowding, kill factor per line + each line kills the other"
+  family = "Combined"
+  free = ["K", "αNC", "αCN", "ηN", "ηC", "φN", "φC"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_phiN_csC_imm"
+  label = "Shared K + crowding, sensitive kill factor + drug slows resistant growth"
+  family = "Combined"
+  free = ["K", "αNC", "αCN", "φN", "γC"]
+  cytostatic = "imm"
+  [[stage.candidate]]
+  name = "cc_K_alpha_phi_protNC"
+  label = "Shared K + crowding, one kill factor + each line shields the other"
+  family = "Combined"
+  free = ["K", "αNC", "αCN", "φ", "ρN", "ρC"]
 
 # ── 3b · low-resource cocultures, shared K ───────────────────────────────────
 [[stage]]

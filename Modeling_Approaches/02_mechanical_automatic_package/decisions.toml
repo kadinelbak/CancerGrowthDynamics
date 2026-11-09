@@ -241,3 +241,51 @@ decision = "Progression is reached when the resistant line reaches K/2 or the se
 was = "progression = N + C ≥ K/2 (2026-10-27 to 2026-11-03; 0.8 K before)"
 by = "user"
 where = "control_config.toml [progression] rule, resistant_threshold_fraction_of_K, sensitive_threshold_of, sensitive_threshold_fraction; control_mpc.jl line_thresholds, progressed, prog_index; control_fasting.jl weights2"
+
+[[decision]]
+date = "2026-11-08"
+area = "fitting"
+decision = "Stage 3a adds coculture interaction candidates (kill factor φ shared or per line, protection ρ, Strobl-style cytostatic drug γ immediate or through the Stage 2b delay with cytostatic-only variants, interference η, and combinations), each stand-alone on shared K and with asymmetric crowding; the selection rule chooses among them and the five earlier candidates."
+was = "only K, crowding and coculture deaths were refitted; the Stage 2b kill was assumed to carry over unchanged"
+by = "user"
+where = "stages.toml s3 candidates; zoo_models.jl L.cc (cc_terms)"
+
+[[decision]]
+date = "2026-11-08"
+area = "fitting"
+decision = "Every fitted candidate is saved (fit_cache/) and not refitted while its structure, inherited values, data and fitting code are unchanged; adding candidates refits only the new ones. ZOO_REFIT=1 refits everything."
+was = "every run refitted every candidate unless ZOO_RESUME reused the per-line stages"
+by = "user"
+where = "run_zoo_fits.jl cached_fit"
+
+[[decision]]
+date = "2026-11-08"
+area = "control"
+decision = "Scenario B and the held-out Ce1 prediction use the monoculture drug response: when the carried Stage 3a model has coculture drug modifiers (φ, ρ, γ) they are switched off there, and a refitted delay rate returns to its Stage 2b value; interference η is kept and refitted on Ce0 with the crowding."
+was = ""
+by = "review"
+where = "control_model.jl scenario_plant; zoo_heldout.jl mono_drug_line; validation.toml heldout.refit"
+
+[[decision]]
+date = "2026-11-09"
+area = "interpretation"
+decision = "A resistant kill factor near 0 in coculture is read as 'no detectable resistant kill at 1 µM' only. The monoculture resistant kill is driven by the 1.47 µM series (A2780cis at 1 µM ended above untreated), so it does not contradict resistant cells dying at higher doses; the monoculture kill is not set to 0."
+was = "open question how a resistant kill near 0 squares with the monoculture kill"
+by = "user"
+where = "paper Results / Discussion wording; no code change"
+
+[[decision]]
+date = "2026-11-09"
+area = "fitting"
+decision = "Stage 3a adds phenotype-switching candidates: sensitive cells switch at a low rate (spontaneous μ0, or drug-induced μD × the sensitive drug-effect state) into a resistant-like state that keeps the sensitive label (counted as A2780), grows at r_C and feels the resistant Stage 2b kill β_C. ASSUMPTION: the two lines are told apart by a label that switching does not change."
+was = ""
+by = "user"
+where = "stages.toml s3 candidates (family Coculture switching); zoo_models.jl L.sw (line_rhs!); run_zoo_fits.jl make_cc"
+
+[[decision]]
+date = "2026-11-09"
+area = "fitting"
+decision = "Two more switching candidates put switching on top of the best Stage 3a model (cc_K_alpha_death_phiNC_sw0 / _swD). Cloud check (fixed + seeded starts, no bootstrap): both fit μ ≈ 0 and reproduce cc_K_alpha_death_phiNC exactly, BIC 709.0 vs 703.9 (the +5.1 is the extra parameter), so the counts give no evidence of sensitive-to-resistant switching. Switching on the simpler bases: death_sw0 802.5, death_swD 802.0, death_phiN_sw0/swD 807.1; cc_K_alpha_sw0/swD did not finish (one start ran for 5+ h)."
+was = ""
+by = "claude"
+where = "stages.toml s3 candidates"
