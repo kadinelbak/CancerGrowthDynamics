@@ -130,7 +130,18 @@ parts = String[]
 chapter_stamps = Tuple{String,String}[]               # (title, report time) of every chapter, for the version record
 toc = String[]
 missing_parts = String[]
+# The 60-day control runs only with run_pipeline.jl --control60 (user, 2026-11-09). When it did not run after this
+# version's fits, its chapter says so instead of passing off an earlier run's report as current.
+function control60_note()
+    f = joinpath(@__DIR__, PKG, "run_manifest.toml"); isfile(f) || return ""
+    st = get(TOML.parsefile(f), "steps", Dict())
+    fits = get(get(st, "fits", Dict()), "finished", ""); c60 = get(get(st, "control60", Dict()), "finished", "")
+    isempty(fits) || (!isempty(c60) && c60 >= fits && get(st["control60"], "ok", false)) ? "" :
+        " <b>Not rerun in this version:</b> the 60-day control runs only with <code>julia run_pipeline.jl --control60</code>, " *
+        "so this chapter is from an earlier run (the date under the heading), made with the fits of that time."
+end
 for (id, title, blurb, rel) in chapters
+    id == "control_60d" && (blurb *= control60_note())
     path = joinpath(DOCS, rel)
     if !isfile(path)
         push!(missing_parts, rel); continue

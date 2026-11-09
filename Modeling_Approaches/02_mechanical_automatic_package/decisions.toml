@@ -265,3 +265,19 @@ decision = "Scenario B and the held-out Ce1 prediction use the monoculture drug 
 was = ""
 by = "review"
 where = "control_model.jl scenario_plant; zoo_heldout.jl mono_drug_line; validation.toml heldout.refit"
+
+[[decision]]
+date = "2026-11-09"
+area = "pipeline"
+decision = "The 60-day dose-only control (control60, report60) runs only with run_pipeline.jl --control60; the Final Report marks its chapter as from an earlier run when it did not run after this version's fits."
+was = "every full run recomputed it (~27 min on 12 threads)"
+by = "user"
+where = "run_pipeline.jl OPTIONAL; build_final_report.jl control60_note"
+
+[[decision]]
+date = "2026-11-09"
+area = "pipeline"
+decision = "Run time only, no result changes: a group's bootstrap is reused by default when nothing it depends on changed (content key, ZOO_REBOOT=1 recomputes); the all-doses variant reads the main run's saved fits; every start of every candidate and both lines of a per-line stage are fitted at the same time; independent pipeline steps run side by side (--jobs, default 3) with CPU time logged; the test files run at the same time; an optional precompiled Julia image (tools/sysimage)."
+was = "bootstraps reused only with --resume; candidates in parallel but their starts one after another; steps and test files one after another"
+by = "user"
+where = "run_zoo_fits.jl saved_boot, load_fit_cache; fit_parallel.jl; run_pipeline.jl; test/run_tests.jl; tools/sysimage"
