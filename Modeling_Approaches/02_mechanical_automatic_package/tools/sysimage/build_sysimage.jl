@@ -5,6 +5,9 @@
 #   julia --project=tools/sysimage tools/sysimage/build_sysimage.jl        (once, ~10–20 min; again after a
 #                                                                            package update, run_pipeline.jl says so)
 #
+# Memory: the build needs more than 15 GB of free RAM (GrowthParameterEstimation pulls in DifferentialEquations); a
+# 2026-11-09 build on a 15 GB machine was killed for lack of memory after 15 min. Close other Julia processes first.
+#
 # Writes tools/sysimage/a2780_sysimage.<so|dll|dylib> and manifest.sha256 (the package Manifest it was built
 # from). run_pipeline.jl uses the image only while that Manifest is unchanged; otherwise it runs without it.
 using Pkg
