@@ -322,10 +322,16 @@ end
 #   A = ∂F/∂x, B = ∂F/∂u, one ForwardDiff Jacobian of F over z = [x; u] (nx + 1 dual directions).
 # With ~9–12 states and one input, forward mode needs nx + 1 passes and reverse mode nx passes,
 # so the cost is similar; forward mode differentiates through the RK4 loop directly and needs no tape.
-function linearize(x, u, P::Plant, Δ)
+# At a dose bound (u ≤ lo or u ≥ hi) B is the one-sided derivative into the feasible side (second-order
+# one-sided difference): at u = 0 with no drug in the system the drug-effect states sit exactly on their
+# max(E, 0) clamp, where AD takes the clamped branch and misses the dose sensitivity (2026-11-08).
+function linearize(x, u, P::Plant, Δ; lo=-Inf, hi=Inf)
     nx = length(x)
     J = ForwardDiff.jacobian(z -> F(z[1:nx], z[nx+1], P, Δ), vcat(x, u))
-    F(x, u, P, Δ), J[:, 1:nx], J[:, nx+1]
+    Fx = F(x, u, P, Δ); B = J[:, nx+1]
+    s = u <= lo ? 1.0 : u >= hi ? -1.0 : 0.0
+    s == 0 || (h = 1e-4 * s; B = (4 .* F(x, u + h, P, Δ) .- F(x, u + 2h, P, Δ) .- 3 .* Fx) ./ (2h))
+    Fx, J[:, 1:nx], B
 end
 
 # Starting counts of every control run: the NOMINAL seeding of the coculture experiments

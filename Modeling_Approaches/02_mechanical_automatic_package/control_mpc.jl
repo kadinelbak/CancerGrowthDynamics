@@ -214,7 +214,7 @@ end
 function cost_gradient(x0, U, P::Plant, Δ, W::Weights)
     xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Vector{Float64}[]
     for k in eachindex(U)
-        xn, A, B = linearize(xs[k], U[k], P, Δ); push!(xs, xn); push!(As, A); push!(Bs, B)
+        xn, A, B = linearize(xs[k], U[k], P, Δ; lo=0.0, hi=W.umax); push!(xs, xn); push!(As, A); push!(Bs, B)
     end
     adjoint_gradient(xs, As, Bs, U, P, W)
 end
@@ -261,6 +261,20 @@ function qp_step(Hm, g, U, lo, hi, Δ, cum)
     box_qp(Hm, c .+ b * Δ, lo, hi, U)
 end
 
+# projected-gradient step U → clamp(U − g/L) with Armijo backtracking (L: the Gauss–Newton Hessian's norm);
+# the SQP fallback when the QP step is rejected. Returns (U, J) or nothing (no descent, or over the budget).
+function pg_step(Jf, J, g, U, lo, hi, L; cum=0.0, Δ=1.0)
+    d = clamp.(U .- g ./ L, lo, hi) .- U; slope = LA.dot(g, d)
+    (slope < 0 && !(cum > 0 && Δ * sum(U .+ d) > cum + 1e-12)) || return nothing
+    α = 1.0
+    for _ in 1:25
+        Un = U .+ α .* d; Jn = Jf(Un)
+        Jn <= J + 1e-4 * α * slope && return (Un, Jn)
+        α /= 2
+    end
+    nothing
+end
+
 # SQP solve of the finite-horizon problem from x0 (continuous doses)
 function sqp_solve(x0, U0, P::Plant, Δ, W::Weights; cum=0.0, max_iter=Int(CFG["sqp"]["max_iter"]), tol=Float64(CFG["sqp"]["tol"]))
     H = length(U0); lo = zeros(H); hi = fill(W.umax, H)
@@ -272,7 +286,7 @@ function sqp_solve(x0, U0, P::Plant, Δ, W::Weights; cum=0.0, max_iter=Int(CFG["
     for outer it in 1:max_iter
         xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Vector{Float64}[]
         for k in 1:H
-            xn, A, B = linearize(xs[k], U[k], P, Δ)
+            xn, A, B = linearize(xs[k], U[k], P, Δ; lo=lo[k], hi=hi[k])
             push!(xs, xn); push!(As, A); push!(Bs, B)
         end
         g = adjoint_gradient(xs, As, Bs, U, P, W)
@@ -286,6 +300,10 @@ function sqp_solve(x0, U0, P::Plant, Δ, W::Weights; cum=0.0, max_iter=Int(CFG["
                 U, Jold, J = Un, J, Jn; accepted = true; break
             end
             α /= 2
+        end
+        if !accepted         # QP step rejected (the Gauss–Newton model misses the progression step's curvature)
+            pg = pg_step(V -> total_cost(x0, V, P, Δ, W), J, g, U, lo, hi, max(LA.opnorm(Hm), 1e-12); cum=cum, Δ=Δ)
+            pg === nothing || ((U, Jold, J) = (pg[1], J, pg[2]); accepted = true)
         end
         push!(hist, J)
         (!accepted || abs(Jold - J) < tol * (1 + abs(J))) && break
