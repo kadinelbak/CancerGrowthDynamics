@@ -250,6 +250,16 @@ betaC_floor = 0.1
   family = "Coculture switching"
   free = ["K", "αNC", "αCN", "dN", "dC", "φN", "μD"]
   [[stage.candidate]]
+  name = "cc_K_alpha_death_phiNC_sw0"
+  label = "Best coculture model (death + kill factor per line) plus spontaneous switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiNC_swD"
+  label = "Best coculture model (death + kill factor per line) plus drug-induced switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC", "μD"]
+  [[stage.candidate]]
   name = "cc_K_protN"
   label = "Shared K, resistant cells shield sensitive cells from the drug (stand-alone)"
   family = "Coculture protection"
