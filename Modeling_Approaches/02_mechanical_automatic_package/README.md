@@ -25,11 +25,19 @@ julia run_pipeline.jl                  # raw data → fits → analyses → cont
 julia run_pipeline.jl --list           # the steps
 julia run_pipeline.jl --from analyses  # start later, reusing earlier outputs
 julia run_pipeline.jl --resume         # reuse unchanged fits, bootstraps and control checkpoints
+julia run_pipeline.jl --control60      # also the 60-day control (left out by default since 2026-11-09)
+julia run_pipeline.jl --jobs 1         # one step at a time (default 3: independent steps run side by side)
 ```
+
+Run time (2026-11-09): fits and bootstraps are reused whenever nothing they depend on changed (`fit_cache/`,
+`boot_checkpoints/`; `ZOO_REFIT=1` / `ZOO_REBOOT=1` recompute), every start of every candidate is its own task,
+the all-doses variant runs next to the control steps and takes the main run's identical fits, and the test files run
+at the same time. `run_manifest.toml` records each step's CPU time and average busy cores. A precompiled image saves
+~30 s per step: `julia --project=tools/sysimage tools/sysimage/build_sysimage.jl` once (and after package updates).
 
 Each step runs in its own process with its log in `outputs/logs/`. `outputs/run_manifest.toml`
 records the git commit, Julia and package versions, thread count, SHA-256 of every data file and the
-time and exit code of each step. A full run takes about 5–6 hours on 20 threads.
+time and exit code of each step. A full run took about 5 hours on 12 threads before the 2026-11-09 changes.
 
 **Reused data are flagged.** A control step whose inputs are unchanged skips its work and writes
 `outputs/reuse/<step>.toml`; `run_pipeline.jl` copies it into the step's `reused_from` (time of the run whose outputs
