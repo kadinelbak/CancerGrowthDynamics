@@ -268,6 +268,30 @@ where = "control_model.jl scenario_plant; zoo_heldout.jl mono_drug_line; validat
 
 [[decision]]
 date = "2026-11-09"
+area = "interpretation"
+decision = "A resistant kill factor near 0 in coculture is read as 'no detectable resistant kill at 1 µM' only. The monoculture resistant kill is driven by the 1.47 µM series (A2780cis at 1 µM ended above untreated), so it does not contradict resistant cells dying at higher doses; the monoculture kill is not set to 0."
+was = "open question how a resistant kill near 0 squares with the monoculture kill"
+by = "user"
+where = "paper Results / Discussion wording; no code change"
+
+[[decision]]
+date = "2026-11-09"
+area = "fitting"
+decision = "Stage 3a adds phenotype-switching candidates: sensitive cells switch at a low rate (spontaneous μ0, or drug-induced μD × the sensitive drug-effect state) into a resistant-like state that keeps the sensitive label (counted as A2780), grows at r_C and feels the resistant Stage 2b kill β_C. ASSUMPTION: the two lines are told apart by a label that switching does not change."
+was = ""
+by = "user"
+where = "stages.toml s3 candidates (family Coculture switching); zoo_models.jl L.sw (line_rhs!); run_zoo_fits.jl make_cc"
+
+[[decision]]
+date = "2026-11-09"
+area = "fitting"
+decision = "Two more switching candidates put switching on top of the best Stage 3a model (cc_K_alpha_death_phiNC_sw0 / _swD). Cloud check (fixed + seeded starts, no bootstrap): both fit μ ≈ 0 and reproduce cc_K_alpha_death_phiNC exactly, BIC 709.0 vs 703.9 (the +5.1 is the extra parameter), so the counts give no evidence of sensitive-to-resistant switching. Switching on the simpler bases: death_sw0 802.5, death_swD 802.0, death_phiN_sw0/swD 807.1; cc_K_alpha_sw0/swD did not finish (one start ran for 5+ h)."
+was = ""
+by = "claude"
+where = "stages.toml s3 candidates"
+
+[[decision]]
+date = "2026-11-09"
 area = "pipeline"
 decision = "The 60-day dose-only control (control60, report60) runs only with run_pipeline.jl --control60; the Final Report marks its chapter as from an earlier run when it did not run after this version's fits."
 was = "every full run recomputed it (~27 min on 12 threads)"

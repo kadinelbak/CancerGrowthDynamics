@@ -77,6 +77,7 @@ heldout_ce1_model(βN, βC) = make_system_model(heldout_ce1_sys(βN, βC))
 # largest parameter index any slot of a system reads (lines, their extra modules, crowding)
 max_free_index(sys) = maximum(vcat([q.i for L in sys.lines for M in modules(L) for q in values(M.s) if q isa Slot],
                                    [q.i for L in sys.lines if cc_on(L) for q in values(L.cc) if q isa Slot],
+                                   [q.i for L in sys.lines if sw_on(L) for q in values(L.sw) if q isa Slot],
                                    [q.i for row in sys.alpha for q in row if q isa Slot]); init=0)
 tag_match(s, sel) = all(string(get(s, k, "")) == string(v) for (k, v) in sel)
 const HO_TAGS = dataset_tags(HO["group"])

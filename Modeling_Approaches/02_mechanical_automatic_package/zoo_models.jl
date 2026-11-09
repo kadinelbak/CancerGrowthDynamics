@@ -38,6 +38,11 @@
 #   cytostatic γ       growth × max(1 − γ·E_cs, 0), Strobl-style; E_cs = dose (immediate) or the line's
 #                      own drug-effect state (the Stage 2b delay chain)
 #   interference η     extra death η·Y/K per viable cell (contact or secreted competition)
+#
+# Phenotype switching (optional L.sw, Stage 3a; see line_rhs!). Cells of this line switch at rate
+# μ0 + μD·E (spontaneous + drug-induced, E = the line's drug-effect state) into a resistant-like state Z
+# that keeps the line's label (so it is counted in this line's X) but grows at the resistant line's r and
+# feels the resistant line's monoculture kill β. Z is one extra hidden state at the end of the line's block.
 
 const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d, :EC50)
 # EC50 has no default: every line sets its own (a Hill line without one is an error, see build_system)
@@ -73,7 +78,8 @@ naux(a::Symbol) = a in (:resource, :toxin) ? 1 : 0
 # [X, hidden states of module 1, hidden states of module 2, …]. Lines without `extra` are unchanged.
 modules(L) = hasproperty(L, :extra) ? vcat(Any[L], L.extra) : Any[L]
 mwidth(M) = ncell(M.action) + nker(M.kernel) + naux(M.action)
-lwidth(L) = 1 + sum(mwidth(M) for M in modules(L))
+sw_on(L) = hasproperty(L, :sw) && L.sw !== nothing
+lwidth(L) = 1 + sum(mwidth(M) for M in modules(L)) + (sw_on(L) ? 1 : 0)
 
 # line spec: growth, kernel, action, input (:D or :R), slots (NamedTuple of Slot over SLOT_KEYS)
 function line_spec(growth, kernel, action, input; fixed=Dict{Symbol,Float64}(), free=Dict{Symbol,Int}())
@@ -239,6 +245,7 @@ end
 end
 freeze_cc(c, p) = merge(c, (kf=freeze_slot(c.kf, p), pr=freeze_slot(c.pr, p), cs=freeze_slot(c.cs, p), di=freeze_slot(c.di, p)))
 freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
+freeze_sw(w, p) = merge(w, (μ0=freeze_slot(w.μ0, p), μD=freeze_slot(w.μD, p), r=freeze_slot(w.r, p), β=freeze_slot(w.β, p)))
 
 # other: count of the other line in the well (coculture modifiers only; 0 in monoculture)
 function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}; other=zero(T)) where {T}
@@ -258,8 +265,24 @@ function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}; other=zero(T)) where
     ks = ns && L.action in (:damage, :transit) ? growth_factor(L.growth, crowd / K, θ) : one(T)
     reff, Keff, loss, out = module_effect!(du, u, o, L, p, w, X, V, r, K, T; ks=ks*fk)
     loss *= fk
-    ns && (loss *= growth_factor(L.growth, crowd / Keff, θ))
-    du[xi+1] = growth_term(L.growth, gm*reff, V, crowd / Keff, θ) - (sv(s.d, p, T) + di + loss)*V - out
+    gf = ns ? growth_factor(L.growth, crowd / Keff, θ) : one(T)
+    loss *= gf
+    dth = sv(s.d, p, T) + di
+    if !sw_on(L)
+        du[xi+1] = growth_term(L.growth, gm*reff, V, crowd / Keff, θ) - (dth + loss)*V - out
+        return nothing
+    end
+    # phenotype switching: V = S (still sensitive) + Z (switched, counted in X); see the header
+    L.action in (:loss, :hill) || error("phenotype switching is only implemented for loss and Hill kill actions")
+    zi = o + mwidth(L) + 1
+    Z = clamp(u[zi], z, V); S = V - Z
+    E = drug_exposure(u, o, L, w, p, T)
+    μ = sv(L.sw.μ0, p, T) + sv(L.sw.μD, p, T) * E
+    kZ = sv(L.sw.β, p, T) * E * gf                       # resistant monoculture kill (no coculture factor)
+    dS = growth_term(L.growth, gm*reff, S, crowd / Keff, θ) - (dth + loss + μ)*S
+    dZ = growth_term(L.growth, sv(L.sw.r, p, T), Z, crowd / Keff, θ) - (dth + kZ)*Z + μ*S
+    du[zi] = dZ
+    du[xi+1] = dS + dZ - out
     nothing
 end
 
@@ -282,6 +305,7 @@ function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}; other=zero(T
     χ = hasproperty(L, :chi) ? sv(L.chi, p, T) : z
     # coculture modifiers act through the first drug module (the line's own module, L itself, at offset o)
     fk, gm, di = L.input == :D ? cc_terms(L, u, o, L, p, T(env.D), other, K, T) : (one(T), one(T), z)
+    sw_on(L) && error("phenotype switching is only implemented for single-module lines")
     cc_on(L) && any(M -> M.input == :D && M.action in (:damage, :transit), mods) &&
         error("coculture modifiers with a damaged-cell drug action are only implemented for single-module lines")
     reff *= gm; loss += di
@@ -422,6 +446,7 @@ end
 function line_tex(L, X, crowd, Ksym)
     mods = modules(L)
     V = any(M -> M.action in (:damage, :transit), mods) ? "V_{$X}" : X
+    sw_on(L) && (V = "$(X)_S")
     parts = [module_tex(M, X, V) for M in mods]
     # a cytostatic effect that follows the delay chain keeps the chain even when the kill is off (β = 0)
     if cc_on(L) && !(L.cc.csimm) && !(L.cc.cs.i == 0 && L.cc.cs.v == 0) && isempty(parts[1].lines) && nker(L.kernel) > 0
@@ -456,7 +481,16 @@ function line_tex(L, X, crowd, Ksym)
     end
     lines = reduce(vcat, [q.lines for q in parts]; init=String[])
     chi && push!(lines, "\\hat u_R=u_R/0.955\\ (1\\text{ at }0.5\\%\\text{ FBS})")
-    vcat(["\\frac{d$X}{dt}=$rhs"], lines)
+    sw_on(L) || return vcat(["\\frac{d$X}{dt}=$rhs"], lines)
+    # phenotype switching: X = X_S + Z_X; Z_X grows and dies as the resistant line (r_C, β_C)
+    Y = X == "N" ? "C" : "N"
+    E = chainlen(L.kernel) > 0 ? "A_{$X,$(chainlen(L.kernel))}" : L.kernel == :none ? "D" : "A_{$X}"
+    mu = join(filter(!isempty, [isoff(L.sw.μ0) ? "" : "\\mu_0", isoff(L.sw.μD) ? "" : "\\mu_D$E"]), "+")
+    mu = occursin("+", mu) ? "\\left($mu\\right)" : mu
+    Zs = "Z_{$X}"
+    zr = "r_{$Y}\\,$Zs\\left(1-$frac\\right)-\\left($(ptex(slot_name(:d, X, L.input)))" *
+         (has(cc.di, 0.0) ? "+\\eta_{$X}\\frac{$Y}{$Ksym}" : "") * "+$(nsf)\\beta_{$Y}$E\\right)$Zs"
+    vcat(["$X=$(X)_S+$Zs", "\\frac{d$(X)_S}{dt}=$rhs-$mu\\,$(X)_S", "\\frac{d$Zs}{dt}=$zr+$mu\\,$(X)_S"], lines)
 end
 
 # ── candidate catalogue ────────────────────────────────────────────────────────

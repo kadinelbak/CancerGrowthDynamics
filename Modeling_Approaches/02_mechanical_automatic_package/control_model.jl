@@ -110,6 +110,7 @@ function line_specs(S, p, iε)
     for (j, l) in enumerate(S.envs[1].lines)
         L = S.lines[l]; xi = S.xi[1][j]; off = S.hb[1][j]
         L.growth in (:logistic, :theta) || error("growth law $(L.growth) not supported in the fast plant")
+        sw_on(L) && error("phenotype switching (L.sw) not supported in the fast plant")
         mods = ModSpec[]
         for M in modules(L)
             ncell(M.action) == 0 && naux(M.action) == 0 || error("action $(M.action) not supported in the fast plant")

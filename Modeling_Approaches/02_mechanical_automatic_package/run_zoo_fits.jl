@@ -263,7 +263,9 @@ const CC_PNAME = Dict(:K => "K", :αNC => "α_NC", :αCN => "α_CN", :βN => "β
                       # coculture modifiers (zoo_models.jl L.cc, 2026-11-08): kill factor φ (one shared or per line),
                       # protection ρ, cytostatic γ^cs, interference η, and a refitted delay rate k (cytostatic-only variants)
                       :φ => "φ", :φN => "φ_N", :φC => "φ_C", :ρN => "ρ_N", :ρC => "ρ_C", :γN => "γ_N^cs", :γC => "γ_C^cs",
-                      :ηN => "η_N", :ηC => "η_C", :kN => "k_N", :kC => "k_C")
+                      :ηN => "η_N", :ηC => "η_C", :kN => "k_N", :kC => "k_C",
+                      # phenotype switching of sensitive cells (zoo_models.jl L.sw, 2026-11-09): spontaneous μ0, drug-induced μD
+                      :μ0 => "μ_0", :μD => "μ_D")
 const CC_MOD_KEYS = (:φ, :φN, :φC, :ρN, :ρC, :γN, :γC, :ηN, :ηC)
 
 # Rebuild a line from its fitted mechanism row: mechanism values fixed, growth from Stage 1,
@@ -305,20 +307,25 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
                  di=slot(Symbol("η$X"), 0.0))
         LN = merge(LN, (cc=mk("N"),)); LC = merge(LC, (cc=mk("C"),))
     end
+    # phenotype switching: sensitive cells switch into a resistant-like state that keeps the sensitive label
+    # (counted as A2780) but grows at the resistant r and feels the resistant Stage 2b kill β_C
+    if any(k -> k in free || haskey(fixed, k), (:μ0, :μD))
+        LN = merge(LN, (sw=(μ0=slot(:μ0, 0.0), μD=slot(:μD, 0.0), r=LC.s.r, β=LC.s.β),))
+    end
     alpha = [[Slot(0, 1.0), slot(:αNC, 1.0)], [slot(:αCN, 1.0), Slot(0, 1.0)]]
     inh(k, row) = (i = findfirst(==(k), row.slots); i === nothing ? (k == :k ? 1.0 : 0.5) : row.params[i])
     start = Dict(:K => 1.1datasets_max, :αNC => 1.0, :αCN => 1.0, :βN => inh(:β, rows[1]), :βC => inh(:β, rows[2]),
                  :dN => 0.05, :dC => 0.05, :εN => 1.0, :εC => 1.0,
                  :φ => 1.0, :φN => 1.0, :φC => 1.0, :ρN => 0.5, :ρC => 0.5, :γN => 0.1, :γC => 0.1, :ηN => 0.05, :ηC => 0.05,
-                 :kN => inh(:k, rows[1]), :kC => inh(:k, rows[2]))
+                 :kN => inh(:k, rows[1]), :kC => inh(:k, rows[2]), :μ0 => 0.01, :μD => 0.05)
     alt = Dict(:K => 1.6datasets_max, :αNC => 0.5, :αCN => 1.5, :βN => 0.5start[:βN], :βC => 0.75start[:βC],
                :dN => 0.2, :dC => 0.01, :εN => 0.5, :εC => 2.0,
                :φ => 0.5, :φN => 0.5, :φC => 0.5, :ρN => 2.0, :ρC => 2.0, :γN => 0.4, :γC => 0.4, :ηN => 0.2, :ηC => 0.2,
-               :kN => 0.5start[:kN], :kC => 0.5start[:kC])
+               :kN => 0.5start[:kN], :kC => 0.5start[:kC], :μ0 => 0.05, :μD => 0.3)
     alt2 = Dict(:K => 0.8datasets_max, :αNC => 1.5, :αCN => 0.5, :βN => 2start[:βN] + 0.05, :βC => 2start[:βC] + 0.05,
                 :dN => 0.01, :dC => 0.2, :εN => 2.0, :εC => 0.5,
                 :φ => 0.2, :φN => 0.2, :φC => 0.2, :ρN => 8.0, :ρC => 8.0, :γN => 0.8, :γC => 0.8, :ηN => 0.01, :ηC => 0.01,
-                :kN => 2start[:kN], :kC => 2start[:kC])
+                :kN => 2start[:kN], :kC => 2start[:kC], :μ0 => 0.002, :μD => 0.01)
     bounds = [k == :K ? (CC_BOUNDS[:K][1] * datasets_max, CC_BOUNDS[:K][2] * datasets_max) :
               k == :βC ? (betaC_floor * start[:βC], CC_BOUNDS[:βC][2]) : CC_BOUNDS[k] for k in free]
     make_cand(name, label, family, [LN, LC], envs, alpha, X0, [CC_PNAME[k] for k in free], bounds,

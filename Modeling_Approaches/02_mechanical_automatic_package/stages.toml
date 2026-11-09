@@ -68,7 +68,7 @@ bootstrap_screen = 40
 
 [coculture]
 # bounds of refitted coculture parameters; K is bounded relative to the data maximum
-bounds = { K = [0.5, 20.0], "αNC" = [0.0, 5.0], "αCN" = [0.0, 5.0], "βN" = [0.0, 10.0], "βC" = [0.0, 10.0], dN = [0.0, 3.0], dC = [0.0, 3.0], "εN" = [0.0, 5.0], "εC" = [0.0, 5.0], "φ" = [0.0, 5.0], "φN" = [0.0, 5.0], "φC" = [0.0, 5.0], "ρN" = [0.0, 50.0], "ρC" = [0.0, 50.0], "γN" = [0.0, 1.0], "γC" = [0.0, 1.0], "ηN" = [0.0, 3.0], "ηC" = [0.0, 3.0], kN = [0.001, 20.0], kC = [0.001, 20.0] }
+bounds = { K = [0.5, 20.0], "αNC" = [0.0, 5.0], "αCN" = [0.0, 5.0], "βN" = [0.0, 10.0], "βC" = [0.0, 10.0], dN = [0.0, 3.0], dC = [0.0, 3.0], "εN" = [0.0, 5.0], "εC" = [0.0, 5.0], "φ" = [0.0, 5.0], "φN" = [0.0, 5.0], "φC" = [0.0, 5.0], "ρN" = [0.0, 50.0], "ρC" = [0.0, 50.0], "γN" = [0.0, 1.0], "γC" = [0.0, 1.0], "ηN" = [0.0, 3.0], "ηC" = [0.0, 3.0], kN = [0.001, 20.0], kC = [0.001, 20.0], "μ0" = [0.0, 0.5], "μD" = [0.0, 2.0] }
 
 # ── 1 · untreated monocultures ────────────────────────────────────────────────
 [[stage]]
@@ -216,6 +216,49 @@ betaC_floor = 0.1
   label = "Shared K + crowding + coculture death, kill factor per line"
   family = "Coculture kill factor"
   free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC"]
+  # phenotype switching (2026-11-09): sensitive cells switch at a low rate into a resistant-like state that keeps
+  # the sensitive label (counted as A2780) but grows at r_C and feels the resistant Stage 2b kill β_C;
+  # spontaneous μ0 (also in untreated wells) or drug-induced μD × the sensitive drug-effect state
+  [[stage.candidate]]
+  name = "cc_K_alpha_sw0"
+  label = "Shared K + crowding, spontaneous switching of sensitive cells to a resistant state"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_swD"
+  label = "Shared K + crowding, drug-induced switching of sensitive cells to a resistant state"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "μD"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_sw0"
+  label = "Shared K + crowding + coculture death, spontaneous switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_swD"
+  label = "Shared K + crowding + coculture death, drug-induced switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "μD"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiN_sw0"
+  label = "Shared K + crowding + coculture death, sensitive kill factor, spontaneous switching (resistant kill kept)"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiN_swD"
+  label = "Shared K + crowding + coculture death, sensitive kill factor, drug-induced switching (resistant kill kept)"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "μD"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiNC_sw0"
+  label = "Best coculture model (death + kill factor per line) plus spontaneous switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC", "μ0"]
+  [[stage.candidate]]
+  name = "cc_K_alpha_death_phiNC_swD"
+  label = "Best coculture model (death + kill factor per line) plus drug-induced switching"
+  family = "Coculture switching"
+  free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC", "μD"]
   [[stage.candidate]]
   name = "cc_K_protN"
   label = "Shared K, resistant cells shield sensitive cells from the drug (stand-alone)"
