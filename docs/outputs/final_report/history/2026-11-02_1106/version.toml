@@ -1,6 +1,6 @@
 content_sha = "2462dd9747a5f6fb3be6d94e947f4dd71506f5c2b473100734c986ee1d06e7f6"
 id = "2026-11-02_1106"
-note = ""
+note = "Version of record: full run of 2 Nov (fits 2:10–4:26 AM, control to 6:50 AM), rebuilt at 11:06 AM with tests passing."
 report_sha = "9fd71b7b16bd32fae18ad94d1c414a938a41e8b8c753e3d3ca4114330bd67d34"
 date = "2026-11-02 11:06"
 commit = "0aa4aaf"

@@ -150,7 +150,7 @@ for (id, title, blurb, rel) in chapters
     base = "../../" * rel                                          # relative to docs/outputs/final_report/
     inject = "<base href=\"$base\" target=\"_top\">$CHAPTER_HEAD"
     html = occursin(r"<head[^>]*>"i, html) ? replace(html, r"<head[^>]*>"i => s -> s * inject; count=1) : inject * html
-    stamp = Dates.format(unix2datetime(mtime(path)), "yyyy-mm-dd HH:MM")
+    stamp = Dates.format(local_mtime(path), "yyyy-mm-dd HH:MM")   # local time, like the version date
     push!(parts, "{id:$(json_str(id)),title:$(json_str(title)),blurb:$(json_str(blurb)),src:$(json_str(base)),stamp:$(json_str(stamp)),html:$(json_str(html))}")
     push!(toc, "<a href='#$id'>$title</a>"); push!(chapter_stamps, (title, stamp))
 end
