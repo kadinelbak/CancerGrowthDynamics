@@ -315,3 +315,11 @@ decision = "The all-doses sensitivity variant was not refitted with the new Stag
 was = "the all-doses variant refitted with every run"
 by = "user"
 where = "outputs/sensitivity/all_doses (8 Nov fits); run_control_sweep.jl SWEEP_DATA = all doses"
+
+[[decision]]
+date = "2026-11-11"
+area = "fitting"
+decision = "The all-doses variant's main fits get a work cap of 2e9 right-hand-side evaluations per optimiser run (fixed starts and the polish included; seeded starts keep the smaller of their budget and the cap). A count, not seconds, so the fits stay reproducible; runs over it are dropped and listed in time_limit_hits.csv. The main fits run without it, so their saved fits stay valid."
+was = "fixed starts and the polish of every main fit ran without a work budget (one all-doses Stage 3a fit ran for 31 h)"
+by = "user"
+where = "fit_parallel.jl FIT_WORK_CAP (ZOO_FIT_WORK_CAP); run_pipeline.jl alldoses; run_zoo_fits.jl cand_key"

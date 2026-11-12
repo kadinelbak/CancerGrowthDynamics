@@ -16,6 +16,15 @@
 #
 # Nothing here changes bootstrap_tools.jl, so the saved fits (fit_cache/, keyed by its hash) stay valid.
 
+# Work cap for the main-fit starts (user, 2026-11-11; set only for the all-doses variant, run_pipeline.jl
+# alldoses: ZOO_FIT_WORK_CAP): the fixed starts and the polish otherwise run without a work budget, and one
+# all-doses Stage 3a fit ran for 31 h on 9–11 Nov. With a cap > 0 every optimiser run of a main fit stops after
+# that many right-hand-side evaluations (a count, so reproducible; seeded starts keep the smaller of their
+# budget and the cap); a run over it is dropped and listed in time_limit_hits.csv. 0 (the main fits) changes
+# nothing, and cand_key adds the cap only when it is set, so the main fits' saved keys stay the same.
+const FIT_WORK_CAP = parse(Int, get(ENV, "ZOO_FIT_WORK_CAP", "0"))
+capped(budget) = FIT_WORK_CAP <= 0 ? budget : budget <= 0 ? FIT_WORK_CAP : min(budget, FIT_WORK_CAP)
+
 function fit_cand_tasks(c, datasets; extra=EXTRA_STARTS)
     np = length(c.pnames); est = hasproperty(c, :x0est) ? c.x0est : Int[]; nx = length(est)
     np + nx == 0 && return fit_cand(c, datasets; extra=extra)          # no starts: a single prediction
@@ -31,14 +40,14 @@ function fit_cand_tasks(c, datasets; extra=EXTRA_STARTS)
     # fixed starts: no budget, their evaluation counts recorded
     @sync for i in 1:nf
         Threads.@spawn fits[i] = bs_fit(c.model, datasets, c.u0, vcat(starts[i], x0s), bounds; tag="$(c.name) start $i",
-                                        u0_builder=builder, budget=0, evals=evs[i])
+                                        u0_builder=builder, budget=capped(0), evals=evs[i])
     end
     ev = reduce(vcat, evs; init=Int[])
     # seeded starts: EXTRA_WORK × the slowest fixed-start fit (the serial loop's rule)
     @sync for i in nf+1:length(starts)
         budget = EXTRA_WORK <= 0 || isempty(ev) ? 0 : max(round(Int, EXTRA_WORK * maximum(ev)), 10_000_000)
         Threads.@spawn fits[i] = bs_fit(c.model, datasets, c.u0, vcat(starts[i], x0s), bounds; tag="$(c.name) start $i",
-                                        u0_builder=builder, budget=budget, evals=nothing)
+                                        u0_builder=builder, budget=capped(budget), evals=nothing)
     end
     best = (params=fill(NaN, np + nx), bic=Inf, sse=Inf)
     bics = Float64[]
@@ -48,7 +57,7 @@ function fit_cand_tasks(c, datasets; extra=EXTRA_STARTS)
     end
     nbest = isfinite(best.bic) ? count(b -> b <= best.bic + START_BIC_TOL, bics) : 0
     if isfinite(best.bic)
-        f = bs_fit(c.model, datasets, c.u0, best.params, bounds; tag=c.name, u0_builder=builder)
+        f = bs_fit(c.model, datasets, c.u0, best.params, bounds; tag=c.name, u0_builder=builder, budget=capped(0))
         f.bic < best.bic && (best = f)
     end
     isfinite(best.bic) || return merge(c, (params=fill(NaN, np), bic=Inf, sse=Inf, se=fill(NaN, np), x0fit=fill(NaN, nx),
