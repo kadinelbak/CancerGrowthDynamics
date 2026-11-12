@@ -71,11 +71,10 @@ function stage4_cands(c3, c3b, βC2)
     cands
 end
 
+isdefined(Main, :fit_cands) || include(joinpath(@__DIR__, "fit_parallel.jl"))
+
 function fit_stage4(cands, ds)
-    rows = Vector{Any}(undef, length(cands))
-    Threads.@threads :dynamic for i in eachindex(cands)
-        rows[i] = fit_cand(cands[i], ds)                # bootstrap_tools.jl (estimated starting values included)
-    end
+    rows = fit_cands(cands, ds)                         # fit_parallel.jl: = fit_cand (bootstrap_tools.jl) per candidate
     order_rule(sort!([r for r in rows if isfinite(r.bic)]; by=r -> r.bic))
 end
 

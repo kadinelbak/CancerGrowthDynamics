@@ -1,6 +1,6 @@
 content_sha = "8a0b86a46ed5551c44ade9c12356549790449ed4813621f0eb487e37ea2673b9"
 id = "2026-11-02_0208"
-note = ""
+note = "Quick check only (BOOT_B=0, no bootstrap): new fits, but the control chapters are from the 1 Nov run on the earlier fits, and its run record was carried over from that run. Not the version of record."
 report_sha = "54fc57ef20b91049929122d2c5b94cb15d86af652d266b17cf101c8c9018dbfa"
 date = "2026-11-02 02:08"
 commit = "0aa4aaf"

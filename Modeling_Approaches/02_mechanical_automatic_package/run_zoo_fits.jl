@@ -28,10 +28,13 @@
 #   ZOO_REFIT=1       refit every candidate instead of reusing its saved fit (fit_cache/, see cached_fit)
 #   ZOO_REUSE_BOOT=1  reuse the bootstrap of every group whose candidates and fits are unchanged
 #                     since the last zoo_state.jls (same names, BICs and parameters)
+#   (default)         a group's bootstrap is reused when nothing it depends on changed (saved_boot, boot_key);
+#   ZOO_REBOOT=1      recompute every bootstrap instead
 
 include(joinpath(@__DIR__, "zoo_common.jl"))
 include(joinpath(@__DIR__, "zoo_models.jl"))
 include(joinpath(@__DIR__, "bootstrap_tools.jl"))
+include(joinpath(@__DIR__, "fit_parallel.jl"))       # fit_cands: every start of every candidate as its own task
 
 const BOOT_B   = parse(Int, get(ENV, "BOOT_B", "200"))
 # ZOO_OUT: a sensitivity run writes its fits, CSVs and report there and publishes nothing
@@ -61,10 +64,7 @@ function make_cand(name, label, family, lines, envs, alpha, X0, pnames, bounds, 
 end
 
 function fit_zoo(cands, datasets)
-    rows = Vector{Any}(undef, length(cands))
-    Threads.@threads :dynamic for i in eachindex(cands)
-        rows[i] = fit_cand(cands[i], datasets)          # bootstrap_tools.jl (estimated starting values included)
-    end
+    rows = fit_cands(cands, datasets)                   # fit_parallel.jl: = fit_cand (bootstrap_tools.jl) per candidate
     failed = [r.name for r in rows if !isfinite(r.bic)]
     isempty(failed) || @warn "no fit" failed
     sort!([r for r in rows if isfinite(r.bic)]; by=r -> r.bic)
@@ -102,9 +102,11 @@ const CATALOGUES = Dict("DRUG_ZOO" => DRUG_ZOO, "LR_ZOO" => LR_ZOO)
 const DRYRUN = get(ENV, "DRYRUN", "0") == "1"
 const DRY_PREV = DRYRUN ? deserialize(joinpath(ZOO_DIR, "zoo_state.jls")) : nothing
 const DRY_BUILT = Dict{String,Any}()
+# the two lines of a per-line stage are fitted at the same time (user, 2026-11-09), so shared state is locked
+const STAGE_LOCK = ReentrantLock()
 function fit_stage(cands, ds, gid; fitter=fit_zoo)
     DRYRUN || return cached_fit(cands, ds, gid, fitter)
-    DRY_BUILT[gid] = cands
+    lock(() -> (DRY_BUILT[gid] = cands), STAGE_LOCK)
     DRY_PREV.groups[findfirst(g -> g.id == gid, DRY_PREV.groups)].cands
 end
 
@@ -137,7 +139,8 @@ fit_record(r) = merge((name=r.name,), NamedTuple{FIT_FIELDS}(Tuple(getfield(r, k
 fit_values(rec) = NamedTuple{FIT_FIELDS}(Tuple(getfield(rec, k) for k in FIT_FIELDS))
 const FIT_SEED = Ref{Any}(nothing)
 # fits of the last finished run (zoo_state.jls), by group id
-function seed_fits(gid)
+seed_fits(gid) = lock(() -> seed_fits_locked(gid), STAGE_LOCK)
+function seed_fits_locked(gid)
     if FIT_SEED[] === nothing
         FIT_SEED[] = Dict{String,Any}()
         f = joinpath(ZOO_DIR, "zoo_state.jls")
@@ -159,8 +162,17 @@ function read_fit_cache(f)
                            u0=Float64.(v["u0"]), x0fit=Float64.(v["x0fit"]), nstarts=Int(v["nstarts"]), nbest=Int(v["nbest"]))
                      for (k, v) in d if k != "about")
 end
+# A side run (ZOO_OUT, e.g. the all-doses variant) also reads the main run's saved fits (user, 2026-11-09): the keys
+# include the data, so only candidates fitted to exactly the same data and settings are taken (Stages 1 and 1b of
+# the all-doses variant are the main run's fits; its Stage 2 A2780cis series differs, so that group is refitted).
+const MAIN_FIT_CACHE_DIR = joinpath(@__DIR__, "outputs", "zoo_fits", "fit_cache")
 function load_fit_cache(gid)
     cache = read_fit_cache(joinpath(FIT_CACHE_DIR, "$gid.toml"))
+    if FIT_CACHE_DIR != MAIN_FIT_CACHE_DIR
+        for (k, v) in read_fit_cache(joinpath(MAIN_FIT_CACHE_DIR, "$gid.toml"))
+            haskey(cache, k) || (cache[k] = v)
+        end
+    end
     sd = seed_fits(gid)
     if sd !== nothing
         for r in sd.cands
@@ -170,11 +182,15 @@ function load_fit_cache(gid)
     end
     cache
 end
+# how much of this run was reused (written to reuse_summary.toml; run_pipeline.jl copies it into the run manifest)
+const REUSE = Dict{String,Any}("fits_reused" => 0, "fits_total" => 0, "bootstraps_reused" => String[], "bootstraps_total" => 0)
 function cached_fit(cands, ds, gid, fitter)
+    lock(() -> (REUSE["fits_total"] += length(cands)), STAGE_LOCK)
     FIT_CACHE_ON || isempty(cands) || return save_fits(gid, fitter(cands, ds), ds, Dict{String,Any}())
     cache = load_fit_cache(gid)
     ks = [cand_key(c, ds) for c in cands]
     hit = [haskey(cache, k) && isfinite(cache[k].bic) for k in ks]
+    lock(() -> (REUSE["fits_reused"] += count(hit)), STAGE_LOCK)
     todo = cands[.!hit]
     @printf("  %s: %d of %d candidates reused from saved fits, %d fitted\n", gid, count(hit), length(cands), length(todo)); flush(stdout)
     fresh = isempty(todo) ? Any[] : fitter(todo, ds)
@@ -383,8 +399,13 @@ for st in STAGES
     if kind in ("growth", "mechanism")
         if !(resumed && haskey(PL, id))
             PL[id] = Dict{String,Any}()
-            for L in LINES
-                PL[id][L.line] = kind == "growth" ? growth_rows(st, L) : mechanism_rows(st, L, PL[st["inherits"]["growth"]][L.line])
+            # both lines at once (user, 2026-11-09): their fits are independent, and each spreads its starts over the cores
+            lres = Vector{Any}(undef, length(LINES))
+            @sync for (j, L) in enumerate(LINES)
+                Threads.@spawn lres[j] = kind == "growth" ? growth_rows(st, L) : mechanism_rows(st, L, PL[st["inherits"]["growth"]][L.line])
+            end
+            for (j, L) in enumerate(LINES)
+                PL[id][L.line] = lres[j]
                 show_rows(L.line, PL[id][L.line].rows)
             end
         end
@@ -443,14 +464,44 @@ function checkpoint_boot(g)
     get(ENV, "ZOO_RESUME", "0") == "1" || return nothing
     f = joinpath(BOOT_CKPT_DIR, "$(g.id).jls"); isfile(f) || return nothing
     ck = try deserialize(f) catch; return nothing end
+    hasproperty(ck, :key) && hasproperty(ck, :fits) || return nothing
     ck.key == BOOT_KEY && ck.fits == fit_key(g) ? ck.res : nothing
+end
+# Saved bootstraps (user, 2026-11-09), reused by default like the saved fits: a group's bootstrap is kept in
+# boot_checkpoints/<id>.jls under a SHA-256 of everything it depends on (each candidate's fit key from cand_key,
+# i.e. structure, inherited values, data and fitting settings, plus its fitted BIC, parameters and starting state;
+# the candidate order, which puts the carried model first; the group data and starting state; B, the screen,
+# work factor and generator; bootstrap_tools.jl and zoo_selection.jl; the GrowthParameterEstimation version).
+# Any change refits that group's bootstrap; unchanged groups are not redone. ZOO_REBOOT=1 (or ZOO_REFIT=1)
+# recomputes every bootstrap.
+const BOOT_REDO = get(ENV, "ZOO_REBOOT", "0") == "1" || !FIT_CACHE_ON
+const BOOT_CODE_HASH = bytes2hex(sha256(read(joinpath(@__DIR__, "bootstrap_tools.jl")) |> x -> vcat(x, read(joinpath(@__DIR__, "zoo_selection.jl")))))
+const GPE_PIN = try
+    m = TOML.parsefile(joinpath(@__DIR__, "Manifest.toml"))
+    repr(sort(collect(only(get(m, "deps", m)["GrowthParameterEstimation"]))))
+catch
+    "unknown"
+end
+boot_key(g) = bytes2hex(sha256(join(vcat([repr(BOOT_KEY), BOOT_CODE_HASH, GPE_PIN, string(VERSION), repr(g.u0), repr(g.datasets)],
+                                          [cand_key(c, g.datasets) * "|" * repr(c.bic) * "|" * repr(c.params) * "|" * repr(c.u0) for c in g.cands]), "\0")))
+function saved_boot(g)
+    BOOT_REDO && return nothing
+    f = joinpath(BOOT_CKPT_DIR, "$(g.id).jls"); isfile(f) || return nothing
+    ck = try deserialize(f) catch; return nothing end
+    hasproperty(ck, :bootkey) && ck.bootkey == boot_key(g) ? ck : nothing
 end
 results = Dict{String,Any}()
 for g in groups
     t0 = time()
-    prev = previous_boot(g)
-    ckres = prev === nothing ? checkpoint_boot(g) : nothing
-    if prev !== nothing
+    saved = BOOT_B > 0 ? saved_boot(g) : nothing
+    prev = saved === nothing ? previous_boot(g) : nothing
+    ckres = saved === nothing && prev === nothing ? checkpoint_boot(g) : nothing
+    BOOT_B > 0 && (REUSE["bootstraps_total"] += 1)
+    (saved !== nothing || prev !== nothing || ckres !== nothing) && push!(REUSE["bootstraps_reused"], g.id)
+    if saved !== nothing
+        res = saved.res
+        println("  $(g.id): candidates, fits and data unchanged, bootstrap reused from its saved run (ZOO_REBOOT=1 recomputes)")
+    elseif prev !== nothing
         res = prev.res
         println("  $(g.id): candidates and fits unchanged, bootstrap reused from the previous run")
     elseif ckres !== nothing
@@ -460,7 +511,7 @@ for g in groups
         res = bootstrap(g; B=BOOT_B)
         try
             mkpath(BOOT_CKPT_DIR)
-            serialize(joinpath(BOOT_CKPT_DIR, "$(g.id).jls"), (key=BOOT_KEY, fits=fit_key(g), res=res))
+            serialize(joinpath(BOOT_CKPT_DIR, "$(g.id).jls"), (key=BOOT_KEY, fits=fit_key(g), bootkey=boot_key(g), res=res))
         catch err
             @warn "bootstrap checkpoint not written" g.id err
         end
@@ -473,7 +524,17 @@ for g in groups
     ks = [length(c.params) for c in g.cands]
     picks = size(res.bic, 1) > 0 ? [rule_pick(res.bic[b, :], ks) for b in 1:size(res.bic, 1)] : Int[]
     res = merge(res, (selected=1, pick=picks))
-    band = prev !== nothing ? prev.band : BOOT_B > 0 ? bands(g, res; tmax=tmax_of(g), j=1) : nothing
+    band = prev !== nothing ? prev.band : saved !== nothing && hasproperty(saved, :band) ? saved.band :
+           BOOT_B > 0 ? bands(g, res; tmax=tmax_of(g), j=1) : nothing
+    # the bands are saved with the bootstrap, so a reused bootstrap does not redraw them
+    if BOOT_B > 0 && saved === nothing
+        try
+            mkpath(BOOT_CKPT_DIR)
+            serialize(joinpath(BOOT_CKPT_DIR, "$(g.id).jls"), (key=BOOT_KEY, fits=fit_key(g), bootkey=boot_key(g), res=res, band=band))
+        catch err
+            @warn "bootstrap checkpoint not written" g.id err
+        end
+    end
     results[g.id] = (res=res, band=band)
     @printf("  %-12s optimal %-24s k=%d  chosen in %5.1f%% of replicates (lowest BIC in %5.1f%%)  [%.0fs]\n", g.id, g.cands[1].name,
             length(g.cands[1].params), BOOT_B > 0 ? pct(res.pick, 1) : NaN, BOOT_B > 0 ? pct(res.winner, 1) : NaN, time() - t0)
@@ -534,6 +595,12 @@ CSV.write(joinpath(ZOO_DIR, "fit_starts.csv"), isempty(start_rows) ? DataFrame(g
 # bootstrap optimiser runs that went over their work budget (bootstrap_tools.jl); limit = evaluations, not seconds
 CSV.write(joinpath(ZOO_DIR, "time_limit_hits.csv"),
           isempty(LIMIT_HITS) ? DataFrame(fit=String[], optimizer=String[], seconds=Float64[], limit=Float64[]) : DataFrame(LIMIT_HITS))
+
+# what was reused, for the run manifest and the Final Report's provenance line (run_pipeline.jl)
+open(joinpath(ZOO_DIR, "reuse_summary.toml"), "w") do io
+    TOML.print(io, Dict{String,Any}("fits_reused" => REUSE["fits_reused"], "fits_total" => REUSE["fits_total"],
+                                    "bootstraps_reused" => sort(REUSE["bootstraps_reused"]), "bootstraps_total" => REUSE["bootstraps_total"]))
+end
 
 # checkpoint: zoo_rebuild_pages.jl redraws the report and site from this without refitting
 try
