@@ -88,6 +88,9 @@ function zoo_sim(c)
                  hasproperty(L, :extra) && (d["extra"] = [modict(M) for M in L.extra])     # extra mechanism modules (Stage 4)
                  hasproperty(L, :chi) && (d["chi"] = [L.chi.i, L.chi.v])                   # drug × low-resource interaction
                  ns_on(L) && (d["ns"] = true)                                              # Norton–Simon: drug losses × growth factor
+                 cc_on(L) && (d["cc"] = Dict{String,Any}("kf" => [L.cc.kf.i, L.cc.kf.v], "pr" => [L.cc.pr.i, L.cc.pr.v], "cs" => [L.cc.cs.i, L.cc.cs.v],
+                                                         "csimm" => L.cc.csimm, "di" => [L.cc.di.i, L.cc.di.v]))   # coculture modifiers (zoo_models.jl cc_terms)
+                 sw_on(L) && (d["sw"] = true)                                              # phenotype switching (not drawn by the site)
                  d
              end for L in S.lines]
     envs = [Dict{String,Any}("D" => e.D, "R" => e.R, "lines" => e.lines .- 1) for e in S.envs]
