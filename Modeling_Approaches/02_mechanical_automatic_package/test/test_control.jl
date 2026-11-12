@@ -24,8 +24,15 @@ end
 function heldout_model_B()
     c3 = zgroup("s3").cands[1]; LN, LC = c3.sys.lines
     βof(c) = c.params[findfirst(==(:β), c.slots)]
-    LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βof(zgroup("s2-a2780").cands[1])),)),))
-    LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βof(zgroup("s2-a2780cis").cands[1])),)),))
+    kof(c) = (i = findfirst(==(:k), c.slots); i === nothing ? nothing : c.params[i])
+    # as zoo_heldout.jl mono_drug_line: Stage 2b kill and delay rate, no coculture drug modifier (φ, ρ, γ)
+    function mono(L, c)
+        s = merge(L.s, (β=Slot(0, βof(c)),))
+        k = kof(c); k !== nothing && L.s.k.i > 0 && (s = merge(s, (k=Slot(0, k),)))
+        L2 = merge(L, (s=s,))
+        cc_on(L2) ? merge(L2, (cc=merge(L2.cc, (kf=Slot(0, 1.0), pr=Slot(0, 0.0), cs=Slot(0, 0.0))),)) : L2
+    end
+    LN2 = mono(LN, zgroup("s2-a2780").cands[1]); LC2 = mono(LC, zgroup("s2-a2780cis").cands[1])
     make_system_model(build_system([LN2, LC2], c3.sys.envs, c3.sys.alpha)), AN_STATE[:validation].ce1[1].params
 end
 

@@ -145,10 +145,19 @@ function trajectory2(x0, U, FP::FPlant, Δ; dt=0.1)
     ts, xs
 end
 # A_k = ∂F/∂x (nx×nx), B_k = ∂F/∂w (nx×2), one forward-mode Jacobian over [x; u; v]
-function linearize2(x, w, FP::FPlant, Δ)
+# at an input bound (w ≤ lo or w ≥ hi) that column of B is the one-sided derivative into the feasible side,
+# as in linearize (control_model.jl): AD misses the dose sensitivity on the max(E, 0) clamp
+function linearize2(x, w, FP::FPlant, Δ; lo=fill(-Inf, length(w)), hi=fill(Inf, length(w)))
     nx = length(x)
     J = ForwardDiff.jacobian(z -> F2(z[1:nx], z[nx+1:end], FP, Δ), vcat(x, w))
-    F2(x, w, FP, Δ), J[:, 1:nx], J[:, nx+1:end]
+    Fx = F2(x, w, FP, Δ); B = J[:, nx+1:end]
+    for i in eachindex(w)
+        s = w[i] <= lo[i] ? 1.0 : w[i] >= hi[i] ? -1.0 : 0.0
+        s == 0 && continue
+        e = (1e-4 * s) .* (eachindex(w) .== i)
+        B[:, i] = (4 .* F2(x, w .+ e, FP, Δ) .- F2(x, w .+ 2 .* e, FP, Δ) .- 3 .* Fx) ./ (2e-4 * s)
+    end
+    Fx, J[:, 1:nx], B
 end
 function x0_fast(FP::FPlant, N0, C0)
     x = zeros(FP.nx); x[FP.iN] = N0; x[FP.iC] = C0; x[FP.iW] = 1.0
@@ -237,7 +246,7 @@ function grad_hess2(x0, U, FP::FPlant, Δ, W::Weights2)
     H = size(U, 1); m = size(U, 2)
     xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Matrix{Float64}[]
     for k in 1:H
-        xn, A, B = linearize2(xs[k], U[k, :], FP, Δ)
+        xn, A, B = linearize2(xs[k], U[k, :], FP, Δ; lo=[0.0, 0.0], hi=[W.umax, 1.0])
         push!(xs, xn); push!(As, A); push!(Bs, B)
     end
     # adjoint gradient
@@ -278,6 +287,10 @@ function sqp_solve2(x0, U0, FP::FPlant, Δ, W::Weights2; max_iter=Int(CFG["sqp"]
                 z, Jold, J = zn, J, Jn; accepted = true; break
             end
             α /= 2
+        end
+        if !accepted         # QP step rejected: a projected-gradient step instead (control_mpc.jl pg_step)
+            pg = pg_step(zz -> total_cost2(x0, Um(zz), FP, Δ, W), J, g, z, lo, hi, max(LA.opnorm(Hs), 1e-12))
+            pg === nothing || ((z, Jold, J) = (pg[1], J, pg[2]); accepted = true)
         end
         (!accepted || abs(Jold - J) < tol * (1 + abs(J))) && break
     end

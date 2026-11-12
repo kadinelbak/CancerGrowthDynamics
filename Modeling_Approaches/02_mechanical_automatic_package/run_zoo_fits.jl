@@ -133,6 +133,7 @@ function cand_key(c, ds)
              repr(c.sys.envs), repr(masked_u0(c)), repr(get(c, :x0nom, nothing)), repr(get(c, :x0est, nothing)),
              repr(get(c, :x0bounds, nothing)), repr(get(c, :x0start, nothing)), repr(ds),
              string(EXTRA_STARTS), string(EXTRA_WORK), string(EXTRA_SPREAD), FIT_CODE_HASH]
+    FIT_WORK_CAP > 0 && push!(parts, "work_cap=$FIT_WORK_CAP")      # fit_parallel.jl: the all-doses variant only
     bytes2hex(sha256(join(parts, "\0")))
 end
 fit_record(r) = merge((name=r.name,), NamedTuple{FIT_FIELDS}(Tuple(getfield(r, k) for k in FIT_FIELDS)))
