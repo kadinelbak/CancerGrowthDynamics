@@ -173,10 +173,11 @@ where = "stages.toml [starting_values] estimate; zoo_data.jl x0_info"
 [[decision]]
 date = "2026-11-02"
 area = "fitting"
-decision = "In the coculture stage the resistant cisplatin kill is refitted but may not fall below 0.1× its Stage 2b value (the upper end of the bootstrap interval), and the no-resistant-kill candidates are dropped: resistant cells that are completely inactive to the drug make no biological sense."
+decision = "[Superseded 2026-11-03: the Stage 2b kill is kept in coculture, no β_C refit or floor] In the coculture stage the resistant cisplatin kill is refitted but may not fall below 0.1× its Stage 2b value (the upper end of the bootstrap interval), and the no-resistant-kill candidates are dropped: resistant cells that are completely inactive to the drug make no biological sense."
 was = "refitted down to 0 or dropped (_noC candidates, user 2026-10-06)"
 by = "user"
 where = "stages.toml s3 betaC_floor = 0.1; s3 candidates"
+superseded_by = "2026-11-03 fitting: Stage 2b kill kept in coculture"
 
 [[decision]]
 date = "2026-11-02"
@@ -229,10 +230,11 @@ where = "run_control*.jl outputs/reuse/; run_pipeline.jl manifest; report_histor
 [[decision]]
 date = "2026-11-03"
 area = "fitting"
-decision = "In the treated cocultures (Stage 3a) the cisplatin kill of both lines is kept at its Stage 2b monoculture value, not refitted. Only the coculture terms (shared K, crowding α_NC and α_CN, extra coculture deaths d_N and d_C) are refitted on Ce0 and Ce1 jointly; they may shrink to 0 but not turn negative, and take the same value with and without drug."
+decision = "[Superseded 2026-11-08: coculture drug modifiers φ, ρ, γ may change the drug effect in coculture; β itself is still not refitted] In the treated cocultures (Stage 3a) the cisplatin kill of both lines is kept at its Stage 2b monoculture value, not refitted. Only the coculture terms (shared K, crowding α_NC and α_CN, extra coculture deaths d_N and d_C) are refitted on Ce0 and Ce1 jointly; they may shrink to 0 but not turn negative, and take the same value with and without drug."
 was = "β_N and β_C refitted in coculture, β_C floored at 0.1 × Stage 2b (it sat on the floor, 0.049)"
 by = "user"
 where = "stages.toml s3 candidates (cc_K, cc_K_alpha, cc_K_alpha_deathN, cc_K_alpha_deathC, cc_K_alpha_death)"
+superseded_by = "2026-11-08 fitting: coculture interaction candidates (φ, ρ, γ, η)"
 
 [[decision]]
 date = "2026-11-03"
@@ -289,3 +291,11 @@ decision = "Two more switching candidates put switching on top of the best Stage
 was = ""
 by = "claude"
 where = "stages.toml s3 candidates"
+
+[[decision]]
+date = "2026-11-11"
+area = "reporting"
+decision = "The all-doses sensitivity variant was not refitted with the new Stage 3a candidates: its refit stalled for 31 h on one Stage 3a candidate (main-fit starts have iteration caps but no work budget) and was stopped. The all-doses control sweep (sweep_all) of this version uses the all-doses fits from 8 Nov (before the new Stage 3a candidates); a refit with a work budget on the all-doses main-fit starts follows."
+was = "the all-doses variant refitted with every run"
+by = "user"
+where = "outputs/sensitivity/all_doses (8 Nov fits); run_control_sweep.jl SWEEP_DATA = all doses"

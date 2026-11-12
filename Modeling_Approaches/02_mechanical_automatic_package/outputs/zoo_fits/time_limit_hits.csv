@@ -1,12 +1,66 @@
 fit,optimizer,seconds,limit
-cc_K_alpha_death start 15,bfgs,14.72655987739563,1.0e7
-cc_K_alpha_deathN start 20,bfgs,17.508949995040894,1.0e7
-cc_K_alpha_deathC start 22,bfgs,17.4044828414917,1.0e7
-cc_K_alpha_deathC start 22,nelder_mead,5.338032007217407,1.0e7
-cc_K_alpha_deathC start 23,bfgs,18.296180963516235,1.0e7
-lrcc_eps start 19,bfgs,121.22757291793823,7.783992e7
-s4_eps start 6,bfgs,97.96642017364502,1.0e7
-s4_chi start 20,bfgs,93.8545548915863,1.0e7
-s4_eps start 9,bfgs,78.86265802383423,1.0e7
-s4_chi_lines start 6,bfgs,206.71467804908752,2.667162e7
-s4_chi_lines start 8,bfgs,140.31156587600708,2.667162e7
+cc_K_alpha_csNC_imm start 7,bfgs,32.8751540184021,1.0e7
+cc_K_alpha_csNonly_delayk start 5,bfgs,30.604743003845215,1.0e7
+cc_K_alpha_csNC_delay start 20,bfgs,36.348451137542725,1.0e7
+cc_K_alpha_csNonly_delayk start 6,bfgs,31.86448097229004,1.0e7
+cc_K_alpha_intC start 8,bfgs,41.16129994392395,1.0e7
+cc_K_alpha_phiNC_intNC start 18,bfgs,61.08227896690369,1.71135e7
+cc_K_alpha_csNonly_delayk start 14,bfgs,25.318066835403442,1.0e7
+cc_K_alpha_intC start 23,bfgs,28.675763845443726,1.0e7
+cc_K_alpha_csNonly_delayk start 20,bfgs,23.814901113510132,1.0e7
+cc_K_alpha_death_phiNC start 20,bfgs,30.792974948883057,1.0e7
+cc_K_alpha_csNonly_delayk start 21,bfgs,22.073226928710938,1.0e7
+cc_K_alpha_intNC start 8,bfgs,22.778980016708374,1.0e7
+cc_K_alpha_death_phiNC_swD start 4,bfgs,75.61739802360535,1.0e7
+cc_K_alpha_swD start 6,bfgs,760.7486028671265,1.0514262e8
+cc_K_alpha_swD start 7,bfgs,760.3811700344086,1.0514262e8
+cc_K_alpha_swD start 11,bfgs,762.275064945221,1.0514262e8
+cc_K_alpha_swD start 14,bfgs,745.7279691696167,1.0514262e8
+cc_K_alpha_swD start 17,bfgs,761.16375207901,1.0514262e8
+cc_K_alpha_swD start 22,bfgs,761.556009054184,1.0514262e8
+cc_K_alpha_death_sw0 start 4,bfgs,62.87808704376221,1.0e7
+cc_K_alpha_death_sw0 start 7,bfgs,67.23335599899292,1.0e7
+cc_K_alpha_death_sw0 start 22,bfgs,61.01603317260742,1.0e7
+s3 cc_K_alpha_phi bootstrap 32,bfgs,226.26900005340576,1.0e8
+s3 cc_K_alpha_phi bootstrap 26,bfgs,233.67233610153198,1.0e8
+s3 cc_K_alpha_phi bootstrap 23,bfgs,234.78786611557007,1.0e8
+s3 cc_K_alpha_phi bootstrap 10,bfgs,235.77439093589783,1.0e8
+s3 cc_K_alpha_swD bootstrap 38,bfgs,1133.7165970802307,1.0e8
+s3 cc_K_alpha_swD bootstrap 20,bfgs,1115.6154990196228,1.0e8
+s3 cc_K_alpha_swD bootstrap 26,bfgs,1112.8222851753235,1.0e8
+s3 cc_K_alpha_swD bootstrap 32,bfgs,1120.1598110198975,1.0e8
+s3 cc_K_alpha_phiN bootstrap 38,bfgs,237.10056900978088,1.0e8
+s3 cc_K_alpha_protN bootstrap 38,bfgs,244.2775809764862,1.0e8
+s3 cc_K_alpha_swD bootstrap 10,bfgs,1118.7406311035156,1.0e8
+s3 cc_K_alpha_protN bootstrap 23,bfgs,237.01562118530273,1.0e8
+s3 cc_K_alpha_phi bootstrap 21,bfgs,236.51360893249512,1.0e8
+s3 cc_K_alpha_phi bootstrap 24,bfgs,249.1021740436554,1.0e8
+s3 cc_K_alpha_swD bootstrap 39,bfgs,1130.668813943863,1.0e8
+s3 cc_K_alpha_phiN bootstrap 26,bfgs,236.2509160041809,1.0e8
+s3 cc_K_alpha_swD bootstrap 21,bfgs,1107.791030883789,1.0e8
+s3 cc_K_alpha_swD bootstrap 24,bfgs,1113.1163821220398,1.0e8
+s3 cc_K_alpha_phiN bootstrap 29,bfgs,239.42807483673096,1.0e8
+s3 cc_K_alpha_phi bootstrap 22,bfgs,237.55116200447083,1.0e8
+s3 cc_K_alpha_swD bootstrap 27,bfgs,1106.989503145218,1.0e8
+s3 cc_K_alpha_swD bootstrap 36,bfgs,1115.9944360256195,1.0e8
+s3 cc_K_alpha_phiN bootstrap 32,bfgs,196.6733980178833,1.0e8
+s3 cc_K_alpha_protN bootstrap 32,bfgs,208.92724800109863,1.0e8
+s3 cc_K_alpha_phi bootstrap 33,bfgs,212.58283877372742,1.0e8
+s3 cc_K_alpha_swD bootstrap 33,bfgs,966.2090120315552,1.0e8
+s3 cc_K_alpha_protN bootstrap 1,bfgs,197.2441611289978,1.0e8
+s3 cc_K_alpha_phi bootstrap 11,bfgs,197.22495198249817,1.0e8
+s3 cc_K_alpha_swD bootstrap 2,bfgs,872.4502539634705,1.0e8
+s3 cc_K_alpha_swD bootstrap 11,bfgs,867.5230169296265,1.0e8
+s3 cc_K_alpha_phiN bootstrap 39,bfgs,170.1297311782837,1.0e8
+s3 cc_K_alpha_swD bootstrap 3,bfgs,832.9270579814911,1.0e8
+s3 cc_K_alpha_swD bootstrap 40,bfgs,822.3439400196075,1.0e8
+s3 cc_K_alpha_phi bootstrap 4,bfgs,179.213711977005,1.0e8
+s3 cc_K_alpha_swD bootstrap 4,bfgs,808.8296859264374,1.0e8
+s3 cc_K_alpha_phi bootstrap 12,bfgs,154.5129508972168,1.0e8
+s3 cc_K_alpha_phi bootstrap 25,bfgs,115.95933198928833,1.0e8
+s3 cc_K_alpha_phiN bootstrap 13,bfgs,110.98718404769897,1.0e8
+s3 cc_K_alpha_swD bootstrap 14,bfgs,559.8548450469971,1.0e8
+s3 cc_K_alpha_swD bootstrap 15,bfgs,547.9139261245728,1.0e8
+s3 cc_K_alpha_phiN bootstrap 15,bfgs,106.99939107894897,1.0e8
+s3 cc_K_alpha_phi bootstrap 16,bfgs,112.3714120388031,1.0e8
+s3 cc_K_alpha_swD bootstrap 16,bfgs,550.4172329902649,1.0e8
