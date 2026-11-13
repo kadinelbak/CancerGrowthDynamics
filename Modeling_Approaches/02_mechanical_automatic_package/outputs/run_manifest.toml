@@ -1,9 +1,9 @@
-steps_requested = ["final"]
-continued_from = "2026-11-12T07:59:21.620"
+steps_requested = ["tests", "final"]
+continued_from = "2026-11-13T04:22:03.210"
 threads = 12
-finished = "2026-11-12T08:08:01.061"
+finished = "2026-11-13T04:39:12.118"
 sysimage = "none"
-started = "2026-11-12T07:59:58.300"
+started = "2026-11-13T04:23:08.025"
 resume = false
 time_limit_hits = 65
 julia = "1.12.6"
@@ -19,23 +19,31 @@ finished = "2026-11-08T11:17:53.390"
     [steps.checks.env]
 
 [steps.report60]
+threads = 1
+finished = "2026-11-13T02:30:32.035"
+cores_used = 0.96
+seconds = 46.5
+started = "2026-11-13T02:29:45.535"
+cpu_seconds = 44.5
 log = "outputs/logs/report60.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 43.4
-finished = "2026-11-10T12:09:55.524"
 
     [steps.report60.env]
     CONTROL_DAYS = "60"
 
 [steps.control30]
+threads = 12
+finished = "2026-11-13T01:42:37.624"
+cores_used = 4.91
+seconds = 1470.8
+started = "2026-11-13T01:18:06.834"
+cpu_seconds = 7219.2
 log = "outputs/logs/control30.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 945.4
-finished = "2026-11-10T11:37:10.544"
 
     [steps.control30.env]
     REDO = "1"
@@ -66,14 +74,14 @@ finished = "2026-11-10T10:39:21.665"
 
 [steps.sweep_report]
 threads = 1
-finished = "2026-11-12T07:59:19.722"
-cores_used = 0.76
+finished = "2026-11-13T04:22:01.308"
+cores_used = 0.77
 seconds = 8.4
-started = "2026-11-12T07:59:11.285"
-cpu_seconds = 6.4
+started = "2026-11-13T04:21:52.871"
+cpu_seconds = 6.5
 log = "outputs/logs/sweep_report.log"
 ok = true
-commit = "a57a5c41ab9ae338c49fa2cdcdf05fa6fbe97502"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
 
     [steps.sweep_report.env]
@@ -102,39 +110,43 @@ bootstraps_total = 0
 
 [steps.findings]
 threads = 1
-finished = "2026-11-12T07:59:56.432"
+finished = "2026-11-13T04:22:38.047"
 cores_used = 0.94
 seconds = 32.5
-started = "2026-11-12T07:59:23.956"
+started = "2026-11-13T04:22:05.581"
 cpu_seconds = 30.5
 log = "outputs/logs/findings.log"
 ok = true
-commit = "a57a5c41ab9ae338c49fa2cdcdf05fa6fbe97502"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
 
     [steps.findings.env]
 
 [steps.final]
 threads = 1
-finished = "2026-11-12T08:07:59.741"
+finished = "2026-11-13T04:39:11.606"
 cores_used = 1.0
-seconds = 479.1
-started = "2026-11-12T08:00:00.624"
-cpu_seconds = 477.1
+seconds = 488.7
+started = "2026-11-13T04:31:02.901"
+cpu_seconds = 487.0
 log = "outputs/logs/final.log"
 ok = true
-commit = "a57a5c41ab9ae338c49fa2cdcdf05fa6fbe97502"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
 
     [steps.final.env]
 
 [steps.control60]
+threads = 12
+finished = "2026-11-13T02:29:41.379"
+cores_used = 4.92
+seconds = 2768.9
+started = "2026-11-13T01:43:32.469"
+cpu_seconds = 13616.5
 log = "outputs/logs/control60.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 1868.4
-finished = "2026-11-10T12:09:08.590"
 
     [steps.control60.env]
     REDO = "1"
@@ -143,14 +155,14 @@ finished = "2026-11-10T12:09:08.590"
 
 [steps.sweep_all]
 threads = 12
-finished = "2026-11-12T07:59:07.085"
-cores_used = 7.45
-seconds = 302.9
-started = "2026-11-12T07:54:04.145"
-cpu_seconds = 2257.3
+finished = "2026-11-13T02:46:32.758"
+cores_used = 7.6
+seconds = 479.2
+started = "2026-11-13T02:38:33.528"
+cpu_seconds = 3643.5
 log = "outputs/logs/sweep_all.log"
 ok = true
-commit = "a57a5c41ab9ae338c49fa2cdcdf05fa6fbe97502"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
 
     [steps.sweep_all.env]
@@ -160,22 +172,30 @@ uncommitted_changes = true
     SWEEP_DATA = "all doses"
 
 [steps.report_long]
+threads = 1
+finished = "2026-11-13T01:18:02.651"
+cores_used = 0.96
+seconds = 48.5
+started = "2026-11-13T01:17:14.149"
+cpu_seconds = 46.5
 log = "outputs/logs/report_long.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 43.6
-finished = "2026-11-10T11:21:21.561"
 
     [steps.report_long.env]
 
 [steps.control_long]
+threads = 12
+finished = "2026-11-13T01:17:09.937"
+cores_used = 3.29
+seconds = 6822.5
+started = "2026-11-12T23:23:27.447"
+cpu_seconds = 22432.4
 log = "outputs/logs/control_long.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 1729.4
-finished = "2026-11-10T11:20:34.359"
 
     [steps.control_long.env]
     REDO = "1"
@@ -192,57 +212,77 @@ finished = "2026-11-10T10:43:50.931"
     [steps.analyses.env]
 
 [steps.report30]
+threads = 1
+finished = "2026-11-13T01:43:28.294"
+cores_used = 0.96
+seconds = 46.5
+started = "2026-11-13T01:42:41.798"
+cpu_seconds = 44.5
 log = "outputs/logs/report30.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 42.5
-finished = "2026-11-10T11:37:56.639"
 
     [steps.report30.env]
     CONTROL_DAYS = "30"
 
 [steps.sweep]
+threads = 12
+finished = "2026-11-13T02:38:29.401"
+cores_used = 7.68
+seconds = 473.2
+started = "2026-11-13T02:30:36.170"
+cpu_seconds = 3633.2
 log = "outputs/logs/sweep.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 300.1
-finished = "2026-11-11T20:20:10.465"
 
     [steps.sweep.env]
     REDO = "1"
     CONTROL_FORCE = "1"
 
 [steps.report14]
+threads = 1
+finished = "2026-11-12T23:23:23.231"
+cores_used = 0.96
+seconds = 46.5
+started = "2026-11-12T23:22:36.738"
+cpu_seconds = 44.5
 log = "outputs/logs/report14.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 42.0
-finished = "2026-11-10T10:51:41.386"
 
     [steps.report14.env]
 
 [steps.control14]
+threads = 12
+finished = "2026-11-12T23:20:09.145"
+cores_used = 4.94
+seconds = 751.6
+started = "2026-11-12T23:07:37.496"
+cpu_seconds = 3712.2
 log = "outputs/logs/control14.log"
 ok = true
-commit = "c88210306dd43ddf7109ce2211d35b594234f81e"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 421.4
-finished = "2026-11-10T10:50:55.834"
 
     [steps.control14.env]
     REDO = "1"
     CONTROL_FORCE = "1"
 
 [steps.tests]
+threads = 12
+finished = "2026-11-13T04:31:01.498"
+cores_used = 6.67
+seconds = 471.1
+started = "2026-11-13T04:23:10.351"
+cpu_seconds = 3144.0
 log = "outputs/logs/tests.log"
 ok = true
-commit = "52d2c924690c9a9d74d503fd920922565c2b7477"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
-seconds = 1313.2
-finished = "2026-11-11T21:14:47.001"
 
     [steps.tests.env]
 
@@ -278,5 +318,5 @@ version = "0.4.1"
 
 [git]
 branch = "claude/project-thread-u8vnid"
-commit = "a57a5c41ab9ae338c49fa2cdcdf05fa6fbe97502"
+commit = "a6d43b18bc2d129978b4c492cd05c70d1994191e"
 uncommitted_changes = true
