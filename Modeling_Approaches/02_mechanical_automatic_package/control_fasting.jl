@@ -171,6 +171,7 @@ struct Weights2
     Bc::Float64; Btox::Float64; Wmin::Float64; umax::Float64; K::Float64
     qP::Float64; Bp::Float64; sP::Float64; qRT::Float64      # time to progression (control_mpc.jl)
     BpN::Float64; BpC::Float64                                # per-line thresholds of the "lines" rule (control_mpc.jl line_thresholds)
+    sB::Float64                                               # scale of the inside of the host barriers (control_mpc.jl host_barrier)
 end
 # untreated, unfasted sensitive-only plateau of the fasting plant (normal medium)
 function sensitive_plateau(FP::FPlant; days=400.0)
@@ -181,14 +182,14 @@ end
 # bc_frac: B_cancer as a fraction of K (0 = no soft burden penalty); tf: terminal factor (both swept)
 function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Float64(HCFG["W_min"]), w=nothing, rv=Float64(FCFG["rv"]),
                   bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
-                  prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]))
+                  prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]), ts=tiebreak_scale())
     c = CFG["weights"]
-    qB, qR, qT, ru, qP, qRT = objective_weights(w)
+    qB, qR, qT, ru, qP, qRT = objective_weights(w; ts=ts)
     Bp, sP = progression_scale(FP.K; prog_frac=prog_frac)
     BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(FP.K, sensitive_plateau(FP); prog_frac=prog_frac) : (Inf, Inf)
-    sc = qP > 0 ? tiebreak_scale() : 1.0           # host weight and fasting costs are tie-breakers too (control_mpc.jl)
+    sc = qP > 0 ? ts : 1.0           # host weight and fasting costs are tie-breakers too (control_mpc.jl)
     Weights2(qB, qR, qT, HCFG["qW"] * sc, ru, rv * sc, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
-             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT, BpN, BpC)
+             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT, BpN, BpC, sc)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
 # the soft burden penalty at B_cancer follows control_config [cancer] barrier: "none" (default since
@@ -198,8 +199,8 @@ function stage_cost2(x, w, FP::FPlant, W::Weights2)
     N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
     progression_cost(N, C, W) + burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.qW * wloss(x, FP, W)^2 +
         W.ru * (w[1] / W.umax)^2 + W.rv * w[2]^2 +
-        (BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : zero(N)) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ) +
-        relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ)
+        (BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : zero(N)) + host_barrier(1 - T / W.Btox, W.μT, W.δ, W.sB) +
+        host_barrier(1 - wloss(x, FP, W), W.μW, W.δ, W.sB)
 end
 terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (progression_cost(x[FP.iN], x[FP.iC], W) + burden_cost(x[FP.iN], x[FP.iC], W) +
                                                      W.qT * (x[FP.iT] / W.Btox)^2 + W.qW * wloss(x, FP, W)^2) +
@@ -234,8 +235,8 @@ function cost_terms2(FP::FPlant, x0, U, Δ, W::Weights2)
     for k in axes(U, 1)
         w = U[k, :]; x = F2(x, w, FP, Δ); N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
         z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (w[1] / W.umax)^2,
-               BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : 0.0, relaxed_barrier(1 - T / W.Btox, W.μT, W.δ),
-               W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ), progression_cost(N, C, W)]
+               BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : 0.0, host_barrier(1 - T / W.Btox, W.μT, W.δ, W.sB),
+               W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, host_barrier(1 - wloss(x, FP, W), W.μW, W.δ, W.sB), progression_cost(N, C, W)]
     end
     (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6],
      weight=z[7], fasting=z[8], barrier_weight=z[9], progression=z[10], total=sum(z))
@@ -455,6 +456,8 @@ baseline_policies2(FP::FPlant, W::Weights2) = [
     ("Fasting only, 48 h every 6 days", (x, k) -> [0.0, k % 3 == 1 ? 1.0 : 0.0]),
     ("Periodic 1 µM with a 48-h fast on each dosing interval", (x, k) -> isodd(k) ? [1.0, 1.0] : [0.0, 0.0]),
     ("Constant 1 µM + 48-h fast every 6 days", (x, k) -> [1.0, k % 3 == 1 ? 1.0 : 0.0]),
+    # a fixed fasting schedule that keeps W ≥ W_min (user, 2026-11-12: the two above break the weight limit)
+    ("Constant 1 µM + 48-h fast every 8 days", (x, k) -> [1.0, k % 4 == 1 ? 1.0 : 0.0]),
 ]
 
 function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2; t_stop=Inf)
@@ -463,11 +466,12 @@ function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2; t_stop=Inf)
     Pr = [x[FP.iP] for x in xs]; Wt = [x[FP.iW] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)     # days with N + C ≥ B_cancer
+    days_half_K = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.K / 2); init=0.0)
     tp, ip = progression_window(ts, prog_index.(N, C, Ref(W)), 1.0, t_stop)       # up to the closed loop's stop (control_mpc.jl)
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days, N_prog=ip > 0 ? N[ip] : NaN, C_prog=ip > 0 ? C[ip] : NaN,
      stop_day=isfinite(t_stop) ? t_stop : NaN,
      max_total=maximum(tot), max_tox=maximum(T), min_weight=minimum(Wt), cum_dose=sum(U[:, 1]) * Δ, fast_days=sum(U[:, 2]) * Δ,
-     cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin, days_over=days_over,
+     cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin, days_over=days_over, days_half_K=days_half_K,
      ts=ts, N=N, C=C, T=T, P=Pr, W=Wt)
 end
