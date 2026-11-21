@@ -1,0 +1,64 @@
+  Activating project at `~/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package`
+Kidney toxicity (Xie et al. 2020) calibrated to 75 mg/m² every 21 days: γ = 0.006586 per µM, ΔE = 5.313, Ē = 1.563, E_lim = 5.479
+Test Summary:                                                                                                    | Pass  Total     Time
+control plant and MPC                                                                                            |  238    238  1m03.9s
+  scenario A: plant reproduces the fitted zoo model at 1 µM                                                      |    1      1     2.4s
+  scenario A: flattened right-hand side equals the zoo right-hand side                                           |    2      2     0.5s
+  scenario A: RK4 transition vs adaptive Tsit5                                                                   |    5      5     1.0s
+  scenario A: AD Jacobians vs central finite differences                                                         |    5      5     2.8s
+  scenario A: linearisation error is second order                                                                |    1      1     0.4s
+  scenario A: adjoint gradient vs finite differences                                                             |    1      1     1.3s
+  scenario A: cost is linear in the burden, with the resistance premium (no progression term)                    |    2      2     0.1s
+  scenario A: every stage and terminal cost is ≥ 0 (exact pruning relies on it)                                  |    2      2     0.5s
+  scenario A: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end               |    9      9     0.0s
+  scenario A: blocked (move-blocking) search equals brute force over blocked plans                               |    3      3     0.5s
+  scenario A: discrete search equals brute force                                                                 |    2      2     0.2s
+  scenario A: SQP respects bounds, does not increase the cost, and is optimal                                    |    5      5     7.6s
+  scenario B: plant reproduces the fitted zoo model at 1 µM                                                      |    1      1     0.2s
+  scenario B: flattened right-hand side equals the zoo right-hand side                                           |    2      2     0.1s
+  scenario B: RK4 transition vs adaptive Tsit5                                                                   |    5      5     0.0s
+  scenario B: AD Jacobians vs central finite differences                                                         |    5      5     0.0s
+  scenario B: linearisation error is second order                                                                |    1      1     0.0s
+  scenario B: adjoint gradient vs finite differences                                                             |    1      1     0.0s
+  scenario B: cost is linear in the burden, with the resistance premium (no progression term)                    |    2      2     0.0s
+  scenario B: every stage and terminal cost is ≥ 0 (exact pruning relies on it)                                  |    2      2     0.3s
+  scenario B: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end               |    9      9     0.0s
+  scenario B: blocked (move-blocking) search equals brute force over blocked plans                               |    3      3     0.0s
+  scenario B: discrete search equals brute force                                                                 |    2      2     0.0s
+  scenario B: SQP respects bounds, does not increase the cost, and is optimal                                    |    5      5     0.1s
+  scenario A, low resource: plant reproduces the fitted zoo model at 1 µM                                        |    1      1     1.6s
+  scenario A, low resource: RK4 transition vs adaptive Tsit5                                                     |    5      5     0.0s
+  scenario A, low resource: AD Jacobians vs central finite differences                                           |    5      5     1.3s
+  scenario A, low resource: linearisation error is second order                                                  |    1      1     0.0s
+  scenario A, low resource: adjoint gradient vs finite differences                                               |    1      1     0.8s
+  scenario A, low resource: cost is linear in the burden, with the resistance premium (no progression term)      |    2      2     0.0s
+  scenario A, low resource: every stage and terminal cost is ≥ 0 (exact pruning relies on it)                    |    2      2     0.1s
+  scenario A, low resource: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end |    9      9     0.0s
+  scenario A, low resource: blocked (move-blocking) search equals brute force over blocked plans                 |    3      3     0.0s
+  scenario A, low resource: discrete search equals brute force                                                   |    2      2     0.0s
+  scenario A, low resource: SQP respects bounds, does not increase the cost, and is optimal                      |    4      4     2.8s
+  scenario B, low resource: plant reproduces the fitted zoo model at 1 µM                                        |           0     0.0s
+  scenario B, low resource: RK4 transition vs adaptive Tsit5                                                     |    5      5     0.0s
+  scenario B, low resource: AD Jacobians vs central finite differences                                           |    5      5     0.0s
+  scenario B, low resource: linearisation error is second order                                                  |    1      1     0.0s
+  scenario B, low resource: adjoint gradient vs finite differences                                               |    1      1     0.0s
+  scenario B, low resource: cost is linear in the burden, with the resistance premium (no progression term)      |    2      2     0.0s
+  scenario B, low resource: every stage and terminal cost is ≥ 0 (exact pruning relies on it)                    |    2      2     0.1s
+  scenario B, low resource: time-to-progression cost: a smooth step at B_prog, resistant cells priced at the end |    9      9     0.0s
+  scenario B, low resource: blocked (move-blocking) search equals brute force over blocked plans                 |    3      3     0.0s
+  scenario B, low resource: discrete search equals brute force                                                   |    2      2     0.0s
+  scenario B, low resource: SQP respects bounds, does not increase the cost, and is optimal                      |    4      4     0.2s
+  nominal closed loop (fixed look-ahead) equals replaying its own schedule                                       |    4      4     0.4s
+  blocked look-ahead: the closed loop equals replaying its own schedule                                          |    4      4     0.3s
+  time to progression on a trajectory                                                                            |    6      6     0.1s
+  measurement noise: log-normal, mean 1, the configured CV, paired by draw                                       |    2      2     0.2s
+  nominal seeding: 100 cells split by the ratio                                                                  |    1      1     0.0s
+  long runs: 30 days, 14-day look-ahead re-planned every 2 days                                                  |    7      7    15.8s
+  relaxed barrier                                                                                                |    6      6     0.0s
+  host barrier: tie-break inside, full penalty outside                                                           |   10     10     0.1s
+  starting counts: the fitted start of the treated coculture                                                     |    9      9     0.2s
+  plant vs data: scenario A at 1 µM reproduces the treated cocultures at day 14                                  |    7      7     0.4s
+  burden barrier shapes                                                                                          |   24     24     0.4s
+  time-to-progression objective and early stop                                                                   |    9      9    17.9s
+  look-ahead that ends with the run                                                                              |    4      4     0.4s
+exit 0

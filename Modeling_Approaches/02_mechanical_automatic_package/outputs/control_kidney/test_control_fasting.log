@@ -1,0 +1,29 @@
+  Activating project at `~/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package`
+Kidney toxicity (Xie et al. 2020) calibrated to 75 mg/m² every 21 days: γ = 0.006586 per µM, ΔE = 5.313, Ē = 1.563, E_lim = 5.479
+Test Summary:                                                                             | Pass  Total   Time
+dose + fasting control                                                                    |   64     64  23.8s
+  scenario A: fed (v = 0) is exactly the normal-medium plant                              |    1      1   1.0s
+  scenario A: fast right-hand side equals the zoo right-hand side                         |    1      1   0.7s
+  scenario A: RK4 transition vs adaptive Tsit5                                            |    6      6   1.7s
+  scenario A: AD Jacobians vs central finite differences                                  |    5      5   2.6s
+  scenario A: adjoint gradient vs finite differences                                      |    1      1   9.4s
+  scenario A: exact search equals brute force and obeys the fasting rules                 |    3      3   1.1s
+  scenario A: blocked search equals brute force (a fast only in a block's first interval) |    3      3   0.4s
+  scenario A: SQP respects bounds and does not increase the cost                          |    2      2   1.3s
+  scenario A: every stage and terminal cost is ≥ 0 (exact pruning relies on it)           |    2      2   0.3s
+  scenario A: nominal closed loop (fixed look-ahead) equals replaying its own schedule    |    2      2   0.7s
+  scenario B: fed (v = 0) is exactly the normal-medium plant                              |    1      1   0.0s
+  scenario B: fast right-hand side equals the zoo right-hand side                         |    1      1   0.1s
+  scenario B: RK4 transition vs adaptive Tsit5                                            |    6      6   0.0s
+  scenario B: AD Jacobians vs central finite differences                                  |    5      5   0.0s
+  scenario B: adjoint gradient vs finite differences                                      |    1      1   0.0s
+  scenario B: exact search equals brute force and obeys the fasting rules                 |    3      3   0.0s
+  scenario B: blocked search equals brute force (a fast only in a block's first interval) |    3      3   0.0s
+  scenario B: SQP respects bounds and does not increase the cost                          |    2      2   0.0s
+  scenario B: every stage and terminal cost is ≥ 0 (exact pruning relies on it)           |    2      2   0.1s
+  scenario B: nominal closed loop (fixed look-ahead) equals replaying its own schedule    |    2      2   0.0s
+  host barriers and the feasible fasting comparator                                       |    4      4   0.7s
+  host states behave as specified                                                         |    5      5   0.0s
+  stress-recovery variant only changes the fed (refeeding) phase                          |    2      2   0.1s
+  Stage 4 is reproduced at 1 µM + low resource                                            |    1      1   1.5s
+exit 0
