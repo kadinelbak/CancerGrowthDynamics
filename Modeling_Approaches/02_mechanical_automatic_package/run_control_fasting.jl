@@ -24,7 +24,7 @@ const NRUN = round(Int, DAYS / Δ0)                                   # one deci
 const LOOK = Int.(CFG["schedule"]["lookahead_blocks"])              # fixed look-ahead blocks (move blocking)
 const LOOK_DAYS = round(Int, sum(LOOK) * Δ0)
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
-const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), "control_$(round(Int, DAYS))d"); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
+const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), control_subdir(DAYS, NaN)); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
 const FCK = joinpath(FOUT, "fasting_state.jls")
 # skip when nothing this run reads has changed since its last finished run (control_model.jl: control_fingerprint)
 const FPRINT = control_fingerprint(@__FILE__, "CONTROL_DAYS" => DAYS)

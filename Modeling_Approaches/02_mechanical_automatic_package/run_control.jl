@@ -32,7 +32,7 @@ include(joinpath(@__DIR__, "control_fasting.jl"))     # includes control_model.j
 const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["closed_loop_days"])))
 # CONTROL_OUT replaces the base folder "outputs" (a side run that must not overwrite the main results)
 const COUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")),
-                      DAYS == Float64(CFG["schedule"]["closed_loop_days"]) ? "control" : "control_$(round(Int, DAYS))d"); mkpath(COUT)
+                      control_subdir(DAYS, Float64(CFG["schedule"]["closed_loop_days"]))); mkpath(COUT)
 const CKP = joinpath(COUT, "control_state.jls")
 # skip when nothing this run reads has changed since its last finished run (control_model.jl: control_fingerprint)
 const FPRINT = control_fingerprint(@__FILE__, "CONTROL_DAYS" => DAYS,
@@ -128,16 +128,23 @@ if !haskey(cck, :sweeps)
             push!(tasks, (kind="burden penalty", scen=scen, label=lab, f=() -> mpc_outcome(P, x0, default_weights(P; bc_frac=Float64(bc), tf=Float64(tf), barrier=:relaxed_log); Wo=W0)))
         end
         base = default_tox()
-        for v in CFG["toxicity"]["r_H_sweep"]
-            Pt = plant_for(:normal, scen; tox=merge(base, (r_H=Float64(v),)))
-            push!(tasks, (kind="toxicity", scen=scen, label="r_H = $v /day", f=() -> mpc_outcome(Pt, x0, default_weights(Pt))))
-        end
-        for v in CFG["toxicity"]["s_B_sweep"]
-            Pt = plant_for(:normal, scen; tox=merge(base, (s_B=Float64(v),)))
-            push!(tasks, (kind="toxicity", scen=scen, label="s_B = $v per µM", f=() -> mpc_outcome(Pt, x0, default_weights(Pt))))
-        end
-        for v in CFG["toxicity"]["B_tox_sweep"]
-            push!(tasks, (kind="toxicity", scen=scen, label="B_tox = $v", f=() -> mpc_outcome(P, x0, default_weights(P; Btox=Float64(v)))))
+        if base.xie       # kidney toxicity (xie2020): the surrogate-plasma scale γ, limit E_lim unchanged
+            for m in CFG["toxicity"]["gamma_mult_sweep"]
+                Pt = plant_for(:normal, scen; tox=default_tox(γ_mult=Float64(m)))
+                push!(tasks, (kind="toxicity", scen=scen, label="γ ×$m (surrogate plasma scale)", f=() -> mpc_outcome(Pt, x0, default_weights(Pt))))
+            end
+        else              # de Pillis healthy-tissue proxy
+            for v in CFG["toxicity"]["r_H_sweep"]
+                Pt = plant_for(:normal, scen; tox=merge(base, (r_H=Float64(v),)))
+                push!(tasks, (kind="toxicity", scen=scen, label="r_H = $v /day", f=() -> mpc_outcome(Pt, x0, default_weights(Pt))))
+            end
+            for v in CFG["toxicity"]["s_B_sweep"]
+                Pt = plant_for(:normal, scen; tox=merge(base, (s_B=Float64(v),)))
+                push!(tasks, (kind="toxicity", scen=scen, label="s_B = $v per µM", f=() -> mpc_outcome(Pt, x0, default_weights(Pt))))
+            end
+            for v in CFG["toxicity"]["B_tox_sweep"]
+                push!(tasks, (kind="toxicity", scen=scen, label="B_tox = $v", f=() -> mpc_outcome(P, x0, default_weights(P; Btox=Float64(v)))))
+            end
         end
         for b in CFG["schedule"]["lookahead_sweep"]
             bb = Int.(b)

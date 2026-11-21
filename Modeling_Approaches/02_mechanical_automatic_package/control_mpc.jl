@@ -94,7 +94,7 @@ function sensitive_plateau(P::Plant; days=400.0)
     x[P.iN]
 end
 # bc_frac: B_cancer as a fraction of K (0 = no burden penalty); tf: terminal factor (both swept in the report)
-function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]),
+function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=tox_limit(P.tox),
                          bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
                          prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]),
                          barrier=Symbol(get(CFG["cancer"], "barrier", "relaxed_log")), ts=tiebreak_scale())

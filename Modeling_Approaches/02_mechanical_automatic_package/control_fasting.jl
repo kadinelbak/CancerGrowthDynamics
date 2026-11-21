@@ -13,7 +13,8 @@
 # so v = 0 gives exactly the normal-medium plant, and (u = 1, v = 1) gives exactly the Stage 4 model.
 # Host (control_config.toml [toxicity], [host]):
 #   dB/dt = s_B·u − d_B·B
-#   dT/dt = a_H·(1 − p_H·P)·(1 − e^(−B))·(1 − T) − r_H·T·(1 − T)
+#   dT/dt = a_H·(1 − p_H·P)·(1 − e^(−B))·(1 − T) − r_H·T·(1 − T)      ([toxicity] model = "depillis")
+#   dE/dt = k_N·Emax·γu/(EC50 + γu)·(1 − p_H·P) − k_N·E                ("xie2020", the default: kidney excess, Xie et al. 2020)
 #   dP/dt = k_P·(v − P)
 #   dW/dt = −k_W·v + r_W·(1 − W)·(1 − v)
 
@@ -108,7 +109,8 @@ function fast_rhs_ref!(du, x, w, FP::FPlant)       # reference: the zoo right-ha
     end
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
     du[FP.iB] = tp.s_B * u - tp.d_B * Bd
-    du[FP.iT] = tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, zero(T)))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
+    du[FP.iT] = tp.xie ? xie_drive(tp, u) * (1 - h.p_H * Pr) - tp.kN * Tx :
+                         tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, zero(T)))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
     du[FP.iP] = h.k_P * (v - Pr)
     du[FP.iW] = -h.k_W * v + h.r_W * (1 - Wt) * (1 - v)
     nothing
@@ -119,7 +121,8 @@ function fast_rhs!(du, x, w, FP::FPlant)
     spec_cells_rhs!(du, x, T(u), T(U_R) * v, εfactor(FP, T(u)), FP.spec, FP.ε, FP.koff, v)     # control_model.jl
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
     du[FP.iB] = tp.s_B * u - tp.d_B * Bd
-    du[FP.iT] = tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, z))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
+    du[FP.iT] = tp.xie ? xie_drive(tp, u) * (1 - h.p_H * Pr) - tp.kN * Tx :
+                         tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, z))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
     du[FP.iP] = h.k_P * (v - Pr)
     du[FP.iW] = -h.k_W * v + h.r_W * (1 - Wt) * (1 - v)
     nothing
@@ -189,7 +192,7 @@ function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Floa
     BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(FP.K, sensitive_plateau(FP); prog_frac=prog_frac) : (Inf, Inf)
     sc = qP > 0 ? ts : 1.0           # host weight and fasting costs are tie-breakers too (control_mpc.jl)
     Weights2(qB, qR, qT, HCFG["qW"] * sc, ru, rv * sc, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
-             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT, BpN, BpC, sc)
+             bc_frac > 0 ? bc_frac * FP.K : Inf, tox_limit(FP.tox), Wmin, umax, FP.K, qP, Bp, sP, qRT, BpN, BpC, sc)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
 # the soft burden penalty at B_cancer follows control_config [cancer] barrier: "none" (default since
