@@ -181,7 +181,7 @@ function model_section()
               prow("\\gamma", t.γ, "per µM", "ASSUMPTION (calibration)", "medium µM → surrogate plasma level: constant 1 µM gives the clinical mean excess Ē = $(fmt(XIE.Ebar))") :
               prow("s_B,\\ d_B", "$(fmt(t.s_B)), $(fmt(t.d_B))", "—, /day", "ASSUMPTION, LITERATURE", "drug burden (de Pillis & Radunskaya 2001)") *
               prow("a_H,\\ r_H", "$(fmt(t.a_H)), $(fmt(t.r_H))", "—, /day", "LITERATURE", "healthy-tissue kill and regrowth (de Pillis & Radunskaya 2001)")),
-             prow("p_H", h.p_H, "—", "ASSUMPTION (swept 0 / 0.5 / 0.8)", "largest fraction of $(TOX_MODEL == \"xie2020\" ? \"kidney\" : \"healthy-tissue\") damage prevented by fasting (Raffaghello 2008; de Groot 2020)"),
+             prow("p_H", h.p_H, "—", "ASSUMPTION (swept 0 / 0.5 / 0.8)", "largest fraction of $(TOX_MODEL == "xie2020" ? "kidney" : "healthy-tissue") damage prevented by fasting (Raffaghello 2008; de Groot 2020)"),
              prow("k_P", h.k_P, "/day", "ASSUMPTION", "protection builds over ≈ 1 day of fasting"),
              prow("k_W", h.k_W, "/day", "LITERATURE-informed (Safdie 2009; swept)", "weight lost per fasting day (fraction of baseline)"),
              prow("r_W", h.r_W, "/day", "LITERATURE-informed (Safdie 2009; swept)", "weight regained after refeeding"),
