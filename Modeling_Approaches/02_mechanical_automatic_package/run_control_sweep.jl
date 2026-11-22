@@ -39,9 +39,9 @@ let f = joinpath(SOUT, "sweep_outcomes.csv")
 end
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const LOOK = Int.(CFG["schedule"]["lookahead_blocks"])
-const LEVELS = Float64.(CFG["dose"]["levels_data"])
+const LEVELS = MPC_LEVELS
 const DATA_DAYS = Float64(CFG["schedule"]["data_days"])
-const MPC = "MPC, measured doses only"
+const MPC = MPC_D
 
 # the default variant, from control_config.toml
 const D0 = (barrier=String(CFG["cancer"]["barrier"]), threshold=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]),

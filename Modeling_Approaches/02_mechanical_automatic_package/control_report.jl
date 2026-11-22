@@ -37,7 +37,7 @@ data_end(sx, top, bottom) = LONG ? @sprintf("<line x1='%.1f' x2='%.1f' y1='%d' y
                                             sx(DATA_DAYS), sx(DATA_DAYS), top, bottom, sx(DATA_DAYS) + 4, top + 10, round(Int, DATA_DAYS)) : ""
 const POL_COL = Dict("No treatment" => "#6b7280", "Constant 1 µM" => "#d95f02", "Maximum measured dose (1.47 µM)" => "#b91c1c",
                      "Periodic 1 µM, 2 days on / 2 off" => "#8b5cf6", "Threshold adaptive (Zhang-style)" => "#3b8b4f",
-                     "MPC, measured doses only" => "#0b6e99")
+                     MPC_D => "#0b6e99", MPC_D_HIGH => "#7c3aed")
 polcol(n) = get(POL_COL, n, "#0f766e")
 poldash(n) = startswith(n, "MPC demonstration") ? "6,4" : ""
 f2(x) = isfinite(x) ? fmt(x) : "—"
@@ -127,7 +127,7 @@ end
 
 # ── pieces ──────────────────────────────────────────────────────────────────
 main_of(env, scen, ratio) = only(filter(x -> x.env == env && x.scen == scen && x.ratio == ratio, C[:main]))
-const POL_ORDER = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)", "MPC, measured doses only"]
+const POL_ORDER = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)", MPC_D, MPC_D_HIGH]
 pol_order(m) = vcat([p for p in POL_ORDER if haskey(m.policies, p)], sort([p for p in keys(m.policies) if !(p in POL_ORDER)]))
 
 const T_TOTAL = "Total cells N + C under each dosing policy. The dashed orange line is B_cancer ($(CFG["cancer"]["B_cancer_fraction_of_K"]) of the fitted capacity K), where the soft burden penalty rises steeply. Lower is less cancer burden."
@@ -151,7 +151,7 @@ function outcome_table(m)
                           tn(d1(dover(o))), td(yn(o.tox_violation)), tn(dayx(o.ttp_first)), tn(d1(o.days_progressed))];
                      cls=startswith(pn, "MPC, measured") ? "win" : ""))
     end
-    table([("Policy", "The dosing rule. MPC = model-predictive control; 'measured doses only' restricts it to 0, 0.62, 1 and 1.47 µM, the doses that were measured. A policy that breaks the toxicity limit is flagged in its row."),
+    table([("Policy", "The dosing rule. MPC = model-predictive control; $(MPC_MEASURED ? "'measured doses only' restricts it to 0, 0.62, 1 and 1.47 µM, the doses that were measured." : "'doses up to $(MPC_CAP) µM' lets it choose $(join(MPC_LEVELS, ", ")) µM; above 1.47 µM the fitted dose response is extrapolated.") A policy that breaks the toxicity limit is flagged in its row."),
            ("Time to progression (day)", T_TTP), ("N + C $DL", "Total cells at $DL.", :lower), ("Days above K/2", "Days with N + C at or above half the shared capacity K.", :lower),
            ("C $DL", "Resistant A2780cis cells at $DL."), ("N $DL", "Sensitive A2780 cells at $DL."),
            ("Resistant fraction", "C / (N + C) at $DL. Lower keeps the population drug-sensitive."), ("Max toxicity", T_TOX),
@@ -224,7 +224,7 @@ function env_section(env)
         m = main_of(env, scen, "50:50")
         ts = m.policies["No treatment"].o.ts
         tot = [(label=pn, color=polcol(pn), dash=poldash(pn), t=ts, y=m.policies[pn].o.N .+ m.policies[pn].o.C) for pn in pol_order(m)]
-        mp = m.policies["MPC, measured doses only"].o; cst = m.policies["Constant 1 µM"].o
+        mp = m.policies[MPC_D].o; cst = m.policies["Constant 1 µM"].o
         nc = [(label="MPC: sensitive N", color="#0b6e99", dash="", t=ts, y=mp.N), (label="MPC: resistant C", color="#0b6e99", dash="6,4", t=ts, y=mp.C),
               (label="Constant 1 µM: sensitive N", color="#d95f02", dash="", t=ts, y=cst.N), (label="Constant 1 µM: resistant C", color="#d95f02", dash="6,4", t=ts, y=cst.C)]
         tox = [(label=pn, color=polcol(pn), dash=poldash(pn), t=ts, y=m.policies[pn].o.T) for pn in pol_order(m)]
@@ -254,9 +254,9 @@ function robust_section()
         q(v, pr) = isempty(v) ? NaN : quantile(v, pr)
         bandof(M) = (t=ts, y=[median(M[i, :]) for i in axes(M, 1)], lo=[q(M[i, :], 0.025) for i in axes(M, 1)], hi=[q(M[i, :], 0.975) for i in axes(M, 1)])
         band(pn, f) = bandof(hcat([f(d[pn]) for d in R.draws if get(d, pn, nothing) !== nothing]...))
-        ser = [merge(band(pn, o -> o.N .+ o.C), (label=pn * " (median, 95%)", color=polcol(pn), dash="")) for pn in ("Constant 1 µM", "MPC, measured doses only")]
+        ser = [merge(band(pn, o -> o.N .+ o.C), (label=pn * " (median, 95%)", color=polcol(pn), dash="")) for pn in ("Constant 1 µM", MPC_D)]
         isempty(R.closed) || push!(ser, merge(bandof(hcat([c.N .+ c.C for c in R.closed]...)), (label="Closed-loop MPC (noisy counts)", color="#0f766e", dash="2,3")))
-        serC = [merge(band(pn, o -> o.C), (label=pn * ": resistant C", color=polcol(pn), dash="6,4")) for pn in ("Constant 1 µM", "MPC, measured doses only")]
+        serC = [merge(band(pn, o -> o.C), (label=pn * ": resistant C", color=polcol(pn), dash="6,4")) for pn in ("Constant 1 µM", MPC_D)]
         push!(secs, "<div>" * withtip(ts_svg("$(env == :normal ? "Normal medium" : "Low resource") · scenario $(scen_label(scen)): N + C over bootstrap parameter sets", vcat(ser, serC); hline=(m.Bc, "B_cancer")),
             "Each schedule (fixed, planned with the best-fit model) re-simulated on $(length(R.draws)) bootstrap parameter sets. Line: median; band: 2.5–97.5 percentiles. A wide band means the fitted parameters leave the outcome uncertain; a band crossing the dashed line means the soft burden penalty level B_cancer is passed under plausible parameters.", "Lower and narrower is better; time above the dashed line is penalised.") * "</div>")
         rowfor(name, ds; cls="") = (tot = [d.tot for d in ds]; cf = [get(d, :Cf, NaN) for d in ds]; nf = [get(d, :Nf, NaN) for d in ds];
@@ -291,7 +291,7 @@ $(table([("Environment", "Normal medium or low resource.", :none), ("Scen.", "Sc
          ("Δ C", "Median of (closed-loop − policy) resistant cells at $DL.", "Negative favours the closed loop."), ("Closed loop fewer C", "Share of draws where the closed loop ends with fewer resistant cells.", :higher),
          ("Δ dose (µM·d)", "Median of (closed-loop − policy) cumulative dose.", "Negative means the closed loop uses less drug.")], prows))"""
 end
-const ROB_POLS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)", "MPC, measured doses only"]
+const ROB_POLS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)", MPC_D]
 # closed loop minus each policy, draw by draw, on the draws that carry a closed-loop run
 function paired_rows(env, scen, R)
     rows = String[]
@@ -300,7 +300,7 @@ function paired_rows(env, scen, R)
     for pn in ROB_POLS
         pr = [(d[CL_NAME], d[pn]) for d in P if get(d, pn, nothing) !== nothing]; isempty(pr) && continue
         dt = [a.tot - b.tot for (a, b) in pr]; dc = [a.Cf - b.Cf for (a, b) in pr]; dd = [a.cum - b.cum for (a, b) in pr]
-        push!(rows, trow([td("$(env == :normal ? "normal" : "low resource")"), td(string(scen)), td(hesc(pn) * (pn == "MPC, measured doses only" ? " (open loop: the nominal schedule replayed)" : "")), tn(length(pr)),
+        push!(rows, trow([td("$(env == :normal ? "normal" : "low resource")"), td(string(scen)), td(hesc(pn) * (pn == MPC_D ? " (open loop: the nominal schedule replayed)" : "")), tn(length(pr)),
                           tn(@sprintf("%+.0f", median(dt))), tn(@sprintf("%.0f%%", 100 * mean(dt .< 0))), tn(@sprintf("%+.0f", median(dc))), tn(@sprintf("%.0f%%", 100 * mean(dc .< 0))),
                           tn(@sprintf("%+.1f", median(dd)))]))
     end
@@ -431,7 +431,7 @@ end
 function breach_summary()
     ms = [m for m in C[:main] if m.env == :normal]
     n = sum(length(m.policies) for m in ms); k = sum(count(v -> v.o.cancer_violation, collect(values(m.policies))) for m in ms)
-    mp = [m.policies["MPC, measured doses only"].o for m in ms]
+    mp = [m.policies[MPC_D].o for m in ms]
     "$k of $n normal-medium runs (3 ratios × 2 scenarios × $(length(first(ms).policies)) policies) pass B_cancer = $(CFG["cancer"]["B_cancer_fraction_of_K"]) K at some time, " *
     "the data-supported MPC in $(count(o -> o.cancer_violation, mp)) of $(length(mp)) (for $(d1(median(dover.(mp)))) days, median)"
 end
@@ -523,7 +523,7 @@ function key_findings()
     out = String[]
     for env in (:normal, :lowres), scen in SCENS
         m = main_of(env, scen, "50:50")
-        mp = m.policies["MPC, measured doses only"]; o = mp.o
+        mp = m.policies[MPC_D]; o = mp.o
         sched = join([@sprintf("%.3g", u) for u in mp.U], ", ")
         bt = best_fixed(m, x -> x.total_final); bc = best_fixed(m, x -> x.C_final); bd = best_fixed(m, x -> x.cum_dose); bx = best_fixed(m, x -> x.max_tox)
         dom = [pn for pn in pol_order(m) if !startswith(pn, "MPC") && (q = m.policies[pn].o; q.total_final <= o.total_final && q.C_final <= o.C_final && q.cum_dose <= o.cum_dose)]
@@ -547,7 +547,7 @@ function hill_section()
     (isfile(f) && isfile(fm)) || return head * "<div class='intro'><p class='muted'>Not run: no Hill alternative at outputs/sensitivity/hill/control/control_outcomes.csv (run run_control.jl with ZOO_STATE pointing to the Hill zoo state and CONTROL_OUT=outputs/sensitivity/hill).</p></div>"
     A = CSV.read(f, DataFrame); M = CSV.read(fm, DataFrame); rows = String[]
     pick(D, env, scen, pn) = (r = D[(string.(D.environment) .== env) .& (string.(D.scenario) .== scen) .& (D.ratio .== "50:50") .& (D.policy .== pn), :]; nrow(r) == 1 ? r[1, :] : nothing)
-    for env in ("normal", "lowres"), scen in string.(SCENS), pn in ("MPC, measured doses only", "Constant 1 µM")
+    for env in ("normal", "lowres"), scen in string.(SCENS), pn in (MPC_D, "Constant 1 µM")
         a = pick(M, env, scen, pn); b = pick(A, env, scen, pn)
         (a === nothing || b === nothing) && continue
         push!(rows, trow([td(env == "normal" ? "normal" : "low resource"), td(scen), td(hesc(pn)), tn(cells(a.total_final)), tn(cells(b.total_final)), tn(cells(a.C_final)), tn(cells(b.C_final)),
@@ -691,7 +691,7 @@ end
 function adaptive_finding()
     parts = String[]
     for env in (:normal, :lowres), scen in SCENS
-        m = main_of(env, scen, "50:50"); mp = m.policies["MPC, measured doses only"]; c1 = m.policies["Constant 1 µM"]
+        m = main_of(env, scen, "50:50"); mp = m.policies[MPC_D]; c1 = m.policies["Constant 1 µM"]
         U = mp.U
         blocks = Tuple{Int,Int}[]                       # runs of treated intervals
         for (i, u) in enumerate(U)
@@ -719,7 +719,7 @@ function write_control_js()
     for env in (:normal, :lowres), scen in SCENS
         m = main_of(env, scen, "50:50"); P = m.policies
         run = "$(env == :normal ? "Normal medium" : "Low resource") · scenario $scen"
-        push!(rows, "{\"run\":\"$(esc_js(run))\",\"schedule\":[$(join(js.(P["MPC, measured doses only"].U), ","))],\"mpc\":$(jo(P["MPC, measured doses only"].o)),\"const1\":$(jo(P["Constant 1 µM"].o)),\"mtd\":$(jo(P["Maximum measured dose (1.47 µM)"].o))}")
+        push!(rows, "{\"run\":\"$(esc_js(run))\",\"schedule\":[$(join(js.(P[MPC_D].U), ","))],\"mpc\":$(jo(P[MPC_D].o)),\"const1\":$(jo(P["Constant 1 µM"].o)),\"mtd\":$(jo(P["Maximum measured dose (1.47 µM)"].o))}")
     end
     jsvar = LONG ? "CONTROL$(round(Int, DAYS))" : "CONTROL"
     out = "// written by control_report.jl — optimal-control summary for the Summary and Presentation\nwindow.$jsvar = {\"generated\":\"$(Dates.format(now(), "yyyy-mm-dd HH:MM"))\",\"days\":$(round(Int, DAYS)),\"dataDays\":$(round(Int, DATA_DAYS)),\"Btox\":$(CFG["toxicity"]["B_tox"]),\"finding\":\"$(esc_js(adaptive_finding()))\",\"rows\":[$(join(rows, ","))]};\n"

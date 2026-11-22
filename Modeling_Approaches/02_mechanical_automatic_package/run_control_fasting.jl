@@ -27,7 +27,7 @@ const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
 const FOUT = joinpath(get(ENV, "CONTROL_OUT", joinpath(@__DIR__, "outputs")), control_subdir(DAYS, NaN)); mkpath(FOUT)   # CONTROL_OUT: side runs, as in run_control.jl
 const FCK = joinpath(FOUT, "fasting_state.jls")
 # skip when nothing this run reads has changed since its last finished run (control_model.jl: control_fingerprint)
-const FPRINT = control_fingerprint(@__FILE__, "CONTROL_DAYS" => DAYS)
+const FPRINT = control_fingerprint(@__FILE__, "CONTROL_DAYS" => DAYS, "MPC_LEVELS" => MPC_LEVELS, "MPC_HIGH_LEVELS" => MPC_HIGH_LEVELS)
 const FPFILE = joinpath(FOUT, "inputs.sha256")
 if control_unchanged(FPFILE, FPRINT, joinpath(FOUT, "fasting_outcomes.csv"))
     println("Control inputs unchanged since the last finished run; reusing $(joinpath(FOUT, "fasting_outcomes.csv")) (CONTROL_FORCE=1 recomputes)")
@@ -45,7 +45,7 @@ const NCL = min(Int(CFG["robustness"]["closed_loop_draws"]), BOOT_N)   # closed-
 const CL_NAME = "Closed-loop MPC, dose + fasting (observes N, C with noise)"
 # starting counts: control_config [initial] source (control_model.jl: start_counts; the fitted Ce1 starts by default)
 ratios = [merge((ratio=r,), start_counts(r)) for r in ("25:75", "50:50", "75:25")]
-const MPC2 = "MPC, dose + fasting (measured levels)"
+const MPC2 = MPC_F
 const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
 println("=== $(round(Int, DAYS))-day control with fasting: $(Threads.nthreads()) threads; $NRUN decisions, fixed look-ahead $LOOK_DAYS days (blocks $LOOK); checkpoint has $(collect(keys(fck))) ==="); flush(stdout)
@@ -128,6 +128,12 @@ function run_all2(FP, x0; n=NRUN, H=LOOK)
     out[MPC2] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
     t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, Wd; mode=:continuous, sk...)
     out[MPCD] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
+    if !isempty(MPC_HIGH_LEVELS)       # the higher-cap MPC policies (control_text.jl), same objective and stopping rule
+        t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, W; vlevels=[0.0], ulevels=MPC_HIGH_LEVELS, sk...)
+        out[MPC_D_HIGH] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
+        t = time(); cl = closed_loop2(FP, FP, x0, Δ0, n, H, W; ulevels=MPC_HIGH_LEVELS, sk...)
+        out[MPC_F_HIGH] = (U=cl.U, o=outcomes2(FP, x0, cl.U, Δ0, W; t_stop=tstop(cl)), secs=time() - t, stop=cl.stop_reason)
+    end
     out
 end
 

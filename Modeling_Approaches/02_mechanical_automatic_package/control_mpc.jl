@@ -434,7 +434,7 @@ function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:c
             U0 = Uwarm[1:Hk]
             if cum <= 0
                 bd = shrink ? cut_blocks(as_blocks(H), n_dec - k + 1) : as_blocks(H)
-                Ud = expand_blocks(discrete_solve(xm, Pm, Δ, bd, Float64.(CFG["dose"]["levels_data"]), W).U, bd)
+                Ud = expand_blocks(discrete_solve(xm, Pm, Δ, bd, MPC_LEVELS, W).U, bd)
                 total_cost(xm, Ud, Pm, Δ, W) < total_cost(xm, U0, Pm, Δ, W) && (U0 = Ud)
             end
             sol = sqp_solve(xm, U0, Pm, Δ, W; cum=cum > 0 ? max(rem, 1e-9) : 0.0)

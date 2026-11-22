@@ -328,7 +328,7 @@ admissible(v, run, gap, maxrun, mingap) = v == 0 || (run < maxrun && (run > 0 ||
 # H: an Int (single intervals) or the look-ahead blocks (control_mpc.jl). In a block the dose holds for
 # every interval and a fast applies to the block's FIRST interval only (fed afterwards), so the fasting
 # rules (48-h fasts, refeeding between) still hold; the cost is summed over every interval.
-function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CFG["dose"]["levels_data"]),
+function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=MPC_LEVELS,
                          vlevels=Float64.(FCFG["levels"]), maxrun=Int(FCFG["max_consecutive_intervals"]),
                          mingap=Int(FCFG["min_gap_intervals"]), run0=0, gap0=10^6, Uinit=nothing)
     blk = as_blocks(H); H = length(blk)

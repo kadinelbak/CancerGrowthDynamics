@@ -13,11 +13,11 @@ const SOUT = joinpath(PKG, "outputs", "control_sweep")
 const SDOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "control_sweep")
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const DATA_DAYS = Float64(CFG["schedule"]["data_days"])
-const MPC = "MPC, measured doses only"
 # headline drug-response scenario (control_config.toml [scenarios].headline, user 2026-11-02): listed first, marked "(main result)"
 const HEADLINE = String(get(get(CFG, "scenarios", Dict{String,Any}()), "headline", "A"))
 scen_order(v) = sort(string.(unique(v)); by=x -> x == HEADLINE ? 0 : 1)
 include(joinpath(PKG, "control_text.jl"))   # scenario_role and the shared caveats
+const MPC = MPC_D
 scen_tag(x) = " ($(scenario_role(x)))"      # A main result since 2026-11-12 (user), B the what-if
 # the B what-if sentence from the 14-day report's plant-vs-data table (outputs/control/plant_vs_data.csv)
 function b_whatif_note()
@@ -28,7 +28,7 @@ function b_whatif_note()
     b_whatif_text(b.N + b.C, b.N_data + b.C_data, a.N + a.C)
 end
 const COMPARATORS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)"]
-const LEVELS = Float64.(CFG["dose"]["levels_data"])
+const LEVELS = MPC_LEVELS
 const DOSE_COL = ["#f3f4f6", "#9ecae1", "#3182bd", "#08306b"]       # 0, 0.62, 1.0, 1.47 µM
 
 hesc(s) = replace(string(s), "&" => "&amp;", "<" => "&lt;", ">" => "&gt;", "'" => "&#39;")

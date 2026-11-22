@@ -21,16 +21,16 @@ const FDOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_autom
 FC = deserialize(joinpath(FOUT, "fasting_state.jls"))
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"]); const NRUN = round(Int, DAYS / Δ0)
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
-const MPC2 = "MPC, dose + fasting (measured levels)"; const MPC1 = "MPC, dose only (fed)"
+const MPC2 = MPC_F; const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
 const B_NOTE = b_whatif_note()
 const POL_ORDER = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)",
-                   "Fasting only, 48 h every 6 days", "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", "Constant 1 µM + 48-h fast every 8 days", MPC1, MPC2, MPCD]
+                   "Fasting only, 48 h every 6 days", "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", "Constant 1 µM + 48-h fast every 8 days", MPC1, MPC2, MPC_D_HIGH, MPC_F_HIGH, MPCD]
 const POL_COL = Dict("No treatment" => "#6b7280", "Constant 1 µM" => "#d95f02", "Maximum measured dose (1.47 µM)" => "#b91c1c",
                      "Periodic 1 µM, 2 days on / 2 off" => "#8b5cf6", "Threshold adaptive (Zhang-style)" => "#3b8b4f",
                      "Fasting only, 48 h every 6 days" => "#a16207", "Periodic 1 µM with a 48-h fast on each dosing interval" => "#db2777",
-                     "Constant 1 µM + 48-h fast every 6 days" => "#9a3412", "Constant 1 µM + 48-h fast every 8 days" => "#c2410c", MPC1 => "#64748b", MPC2 => "#0b6e99", MPCD => "#0f766e")
-polcol(n) = get(POL_COL, n, "#0f766e"); poldash(n) = n == MPCD ? "6,4" : n == MPC1 ? "2,3" : ""
+                     "Constant 1 µM + 48-h fast every 6 days" => "#9a3412", "Constant 1 µM + 48-h fast every 8 days" => "#c2410c", MPC1 => "#64748b", MPC2 => "#0b6e99", MPC_D_HIGH => "#a78bfa", MPC_F_HIGH => "#7c3aed", MPCD => "#0f766e")
+polcol(n) = get(POL_COL, n, "#0f766e"); poldash(n) = n == MPCD ? "6,4" : n in (MPC1, MPC_D_HIGH) ? "2,3" : ""
 cells(x) = isfinite(x) ? @sprintf("%.0f", x) : "—"
 yn(b) = b ? "<span class='flag'>yes</span>" : "no"
 pct(x) = @sprintf("%.0f%%", 100x)
