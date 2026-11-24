@@ -37,7 +37,7 @@ run_days = [14.0, 30.0, 60.0]    # ASSUMPTION (user, 2026-10-27): run lengths of
 units = "µM cisplatin in the medium"   # DATA: the experimental dose unit
 u_max_data = 1.47                # DATA: highest dose with measurements (Stage 2 monoculture, IC25 file)
 levels_data = [0.0, 0.62, 1.0, 1.47]   # DATA: every dose that was measured
-mpc_high_levels = []                   # ASSUMPTION (user, 2026-11-22): dose levels of the extra higher-cap MPC policies, e.g. [0.0, 0.62, 1.0, 1.47, 2.0, 3.0] for "≤ 3 µM" (extrapolated above 1.47 µM; the kidney limit E_lim still applies); empty = none (CONTROL_MPC_HIGH_LEVELS overrides)
+mpc_high_levels = [0.0, 0.62, 1.0, 1.47, 2.0, 3.0]   # ASSUMPTION (user, 2026-11-22; main runs since 2026-11-23): dose levels of the extra higher-cap MPC policies, e.g. [0.0, 0.62, 1.0, 1.47, 2.0, 3.0] for "≤ 3 µM" (extrapolated above 1.47 µM; the kidney limit E_lim still applies); empty = none (CONTROL_MPC_HIGH_LEVELS overrides)
 mpc_levels = [0.0, 0.62, 1.0, 1.47]    # ASSUMPTION (user, 2026-11-22): the doses the data-supported MPC may choose; the measured doses by default (CONTROL_MPC_LEVELS overrides, e.g. "0,0.62,1,1.47,2,3" for a cap at 3 µM, extrapolated above 1.47 µM)
 u_max_demo = 3.0                 # ASSUMPTION: demonstration mode only; above 1.47 µM the fitted dose response is extrapolated
 cumulative_max_uM_days = 0.0     # ASSUMPTION: optional budget on ∫u dt; 0 = no budget (none is used)

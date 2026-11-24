@@ -1,0 +1,139 @@
+=== Autonomous model zoo: 12 threads, B = 200 ===
+Resumed the per-line stages s1, s1b, s2 from /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_fits/zoo_mono_stages.jls
+
+=== Stage s1: 1 Untreated monoculture ===
+
+=== Stage s1b: 1b Low-resource monoculture ===
+Stage s1b: per line (A) (A per line 57.51, k=4; B shared lr_imm_plus_chain3_loss 62.42, k=6; ΔBIC +4.91)
+
+=== Stage s2: 2 Treated monoculture ===
+Stage s2 shared structure: chain3_loss (joint BIC 251.01, k=4)
+
+=== Stage s3: 3 Ce0 + Ce1 coculture ===
+  s3: 5 of 47 candidates reused from saved fits, 42 fitted
+  coculture cc_K_alpha_death_phiNC k=7 BIC=  703.88  K = 5477.4, α_NC = 0.8273, α_CN = 1.271, d_N = 0.2095, d_C = 0.2266, φ_N = 0.4488, φ_C = 4.693e-16
+  coculture cc_K_alpha_death_phiNC_sw0 k=8 BIC=  709.00  K = 5477.4, α_NC = 0.8273, α_CN = 1.271, d_N = 0.2095, d_C = 0.2266, φ_N = 0.4488, φ_C = 9.906e-24, μ_0 = 1.567e-21
+  coculture cc_K_alpha_death_phiNC_swD k=8 BIC=  709.00  K = 5477.4, α_NC = 0.8273, α_CN = 1.271, d_N = 0.2095, d_C = 0.2266, φ_N = 0.4488, φ_C = 1.071e-24, μ_D = 1.433e-23
+  coculture cc_K_alpha_death_protNC k=7 BIC=  725.06  K = 5037.7, α_NC = 0.9554, α_CN = 1.243, d_N = 0.1672, d_C = 0.1977, ρ_N = 6.797, ρ_C = 50
+  coculture cc_K_alpha_death_phi k=6 BIC=  744.52  K = 5387.3, α_NC = 0.8379, α_CN = 1.393, d_N = 0.2118, d_C = 0.2054, φ = 0.2699
+  coculture cc_K_alpha_csNonly_delay k=4 BIC=  790.94  K = 3200.6, α_NC = 0.8957, α_CN = 1.278, γ_N^cs = 0.9012
+  coculture cc_K_alpha_phiC      k=4 BIC=  791.87  K = 3204.7, α_NC = 0.8969, α_CN = 1.282, φ_C = 1.017e-16
+  coculture cc_K_alpha_protC     k=4 BIC=  791.97  K = 3211.5, α_NC = 0.8956, α_CN = 1.28, ρ_C = 50
+  coculture cc_K_alpha_csNonly_imm k=4 BIC=  792.78  K = 3181.2, α_NC = 0.9023, α_CN = 1.282, γ_N^cs = 0.6985
+  coculture cc_K_alpha_csNConly_imm k=5 BIC=  793.59  K = 3246.6, α_NC = 0.8905, α_CN = 1.267, γ_N^cs = 0.6776, γ_C^cs = 0.1082
+  coculture cc_K_alpha_csNonly_delayk k=5 BIC=  795.75  K = 3197.6, α_NC = 0.8963, α_CN = 1.279, γ_N^cs = 0.8368, k_N = 1.147
+  coculture cc_K_alpha_csNConly_delay k=5 BIC=  796.06  K = 3200.6, α_NC = 0.8957, α_CN = 1.278, γ_N^cs = 0.9012, γ_C^cs = 2.109e-16
+  coculture cc_K_alpha_phiNC     k=5 BIC=  796.06  K = 3200.6, α_NC = 0.8957, α_CN = 1.278, φ_N = 0.934, φ_C = 6.153e-15
+  coculture cc_K_alpha_protNC    k=5 BIC=  796.11  K = 3209.4, α_NC = 0.8963, α_CN = 1.278, ρ_N = 0.2575, ρ_C = 47.93
+  coculture cc_K_alpha_phi       k=4 BIC=  799.17  K = 3227.7, α_NC = 0.8858, α_CN = 1.261, φ = 0.8061
+  coculture cc_K_alpha_phi_protNC k=6 BIC=  801.10  K = 3207.1, α_NC = 0.8946, α_CN = 1.276, φ = 0.9365, ρ_N = 0.03358, ρ_C = 49.66
+  coculture cc_K_alpha_death_swD k=6 BIC=  802.03  K = 3934.8, α_NC = 0.842, α_CN = 1.302, d_N = 0.08035, d_C = 0.0733, μ_D = 1.773
+  coculture cc_K_alpha_csNConly_delayk k=7 BIC=  802.25  K = 3256.4, α_NC = 0.8865, α_CN = 1.266, γ_N^cs = 0.793, γ_C^cs = 0.1046, k_N = 1.182, k_C = 20
+  coculture cc_K_alpha_death_sw0 k=6 BIC=  802.45  K = 3916.1, α_NC = 0.8385, α_CN = 1.299, d_N = 0.07023, d_C = 0.07325, μ_0 = 0.2921
+  coculture cc_K_alpha_swD       k=4 BIC=  802.52  K = 3240.7, α_NC = 0.8801, α_CN = 1.259, μ_D = 0.1368
+  coculture cc_K_alpha_sw0       k=4 BIC=  802.62  K = 3247.1, α_NC = 0.8733, α_CN = 1.265, μ_0 = 0.06651
+  coculture cc_K_alpha_phiN      k=4 BIC=  803.20  K = 3245.1, α_NC = 0.8807, α_CN = 1.26, φ_N = 0.8351
+  coculture cc_K_alpha           k=3 BIC=  803.27  K = 3275.1, α_NC = 0.8794, α_CN = 1.26
+  coculture cc_K_alpha_protN     k=4 BIC=  803.41  K = 3251.8, α_NC = 0.8858, α_CN = 1.263, ρ_N = 0.7381
+  coculture cc_K_alpha_deathC    k=4 BIC=  805.10  K = 3447.9, α_NC = 0.956, α_CN = 1.169, d_C = 0.03867
+  coculture cc_K_alpha_phiNC_intNC k=7 BIC=  806.31  K = 3200.6, α_NC = 0.8957, α_CN = 1.022, η_N = 1.612e-20, η_C = 0.2043, φ_N = 0.934, φ_C = 4.383e-20
+  coculture cc_K_alpha_death_phiN_swD k=7 BIC=  807.09  K = 4018.5, α_NC = 0.8218, α_CN = 1.332, d_N = 0.09421, d_C = 0.07876, φ_N = 0.6129, μ_D = 5.829e-14
+  coculture cc_K_alpha_death_phiN_sw0 k=7 BIC=  807.09  K = 4018.5, α_NC = 0.8218, α_CN = 1.332, d_N = 0.09421, d_C = 0.07876, φ_N = 0.6129, μ_0 = 1.967e-15
+  coculture cc_K_alpha_phiN_csC_imm k=5 BIC=  808.33  K = 3245.1, α_NC = 0.8807, α_CN = 1.26, φ_N = 0.8351, γ_C^cs = 3.914e-15
+  coculture cc_K_alpha_csC_delay k=4 BIC=  808.39  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, γ_C^cs = 1.647e-16
+  coculture cc_K_alpha_deathN    k=4 BIC=  808.39  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, d_N = 4.236e-17
+  coculture cc_K_alpha_csN_imm   k=4 BIC=  808.39  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, γ_N^cs = 8.666e-20
+  coculture cc_K_alpha_csC_imm   k=4 BIC=  808.39  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, γ_C^cs = 6.548e-17
+  coculture cc_K_alpha_csN_delay k=4 BIC=  808.39  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, γ_N^cs = 4.114e-18
+  coculture cc_K_alpha_intN      k=4 BIC=  808.39  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, η_N = 5.739e-18
+  coculture cc_K_alpha_intC      k=4 BIC=  808.39  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, η_C = 1.667e-17
+  coculture cc_K_alpha_death     k=5 BIC=  810.23  K = 3447.9, α_NC = 0.956, α_CN = 1.169, d_N = 5.134e-16, d_C = 0.03867
+  coculture cc_K_alpha_csNC_imm  k=5 BIC=  813.52  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, γ_N^cs = 2.234e-21, γ_C^cs = 2.05e-21
+  coculture cc_K_alpha_intNC     k=5 BIC=  813.52  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, η_N = 6.327e-22, η_C = 2.038e-21
+  coculture cc_K_alpha_csNC_delay k=5 BIC=  813.52  K = 3275.1, α_NC = 0.8794, α_CN = 1.26, γ_N^cs = 1.904e-21, γ_C^cs = 2.571e-21
+  coculture cc_K_phi             k=2 BIC=  861.12  K = 2583.6, φ = 0.5851
+  coculture cc_K_phiNC           k=3 BIC=  862.55  K = 2578.0, φ_N = 0.801, φ_C = 3.617e-14
+  coculture cc_K                 k=1 BIC=  865.18  K = 2627.0
+  coculture cc_K_protN           k=2 BIC=  865.55  K = 2602.7, ρ_N = 1.993
+  coculture cc_K_csN_delay       k=2 BIC=  870.30  K = 2627.0, γ_N^cs = 3.274e-15
+  coculture cc_K_csN_imm         k=2 BIC=  870.30  K = 2627.0, γ_N^cs = 1.003e-13
+  coculture cc_K_intN            k=2 BIC=  870.30  K = 2627.0, η_N = 1.389e-14
+
+=== Stage s3b: 3b Low-resource coculture ===
+  s3b: 0 of 5 candidates reused from saved fits, 5 fitted
+  LR coculture lrcc_epsN            k=1 BIC=  674.19  ε_N = 1.208
+  LR coculture lrcc_eps             k=2 BIC=  678.44  ε_N = 1.206, ε_C = 0.9333
+  LR coculture lrcc_inherit         k=0 BIC=  680.19  
+  LR coculture lrcc_epsC            k=1 BIC=  684.28  ε_C = 0.9292
+  LR coculture lrcc_noLR            k=0 BIC=  942.94  
+
+=== Stage s4: 4 Low resource + cisplatin coculture ===
+  s4: 0 of 6 candidates reused from saved fits, 6 fitted
+  combination s4_eps               k=2 BIC=   99.50  ε_N^R = 1.3, ε_C^R = 0.5191
+  combination s4_inherited         k=0 BIC=  111.39  
+  combination s4_chi_K             k=2 BIC=  113.81  χ = 0.2378, K = 21469.4
+  combination s4_chi               k=1 BIC=  113.91  χ = 0.1029
+  combination s4_K                 k=1 BIC=  114.56  K = 6368.2
+  combination s4_chi_lines         k=2 BIC=  117.13  χ_N = 0.1029, χ_C = 4.525
+  s1-a2780: candidates and fits unchanged, bootstrap reused from the previous run
+  s1-a2780     optimal logistic                 k=2  chosen in  88.0% of replicates (lowest BIC in  77.5%)  [0s]
+  s1-a2780cis: candidates and fits unchanged, bootstrap reused from the previous run
+  s1-a2780cis  optimal logistic                 k=2  chosen in 100.0% of replicates (lowest BIC in  98.0%)  [0s]
+  s1b-a2780: candidates and fits unchanged, bootstrap reused from the previous run
+  s1b-a2780    optimal lr_imm_loss              k=1  chosen in  57.5% of replicates (lowest BIC in  42.5%)  [0s]
+  s1b-a2780cis: candidates and fits unchanged, bootstrap reused from the previous run
+  s1b-a2780cis optimal lr_imm_plus_chain3_loss  k=3  chosen in  49.0% of replicates (lowest BIC in  55.0%)  [0s]
+  s2-a2780: candidates and fits unchanged, bootstrap reused from the previous run
+  s2-a2780     optimal chain3_loss              k=2  chosen in  69.5% of replicates (lowest BIC in  63.0%)  [0s]
+  s2-a2780cis: candidates and fits unchanged, bootstrap reused from the previous run
+  s2-a2780cis  optimal chain3_loss              k=2  chosen in   1.5% of replicates (lowest BIC in   9.5%)  [0s]
+    s3: bootstrap work budget per optimiser run = 50.0× a refit (100000000–29361496950 evaluations)
+    s3: 25 / 200 replicates
+    s3: screened after 40 replicates; 2 of 47 candidates continue to 200 (dropped: cc_K_alpha_death_phiNC_sw0, cc_K_alpha_death_protNC, cc_K_alpha_death_phi, cc_K_alpha_csNonly_delay, cc_K_alpha_phiC, cc_K_alpha_protC, cc_K_alpha_csNonly_imm, cc_K_alpha_csNConly_imm, cc_K_alpha_csNonly_delayk, cc_K_alpha_csNConly_delay, cc_K_alpha_phiNC, cc_K_alpha_protNC, cc_K_alpha_phi, cc_K_alpha_phi_protNC, cc_K_alpha_death_swD, cc_K_alpha_csNConly_delayk, cc_K_alpha_death_sw0, cc_K_alpha_swD, cc_K_alpha_sw0, cc_K_alpha_phiN, cc_K_alpha, cc_K_alpha_protN, cc_K_alpha_deathC, cc_K_alpha_phiNC_intNC, cc_K_alpha_death_phiN_swD, cc_K_alpha_death_phiN_sw0, cc_K_alpha_phiN_csC_imm, cc_K_alpha_csC_delay, cc_K_alpha_deathN, cc_K_alpha_csN_imm, cc_K_alpha_csC_imm, cc_K_alpha_csN_delay, cc_K_alpha_intN, cc_K_alpha_intC, cc_K_alpha_death, cc_K_alpha_csNC_imm, cc_K_alpha_intNC, cc_K_alpha_csNC_delay, cc_K_phi, cc_K_phiNC, cc_K, cc_K_protN, cc_K_csN_delay, cc_K_csN_imm, cc_K_intN)
+    s3: 50 / 200 replicates
+    s3: 75 / 200 replicates
+    s3: 100 / 200 replicates
+    s3: 125 / 200 replicates
+    s3: 150 / 200 replicates
+    s3: 175 / 200 replicates
+    s3: 200 / 200 replicates
+  s3           optimal cc_K_alpha_death_phiNC   k=7  chosen in 100.0% of replicates (lowest BIC in 100.0%)  [50699s]
+    s3b: bootstrap work budget per optimiser run = 50.0× a refit (100000000–100000000 evaluations)
+    s3b: 25 / 200 replicates
+    s3b: screened after 40 replicates; 3 of 5 candidates continue to 200 (dropped: lrcc_eps, lrcc_noLR)
+    s3b: 50 / 200 replicates
+    s3b: 75 / 200 replicates
+    s3b: 100 / 200 replicates
+    s3b: 125 / 200 replicates
+    s3b: 150 / 200 replicates
+    s3b: 175 / 200 replicates
+    s3b: 200 / 200 replicates
+  s3b          optimal lrcc_epsN                k=1  chosen in  11.0% of replicates (lowest BIC in  17.5%)  [9s]
+    s4: bootstrap work budget per optimiser run = 50.0× a refit (100000000–100000000 evaluations)
+    s4: 25 / 200 replicates
+    s4: screened after 40 replicates; 2 of 6 candidates continue to 200 (dropped: s4_chi_K, s4_chi, s4_K, s4_chi_lines)
+    s4: 50 / 200 replicates
+    s4: 75 / 200 replicates
+    s4: 100 / 200 replicates
+    s4: 125 / 200 replicates
+    s4: 150 / 200 replicates
+    s4: 175 / 200 replicates
+    s4: 200 / 200 replicates
+  s4           optimal s4_eps                   k=2  chosen in 100.0% of replicates (lowest BIC in 100.0%)  [194s]
+staged.js: 1.12 MB; figures 14 d: ['Total N + C, 50:50 start', 'Final cells vs cumulative dose, every policy (50:50)', 'Sensitive and resistant cells', 'Dose schedules (µM per 2-day interval)', 'Toxicity burden T']; 120 d: ['Total N + C, 50:50 start', 'Final cells vs cumulative dose, every policy (50:50)', 'Sensitive (solid) and resistant (dashed) cells', 'Schedules: dose (bars) and fasting (purple, F)', 'Healthy-tissue loss T', 'Body weight W', 'Fasting protection P']; outcomes 7/11; blocks ['Cells (scenario A; generated f', 'Host', 'Objective (minimised over the ']; plant rows 24
+Wrote /home/kadin/Desktop/Research/CancerGrowthDynamics/docs/outputs/final_report/report.html (6.75 MB, 12 chapters), version 2026-11-10_1037
+Archived as docs/outputs/final_report/history/2026-11-10_1037/
+Wrote docs/outputs/final_report/history/index.html (23 versions)
+Site navigation bar added to 2 page(s)
+  Activating project at `~/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package`
+┌ Warning: Failed to achieve finite new evaluation point, using alpha=0
+└ @ LineSearches ~/.julia/packages/LineSearches/2BCHN/src/hagerzhang.jl:156
+┌ Warning: Failed to achieve finite new evaluation point, using alpha=0
+└ @ LineSearches ~/.julia/packages/LineSearches/2BCHN/src/hagerzhang.jl:156
+┌ Warning: Failed to achieve finite new evaluation point, using alpha=0
+└ @ LineSearches ~/.julia/packages/LineSearches/2BCHN/src/hagerzhang.jl:156
+Wrote /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_fits/report.html
+  and /home/kadin/Desktop/Research/CancerGrowthDynamics/docs/Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_fits/report.html
+Wrote /home/kadin/Desktop/Research/CancerGrowthDynamics/docs/outputs/results/bundle.js
+
+Done.
