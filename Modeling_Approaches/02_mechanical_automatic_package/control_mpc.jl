@@ -93,6 +93,14 @@ function sensitive_plateau(P::Plant; days=400.0)
     for _ in 1:round(Int, days / 2); x = F(x, 0.0, P, 2.0); end
     x[P.iN]
 end
+# Plateau the sensitive threshold is taken from (user, 2026-11-24, fix 3): progression is a fixed number of cells,
+# the same in every environment, so a low-resource plant (P.fp, held at v = 1) uses the normal-medium (fed) plateau
+# of the same model ([progression] thresholds_in_low_resource = "normal"). "own" = the low-resource plant's own
+# untreated plateau (2026-11-03 to 2026-11-24): every untreated low-resource culture then "progresses" by reaching
+# 85% of its own plateau, so MPC dosed throughout to hold A2780 down while A2780cis was dying anyway.
+const LR_THRESHOLDS = String(get(CFG["progression"], "thresholds_in_low_resource", "own"))
+LR_THRESHOLDS in ("own", "normal") || error("[progression] thresholds_in_low_resource must be \"own\" or \"normal\"")
+threshold_plateau(P::Plant) = (LR_THRESHOLDS == "normal" && P.fp !== nothing) ? sensitive_plateau(P.fp) : sensitive_plateau(P)
 # bc_frac: B_cancer as a fraction of K (0 = no burden penalty); tf: terminal factor (both swept in the report)
 function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=tox_limit(P.tox),
                          bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
@@ -102,7 +110,7 @@ function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=no
     barrier in BARRIERS || error("unknown burden barrier $barrier (one of $(join(BARRIERS, ", ")))")
     qB, qR, qT, ru, qP, qRT = objective_weights(w; ts=ts)
     Bp, sP = progression_scale(P.K; prog_frac=prog_frac)
-    BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(P.K, sensitive_plateau(P); prog_frac=prog_frac) : (Inf, Inf)
+    BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(P.K, threshold_plateau(P); prog_frac=prog_frac) : (Inf, Inf)
     Weights(qB, qR, qT, ru, tf, c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
             bc_frac > 0 ? bc_frac * P.K : Inf, Btox, umax, P.K, qP, Bp, sP, qRT,
             barrier, Float64(get(cc, "hard_weight", 1000.0)), Float64(get(cc, "hard_width_fraction_of_K", 0.001)) * P.K, BpN, BpC,
@@ -144,7 +152,20 @@ function progressed(N, C, W)
 end
 # progression index: ≥ 1 exactly when the culture is progressed (stop rules and time to progression)
 prog_index(N, C, W) = uses_lines(W) ? max(N / W.BpN, C / W.BpC) : (N + C) / W.Bp
-progression_cost(N, C, W) = W.qP * progressed(N, C, W)
+# Shape of the progression term (user, 2026-11-24, "should it be set up as a barrier"): "step" (the smooth step
+# above, ≈ 0 below each threshold and ≈ 1 above: the controller can ride just under a line) or "barrier" (a relaxed
+# log barrier per line, Feller & Ebenbauer 2017, on z = 1 − N/BpN and 1 − C/BpC: it rises as either line approaches
+# its threshold, so the controller keeps a margin, and continues as a steep quadratic beyond it). Both are ≥ 0, so the
+# exact search can still prune. CONTROL_PROG_COST overrides [progression] cost (side runs into CONTROL_OUT).
+const PROG_COST = Symbol(get(ENV, "CONTROL_PROG_COST", String(get(CFG["progression"], "cost", "step"))))
+PROG_COST in (:step, :barrier) || error("unknown [progression] cost $PROG_COST (step or barrier)")
+const MU_PROG = parse(Float64, get(ENV, "CONTROL_MU_PROG", string(get(CFG["progression"], "mu_prog", 0.1))))
+function prog_shape(N, C, W)
+    (PROG_COST === :barrier && uses_lines(W)) || return progressed(N, C, W)
+    N⁺ = max(N, zero(N)); C⁺ = max(C, zero(C))
+    MU_PROG * (relaxed_barrier(1 - N⁺ / W.BpN, 1.0, W.δ) + relaxed_barrier(1 - C⁺ / W.BpC, 1.0, W.δ))
+end
+progression_cost(N, C, W) = W.qP * prog_shape(N, C, W)
 # Time spent progressed within one decision interval (user, 2026-11-01: maximise time to progression): the
 # interval is simulated in PROG_SUB pieces and the step σ is averaged over their ends, so qP·(fraction of
 # the interval at or above B_prog) is charged instead of σ at the interval's end only. With the default
@@ -157,7 +178,7 @@ function step_progressed(x, u, P::Plant, Δ, W)
     PROG_SUB <= 1 && (y = F(x, u, P, Δ); return (y, progression_cost(y[P.iN], y[P.iC], W)))
     p = 0.0; h = Δ / PROG_SUB
     for _ in 1:PROG_SUB
-        x = F(x, u, P, h); p += progressed(x[P.iN], x[P.iC], W)
+        x = F(x, u, P, h); p += prog_shape(x[P.iN], x[P.iC], W)
     end
     (x, W.qP * p / PROG_SUB)
 end

@@ -148,6 +148,9 @@ resistant_threshold_fraction_of_K = 0.5   # ASSUMPTION (user, 2026-11-03): resis
 sensitive_threshold_of = "plateau"        # ASSUMPTION (2026-11-03): "plateau" or "K"; the user proposed 0.8 K, which the sensitive line cannot reach (its untreated coculture plateau is about 0.76 K)
 sensitive_threshold_fraction = 0.85       # ASSUMPTION (2026-11-03): 85% of the untreated sensitive plateau (about 0.65 K in the 2026-11-02 fit)
 threshold_fraction_of_K = 0.5    # ASSUMPTION (user, 2026-10-27: K/2, the same level as B_cancer; 0.8 = "80% confluence" before): the untreated plateau (0.71–0.84 K) sat right at 0.8 K, which made the objective flat
+cost = "step"                    # ASSUMPTION (user, 2026-11-24 asked whether progression should be a barrier): "step" = the smooth step below (≈ 0 under each threshold, qP above it), or "barrier" = a relaxed log barrier per line on 1 − N/BpN and 1 − C/BpC (rises as a line nears its threshold, so MPC keeps a margin); compared side by side in the 2026-11-24 report (CONTROL_PROG_COST)
+mu_prog = 0.1                    # ASSUMPTION: weight of each line's barrier with cost = "barrier", times qP (qP·μ_P·(−log z) = 0.69 per interval at half a threshold)
+thresholds_in_low_resource = "normal"   # ASSUMPTION (user, 2026-11-24, fix 3): progression thresholds are fixed cell numbers, taken from the normal-medium (fed) plant in every environment; "own" = each low-resource plant's own untreated plateau (2026-11-03 to 2026-11-24)
 step_width_fraction_of_K = 0.01  # ASSUMPTION (numerical; user, 2026-11-12; 0.02 before): width s of the smooth progression step, 1% of K (σ goes from 0.12 to 0.88 over ±2% of K), so it leaks less cost below the thresholds into the second tier
 qP = 10.0                        # ASSUMPTION: cost of one decision interval spent progressed; dominates the other terms (swept)
 qRT = 10.0                       # ASSUMPTION: terminal cost of the resistant cells, qRT·C/K at the end of the look-ahead (swept 0 / 10 / 30)
@@ -202,6 +205,8 @@ tol = 1e-7                       # ASSUMPTION (numerical setting): relative chan
 levels = [0.0, 1.0]              # DATA: the two measured media (10% and 0.5% FBS)
 max_consecutive_intervals = 1    # LITERATURE-informed: one 2-day interval = a 48-h fast; fasts of 24–72 h around platinum chemotherapy were feasible (Dorff et al. 2016, BMC Cancer 16:360)
 min_gap_intervals = 1            # ASSUMPTION: at least one fed interval (2 days of refeeding) between fasts
+in_vivo_strength = 1.0           # ASSUMPTION (user, 2026-11-24, fix 4): a in u_R = 0.955·a·v, the share of the in-vitro low-resource effect a fast has on the cancer cells; 1 = full in-vitro strength (an upper bound, the default so far)
+in_vivo_strength_sweep = [0.1, 0.3, 0.5, 1.0]   # ASSUMPTION: swept for the dose + fasting MPC (the smallest a at which it still beats dose-only MPC is the claim's real support)
 rv = 0.05                        # ASSUMPTION: cost weight of a fasting interval (burden of fasting itself), stage cost rv·v²
 # Drug × low-resource interaction. Two conditions were measured: low resource alone (Stages 1b/3b,
 # strength ε = 1) and low resource + 1 µM cisplatin (Stage 4, ε_N ≈ 7.6, ε_C ≈ 0.36 since the 2026-10-01 refit). The plant

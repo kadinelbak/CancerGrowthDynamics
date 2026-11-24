@@ -40,12 +40,16 @@ struct FPlant{TT<:NamedTuple,HT<:NamedTuple}
     tox::TT; host::HT
     spec::Vector{LineSpec}
     koff::Float64               # fade rate of low-resource stress after refeeding; NaN = the fitted build-up rate (the zoo model)
+    a::Float64                  # in-vivo strength of a fast on the cancer cells (user, 2026-11-24, fix 4): u_R = 0.955·a·v; 1 = the
+                                # in-vitro low-resource effect at full strength (an upper bound); the low-resource plant always uses 1
 end
+# [fasting] in_vivo_strength (FAST_STRENGTH overrides it for a side run)
+default_fast_strength() = parse(Float64, get(ENV, "FAST_STRENGTH", string(get(FCFG, "in_vivo_strength", 1.0))))
 
 shift_slots(s, np) = NamedTuple{keys(s)}(Tuple(v.i > 0 ? Slot(v.i + np, v.v) : v for v in values(s)))
 
 function fast_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox(), host=default_host(),
-                    eps_mode=Symbol(FCFG["eps_mode"]), koff=NaN)
+                    eps_mode=Symbol(FCFG["eps_mode"]), koff=NaN, a=default_fast_strength())
     P0 = scenario_plant(scen; b=b, tox=tox)
     P0 === nothing && return nothing
     # Stage 4 adds each line's low-resource module and whatever it refits: low-resource strengths ε (free ε slots
@@ -70,7 +74,7 @@ function fast_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox
     name = (scen == :A ? "A: Stage 3 coculture model as selected" : "B: monoculture drug response for both lines") *
            " + fitted low-resource modules"
     FPlant(name, base, iε, ε, eps_mode, Float64(FCFG["eps_u_ref"]),
-           n + 4, base.iN, base.iC, n + 1, n + 2, n + 3, n + 4, base.K, tox, host, line_specs(base, iε), Float64(koff))
+           n + 4, base.iN, base.iC, n + 1, n + 2, n + 3, n + 4, base.K, tox, host, line_specs(base, iε), Float64(koff), Float64(a))
 end
 
 # The 14-day controller's low-resource environment (control_model.jl Plant interface): the same plant
@@ -78,7 +82,7 @@ end
 # resource is the culture's environment there, not a fast the host chooses. ε(u) follows eps_mode as above,
 # so u = 0 gives the low-resource-only model and u = 1 µM the Stage 4 model.
 function lr_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox())
-    FP = fast_plant(scen; b=b, tox=tox, host=merge(default_host(), (p_H=0.0,)))
+    FP = fast_plant(scen; b=b, tox=tox, host=merge(default_host(), (p_H=0.0,)), a=1.0)     # the medium itself: full strength
     FP === nothing && return nothing
     B = FP.base
     name = (scen == :A ? "A (low resource): Stage 3 coculture model" : "B (low resource): monoculture drug response") *
@@ -96,7 +100,7 @@ function fast_rhs_ref!(du, x, w, FP::FPlant)       # reference: the zoo right-ha
     for (j, i) in enumerate(FP.iε)
         p[i] = 1 + (FP.ε[j] - 1) * f
     end
-    envc = (D=T(u), R=T(U_R) * v)
+    envc = (D=T(u), R=T(U_R) * T(FP.a) * v)
     for (j, l) in enumerate(env.lines)
         xi = S.xi[1][j]; L = S.lines[l]
         crowd = max(x[xi+1], zero(T)); other = zero(T)
@@ -118,7 +122,7 @@ end
 function fast_rhs!(du, x, w, FP::FPlant)
     u, v = w[1], w[2]
     T = promote_type(eltype(x), eltype(w)); z = zero(T)
-    spec_cells_rhs!(du, x, T(u), T(U_R) * v, εfactor(FP, T(u)), FP.spec, FP.ε, FP.koff, v)     # control_model.jl
+    spec_cells_rhs!(du, x, T(u), T(U_R) * T(FP.a) * v, εfactor(FP, T(u)), FP.spec, FP.ε, FP.koff, v)     # control_model.jl
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
     du[FP.iB] = tp.s_B * u - tp.d_B * Bd
     du[FP.iT] = tp.xie ? xie_drive(tp, u) * (1 - h.p_H * Pr) - tp.kN * Tx :
@@ -224,7 +228,7 @@ function plan_cost2(x0, U, FP, Δ, W)
     for k in axes(U, 1)
         w = U[k, :]; pc = 0.0
         for _ in 1:PROG_SUB
-            x = F2(x, w, FP, Δ / PROG_SUB); pc += progressed(x[FP.iN], x[FP.iC], W)
+            x = F2(x, w, FP, Δ / PROG_SUB); pc += prog_shape(x[FP.iN], x[FP.iC], W)
         end
         J += stage_cost2(x, w, FP, W) - progression_cost(x[FP.iN], x[FP.iC], W) + W.qP * pc / PROG_SUB
     end
@@ -342,7 +346,7 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=MPC_LEVELS,
             # time spent progressed, averaged over PROG_SUB pieces of the interval (control_mpc.jl: step_progressed)
             local pc = 0.0
             for _ in 1:PROG_SUB
-                F2!(y, tmp, (u, vj), FP, Δ / PROG_SUB, buf); copyto!(tmp, y); pc += progressed(y[FP.iN], y[FP.iC], W)
+                F2!(y, tmp, (u, vj), FP, Δ / PROG_SUB, buf); copyto!(tmp, y); pc += prog_shape(y[FP.iN], y[FP.iC], W)
             end
             cb += stage_cost2(y, (u, vj), FP, W) - progression_cost(y[FP.iN], y[FP.iC], W) + W.qP * pc / PROG_SUB
             run, gap = vj > 0 ? (run + 1, 0) : (0, gap + 1)
