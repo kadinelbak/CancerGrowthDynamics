@@ -23,12 +23,13 @@ const Δ0 = Float64(CFG["schedule"]["decision_interval_days"]); const NRUN = rou
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
 const MPC2 = "MPC, dose + fasting (measured levels)"; const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
+const B_NOTE = b_whatif_note()
 const POL_ORDER = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)",
-                   "Fasting only, 48 h every 6 days", "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", MPC1, MPC2, MPCD]
+                   "Fasting only, 48 h every 6 days", "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", "Constant 1 µM + 48-h fast every 8 days", MPC1, MPC2, MPCD]
 const POL_COL = Dict("No treatment" => "#6b7280", "Constant 1 µM" => "#d95f02", "Maximum measured dose (1.47 µM)" => "#b91c1c",
                      "Periodic 1 µM, 2 days on / 2 off" => "#8b5cf6", "Threshold adaptive (Zhang-style)" => "#3b8b4f",
                      "Fasting only, 48 h every 6 days" => "#a16207", "Periodic 1 µM with a 48-h fast on each dosing interval" => "#db2777",
-                     "Constant 1 µM + 48-h fast every 6 days" => "#9a3412", MPC1 => "#64748b", MPC2 => "#0b6e99", MPCD => "#0f766e")
+                     "Constant 1 µM + 48-h fast every 6 days" => "#9a3412", "Constant 1 µM + 48-h fast every 8 days" => "#c2410c", MPC1 => "#64748b", MPC2 => "#0b6e99", MPCD => "#0f766e")
 polcol(n) = get(POL_COL, n, "#0f766e"); poldash(n) = n == MPCD ? "6,4" : n == MPC1 ? "2,3" : ""
 cells(x) = isfinite(x) ? @sprintf("%.0f", x) : "—"
 yn(b) = b ? "<span class='flag'>yes</span>" : "no"
@@ -50,7 +51,7 @@ const DRUG_SHAPE = DRUG_HILL ? "Hill" : "linear" * (ns_on(zgroup("s2-a2780").can
 # headline drug-response scenario (control_config.toml [scenarios].headline, user 2026-11-02): listed first, marked "(main result)"
 const HEADLINE = String(get(get(CFG, "scenarios", Dict{String,Any}()), "headline", "A"))
 const SCENS = HEADLINE == "B" ? (:B, :A) : (:A, :B)
-scen_tag(scen) = string(scen) == HEADLINE ? "main result" : "sensitivity case"
+scen_tag(scen) = scenario_role(scen)       # control_model.jl (A main result since 2026-11-12, user; B the what-if)
 main_of(scen, ratio) = only(filter(m -> m.scen == scen && m.ratio == ratio, FC[:main]))
 pol_order(m) = [p for p in POL_ORDER if haskey(m.policies, p)]
 # withtip(html, text, better; warn=...) lives in info_tips.jl
@@ -228,22 +229,25 @@ function outcome_table(m)
     rows = String[]
     for pn in pol_order(m)
         v = m.policies[pn]; o = v.o
-        push!(rows, trow([td("<span style='color:$(polcol(pn))'>■</span> " * hesc(pn)), tn(cells(o.N_final)), tn(cells(o.C_final)), tn(cells(o.total_final)),
+        flags = join(["<span class='flag'>breaks the $l limit</span>" for (l, b) in (("weight", o.weight_violation), ("toxicity", o.tox_violation)) if b], " ")
+        push!(rows, trow([td("<span style='color:$(polcol(pn))'>■</span> " * hesc(pn) * (isempty(flags) ? "" : " " * flags)), tn(dayx(o.ttp)), tn(cells(o.total_final)),
+                          tn(d0(get(o, :days_half_K, NaN))), tn(cells(o.C_final)), tn(cells(o.N_final)),
                           tn(@sprintf("%.2f", o.resistant_fraction)), tn(@sprintf("%.3f", o.max_tox)), tn(@sprintf("%.3f", o.min_weight)),
                           tn(@sprintf("%.1f", o.cum_dose)), tn(@sprintf("%.0f", o.fast_days)), td(yn(o.cancer_violation)), tn(d0(dover(o))), td(yn(o.tox_violation)), td(yn(o.weight_violation)),
-                          tn(dayx(o.ttp)), tn(d0(o.days_progressed))];
+                          tn(d0(o.days_progressed))];
                      cls=pn == MPC2 ? "win" : ""))
     end
-    table([("Policy", "The dosing and fasting rule. MPC = model-predictive control. 'Dose only' may not fast; 'dose + fasting' chooses both from the measured levels.", :none),
+    table([("Policy", "The dosing and fasting rule. MPC = model-predictive control. 'Dose only' may not fast; 'dose + fasting' chooses both from the measured levels. A policy that breaks the weight or toxicity limit is flagged in its row.", :none),
+           ("Time to progression (day)", T_TTP, "Later is better; 'not progressed' is best: the goal of the controller."),
+           ("N + C day $DSTR", "Total cells at day $DSTR.", :lower), ("Days above K/2", "Days with N + C at or above half the shared capacity K.", :lower),
+           ("C day $DSTR", "Resistant A2780cis cells at day $DSTR.", :lower),
            ("N day $DSTR", "Sensitive A2780 cells at day $DSTR.", "Lower is better, but a surviving sensitive population also holds resistant cells back."),
-           ("C day $DSTR", "Resistant A2780cis cells at day $DSTR.", :lower), ("N + C", "Total cells at day $DSTR.", :lower),
            ("Resistant fraction", "C/(N + C) at day $DSTR.", :lower), ("Max toxicity", "Highest healthy-tissue loss T (limit 0.25).", :lower),
            ("Min weight", "Lowest body weight W (fraction of baseline; limit 0.95).", :higher),
            ("Dose (µM·d)", "Cumulative cisplatin ∫u dt.", :lower), ("Fasting days", "Days spent fasting (v = 1).", :lower),
            ("Above B_cancer", "N + C reached B_cancer (where the soft burden penalty rises steeply) at some time.", "'no' is better."),
            ("Days above B_cancer", "Days with N + C at or above B_cancer.", :lower), ("Toxicity limit hit", "T reached B_tox.", "'no' is better."),
            ("Weight limit hit", "W fell to W_min (5% loss).", "'no' is better.", W_WMIN),
-           ("Time to progression (day)", T_TTP, "Later is better; 'not progressed' is best: the goal of the controller."),
            ("Days progressed", "Days with N + C at or above B_prog.", :lower)], rows) |> x -> withtip(x, T_OUT, :none; warn=[:extrapolation, :not_patient_days])
 end
 
@@ -304,7 +308,7 @@ function scen_section(scen)
     pr = [(label=pn, color=polcol(pn), dash=poldash(pn), t=ts, y=m.policies[pn].o.P) for pn in shown]
     ratios = join(["<h4>Seeding ratio $r</h4>" * outcome_table(main_of(scen, r)) for r in ("25:75", "50:50", "75:25")])
     pts = [(label=pn, color=polcol(pn), x=m.policies[pn].o.cum_dose, tot=m.policies[pn].o.total_final, C=m.policies[pn].o.C_final) for pn in pol_order(m)]
-    """<section class='panel' id='scen-$scen'><h3>Scenario $(hesc(m.name)) <small>· $(scen_tag(scen))</small></h3>
+    """<section class='panel' id='scen-$scen'><h3>Scenario $(hesc(m.name)) <small>· $(scen_tag(scen))</small></h3>$(string(scen) == "B" ? "<p class='muted'>" * hesc(B_NOTE) * "</p>" : "")
 <div class='grid'>
 <div>$(withtip(ts_svg("Total N + C, 50:50 start", tot; hline=(W.Bc, "B_cancer"), ymax=ceil(max(W.Bc * 1.15, maximum(maximum(s.y) for s in tot) * 1.05); sigdigits=2)), "Total cells under each policy. The dashed orange line is B_cancer ($(BC_FRAC) of K), where the soft burden penalty rises steeply. The shaded region is after day 14.", :lower; warn=[:extrapolation, :soft_penalty]))</div>
 <div>$(withtip(pareto_svg("Final cells vs cumulative dose, every policy (50:50)", pts), T_PARETO, "Lower and further left is better (fewer cells for less drug)."))</div>
@@ -318,7 +322,7 @@ $ratios</section>"""
 end
 
 const ROB_POLS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Periodic 1 µM with a 48-h fast on each dosing interval",
-                  "Constant 1 µM + 48-h fast every 6 days", MPC1, MPC2]
+                  "Constant 1 µM + 48-h fast every 6 days", "Constant 1 µM + 48-h fast every 8 days", MPC1, MPC2]
 mrange(v) = any(isnan, v) || isempty(v) ? "—" : "$(cells(median(v))) ($(cells(quantile(v, .025)))–$(cells(quantile(v, .975))))"
 function robust_section()
     secs = String[]; rows = String[]; prows = String[]
@@ -435,7 +439,7 @@ function limits_section()
 <li><b>The burden limit is a soft penalty.</b> B_cancer = $(BC_FRAC) K is where a relaxed barrier (a penalty) starts to dominate the cost, not a hard cap; growing cultures pass it, the tables count whether and for how long, and its position and the terminal weight are swept.</li>
 <li><b>Fasting without drug</b> is predicted with an RMSE of $(cells(FC[:checks][:interp].rmse)) cells (the Stage 3b fit: $(cells(FC[:checks][:s3b_rmse])) cells on the points it used; checks above), and the drug × low-resource interaction was measured at one dose only (1 µM).</li>
 <li><b>Host states are literature-informed proxies</b>: nothing in these experiments measured toxicity, weight or protection. The weight rates come from a case series, the weight limit is an assumption informed by a consensus cachexia definition, and the protection strength is an assumption (the randomized DIRECT trial found less DNA damage in T cells but no difference in toxicity grades, so p_H = 0 is in the sweep).</li>
-<li><b>Resistant kill in coculture</b> (scenario A vs B) remains the largest structural uncertainty, as in the 14-day report. Scenario A passes leave-one-ratio-out validation but was fitted to the treated cocultures; only scenario B was tested on held-out treated cocultures.</li><li><b>The toxicity limit is inactive at the default settings.</b> T can never exceed a_H/r_H = $(round(default_tox().a_H / default_tox().r_H; sigdigits=3)) (less while fasting protects healthy tissue), below the bound B_tox = $(CFG["toxicity"]["B_tox"]); the toxicity cost still discourages dosing, but the toxicity barrier never decides a schedule here.</li>
+<li><b>Resistant kill in coculture</b> (scenario A vs B) remains the largest structural uncertainty, as in the 14-day report. $(hesc(KILL_LIMIT_NOTE)) $(hesc(B_NOTE))</li><li><b>Beyond the data.</b> $(hesc(EXTRAP_NOTE)) $(hesc(LOWRES_NOTE)) Fasting is modelled as low resource, so every fasting result rests on that single treated low-resource series.</li><li><b>The toxicity limit is inactive at the default settings.</b> T can never exceed a_H/r_H = $(round(default_tox().a_H / default_tox().r_H; sigdigits=3)) (less while fasting protects healthy tissue), below the bound B_tox = $(CFG["toxicity"]["B_tox"]); the toxicity cost still discourages dosing, but the toxicity barrier never decides a schedule here.</li>
 <li><b>Measurement and state estimation.</b> The closed-loop robustness runs assume each media change gives separate counts of N and C with $(round(Int, 100CV_OBS))% noise and that the hidden drug-effect, stress and host states follow the planner's own model. Scenario B's bootstrap draws borrow the Stage 3a bootstrap ratios for its crowding parameters.</li></ul></div>
 <h2>References</h2>
 <div class='intro'><ul class='muted'>
@@ -535,7 +539,8 @@ $(stopping_note())
 <p class='warnline'><b>Read first</b> $(warn([:extrapolation, :not_patient_days, W_UPPER, W_HOST, W_UNTESTED])) <span class='muted'>click each ⚠; all caveats are listed in full under <a href='#limits'>What the data do not support</a>.</span></p>
 $(model_section())
 $(checks_section())
-<h2>Results $(tip("For each scenario: plots from the 50:50 start, then outcome tables for all three seeding ratios. Policies: five fed baselines (as in the 14-day report), three fixed fasting schedules in the style of the clinical studies, MPC without fasting, MPC with fasting (measured levels, solved exactly) and a continuous demonstration.", :none))</h2>
+<div class='intro'><ul><li>$(hesc(EXTRAP_NOTE)) The tables give day $DSTR; days 15–$DSTR are model extrapolation.</li><li>$(hesc(LOWRES_NOTE))</li><li>$(hesc(KILL_LIMIT_NOTE))</li></ul></div>
+<h2>Results $(tip("For each scenario: plots from the 50:50 start, then outcome tables for all three seeding ratios. Policies: five fed baselines (as in the 14-day report), four fixed fasting schedules in the style of the clinical studies (the 8-day one keeps the weight limit; the others are flagged where they break it), MPC without fasting, MPC with fasting (measured levels, solved exactly) and a continuous demonstration.", :none))</h2>
 $(snapshot_section())
 $(join([scen_section(sc) for sc in SCENS]))
 $(washout_section())

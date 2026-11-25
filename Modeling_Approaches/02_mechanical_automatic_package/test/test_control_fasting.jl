@@ -138,6 +138,20 @@ end
         end
     end
 
+    # user, 2026-11-12: the host barriers' inside is a tie-breaker; the 8-day fasting comparator keeps W ≥ W_min
+    @testset "host barriers and the feasible fasting comparator" begin
+        FP = fast_plant(:A); W = weights2(FP)
+        @test W.sB == CFG["progression"]["tiebreak_scale"]
+        x = x0_fast(FP, 300.0, 300.0); x1 = F2(x, [0.0, 1.0], FP, Δ)                   # one 48-h fast, well inside W_min
+        z = 1 - wloss(x1, FP, W)
+        @test 0 < z < 1 && host_barrier(z, W.μW, W.δ, W.sB) ≈ W.sB * relaxed_barrier(z, W.μW, W.δ)
+        pols = Dict(baseline_policies2(FP, W))
+        U8 = run_policy2(pols["Constant 1 µM + 48-h fast every 8 days"], FP, x, Δ, 60)
+        @test sum(U8[:, 2]) == 15 && outcomes2(FP, x, U8, Δ, W).min_weight > W.Wmin   # 15 fasts in 120 days, weight limit kept
+        U6 = run_policy2(pols["Constant 1 µM + 48-h fast every 6 days"], FP, x, Δ, 60)
+        @test outcomes2(FP, x, U6, Δ, W).weight_violation                              # the 6-day schedule breaks it (flagged)
+    end
+
     @testset "host states behave as specified" begin
         FP = fast_plant(:A); h = FP.host
         x = x0_fast(FP, 300.0, 300.0); x1 = F2(x, [0.0, 1.0], FP, Δ)            # one 2-day fast

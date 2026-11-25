@@ -365,6 +365,62 @@ function nominal_seeding(ratio::AbstractString)
     (N0=tot * s / (s + r), C0=tot * r / (s + r))
 end
 
+# The Stage 3a coculture series with this ratio, treated (Ce1, D > 0) or untreated (Ce0): its environment and the
+# u indices of its N and C (the carried model's lines: 1 = A2780, 2 = A2780cis). Found from the nominal seeding.
+function coculture_env(ratio::AbstractString, treated::Bool)
+    c3 = zgroup("s3").cands[1]; S = c3.sys; obs = sys_obs(S); nom = nominal_seeding(ratio)
+    for (e, env) in enumerate(S.envs)
+        (input_at(env.D, 0.0) > 0) == treated || continue
+        iN, iC = S.xi[e][1] + 1, S.xi[e][2] + 1
+        jN, jC = findfirst(==(iN), obs), findfirst(==(iC), obs)
+        isapprox(c3.x0nom[jN], nom.N0; rtol=1e-6) && isapprox(c3.x0nom[jC], nom.C0; rtol=1e-6) && return (e=e, iN=iN, iC=iC)
+    end
+    error("no $(treated ? "treated" : "untreated") Stage 3a coculture series with ratio $ratio")
+end
+# Its fitted starting counts (the carried Stage 3a model's u0: estimated where the fit estimates them, nominal otherwise)
+function fitted_start(ratio::AbstractString, treated::Bool)
+    c3 = zgroup("s3").cands[1]; s = coculture_env(ratio, treated)
+    (N0=c3.u0[s.iN], C0=c3.u0[s.iC])
+end
+# Starting counts of every control run (control_config.toml [initial] source, user 2026-11-12): "fitted_treated"
+# (default) starts each ratio from the Stage 3a fitted start of its treated (Ce1) series, so the controller and
+# the fit simulate the same wells; "nominal" = the nominal seeding (before 2026-11-12).
+initial_source() = String(get(CFG["initial"], "source", "nominal"))
+start_counts(ratio::AbstractString) = initial_source() == "fitted_treated" ? fitted_start(ratio, true) : nominal_seeding(ratio)
+# measured day-14 counts (N, C) of a Stage 3a coculture series and the fit's residual RMSE over that series' points
+function coculture_day14(ratio::AbstractString, treated::Bool)
+    g3 = zgroup("s3"); c3 = g3.cands[1]; s = coculture_env(ratio, treated)
+    sol = solve(ODEProblem(c3.model, c3.u0, (0.0, 14.0), c3.params), Tsit5(); reltol=1e-10, abstol=1e-10)
+    dN = only(d for d in g3.datasets if d.state_index == s.iN); dC = only(d for d in g3.datasets if d.state_index == s.iC)
+    at14(d) = d.y[findlast(==(14.0), d.x)]
+    rmse(d, i) = sqrt(sum(abs2, [sol(t)[i] for t in d.x] .- d.y) / length(d.x))
+    (N=at14(dN), C=at14(dC), rmseN=rmse(dN, s.iN), rmseC=rmse(dC, s.iC), fitN=sol(14.0)[s.iN], fitC=sol(14.0)[s.iC])
+end
+# Plant against data (user, 2026-11-12): each scenario's plant from each condition's own fitted start, untreated
+# (u = 0, against Ce0) and at a constant 1 µM (against Ce1), day-14 N and C next to the measured counts
+function plant_vs_data(; Δ=Float64(CFG["schedule"]["decision_interval_days"]))
+    rows = NamedTuple[]
+    for scen in (:A, :B)
+        P = scenario_plant(scen)
+        for ratio in ("25:75", "50:50", "75:25"), (treated, u) in ((false, 0.0), (true, 1.0))
+            s = fitted_start(ratio, treated); x = x0_for(P, s.N0, s.C0)
+            for _ in 1:round(Int, 14.0 / Δ); x = F(x, u, P, Δ); end
+            d = coculture_day14(ratio, treated)
+            push!(rows, (scenario=scen, ratio=ratio, condition=treated ? "Ce1 (1 µM)" : "Ce0 (untreated)", N0=s.N0, C0=s.C0,
+                         N=x[P.iN], C=x[P.iC], N_data=d.N, C_data=d.C, rmseN=d.rmseN, rmseC=d.rmseC))
+        end
+    end
+    rows
+end
+
+# Scenario roles and the caveats every control report states: control_text.jl (shared with control_sweep_report.jl)
+include(joinpath(@__DIR__, "control_text.jl"))
+function b_whatif_note(rows=plant_vs_data())
+    tot(sc) = (r = only(x for x in rows if x.scenario == sc && x.ratio == "50:50" && startswith(x.condition, "Ce1")); (r.N + r.C, r.N_data + r.C_data))
+    (b, d), (a, _) = tot(:B), tot(:A)
+    b_whatif_text(b, d, a)
+end
+
 # initial state: the given counts, drug and toxicity states at 0
 function x0_for(P::Plant, N0, C0)
     x = zeros(P.nx); x[P.iN] = N0; x[P.iC] = C0

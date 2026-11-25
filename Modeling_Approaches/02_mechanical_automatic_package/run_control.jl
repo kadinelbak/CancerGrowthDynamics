@@ -62,9 +62,9 @@ const BOOT_N = min(Int(CFG["robustness"]["open_loop_draws"]), size(ZOO_STATE.res
 const NCL = min(Int(CFG["robustness"]["closed_loop_draws"]), BOOT_N)   # closed-loop draws (paired with every policy)
 const CL_NAME = "Closed-loop MPC (observes N, C with noise)"
 
-# starting counts: the nominal seeding split by the ratio (control_model.jl: nominal_seeding), the same in
-# both environments; the data's day-0 values are not used
-ratios_normal = [merge((ratio=r,), nominal_seeding(r)) for r in ("25:75", "50:50", "75:25")]
+# starting counts: control_config [initial] source (control_model.jl: start_counts; by default the Stage 3a fitted
+# start of each ratio's treated Ce1 series), the same in both environments
+ratios_normal = [merge((ratio=r,), start_counts(r)) for r in ("25:75", "50:50", "75:25")]
 ratios_lr = ratios_normal
 plant_for(env, scen; b=nothing, tox=default_tox()) = env == :normal ? scenario_plant(scen; b=b, tox=tox) : lr_plant(scen; b=b, tox=tox)
 ratios_for(env) = env == :normal ? ratios_normal : ratios_lr
@@ -116,6 +116,10 @@ if !haskey(cck, :sweeps)
         P = plant_for(:normal, scen); x0 = x0_for(P, r.N0, r.C0); W0 = default_weights(P)
         for w in CFG["weights"]["sweep"]
             push!(tasks, (kind="weights", scen=scen, label=wlabel(w), f=() -> mpc_outcome(P, x0, default_weights(P; w=Float64.(w)); Wo=W0)))
+        end
+        # the tie-break scale of the second tier (user, 2026-11-12): the 14-day schedule is ranked by that tier
+        for ts in CFG["progression"]["tiebreak_sweep"]
+            push!(tasks, (kind="tie-break scale", scen=scen, label="tie-break scale = $ts", f=() -> mpc_outcome(P, x0, default_weights(P; ts=Float64(ts)); Wo=W0)))
         end
         # soft burden penalty: where it starts (0 = none) × the terminal weight; scored against the default B_cancer
         for bc in CFG["cancer"]["B_cancer_sweep"], tf in CFG["cancer"]["terminal_factor_sweep"]
@@ -219,7 +223,7 @@ for m in cck[:main], (pn, v) in m.policies
     push!(rows, (environment=string(m.env), scenario=string(m.scen), ratio=m.ratio, policy=pn, schedule_uM=join(round.(v.U; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction,
                  max_total=o.max_total, max_toxicity=o.max_tox, cumulative_dose_uM_days=o.cum_dose,
-                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation,
+                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, days_above_half_K=get(o, :days_half_K, NaN), toxicity_bound_violated=o.tox_violation,
                  first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed,
                  N_at_progression=o.N_prog, C_at_progression=o.C_prog, control_stopped_day=o.stop_day, stop_reason=sr))
 end

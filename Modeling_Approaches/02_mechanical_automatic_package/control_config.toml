@@ -8,7 +8,7 @@
 # Replace ASSUMPTION values with measurements when they exist.
 
 [scenarios]
-headline = "B"   # ASSUMPTION (user, 2026-11-02): B (monoculture kills for both lines) is the reported main result because a fully drug-inactive resistant line is not biologically plausible; A (Stage 3a coculture fit, resistant kill 0) is a sensitivity case
+headline = "A"   # ASSUMPTION (user, 2026-11-12): A (the Stage 3a coculture fit) is the main result, as it reproduces the treated cocultures; B (monoculture drug response in coculture) is a labelled what-if, contradicted by the treated cocultures (1 µM day-14 total ~620 predicted vs ~3,300 measured at 50:50). B was the headline 2026-11-02 to 2026-11-12
 
 [schedule]
 decision_interval_days = 2.0     # DATA: media are changed about every 2 days, so a new dose can start at each change
@@ -84,6 +84,7 @@ terminal_factor_sweep = [1.0, 5.0, 10.0] # ASSUMPTION: sensitivity of the 50:50 
 # total, in Mean Cells units, split by the seeding ratio: 25:75 -> N = 25, C = 75), not a measured
 # day-0 value. The drug, stress and host states start at 0 (body weight W at 1).
 seeding_total = 100.0            # DATA: experimental design (seeding density)
+source = "fitted_treated"        # ASSUMPTION (user, 2026-11-12): each ratio starts from the Stage 3a fitted starting state of its treated (Ce1) series, so the controller simulates the same wells as the fit; "nominal" = seeding_total split by the ratio (before 2026-11-12)
 
 [observation]
 # Closed-loop robustness runs: the controller sees only the cell counts N and C, with multiplicative
@@ -116,14 +117,15 @@ resistant_threshold_fraction_of_K = 0.5   # ASSUMPTION (user, 2026-11-03): resis
 sensitive_threshold_of = "plateau"        # ASSUMPTION (2026-11-03): "plateau" or "K"; the user proposed 0.8 K, which the sensitive line cannot reach (its untreated coculture plateau is about 0.76 K)
 sensitive_threshold_fraction = 0.85       # ASSUMPTION (2026-11-03): 85% of the untreated sensitive plateau (about 0.65 K in the 2026-11-02 fit)
 threshold_fraction_of_K = 0.5    # ASSUMPTION (user, 2026-10-27: K/2, the same level as B_cancer; 0.8 = "80% confluence" before): the untreated plateau (0.71–0.84 K) sat right at 0.8 K, which made the objective flat
-step_width_fraction_of_K = 0.02  # ASSUMPTION (numerical): width s of the smooth step, 2% of K (σ goes from 0.12 to 0.88 over ±4% of K)
+step_width_fraction_of_K = 0.01  # ASSUMPTION (numerical; user, 2026-11-12; 0.02 before): width s of the smooth progression step, 1% of K (σ goes from 0.12 to 0.88 over ±2% of K), so it leaks less cost below the thresholds into the second tier
 qP = 10.0                        # ASSUMPTION: cost of one decision interval spent progressed; dominates the other terms (swept)
 qRT = 10.0                       # ASSUMPTION: terminal cost of the resistant cells, qRT·C/K at the end of the look-ahead (swept 0 / 10 / 30)
 # Time to progression first (user, 2026-11-01). The progression cost is the time spent at or above B_prog,
 # averaged over `substeps` pieces of each decision interval; every other term of the objective is multiplied
 # by tiebreak_scale, so they only break ties between plans with the same time to progression.
 substeps = 8                     # ASSUMPTION (numerical): 0.25-day pieces of a 2-day interval (the RK4 steps are unchanged)
-tiebreak_scale = 0.001           # ASSUMPTION: tie-breakers (burden, resistant cells, dose, toxicity, host weight, fasting) at 1/1000 of their [weights] values
+tiebreak_scale = 0.1             # ASSUMPTION (user, 2026-11-12; 0.001 2026-11-01 to 2026-11-12): the second tier (burden, resistant cells, dose, toxicity, host weight, fasting, and the inside of the host barriers) at 1/10 of its [weights] values. Time to progression still comes first (a whole interval of second-tier cost is worth well under an hour progressed); at 0.01 the leak of the smooth progression step below the thresholds was as large as the second tier and moved the 14-day schedule
+tiebreak_sweep = [0.001, 0.01, 0.1, 0.3]   # ASSUMPTION: the tie-break scale, swept in the 14-day report (run_control.jl)
 # Stopping (user, 2026-11-01): no MPC decisions are computed once the result is known. A run stops when
 # progression is confirmed at confirm_decisions successive decision times (the controller keeps trying to
 # bring the culture back through all of them), or when MPC has gone settle_margin_days past the latest
@@ -143,8 +145,8 @@ sustain_days = 10.0              # ASSUMPTION (reporting): time to progression =
 # qR is the extra cost of a resistant cell: with qR = 1 a resistant cell counts as two cells, because
 # further cisplatin cannot remove it. On top: a soft burden penalty (relaxed barrier above B_cancer) and
 # a relaxed barrier at the toxicity limit B_tox.
-qB = 0.1                         # ASSUMPTION: weight of the total burden (N + C)/K; a tie-breaker under the time-to-progression goal (1 before 2026-10-07)
-qR = 0.0                         # ASSUMPTION: per-interval resistance premium; resistance now enters through the terminal qRT ([progression]); 1 before 2026-10-07
+qB = 1.0                         # ASSUMPTION (user, 2026-11-12: the 2026-10-02 relative weights, inside the tie-break tier; 0.1 2026-10-07 to 2026-11-12): weight of the total burden (N + C)/K
+qR = 1.0                         # ASSUMPTION (user, 2026-11-12; 0 2026-10-07 to 2026-11-12): per-interval resistance premium C/K, inside the tie-break tier, on top of the terminal qRT ([progression])
 qT = 1.0                         # ASSUMPTION: weight of toxicity (T/B_tox)²; swept 1 / 3
 ru = 0.1                         # ASSUMPTION: weight of the dose (u/u_max)², a small cost of drug use; swept 0.1 / 1
 terminal_factor = 5.0            # ASSUMPTION: terminal cost = this × (progression + burden + resistance + toxicity terms) at the end of the look-ahead, plus qRT·C/K ([progression]); swept 1 / 5 / 10
@@ -154,7 +156,7 @@ barrier_delta = 0.02             # ASSUMPTION: relaxed-barrier switch point δ (
 # objective weights [qB, qR, qT, ru, qP, qRT] (sensitivity of the 50:50 MPC): the default, the 2026-10-02 objective
 # (burden + resistance, no progression term), no terminal resistant cost, a 3× terminal resistant cost, a
 # weaker progression weight, toxicity ×3 and drug cost ×10
-sweep = [[0.1, 0.0, 1.0, 0.1, 10.0, 10.0], [1.0, 1.0, 1.0, 0.1, 0.0, 0.0], [0.1, 0.0, 1.0, 0.1, 10.0, 0.0], [0.1, 0.0, 1.0, 0.1, 10.0, 30.0], [0.1, 0.0, 1.0, 0.1, 3.0, 10.0], [0.1, 0.0, 3.0, 0.1, 10.0, 10.0], [0.1, 0.0, 1.0, 1.0, 10.0, 10.0]]   # ASSUMPTION
+sweep = [[1.0, 1.0, 1.0, 0.1, 10.0, 10.0], [0.1, 0.0, 1.0, 0.1, 10.0, 10.0], [1.0, 1.0, 1.0, 0.1, 0.0, 0.0], [1.0, 1.0, 1.0, 0.1, 10.0, 0.0], [1.0, 1.0, 1.0, 0.1, 10.0, 30.0], [1.0, 1.0, 1.0, 0.1, 3.0, 10.0], [1.0, 1.0, 3.0, 0.1, 10.0, 10.0], [1.0, 1.0, 1.0, 1.0, 10.0, 10.0]]   # ASSUMPTION: [qB, qR, qT, ru, qP, qRT]; the default first (2026-11-12), then the 2026-11-01 to 2026-11-12 default, the objective without progression, and one-at-a-time changes of the default
 
 [sqp]
 max_iter = 40                    # ASSUMPTION (numerical setting)

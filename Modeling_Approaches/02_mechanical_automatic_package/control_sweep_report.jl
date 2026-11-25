@@ -17,7 +17,16 @@ const MPC = "MPC, measured doses only"
 # headline drug-response scenario (control_config.toml [scenarios].headline, user 2026-11-02): listed first, marked "(main result)"
 const HEADLINE = String(get(get(CFG, "scenarios", Dict{String,Any}()), "headline", "A"))
 scen_order(v) = sort(string.(unique(v)); by=x -> x == HEADLINE ? 0 : 1)
-scen_tag(x) = string(x) == HEADLINE ? " (main result)" : " (sensitivity case)"
+include(joinpath(PKG, "control_text.jl"))   # scenario_role and the shared caveats
+scen_tag(x) = " ($(scenario_role(x)))"      # A main result since 2026-11-12 (user), B the what-if
+# the B what-if sentence from the 14-day report's plant-vs-data table (outputs/control/plant_vs_data.csv)
+function b_whatif_note()
+    f = joinpath(PKG, "outputs", "control", "plant_vs_data.csv"); isfile(f) || return ""
+    d = CSV.read(f, DataFrame; stringtype=String)
+    row(sc) = d[(d.scenario .== sc) .& (d.ratio .== "50:50") .& startswith.(d.condition, "Ce1"), :][1, :]
+    b, a = row("B"), row("A")
+    b_whatif_text(b.N + b.C, b.N_data + b.C_data, a.N + a.C)
+end
 const COMPARATORS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)"]
 const LEVELS = Float64.(CFG["dose"]["levels_data"])
 const DOSE_COL = ["#f3f4f6", "#9ecae1", "#3182bd", "#08306b"]       # 0, 0.62, 1.0, 1.47 µM
@@ -55,7 +64,7 @@ function heatmap(sub)
 end
 
 function outcome_table(sub)
-    hdr = "<tr><th>Variant</th><th>MPC time to progression</th><th>MPC N + C end</th><th>MPC resistant end</th><th>MPC resistant fraction</th><th>MPC dose (µM·d)</th><th>Best comparator (time to progression)</th><th>No treatment N + C end</th></tr>"
+    hdr = "<tr><th>Variant</th><th>MPC time to progression</th><th>MPC N + C end</th><th>MPC resistant end</th><th>MPC days above K/2</th><th>MPC resistant fraction</th><th>MPC dose (µM·d)</th><th>Best comparator (time to progression)</th><th>No treatment N + C end</th></tr>"
     rows = String[]
     for v in unique(sub.variant)
         g = sub[sub.variant .== v, :]; m = g[g.policy .== MPC, :]
@@ -64,7 +73,7 @@ function outcome_table(sub)
         best = isempty(c) ? nothing : c[argmax([(ttpv(x.time_to_progression_day), -x.total_final) for x in eachrow(c)]), :]
         nt = g[g.policy .== "No treatment", :]
         beats = best === nothing ? "" : ttpv(m.time_to_progression_day) > ttpv(best.time_to_progression_day) ? " class='win'" : ""
-        push!(rows, "<tr$(m.beyond_data ? " class='beyond'" : "")><td>$(hesc(m.axis)): $(hesc(v))</td><td$beats>$(ttp(m.time_to_progression_day))</td><td class='num'>$(num(m.total_final))</td><td class='num'>$(num(m.C_final))</td>" *
+        push!(rows, "<tr$(m.beyond_data ? " class='beyond'" : "")><td>$(hesc(m.axis)): $(hesc(v))</td><td$beats>$(ttp(m.time_to_progression_day))</td><td class='num'>$(num(m.total_final))</td><td class='num'>$(num(m.C_final))</td><td class='num'>$(hasproperty(m, :days_above_half_K) ? num(m.days_above_half_K; d=1) : "—")</td>" *
                      "<td class='num'>$(num(m.resistant_fraction; d=2))</td><td class='num'>$(num(m.cumulative_dose_uM_days; d=1))</td>" *
                      "<td>$(best === nothing ? "—" : hesc(best.policy) * " (" * ttp(best.time_to_progression_day) * ")")</td><td class='num'>$(isempty(nt) ? "—" : num(nt[1, :total_final]))</td></tr>")
     end
@@ -109,7 +118,7 @@ details{margin:8px 0}summary{cursor:pointer;font-weight:600;padding:6px 0}.muted
 <h1>Control sweep: barriers, thresholds, run lengths</h1>
 <div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control_sweep.jl</code> and <code>control_sweep_report.jl</code> (PRD, user 2026-10-27). Normal medium; $nv variants, each axis changed one at a time from the default ($(CFG["cancer"]["barrier"]) barrier, B_cancer = B_prog = $(CFG["cancer"]["B_cancer_fraction_of_K"]) K, $(round(Int, CFG["schedule"]["closed_loop_days"])) days, look-ahead $(CFG["schedule"]["lookahead_to_end"] ? "ending with the run" : "fixed"), time-to-progression objective), plus the full barrier × run-length cross. Every variant is scored with its own thresholds, and every comparator is rerun under it.</p>
 <p><b>Barriers.</b> relaxed_log: the relaxed log barrier (Feller &amp; Ebenbauer 2017); quadratic: zero below B_cancer, a quadratic penalty above; hard: a near-wall that makes any interval at or above B_cancer cost about $(CFG["cancer"]["hard_weight"]), so a crossing plan is chosen only when every plan crosses; none: no burden penalty, the progression step only.</p>
-<p><b>Read with care.</b> Runs longer than $(round(Int, DATA_DAYS)) days (shaded) follow the fitted equations beyond the data. A green cell marks an MPC that progresses later than every comparator. Scenario A (no resistant kill in coculture) cannot be rescued by any cost design: killing sensitive cells frees room for resistant ones.</p></div>
+<p><b>Read with care.</b> Runs longer than $(round(Int, DATA_DAYS)) days (shaded) follow the fitted equations beyond the data. A green cell marks an MPC that progresses later than every comparator. Scenario A (the main result) has no detectable resistant kill in coculture, so no cost design can kill resistant cells there: killing sensitive cells frees room for resistant ones. $(hesc(KILL_LIMIT_NOTE)) $(hesc(EXTRAP_NOTE)) $(hesc(b_whatif_note()))</p></div>
 $(join(secs))
 </main></body></html>"""
 for d in (SOUT, SDOCS)

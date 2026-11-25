@@ -93,7 +93,7 @@ function run_variant(v, scen, r)
 end
 
 const V = variants()
-const RATIOS = [merge((ratio=r,), nominal_seeding(r)) for r in ("25:75", "50:50", "75:25")]
+const RATIOS = [merge((ratio=r,), start_counts(r)) for r in ("25:75", "50:50", "75:25")]
 tasks = [(v, s, r) for v in V for s in (:A, :B) for r in RATIOS]
 st = (isfile(SKP) && get(ENV, "REDO", "0") != "1") ? deserialize(SKP) : Dict{Any,Any}()
 key(v, s, r) = (vlabel(v), v.axis, s, r.ratio)
@@ -122,7 +122,7 @@ for (v, s, r) in tasks, (pn, x) in sort(collect(st[key(v, s, r)].res); by=first)
                  environment="normal", scenario=string(s), ratio=r.ratio, K=m.K, policy=pn, schedule_uM=join(round.(x.U; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction,
                  max_total=o.max_total, max_toxicity=o.max_tox, cumulative_dose_uM_days=o.cum_dose,
-                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation,
+                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, days_above_half_K=get(o, :days_half_K, NaN), toxicity_bound_violated=o.tox_violation,
                  first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed,
                  N_at_progression=get(o, :N_prog, NaN), C_at_progression=get(o, :C_prog, NaN),
                  control_stopped_day=get(o, :stop_day, NaN), stop_reason=get(x, :stop, "")))

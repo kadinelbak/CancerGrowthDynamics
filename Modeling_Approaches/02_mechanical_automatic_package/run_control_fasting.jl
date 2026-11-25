@@ -43,8 +43,8 @@ savef() = serialize(FCK, fck)
 const BOOT_N = min(Int(CFG["robustness"]["open_loop_draws"]), size(ZOO_STATE.results["s3"].res.pars[1], 1), size(ZOO_STATE.results["s4"].res.pars[1], 1))
 const NCL = min(Int(CFG["robustness"]["closed_loop_draws"]), BOOT_N)   # closed-loop robustness runs per scenario (paired with every policy)
 const CL_NAME = "Closed-loop MPC, dose + fasting (observes N, C with noise)"
-# starting counts: the nominal seeding split by the ratio (control_model.jl: nominal_seeding)
-ratios = [merge((ratio=r,), nominal_seeding(r)) for r in ("25:75", "50:50", "75:25")]
+# starting counts: control_config [initial] source (control_model.jl: start_counts; the fitted Ce1 starts by default)
+ratios = [merge((ratio=r,), start_counts(r)) for r in ("25:75", "50:50", "75:25")]
 const MPC2 = "MPC, dose + fasting (measured levels)"
 const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
@@ -198,7 +198,7 @@ end
 if !haskey(fck, :robust)
     rob = Dict{Any,Any}()
     pols = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off",
-            "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", MPC1, MPC2]
+            "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", "Constant 1 µM + 48-h fast every 8 days", MPC1, MPC2]
     summ(o) = (N=o.N, C=o.C, T=o.T, W=o.W, cum=o.cum_dose, fast=o.fast_days, cv=o.cancer_violation, tv=o.tox_violation, wv=o.weight_violation, dover=o.days_over,
                Nf=o.N_final, Cf=o.C_final, tot=o.total_final, rf=o.resistant_fraction, minW=o.min_weight, maxT=o.max_tox,
                ttp=o.ttp, ttp_first=o.ttp_first, dprog=o.days_progressed)
@@ -255,7 +255,7 @@ for m in fck[:main], (pn, v) in m.policies
     push!(rows, (scenario=string(m.scen), ratio=m.ratio, policy=pn, dose_uM=join(round.(v.U[:, 1]; digits=3), " "), fasting=join(round.(v.U[:, 2]; digits=3), " "),
                  N_final=o.N_final, C_final=o.C_final, total_final=o.total_final, resistant_fraction=o.resistant_fraction, max_total=o.max_total,
                  max_toxicity=o.max_tox, min_weight=o.min_weight, cumulative_dose_uM_days=o.cum_dose, fasting_days=o.fast_days,
-                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, toxicity_bound_violated=o.tox_violation, weight_bound_violated=o.weight_violation,
+                 cancer_bound_violated=o.cancer_violation, days_above_B_cancer=o.days_over, days_above_half_K=get(o, :days_half_K, NaN), toxicity_bound_violated=o.tox_violation, weight_bound_violated=o.weight_violation,
                  first_progression_day=o.ttp_first, time_to_progression_day=o.ttp, days_progressed=o.days_progressed,
                  N_at_progression=o.N_prog, C_at_progression=o.C_prog, control_stopped_day=o.stop_day, stop_reason=sr))
 end
