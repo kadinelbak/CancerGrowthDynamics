@@ -173,10 +173,11 @@ where = "stages.toml [starting_values] estimate; zoo_data.jl x0_info"
 [[decision]]
 date = "2026-11-02"
 area = "fitting"
-decision = "In the coculture stage the resistant cisplatin kill is refitted but may not fall below 0.1× its Stage 2b value (the upper end of the bootstrap interval), and the no-resistant-kill candidates are dropped: resistant cells that are completely inactive to the drug make no biological sense."
+decision = "[Superseded 2026-11-03: the Stage 2b kill is kept in coculture, no β_C refit or floor] In the coculture stage the resistant cisplatin kill is refitted but may not fall below 0.1× its Stage 2b value (the upper end of the bootstrap interval), and the no-resistant-kill candidates are dropped: resistant cells that are completely inactive to the drug make no biological sense."
 was = "refitted down to 0 or dropped (_noC candidates, user 2026-10-06)"
 by = "user"
 where = "stages.toml s3 betaC_floor = 0.1; s3 candidates"
+superseded_by = "2026-11-03 fitting: Stage 2b kill kept in coculture"
 
 [[decision]]
 date = "2026-11-02"
@@ -229,10 +230,11 @@ where = "run_control*.jl outputs/reuse/; run_pipeline.jl manifest; report_histor
 [[decision]]
 date = "2026-11-03"
 area = "fitting"
-decision = "In the treated cocultures (Stage 3a) the cisplatin kill of both lines is kept at its Stage 2b monoculture value, not refitted. Only the coculture terms (shared K, crowding α_NC and α_CN, extra coculture deaths d_N and d_C) are refitted on Ce0 and Ce1 jointly; they may shrink to 0 but not turn negative, and take the same value with and without drug."
+decision = "[Superseded 2026-11-08: coculture drug modifiers φ, ρ, γ may change the drug effect in coculture; β itself is still not refitted] In the treated cocultures (Stage 3a) the cisplatin kill of both lines is kept at its Stage 2b monoculture value, not refitted. Only the coculture terms (shared K, crowding α_NC and α_CN, extra coculture deaths d_N and d_C) are refitted on Ce0 and Ce1 jointly; they may shrink to 0 but not turn negative, and take the same value with and without drug."
 was = "β_N and β_C refitted in coculture, β_C floored at 0.1 × Stage 2b (it sat on the floor, 0.049)"
 by = "user"
 where = "stages.toml s3 candidates (cc_K, cc_K_alpha, cc_K_alpha_deathN, cc_K_alpha_deathC, cc_K_alpha_death)"
+superseded_by = "2026-11-08 fitting: coculture interaction candidates (φ, ρ, γ, η)"
 
 [[decision]]
 date = "2026-11-03"
@@ -354,3 +356,59 @@ decision = "Run time only, no result changes: a group's bootstrap is reused by d
 was = "bootstraps reused only with --resume; candidates in parallel but their starts one after another; steps and test files one after another"
 by = "user"
 where = "run_zoo_fits.jl saved_boot, load_fit_cache; fit_parallel.jl; run_pipeline.jl; test/run_tests.jl; tools/sysimage"
+
+[[decision]]
+date = "2026-11-11"
+area = "reporting"
+decision = "The all-doses sensitivity variant was not refitted with the new Stage 3a candidates: its refit stalled for 31 h on one Stage 3a candidate (main-fit starts have iteration caps but no work budget) and was stopped. The all-doses control sweep (sweep_all) of this version uses the all-doses fits from 8 Nov (before the new Stage 3a candidates); a refit with a work budget on the all-doses main-fit starts follows."
+was = "the all-doses variant refitted with every run"
+by = "user"
+where = "outputs/sensitivity/all_doses (8 Nov fits); run_control_sweep.jl SWEEP_DATA = all doses"
+
+[[decision]]
+date = "2026-11-11"
+area = "fitting"
+decision = "The all-doses variant's main fits get a work cap of 2e9 right-hand-side evaluations per optimiser run (fixed starts and the polish included; seeded starts keep the smaller of their budget and the cap). A count, not seconds, so the fits stay reproducible; runs over it are dropped and listed in time_limit_hits.csv. The main fits run without it, so their saved fits stay valid."
+was = "fixed starts and the polish of every main fit ran without a work budget (one all-doses Stage 3a fit ran for 31 h)"
+by = "user"
+where = "fit_parallel.jl FIT_WORK_CAP (ZOO_FIT_WORK_CAP); run_pipeline.jl alldoses; run_zoo_fits.jl cand_key"
+
+[[decision]]
+date = "2026-11-12"
+area = "control"
+decision = "Scenario A (the Stage 3a coculture fit) is the main result of every control, sweep and fasting report. Scenario B (the monoculture drug response in coculture) is a labelled what-if: the treated cocultures contradict it (at a constant 1 µM it predicts a day-14 total of about 600 cells at 50:50 against about 3,300 measured). The coculture kill factors were measured at 1 µM only and are applied unchanged at every dose; B is the bound for a resistant kill as in monoculture. No dose-dependent kill factor was added (no coculture data above 1 µM)."
+was = "B was the headline (2026-11-02): a fully drug-inactive resistant line was judged not biologically plausible"
+by = "user"
+where = "control_config.toml [scenarios] headline; control_model.jl scenario_role, b_whatif_note, KILL_LIMIT_NOTE; control_report.jl, control_fasting_report.jl, control_sweep_report.jl, build_findings_report.jl, build_staged.py"
+
+[[decision]]
+date = "2026-11-12"
+area = "control"
+decision = "Every control run starts from the Stage 3a fitted starting state of its ratio's treated (Ce1) series, so the controller simulates the same wells as the fit. The 14-day report shows the plant against the data at day 14 (both scenarios, 3 ratios, untreated against Ce0 and a constant 1 µM against Ce1, each from its own fitted start), and a test requires scenario A at 1 µM to reproduce the measured Ce1 day-14 N and C within 2 × the fit's residual RMSE of that series."
+was = "the nominal seeding (100 cells split by the ratio)"
+by = "user"
+where = "control_config.toml [initial] source; control_model.jl start_counts, fitted_start, plant_vs_data; control_report.jl plant_data_section; test/test_control.jl"
+
+[[decision]]
+date = "2026-11-12"
+area = "control"
+decision = "Objective: time to progression first, then a second tier of total burden (qB = 1), resistant cells (qR = 1), toxicity, dose and host costs, scaled by tiebreak_scale = 0.1; the smooth progression step is 1% of K wide. At 0.01 the step's cost below the thresholds was as large as the second tier and moved the 14-day schedule by two dose levels. In scenario A the MPC does not progress within 14 days (constant 1 µM, 1.47 µM and no treatment do, from the fitted starts), so its 14-day schedule is ranked by the second tier and still depends on its scale: between 0.1 and 0.3 within one dose level per interval and a few percent in total cells, but up to about 10% in resistant cells (documented in the 14-day report; 0.001, 0.01, 0.1 and 0.3 are swept)."
+was = "qB = 0.1, qR = 0, tiebreak_scale = 0.001, step width 2% of K (2026-11-01 to 2026-11-12)"
+by = "user"
+where = "control_config.toml [weights] qB, qR, sweep; [progression] tiebreak_scale, tiebreak_sweep, step_width_fraction_of_K; control_mpc.jl objective_weights(ts); run_control.jl sweeps"
+
+[[decision]]
+date = "2026-11-12"
+area = "control"
+decision = "Host limits (toxicity T ≤ B_tox, body weight W ≥ W_min): the inside of the relaxed log barrier is a second-tier cost (× tiebreak_scale), while a violation keeps the full quadratic penalty μz²/(2δ²). At full scale the inside priced every dose and every fast far above the burden they remove (one 48-h fast 0.033 per interval against a burden term of ~7e-5), so the dose + fasting MPC never fasted. With the change it fasts about every 12–14 days at 50:50 (min W 0.969) and ends with fewer total and resistant cells than MPC dose only."
+was = "the host barriers at full scale while every other term was a tie-breaker (2026-11-01 to 2026-11-12)"
+by = "user"
+where = "control_mpc.jl host_barrier, Weights.sB, stage_cost, cost_terms; control_fasting.jl Weights2.sB, stage_cost2, cost_terms2"
+
+[[decision]]
+date = "2026-11-12"
+area = "control"
+decision = "A feasible fixed fasting comparator, 'Constant 1 µM + 48-h fast every 8 days' (min W ≈ 0.96 over 120 days), next to the earlier ones that break the 5% weight limit (min W 0.947 and 0.907); every outcome table flags a policy that breaks the weight or toxicity limit in its own row. The outcome tables lead with time to progression, final N + C, days above K/2 and final resistant cells; everything past day 14 is labelled model extrapolation, and the low-resource sections state that the resistant line dies without any drug and that the treated low-resource plant rests on the single 50:50 combination series."
+was = "only schedules breaking the weight limit; violations only in a CSV column"
+by = "user"
+where = "control_fasting.jl baseline_policies2; control_report.jl / control_fasting_report.jl outcome_table; control_mpc.jl outcomes days_half_K"

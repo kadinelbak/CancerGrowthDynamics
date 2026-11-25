@@ -229,6 +229,29 @@ betaC_floor = 0.1
   label = "Shared K + crowding + coculture death, kill factor per line"
   family = "Coculture kill factor"
   free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC"]
+  # shared K fixed at the mean of the Stage 1 monoculture capacities (user, 2026-11-24): the data pin down each
+  # line's plateau K(1 − d/r), so a free K can grow while the coculture deaths d grow with it (K 5,477 with
+  # d ≈ 0.21 vs K ≈ 3,200–3,450 without deaths). With K fixed, d and α must explain the coculture on their own.
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_death_phiNC"
+  label = "K = mean monoculture K + crowding + coculture death, kill factor per line"
+  family = "Coculture kill factor (K fixed)"
+  free = ["αNC", "αCN", "dN", "dC", "φN", "φC"]
+  K_from = "mono_mean"
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_phiNC"
+  label = "K = mean monoculture K + crowding, kill factor per line"
+  family = "Coculture kill factor (K fixed)"
+  free = ["αNC", "αCN", "φN", "φC"]
+  K_from = "mono_mean"
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_death"
+  label = "K = mean monoculture K + crowding + coculture death, drug mechanisms from Stage 2"
+  family = "Coculture kill factor (K fixed)"
+  free = ["αNC", "αCN", "dN", "dC"]
+  K_from = "mono_mean"
+  # merge of the fix review (PR #21) with main (user, 2026-11-25): both sets of K-at-monoculture candidates are kept;
+  # the two fix-review candidates whose names clashed with the 24 Nov ones carry the suffix _X1
   # fix review X1 (user, 2026-11-09): K at the monoculture capacity (mean Stage 1 K of the two lines), so it is the
   # level the wells reach (the free-K death model put K at 5,477, above any count), and density-dependent
   # suppression η·Y/K in place of the constant coculture deaths (it switches off when the drug removes the other line)
@@ -239,13 +262,13 @@ betaC_floor = 0.1
   free = ["αNC", "αCN"]
   K_mono = true
   [[stage.candidate]]
-  name = "cc_Kmono_alpha_phiNC"
+  name = "cc_Kmono_alpha_phiNC_X1"
   label = "K at monoculture capacity + crowding, kill factor per line"
   family = "Coculture K at monoculture capacity"
   free = ["αNC", "αCN", "φN", "φC"]
   K_mono = true
   [[stage.candidate]]
-  name = "cc_Kmono_alpha_death_phiNC"
+  name = "cc_Kmono_alpha_death_phiNC_X1"
   label = "K at monoculture capacity + crowding + constant coculture death, kill factor per line"
   family = "Coculture K at monoculture capacity"
   free = ["αNC", "αCN", "dN", "dC", "φN", "φC"]

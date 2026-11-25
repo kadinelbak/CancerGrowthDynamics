@@ -6,12 +6,14 @@
 # outputs/sensitivity/hill/** (drug-response shape) and the neural-network comparison, when present.
 include(joinpath(@__DIR__, "zoo_common.jl")); include(joinpath(@__DIR__, "zoo_models.jl")); include(joinpath(@__DIR__, "bootstrap_tools.jl"))
 include(joinpath(@__DIR__, "info_tips.jl"))
+include(joinpath(@__DIR__, "fit_set.jl"))              # which saved fit set the outputs use (user, 2026-11-23)
 using Serialization, Printf, Statistics
 
 const OUTD = joinpath(@__DIR__, "outputs")
 const DOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "findings")
 const CCFG = TOML.parsefile(joinpath(@__DIR__, "control_config.toml"))
 const LONG = round(Int, CCFG["schedule"]["long_days"])
+const HEADLINE = String(get(get(CCFG, "scenarios", Dict{String,Any}()), "headline", "A"))
 readcsv(p) = isfile(p) ? CSV.read(p, DataFrame; stringtype=String) : nothing
 h(s) = replace(string(s), "&" => "&amp;", "<" => "&lt;", ">" => "&gt;")
 f1(x) = x isa Number && isfinite(x) ? @sprintf("%.1f", x) : "—"
@@ -121,16 +123,19 @@ function control()
             fixed = g[.!startswith.(g.policy, "MPC"), :]
             bt = fixed[argmin(fixed.total_final), :]; bc = fixed[argmin(fixed.C_final), :]
             lab = join([string(g[1, k]) for k in intersect(["environment", "scenario"], names(df))], " · ")
-            push!(rows, tr([h(lab), f0(m.total_final[1]) * " (" * f0(m.C_final[1]) * ")", f1(m.cumulative_dose_uM_days[1]),
+            sc = string(g[1, "scenario"]); lab *= sc == HEADLINE ? " (main result)" : sc == "B" ? " (what-if: monoculture drug response)" : " (sensitivity case)"
+            ttp(x) = x isa Number && isfinite(x) ? f1(x) : "not progressed"
+            push!(rows, tr([h(lab), ttp(m.time_to_progression_day[1]), f0(m.total_final[1]) * " (" * f0(m.C_final[1]) * ")", f1(m.cumulative_dose_uM_days[1]),
                             h(bt.policy) * ": " * f0(bt.total_final), h(bc.policy) * ": " * f0(bc.C_final)]))
         end
-        "<h3>$title</h3>" * table([th("Run", "Environment / scenario, 50:50 start.", :none), th("MPC: total (resistant)", "Cells at the end under the controller.", :lower),
+        "<h3>$title</h3>" * table([th("Run", "Environment / scenario, 50:50 start.", :none), th("MPC time to progression (day)", "When the controller's culture progresses; 'not progressed' within the run is best.", :higher),
+                                    th("MPC: total (resistant)", "Cells at the end under the controller.", :lower),
                                     th("MPC dose (µM·d)", "Cumulative cisplatin.", :lower), th("Best fixed policy, total", "The fixed schedule with the fewest total cells.", :lower),
                                     th("Best fixed policy, resistant", "The fixed schedule with the fewest resistant cells.", :lower)], rows)
     end
     c14 !== nothing && push!(out, block(c14, "14 days, dose only", "MPC, measured doses only"))
     cl !== nothing && push!(out, block(cl, "$LONG days, dose + fasting", "MPC, dose + fasting (measured levels)"))
-    "<h2>Optimal control against the best fixed policies $(tip("The controller maximises the time to progression (N + C kept under 0.8 K) and prices the resistant cells it leaves, traded against toxicity, dose and a soft burden penalty, so a fixed schedule can beat it on a single end-of-run metric.", :none))</h2>" * join(out)
+    "<h2>Optimal control against the best fixed policies $(tip("The controller maximises the time to progression (resistant cells at K/2 or sensitive cells at 85% of their untreated plateau) first; total cells, resistant cells, dose and host costs form a second tier, so a fixed schedule can beat it on a single end-of-run metric. Scenario A (the coculture fit) is the main result; B applies the monoculture drug response in coculture and is contradicted by the treated cocultures. Days after 14 are model extrapolation.", :none))</h2>" * join(out)
 end
 
 # ── 6. drug-response shape ────────────────────────────────────────────────────
@@ -202,7 +207,7 @@ html = """<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name=
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>
 <p><a href='../../../../index.html'>Reports home</a> · <a href='../../../../outputs/final_report/report.html'>Final report</a></p>
 <h1>Key findings, assumptions and limitations</h1>
-<div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the outputs of the latest pipeline run (zoo fits of $(Libc.strftime("%Y-%m-%d %H:%M", mtime(joinpath(OUTD, "zoo_fits", "zoo_state.jls"))))). Every number below is read from that run's files.</p></div>
+<div class='intro'><p><b>$(fits_used_text())</b></p><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the outputs of the latest pipeline run (zoo fits of $(Libc.strftime("%Y-%m-%d %H:%M", mtime(joinpath(OUTD, "zoo_fits", "zoo_state.jls"))))). Every number below is read from that run's files.</p></div>
 $(glance())
 $(transport())
 $(starts())

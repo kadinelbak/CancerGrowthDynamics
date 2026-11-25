@@ -435,6 +435,8 @@ schedule = "const_0"
 file = "New Datasets/ALL A2780-cis LR data.xlsx"
 sheet = "2 - A2780 30k 1-3"
 qc = ["exact_duplicate", "transient_drop"]
+exclude_days = [11, 12]
+exclude_reason = "2026-11-24: sensitive count collapses days 11–12 (2,668 → 1,444 → 336) in one well series only; treated as a well failure"
 
 [[source]]
 id = "co_lowres_run2_25S75R_A2780cis"
@@ -450,6 +452,8 @@ schedule = "const_0"
 file = "New Datasets/ALL A2780-cis LR data.xlsx"
 sheet = "2 - A2780cis 30k 1-3"
 qc = ["exact_duplicate", "transient_drop"]
+exclude_days = [11, 12]
+exclude_reason = "2026-11-24: sensitive count collapses days 11–12 (2,668 → 1,444 → 336) in one well series only; treated as a well failure"
 
 [[source]]
 id = "co_lowres_run2_50S50R_A2780"

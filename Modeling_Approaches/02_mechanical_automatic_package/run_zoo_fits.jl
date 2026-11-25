@@ -133,6 +133,7 @@ function cand_key(c, ds)
              repr(c.sys.envs), repr(masked_u0(c)), repr(get(c, :x0nom, nothing)), repr(get(c, :x0est, nothing)),
              repr(get(c, :x0bounds, nothing)), repr(get(c, :x0start, nothing)), repr(ds),
              string(EXTRA_STARTS), string(EXTRA_WORK), string(EXTRA_SPREAD), FIT_CODE_HASH]
+    FIT_WORK_CAP > 0 && push!(parts, "work_cap=$FIT_WORK_CAP")      # fit_parallel.jl: the all-doses variant only
     bytes2hex(sha256(join(parts, "\0")))
 end
 fit_record(r) = merge((name=r.name,), NamedTuple{FIT_FIELDS}(Tuple(getfield(r, k) for k in FIT_FIELDS)))
@@ -358,6 +359,9 @@ function coculture_rows(st)
     growth = PL[st["inherits"]["growth"]]
     cands = [begin
                  fx = Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(c, "fixed", Dict()))
+                 # K_from = "mono_mean" (user, 2026-11-24): the shared K is not fitted but fixed at the mean of the two
+                 # Stage 1 monoculture capacities, so a large K cannot be traded against coculture deaths
+                 get(c, "K_from", "") == "mono_mean" && (fx[:K] = (growth["A2780"].K + growth["A2780cis"].K) / 2)
                  if haskey(c, "fixed_from")
                      b = CC[c["fixed_from"]].rows[1]
                      merge!(fx, Dict(:K => ccval(b, :K, NaN), :αNC => ccval(b, :αNC, 1.0), :αCN => ccval(b, :αCN, 1.0)))

@@ -1,0 +1,28 @@
+=== zoo analyses: 12 threads; checkpoint has [:models, :version, :pkgboot, :profile, :intermittent, :validation, :gsa]; to (re)compute: ["s3", "s3b", "s4"] ===
+
+--- within-trajectory iid residual bootstrap: s3, s3b, s4 ---
+  done in 38s
+
+--- profile likelihood: 81 refits ---
+    20 / 81 profile points
+    40 / 81 profile points
+    60 / 81 profile points
+    80 / 81 profile points
+
+--- held-out Ce1 for the new Stage 3 model ---
+
+--- global sensitivity for new groups: s3, s3b, s4 ---
+
+--- global sensitivity of the full treated-coculture model (Stage 1, 2 or 3 changed) ---
+  done in 93s
+
+--- forecasts for new groups: s3, s3b, s4 ---
+
+--- blocked validation for refitted groups: s3 leave one ratio out; s3b leave one run out; s3b leave one ratio out ---
+  Activating project at `~/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package`
+Wrote /home/kadin/Desktop/Research/CancerGrowthDynamics/docs/Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_analyses/bootstrap/report.html
+Wrote /home/kadin/Desktop/Research/CancerGrowthDynamics/docs/Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_analyses/sensitivity/report.html
+Wrote /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_fits/heldout_ce1.csv
+Wrote /home/kadin/Desktop/Research/CancerGrowthDynamics/docs/Modeling_Approaches/02_mechanical_automatic_package/outputs/zoo_analyses/validation/report.html
+
+Done.

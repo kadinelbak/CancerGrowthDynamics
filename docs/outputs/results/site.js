@@ -299,23 +299,39 @@ function zooSystem(sim, p) {
   // A line with one or more modules (mirrors line_rhs! / line_rhs_multi!): growth-rate and
   // capacity effects multiply, losses add; drug losses scale by (1 + χ·u_R/0.955) if L.chi is set.
   // xi: observed-count index; o: one before the line's first hidden state.
-  function line(du, u, xi, o, L, env, crowd) {
+  // drug-effect state E of module M at offset o (mirrors drug_exposure in zoo_models.jl)
+  function exposure(u, o, M, w) {
+    w *= sv(M.s['ε']);
+    const nc = ZOO_NCELL[M.action] || 0, nk = ZOO_NKER[M.kernel] || 0, ko = o + nc;
+    if (nk === 0) return w;
+    return M.kernel.startsWith('chain') ? Math.max(u[ko + nk], 0) : Math.max(u[ko + 1], 0);
+  }
+  // coculture modifiers (L.cc, mirrors cc_terms in zoo_models.jl): [kill multiplier, growth multiplier, extra death]
+  function ccTerms(L, u, o, w, other, K) {
+    if (!L.cc || L.input !== 'D') return [1, 1, 0];
+    const c = L.cc, y = Math.max(other, 0) / K, g = sv(c.cs);
+    const fk = sv(c.kf) / (1 + sv(c.pr) * y);
+    const gm = g === 0 ? 1 : Math.max(1 - g * (c.csimm ? w * sv(L.s['ε']) : exposure(u, o, L, w)), 0);
+    return [fk, gm, sv(c.di) * y];
+  }
+  function line(du, u, xi, o, L, env, crowd, other = 0) {
     const mods = [L].concat(L.extra || []);
     const X = Math.max(u[xi], 0);
     let cells = 0, off = o;
     for (const M of mods) { const nc = ZOO_NCELL[M.action] || 0; for (let j = 1; j <= nc; j++) cells += Math.max(u[off + j], 0); off += width(M); }
     const V = Math.max(X - cells, 0);
     const r = sv(L.s.r), K = sv(L.s.K);
-    let reff = r, Keff = K, loss = sv(L.s.d), dloss = 0, out = 0;
+    const [fk, gm, di] = ccTerms(L, u, o, env.D, other, K);
+    let reff = r * gm, Keff = K, loss = sv(L.s.d) + di, dloss = 0, out = 0;
     const chi = L.chi ? sv(L.chi) : 0, th = sv(L.s['θ']);
     off = o;
     for (const M of mods) {
-      const w = M.input === 'D' ? env.D : env.R;
-      const gx = Math.max(crowd / K, 0), ks = L.ns && M.input === 'D' && (M.action === 'damage' || M.action === 'transit')
-        ? (L.growth === 'theta' ? Math.max(1 - Math.pow(gx, th), 0) : Math.max(1 - gx, 0)) : 1;
+      const w = M.input === 'D' ? env.D : env.R, dm = M.input === 'D' && (M.action === 'damage' || M.action === 'transit');
+      const gx = Math.max(crowd / K, 0), ks = (L.ns && dm
+        ? (L.growth === 'theta' ? Math.max(1 - Math.pow(gx, th), 0) : Math.max(1 - gx, 0)) : 1) * (dm ? fk : 1);
       const [re, Ke, lo, ou] = mod(du, u, off, M, w, X, V, r, K, ks);
       reff *= re / r; Keff *= Ke / K;
-      if (M.input === 'D') dloss += lo * (1 + chi * env.R / uR); else loss += lo;
+      if (M.input === 'D') dloss += fk * lo * (1 + chi * env.R / uR); else loss += lo;
       out += ou; off += width(M);
     }
     // Norton–Simon (L.ns, mirrors growth_factor in zoo_models.jl): drug losses × the line's growth factor
@@ -327,9 +343,9 @@ function zooSystem(sim, p) {
     const du = new Array(u.length).fill(0);
     S.envs.forEach((env, e) => env.lines.forEach((l, j) => {
       const xi = S.xi[e][j], L = S.lines[l];
-      let crowd = Math.max(u[xi], 0);
-      env.lines.forEach((lm, m) => { if (m !== j) crowd += sv(S.alpha[l][lm]) * Math.max(u[S.xi[e][m]], 0); });
-      line(du, u, xi, S.hb[e][j] - 1, L, env, crowd);
+      let crowd = Math.max(u[xi], 0), other = 0;
+      env.lines.forEach((lm, m) => { if (m !== j) { const y = Math.max(u[S.xi[e][m]], 0); crowd += sv(S.alpha[l][lm]) * y; other += y; } });
+      line(du, u, xi, S.hb[e][j] - 1, L, env, crowd, other);
     }));
     return du;
   };

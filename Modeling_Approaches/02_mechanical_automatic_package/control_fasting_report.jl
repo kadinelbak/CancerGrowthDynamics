@@ -11,25 +11,27 @@ const ZOO_DIR = joinpath(@__DIR__, "outputs", "zoo_fits")
 const ZOO_DOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "zoo_fits")
 const BOOT_B = ZOO_STATE.B
 include(joinpath(@__DIR__, "zoo_report.jl"))           # hesc, fmt, tip(text, better), INFO_TIPS_HEAD
+include(joinpath(@__DIR__, "fit_set.jl"))              # which saved fit set the control uses (user, 2026-11-23)
 
 const DAYS = parse(Float64, get(ENV, "CONTROL_DAYS", string(CFG["schedule"]["long_days"]))); const DATA_DAYS = Float64(CFG["schedule"]["data_days"])
 const DSTR = string(round(Int, DAYS))
 const SNAP = [d for d in Float64.(CFG["schedule"]["snapshot_days"]) if d <= DAYS]
 const TICK = DAYS <= 30 ? 5 : DAYS <= 60 ? 10 : 20
-const FOUT = joinpath(@__DIR__, "outputs", "control_$(DSTR)d")
+const FOUT = joinpath(@__DIR__, "outputs", control_subdir(DAYS, NaN))
 const FDOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "control_$(DSTR)d")
 FC = deserialize(joinpath(FOUT, "fasting_state.jls"))
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"]); const NRUN = round(Int, DAYS / Δ0)
 const UMAX_DEMO = Float64(CFG["dose"]["u_max_demo"])
-const MPC2 = "MPC, dose + fasting (measured levels)"; const MPC1 = "MPC, dose only (fed)"
+const MPC2 = MPC_F; const MPC1 = "MPC, dose only (fed)"
 const MPCD = "MPC demonstration (continuous u ≤ $(UMAX_DEMO) µM, v ∈ [0, 1])"
+const B_NOTE = b_whatif_note()
 const POL_ORDER = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)",
-                   "Fasting only, 48 h every 6 days", "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", MPC1, MPC2, MPCD]
+                   "Fasting only, 48 h every 6 days", "Periodic 1 µM with a 48-h fast on each dosing interval", "Constant 1 µM + 48-h fast every 6 days", "Constant 1 µM + 48-h fast every 8 days", MPC1, MPC2, MPC_D_HIGH, MPC_F_HIGH, MPCD]
 const POL_COL = Dict("No treatment" => "#6b7280", "Constant 1 µM" => "#d95f02", "Maximum measured dose (1.47 µM)" => "#b91c1c",
                      "Periodic 1 µM, 2 days on / 2 off" => "#8b5cf6", "Threshold adaptive (Zhang-style)" => "#3b8b4f",
                      "Fasting only, 48 h every 6 days" => "#a16207", "Periodic 1 µM with a 48-h fast on each dosing interval" => "#db2777",
-                     "Constant 1 µM + 48-h fast every 6 days" => "#9a3412", MPC1 => "#64748b", MPC2 => "#0b6e99", MPCD => "#0f766e")
-polcol(n) = get(POL_COL, n, "#0f766e"); poldash(n) = n == MPCD ? "6,4" : n == MPC1 ? "2,3" : ""
+                     "Constant 1 µM + 48-h fast every 6 days" => "#9a3412", "Constant 1 µM + 48-h fast every 8 days" => "#c2410c", MPC1 => "#64748b", MPC2 => "#0b6e99", MPC_D_HIGH => "#a78bfa", MPC_F_HIGH => "#7c3aed", MPCD => "#0f766e")
+polcol(n) = get(POL_COL, n, "#0f766e"); poldash(n) = n == MPCD ? "6,4" : n in (MPC1, MPC_D_HIGH) ? "2,3" : ""
 cells(x) = isfinite(x) ? @sprintf("%.0f", x) : "—"
 yn(b) = b ? "<span class='flag'>yes</span>" : "no"
 pct(x) = @sprintf("%.0f%%", 100x)
@@ -50,7 +52,7 @@ const DRUG_SHAPE = DRUG_HILL ? "Hill" : "linear" * (ns_on(zgroup("s2-a2780").can
 # headline drug-response scenario (control_config.toml [scenarios].headline, user 2026-11-02): listed first, marked "(main result)"
 const HEADLINE = String(get(get(CFG, "scenarios", Dict{String,Any}()), "headline", "A"))
 const SCENS = HEADLINE == "B" ? (:B, :A) : (:A, :B)
-scen_tag(scen) = string(scen) == HEADLINE ? "main result" : "sensitivity case"
+scen_tag(scen) = scenario_role(scen)       # control_model.jl (A main result since 2026-11-12, user; B the what-if)
 main_of(scen, ratio) = only(filter(m -> m.scen == scen && m.ratio == ratio, FC[:main]))
 pol_order(m) = [p for p in POL_ORDER if haskey(m.policies, p)]
 # withtip(html, text, better; warn=...) lives in info_tips.jl
@@ -128,6 +130,9 @@ end
 
 # ── model section ─────────────────────────────────────────────────────────────
 ctex(a, X, Y, nm) = (a.i == 0 && a.v == 0) ? X : (a.i == 0 && a.v == 1) ? "$X+$Y" : "$X+\\alpha_{$nm}$Y"
+# the de Pillis host equations (B and the healthy-tissue loss T), shown when [toxicity] model = "depillis"
+host_tox_eqs_depillis() = """$(eqt(raw"\frac{dB}{dt}=s_B\,u-d_B\,B", "Systemic drug burden (de Pillis & Radunskaya 2001). s_B maps 1 µM in the medium to 1 unit of burden."; warn=:tox_proxy))
+$(eqt(raw"\frac{dT}{dt}=a_H\,\left(1-p_H\,P\right)\left(1-e^{-B}\right)(1-T)-r_H\,T\,(1-T)", "Toxicity burden T = fraction of healthy tissue lost (de Pillis & Radunskaya 2001), with the fasting protection factor (1 − p_H·P): while protected, the same drug burden does less damage to healthy tissue. This is differential stress resistance (Raffaghello et al. 2008; de Groot et al. 2020 saw less chemotherapy-induced DNA damage in T cells)."; warn=W_PH))"""
 function model_section()
     FP = fast_plant(:A); S = FP.base.sys
     celltex = vcat(line_tex(S.lines[1], "N", ctex(S.alpha[1][2], "N", "C", "NC"), "K"), line_tex(S.lines[2], "C", ctex(S.alpha[2][1], "C", "N", "CN"), "K"))
@@ -172,14 +177,17 @@ function model_section()
              (chiN != 0 || chiC != 0 ? prow("\\chi", chiN == chiC ? fmt(chiN) : "$(fmt(chiN)), $(fmt(chiC))", "—", "DATA · Stage 4",
                                              "drug × low-resource interaction: the cisplatin kill is × (1 + χ) in 0.5% FBS") : ""),
              prow("u_R", U_R, "—", "DATA", "low-resource level at 0.5% FBS"),
-             prow("s_B,\\ d_B", "$(fmt(t.s_B)), $(fmt(t.d_B))", "—, /day", "ASSUMPTION, LITERATURE", "drug burden (de Pillis & Radunskaya 2001)"),
-             prow("a_H,\\ r_H", "$(fmt(t.a_H)), $(fmt(t.r_H))", "—, /day", "LITERATURE", "healthy-tissue kill and regrowth (de Pillis & Radunskaya 2001)"),
-             prow("p_H", h.p_H, "—", "ASSUMPTION (swept 0 / 0.5 / 0.8)", "largest fraction of healthy-tissue damage prevented by fasting (Raffaghello 2008; de Groot 2020)"),
+             (TOX_MODEL == "xie2020" ?
+              prow("k_N,\\ E_{max},\\ EC_{50}", "$(fmt(t.kN)), $(fmt(t.Emax)), $(fmt(t.EC50))", "/day, —, µM", "LITERATURE", "kidney injury response (Xie et al. 2020)") *
+              prow("\\gamma", t.γ, "per µM", "ASSUMPTION (calibration)", "medium µM → surrogate plasma level: constant 1 µM gives the clinical mean excess Ē = $(fmt(XIE.Ebar))") :
+              prow("s_B,\\ d_B", "$(fmt(t.s_B)), $(fmt(t.d_B))", "—, /day", "ASSUMPTION, LITERATURE", "drug burden (de Pillis & Radunskaya 2001)") *
+              prow("a_H,\\ r_H", "$(fmt(t.a_H)), $(fmt(t.r_H))", "—, /day", "LITERATURE", "healthy-tissue kill and regrowth (de Pillis & Radunskaya 2001)")),
+             prow("p_H", h.p_H, "—", "ASSUMPTION (swept 0 / 0.5 / 0.8)", "largest fraction of $(TOX_MODEL == "xie2020" ? "kidney" : "healthy-tissue") damage prevented by fasting (Raffaghello 2008; de Groot 2020)"),
              prow("k_P", h.k_P, "/day", "ASSUMPTION", "protection builds over ≈ 1 day of fasting"),
              prow("k_W", h.k_W, "/day", "LITERATURE-informed (Safdie 2009; swept)", "weight lost per fasting day (fraction of baseline)"),
              prow("r_W", h.r_W, "/day", "LITERATURE-informed (Safdie 2009; swept)", "weight regained after refeeding"),
              prow("W_{min}", W.Wmin, "—", "ASSUMPTION informed by Fearon 2011 (swept)", "weight-loss limit; Fearon's > 5% criterion defines cachexia over 6 months, not an acute fast (acute fasting loss is largely water and glycogen and is regained)"),
-             prow("B_{tox}", W.Btox, "—", "LITERATURE", "healthy tissue ≥ 75% (de Pillis & Radunskaya 2001)"),
+             (TOX_MODEL == "xie2020" ? prow("E_{lim}", W.Btox, "—", "ASSUMPTION (calibration)", "peak kidney excess of 75 mg/m² every 21 days (one dose: ΔE = $(fmt(XIE.ΔE)))") : prow("B_{tox}", W.Btox, "—", "LITERATURE", "healthy tissue ≥ 75% (de Pillis & Radunskaya 2001)")),
              prow("B_{cancer}", "$(BC_FRAC) K = $(cells(W.Bc))", "cells", "ASSUMPTION (swept)", "where the soft burden penalty (relaxed barrier) rises steeply; a penalty, not a hard cap")]
     """<h2>The model the controller uses $(tip("Every equation the controller simulates, in the order the states appear. The cell equations are generated from the plant itself, the same way the zoo pages write them, so what is shown is what is simulated.", :none))</h2>
 <div class='intro'><p>Two controls, each held constant over a 2-day interval between media changes: the cisplatin concentration \\(u\\) (µM) and fasting \\(v\\) (1 = the interval is run in 0.5% FBS, 0 = fed, 10% FBS). Fasting enters the cells through the fitted low-resource level \\(u_R = $(fmt(U_R))\\,v\\), and the host through the weight and protection states. When \\(v = 0\\) the model is exactly the 14-day control model; with \\(u = 1\\) µM and \\(v = 1\\) it is exactly the fitted Stage 4 model (both checked below).</p>
@@ -189,14 +197,13 @@ $(length(celltex) > 2 ? join([eq(e) for e in celltex[3:end]]) : "")
 $(eqt(raw"\frac{dA_{X,1}}{dt}=k_X\,(u-A_{X,1}),\quad \frac{dA_{X,j}}{dt}=k_X\,(A_{X,j-1}-A_{X,j}),\ j=2,3,\qquad E_X=A_{X,3}", "Drug-effect chain of each line (Stage 2): the kill follows the dose with a delay of about 3/k_X days."))
 $(isempty(FP.iε) ? eqt("\\text{drug losses}\\times\\left(1+\\chi\\,u_R/0.955\\right),\\quad \\chi=$(fmt(FP.spec[1].chi))", "Drug × low-resource interaction (Stage 4): the carried model multiplies each line's cisplatin kill by (1 + χ) in 0.5% FBS and leaves it unchanged in 10% FBS, so it reproduces both measured conditions; no interpolation in the dose is needed.") : eqt(raw"\varepsilon_X(u)=1+\left(\varepsilon_X^{S4}-1\right)\min\!\left(\frac{u}{1\,\mu\mathrm{M}},\,1\right)", "Drug × low-resource interaction. Low resource alone was fitted with strength 1 (Stages 1b/3b); low resource with 1 µM cisplatin with ε^S4 (Stage 4). The plant reproduces both measured conditions and interpolates linearly in the dose between them (capped above 1 µM). The alternative, ε^S4 at every dose, predicts the low-resource cocultures much worse (checks below)."))
 <h3>Host</h3>
-$(eqt(raw"\frac{dB}{dt}=s_B\,u-d_B\,B", "Systemic drug burden (de Pillis & Radunskaya 2001). s_B maps 1 µM in the medium to 1 unit of burden."; warn=:tox_proxy))
-$(eqt(raw"\frac{dT}{dt}=a_H\,\left(1-p_H\,P\right)\left(1-e^{-B}\right)(1-T)-r_H\,T\,(1-T)", "Toxicity burden T = fraction of healthy tissue lost (de Pillis & Radunskaya 2001), with the fasting protection factor (1 − p_H·P): while protected, the same drug burden does less damage to healthy tissue. This is differential stress resistance (Raffaghello et al. 2008; de Groot et al. 2020 saw less chemotherapy-induced DNA damage in T cells)."; warn=W_PH))
+$(TOX_MODEL == "xie2020" ? eqt(TX.eqf, "Kidney toxicity (Xie et al. 2020), with the fasting protection factor (1 − p_H·P). " * TX.what; warn=:tox_proxy) : host_tox_eqs_depillis())
 $(eqt(raw"\frac{dP}{dt}=k_P\,(v-P)", "Protection state: builds towards 1 while fasting (about 1 day to establish, which is why the trials fast 24–48 h before the drug) and fades after refeeding. Its timing matters: fasting protects best when it starts before the dose."))
 $(eqt(raw"\frac{dW}{dt}=-k_W\,v+r_W\,(1-W)(1-v)", "Body weight as a fraction of baseline: falls by k_W per fasting day and recovers towards 1 at rate r_W after refeeding (Safdie et al. 2009: a patient lost ≈ 3 kg over a multi-day fast, regained part in days and the rest within ≈ 3 weeks). This is the host cost of fasting."))
 <h3>Objective (minimised over the look-ahead at every decision)</h3>
-$(eqt(raw"\ell=q_P\,\sigma\!\Big(\tfrac{N+C-B_{prog}}{s}\Big)+q_B\,\tfrac{N+C}{K}+q_R\,\tfrac{C}{K}+q_T\Big(\tfrac{T}{B_{tox}}\Big)^2+q_W\Big(\tfrac{1-W}{1-W_{min}}\Big)^2+r_u\Big(\tfrac{u}{u_{max}}\Big)^2+r_v\,v^2", "Stage cost after each interval. Goal since 2026-10-07: TIME TO PROGRESSION. σ is a smooth step (logistic, width s = $(CFG["progression"]["step_width_fraction_of_K"]) K) at B_prog = $(CFG["progression"]["threshold_fraction_of_K"]) K (80% confluence), so with q_P = $(CFG["progression"]["qP"]) the summed cost counts the intervals spent progressed: the controller keeps the culture under B_prog as long as it can, as adaptive therapy does (Zhang et al. 2017; Gatenby et al. 2009). The burden and resistance terms (q_B = $(CFG["weights"]["qB"]), q_R = $(CFG["weights"]["qR"])) are now tie-breakers. Earlier goal: a low total tumour burden with resistant cells held back. The burden (N + C)/K is linear, so every cell costs the same at any tumour size; the resistance premium q_R·C/K makes a resistant cell count as two (q_R = q_B), because further cisplatin cannot remove it. Then toxicity, weight loss, dose and fasting. Every term is scaled by its limit so they are comparable. Defaults: q_B = q_R = q_T = q_W = 1, r_u = 0.1, r_v = 0.05; the weights (including q_R = 0 and 3) are swept below."))
-$(eqt(raw"+\,b_{\mu}\!\Big(1-\tfrac{N+C}{B_{cancer}}\Big)+b_{\mu}\!\Big(1-\tfrac{T}{B_{tox}}\Big)+b_{\mu}\!\Big(1-\tfrac{1-W}{1-W_{min}}\Big),\qquad b_\mu(z)=\begin{cases}-\mu\log z,&z\ge\delta\\ \mu\big[\tfrac12\big(\tfrac{z-2\delta}{\delta}\big)^2-\tfrac12-\log\delta\big],&z<\delta\end{cases}", "Relaxed log barriers (Feller & Ebenbauer 2017) at three levels: the cancer burden B_cancer, healthy-tissue loss B_tox and weight loss W_min. A relaxed barrier is a soft constraint (a penalty): it grows steeply as the level is approached and continues as a steep quadratic beyond it, so passing a level has a finite cost. At B_cancer it is the soft burden penalty, which growing cultures pass; the tables count whether and for how many days. Its position and the terminal weight are swept below."))
-$(eqt(raw"J=\sum_{k=1}^{H}\ell(x_{k+1},u_k,v_k)+5\Big[q_P\,\sigma(\cdot)+q_B\,\tfrac{N+C}{K}+q_R\,\tfrac{C}{K}+q_T\Big(\tfrac{T}{B_{tox}}\Big)^2+q_W\Big(\tfrac{1-W}{1-W_{min}}\Big)^2\Big]_{H+1}+q_{RT}\,\tfrac{C_{H+1}}{K}", "Total cost over the look-ahead of $(sum(LOOKB)) intervals ($(LOOK_DAYS) days), planned as $(length(LOOKB)) blocks of $(join(LOOKB, ", ")) intervals with one dose each (move blocking, Cagienard et al. 2007; a fast applies to a block's first interval), plus q_RT·C/K (q_RT = $(CFG["progression"]["qRT"])) for the resistant cells left at its end, which drive the next progression; and with a terminal cost (×$(CFG["weights"]["terminal_factor"])) at the end. The first interval of the best plan is applied, then the plan is recomputed at the next media change (receding horizon). The look-ahead stays 14 days for every decision, also near day $DSTR (the plan runs past it), so the schedule is the first $NRUN decisions of a continuing policy with no end-of-run effect. MPC minimises this weighted cost, not the burden alone."))
+$(eqt(tox_tex(raw"\ell=q_P\,\sigma\!\Big(\tfrac{N+C-B_{prog}}{s}\Big)+q_B\,\tfrac{N+C}{K}+q_R\,\tfrac{C}{K}+q_T\Big(\tfrac{T}{B_{tox}}\Big)^2+q_W\Big(\tfrac{1-W}{1-W_{min}}\Big)^2+r_u\Big(\tfrac{u}{u_{max}}\Big)^2+r_v\,v^2"), "Stage cost after each interval. Goal since 2026-10-07: TIME TO PROGRESSION. σ is a smooth step (logistic, width s = $(CFG["progression"]["step_width_fraction_of_K"]) K) at B_prog = $(CFG["progression"]["threshold_fraction_of_K"]) K (80% confluence), so with q_P = $(CFG["progression"]["qP"]) the summed cost counts the intervals spent progressed: the controller keeps the culture under B_prog as long as it can, as adaptive therapy does (Zhang et al. 2017; Gatenby et al. 2009). The burden and resistance terms (q_B = $(CFG["weights"]["qB"]), q_R = $(CFG["weights"]["qR"])) are now tie-breakers. Earlier goal: a low total tumour burden with resistant cells held back. The burden (N + C)/K is linear, so every cell costs the same at any tumour size; the resistance premium q_R·C/K makes a resistant cell count as two (q_R = q_B), because further cisplatin cannot remove it. Then toxicity, weight loss, dose and fasting. Every term is scaled by its limit so they are comparable. Defaults: q_B = q_R = q_T = q_W = 1, r_u = 0.1, r_v = 0.05; the weights (including q_R = 0 and 3) are swept below."))
+$(eqt(tox_tex(raw"+\,b_{\mu}\!\Big(1-\tfrac{N+C}{B_{cancer}}\Big)+b_{\mu}\!\Big(1-\tfrac{T}{B_{tox}}\Big)+b_{\mu}\!\Big(1-\tfrac{1-W}{1-W_{min}}\Big),\qquad b_\mu(z)=\begin{cases}-\mu\log z,&z\ge\delta\\ \mu\big[\tfrac12\big(\tfrac{z-2\delta}{\delta}\big)^2-\tfrac12-\log\delta\big],&z<\delta\end{cases}"), "Relaxed log barriers (Feller & Ebenbauer 2017) at three levels: the cancer burden B_cancer, healthy-tissue loss B_tox and weight loss W_min. A relaxed barrier is a soft constraint (a penalty): it grows steeply as the level is approached and continues as a steep quadratic beyond it, so passing a level has a finite cost. At B_cancer it is the soft burden penalty, which growing cultures pass; the tables count whether and for how many days. Its position and the terminal weight are swept below."))
+$(eqt(tox_tex(raw"J=\sum_{k=1}^{H}\ell(x_{k+1},u_k,v_k)+5\Big[q_P\,\sigma(\cdot)+q_B\,\tfrac{N+C}{K}+q_R\,\tfrac{C}{K}+q_T\Big(\tfrac{T}{B_{tox}}\Big)^2+q_W\Big(\tfrac{1-W}{1-W_{min}}\Big)^2\Big]_{H+1}+q_{RT}\,\tfrac{C_{H+1}}{K}"), "Total cost over the look-ahead of $(sum(LOOKB)) intervals ($(LOOK_DAYS) days), planned as $(length(LOOKB)) blocks of $(join(LOOKB, ", ")) intervals with one dose each (move blocking, Cagienard et al. 2007; a fast applies to a block's first interval), plus q_RT·C/K (q_RT = $(CFG["progression"]["qRT"])) for the resistant cells left at its end, which drive the next progression; and with a terminal cost (×$(CFG["weights"]["terminal_factor"])) at the end. The first interval of the best plan is applied, then the plan is recomputed at the next media change (receding horizon). The look-ahead stays 14 days for every decision, also near day $DSTR (the plan runs past it), so the schedule is the first $NRUN decisions of a continuing policy with no end-of-run effect. MPC minimises this weighted cost, not the burden alone."))
 $(eqt(raw"u_k\in\{0,\,0.62,\,1,\,1.47\}\ \mu\mathrm{M},\quad v_k\in\{0,1\},\quad \text{at most 1 fasting interval in a row (48 h)},\quad \ge 1\ \text{fed interval between fasts}", "Measured-levels mode: only the doses and media that were measured, and fasts no longer than 48 h (fasts of 24–72 h around platinum chemotherapy were feasible: Dorff et al. 2016) with at least 2 days of refeeding between them. The problem is then solved exactly by searching every admissible schedule. The demonstration mode relaxes this to u ∈ [0, 3] µM and v ∈ [0, 1] (partial serum reduction) and uses SQP with the same automatic-differentiation linearisation as the 14-day report."; warn="The 2 days of refeeding between fasts is an assumption, not a measured requirement."))
 </div>
 $(table([("Parameter", "Symbol in the equations.", :none), ("Value", "Value used by the controller (scenario A unless noted).", :none), ("Units", "Units.", :none),
@@ -223,27 +230,30 @@ $(table([("Run", "Low-resource coculture run (1 or 2).", :none), ("Ratio", "Seed
          ("Last observed", "Last measured count.", :none), ("Last predicted", "Predicted count on that day. Closer to the observed value is better.", "Closer to the observed value is better.")], rows))"""
 end
 
-const T_OUT = "Model simulation to day $DSTR. Resistant fraction = C/(N + C). Max toxicity is the highest T; min weight is the lowest W. 'Above B_cancer' counts the soft burden penalty level: whether, and for how many days, N + C was at or above B_cancer. The toxicity and weight limits are 'hit' if the trajectory reaches them at any time."
+const T_OUT = "Model simulation to day $DSTR. Resistant fraction = C/(N + C). Max toxicity is the highest $(TX.short); min weight is the lowest W. 'Above B_cancer' counts the soft burden penalty level: whether, and for how many days, N + C was at or above B_cancer. The toxicity and weight limits are 'hit' if the trajectory reaches them at any time."
 function outcome_table(m)
     rows = String[]
     for pn in pol_order(m)
         v = m.policies[pn]; o = v.o
-        push!(rows, trow([td("<span style='color:$(polcol(pn))'>■</span> " * hesc(pn)), tn(cells(o.N_final)), tn(cells(o.C_final)), tn(cells(o.total_final)),
+        flags = join(["<span class='flag'>breaks the $l limit</span>" for (l, b) in (("weight", o.weight_violation), ("toxicity", o.tox_violation)) if b], " ")
+        push!(rows, trow([td("<span style='color:$(polcol(pn))'>■</span> " * hesc(pn) * (isempty(flags) ? "" : " " * flags)), tn(dayx(o.ttp)), tn(cells(o.total_final)),
+                          tn(d0(get(o, :days_half_K, NaN))), tn(cells(o.C_final)), tn(cells(o.N_final)),
                           tn(@sprintf("%.2f", o.resistant_fraction)), tn(@sprintf("%.3f", o.max_tox)), tn(@sprintf("%.3f", o.min_weight)),
                           tn(@sprintf("%.1f", o.cum_dose)), tn(@sprintf("%.0f", o.fast_days)), td(yn(o.cancer_violation)), tn(d0(dover(o))), td(yn(o.tox_violation)), td(yn(o.weight_violation)),
-                          tn(dayx(o.ttp)), tn(d0(o.days_progressed))];
+                          tn(d0(o.days_progressed))];
                      cls=pn == MPC2 ? "win" : ""))
     end
-    table([("Policy", "The dosing and fasting rule. MPC = model-predictive control. 'Dose only' may not fast; 'dose + fasting' chooses both from the measured levels.", :none),
+    table([("Policy", "The dosing and fasting rule. MPC = model-predictive control. 'Dose only' may not fast; 'dose + fasting' chooses both from the measured levels. A policy that breaks the weight or toxicity limit is flagged in its row.", :none),
+           ("Time to progression (day)", T_TTP, "Later is better; 'not progressed' is best: the goal of the controller."),
+           ("N + C day $DSTR", "Total cells at day $DSTR.", :lower), ("Days above K/2", "Days with N + C at or above half the shared capacity K.", :lower),
+           ("C day $DSTR", "Resistant A2780cis cells at day $DSTR.", :lower),
            ("N day $DSTR", "Sensitive A2780 cells at day $DSTR.", "Lower is better, but a surviving sensitive population also holds resistant cells back."),
-           ("C day $DSTR", "Resistant A2780cis cells at day $DSTR.", :lower), ("N + C", "Total cells at day $DSTR.", :lower),
            ("Resistant fraction", "C/(N + C) at day $DSTR.", :lower), ("Max toxicity", "Highest healthy-tissue loss T (limit 0.25).", :lower),
            ("Min weight", "Lowest body weight W (fraction of baseline; limit 0.95).", :higher),
            ("Dose (µM·d)", "Cumulative cisplatin ∫u dt.", :lower), ("Fasting days", "Days spent fasting (v = 1).", :lower),
            ("Above B_cancer", "N + C reached B_cancer (where the soft burden penalty rises steeply) at some time.", "'no' is better."),
-           ("Days above B_cancer", "Days with N + C at or above B_cancer.", :lower), ("Toxicity limit hit", "T reached B_tox.", "'no' is better."),
+           ("Days above B_cancer", "Days with N + C at or above B_cancer.", :lower), ("Toxicity limit hit", "$(TX.sym) reached $(TX.lim).", "'no' is better."),
            ("Weight limit hit", "W fell to W_min (5% loss).", "'no' is better.", W_WMIN),
-           ("Time to progression (day)", T_TTP, "Later is better; 'not progressed' is best: the goal of the controller."),
            ("Days progressed", "Days with N + C at or above B_prog.", :lower)], rows) |> x -> withtip(x, T_OUT, :none; warn=[:extrapolation, :not_patient_days])
 end
 
@@ -287,9 +297,9 @@ function cost_table(scen, m)
                           tn(f3(ct.penalty_burden)), tn(f3(ct.barrier_tox)), tn(f3(ct.weight + ct.fasting + ct.barrier_weight)), tn(f3(ct.total))]; cls=pn == MPC2 ? "win" : ""))
     end
     table([("Policy", "The dosing and fasting rule.", :none), ("Progression", "Σ q_P·σ((N + C − B_prog)/s): about q_P for every interval spent at or above B_prog = $(CFG["progression"]["threshold_fraction_of_K"]) K, the controller's main goal.", :lower), ("Burden", "Σ q_B·(N + C)/K over the $NRUN intervals.", :lower), ("Resistance premium", "Σ q_R·C/K.", :lower),
-           ("Toxicity", "Σ q_T·(T/B_tox)².", :lower), ("Dose", "Σ r_u·(u/u_max)², u_max = $(CFG["dose"]["u_max_data"]) µM for every policy.", :lower),
+           ("Toxicity", "Σ q_T·($(TX.sym)/$(TX.lim))².", :lower), ("Dose", "Σ r_u·(u/u_max)², u_max = $(CFG["dose"]["u_max_data"]) µM for every policy.", :lower),
            ("Burden penalty", "Σ of the soft burden penalty b_μ(1 − (N + C)/B_cancer): log barrier below B_cancer, steep quadratic above it.", :lower),
-           ("Toxicity barrier", "Σ b_μ(1 − T/B_tox).", :lower), ("Fasting / weight", "Σ of q_W·((1 − W)/(1 − W_min))², r_v·v² and the weight barrier.", :lower),
+           ("Toxicity barrier", "Σ b_μ(1 − $(TX.sym)/$(TX.lim)).", :lower), ("Fasting / weight", "Σ of q_W·((1 − W)/(1 − W_min))², r_v·v² and the weight barrier.", :lower),
            ("Total", "Σ ℓ over the run, the stage cost MPC trades off (its terminal cost is a planning device and is left out).", :lower)], rows) |>
         x -> withtip(x, "Each policy's $DSTR-day run scored with the controller's own stage cost, term by term (50:50 start). Large 'Burden penalty' values show where the soft penalty above B_cancer, not the cell count itself, drives the cost. MPC minimises the total over its $(LOOK_DAYS)-day look-ahead at every decision, not each term.", "Lower is better (in every column, and above all in Total).")
 end
@@ -304,13 +314,13 @@ function scen_section(scen)
     pr = [(label=pn, color=polcol(pn), dash=poldash(pn), t=ts, y=m.policies[pn].o.P) for pn in shown]
     ratios = join(["<h4>Seeding ratio $r</h4>" * outcome_table(main_of(scen, r)) for r in ("25:75", "50:50", "75:25")])
     pts = [(label=pn, color=polcol(pn), x=m.policies[pn].o.cum_dose, tot=m.policies[pn].o.total_final, C=m.policies[pn].o.C_final) for pn in pol_order(m)]
-    """<section class='panel' id='scen-$scen'><h3>Scenario $(hesc(m.name)) <small>· $(scen_tag(scen))</small></h3>
+    """<section class='panel' id='scen-$scen'><h3>Scenario $(hesc(m.name)) <small>· $(scen_tag(scen))</small></h3>$(string(scen) == "B" ? "<p class='muted'>" * hesc(B_NOTE) * "</p>" : "")
 <div class='grid'>
 <div>$(withtip(ts_svg("Total N + C, 50:50 start", tot; hline=(W.Bc, "B_cancer"), ymax=ceil(max(W.Bc * 1.15, maximum(maximum(s.y) for s in tot) * 1.05); sigdigits=2)), "Total cells under each policy. The dashed orange line is B_cancer ($(BC_FRAC) of K), where the soft burden penalty rises steeply. The shaded region is after day 14.", :lower; warn=[:extrapolation, :soft_penalty]))</div>
 <div>$(withtip(pareto_svg("Final cells vs cumulative dose, every policy (50:50)", pts), T_PARETO, "Lower and further left is better (fewer cells for less drug)."))</div>
 <div>$(withtip(ts_svg("Sensitive (solid) and resistant (dashed) cells", nc), "Sensitive N and resistant C under MPC with fasting, MPC without fasting and constant 1 µM. Fasting kills the starvation-sensitive A2780cis cells in the fitted models, so compare the dashed curves.", :lower))</div>
 <div>$(withtip(sched_svg("Schedules: dose (bars) and fasting (purple, F)", [(pn, m.policies[pn].U) for pn in pol_order(m)]), "Each row is a policy over $NRUN two-day intervals. Bar height is the cisplatin dose (hover for the value); purple shading marks fasting intervals (its strength for the continuous demonstration).", :none))</div>
-<div>$(withtip(ts_svg("Healthy-tissue loss T", tox; hline=(W.Btox, "B_tox"), ymax=max(W.Btox * 1.3, maximum(maximum(s.y) for s in tox) * 1.1), ylabel="T (fraction)"), "Toxicity proxy with fasting protection. The dashed line is the limit B_tox = 0.25.", :lower; warn=:tox_proxy))</div>
+<div>$(withtip(ts_svg(TX.name, tox; hline=(W.Btox, TX.lim), ymax=max(W.Btox * 1.3, maximum(maximum(s.y) for s in tox) * 1.1), ylabel=TX.ylabel), "Host toxicity with fasting protection. " * TX.limit_note, :lower; warn=:tox_proxy))</div>
 <div>$(withtip(ts_svg("Body weight W", wt; hline=(W.Wmin, "W_min (assumed limit)"), ymin=min(0.9, minimum(minimum(s.y) for s in wt) - 0.005), ymax=1.005, ylabel="W (fraction of baseline)"), "Host cost of fasting: weight falls by k_W per fasting day and recovers after refeeding. The dashed line is the 5%-loss limit W_min.", :higher; warn=[W_WMIN, :not_patient_days]))</div>
 <div>$(withtip(ts_svg("Fasting protection P", pr; ymax=1.0, ylabel="P (0 = none, 1 = full)"), "Protection of healthy tissue builds while fasting and fades after. A dose given while P is high does less damage to healthy tissue.", "Higher when the drug is given is better."))</div>
 </div><h4>Cost of each run, term by term (50:50)</h4>$(cost_table(scen, m))
@@ -318,7 +328,7 @@ $ratios</section>"""
 end
 
 const ROB_POLS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Periodic 1 µM with a 48-h fast on each dosing interval",
-                  "Constant 1 µM + 48-h fast every 6 days", MPC1, MPC2]
+                  "Constant 1 µM + 48-h fast every 6 days", "Constant 1 µM + 48-h fast every 8 days", MPC1, MPC2]
 mrange(v) = any(isnan, v) || isempty(v) ? "—" : "$(cells(median(v))) ($(cells(quantile(v, .025)))–$(cells(quantile(v, .975))))"
 function robust_section()
     secs = String[]; rows = String[]; prows = String[]
@@ -355,7 +365,7 @@ function robust_section()
 <div class='intro'><p>Each fixed schedule is replayed on the bootstrap parameter sets. Scenario B's crowding was fitted to the untreated cocultures, which have no bootstrap of their own: each draw borrows the Stage 3a bootstrap ratio (replicate ÷ estimate) of the same parameter. <b>Closed loop:</b> on the first $ncl draws MPC plans with the best-fit model, sees only the cell counts N and C at each media change with $(round(Int, 100CV_OBS))% multiplicative log-normal noise, and reconstructs the hidden states (drug-effect and stress chains, B, T, P, W) by simulating its own model under the doses and fasting it has applied. The comparison with each fixed policy is paired: the same plants (and noise) for every policy, on exactly those draws.</p></div>
 <div class='grid'>$(join(secs))</div>
 $(table([("Scen.", "Drug-response scenario.", :none), ("Policy", "Schedule planned with the best-fit model.", :none), ("Draws", "Parameter sets simulated.", :higher),
-         ("Above B_cancer", "Share of parameter sets where N + C reaches B_cancer (the soft burden penalty level).", :lower), ("Toxicity limit hit", "Share where T reaches B_tox.", :lower),
+         ("Above B_cancer", "Share of parameter sets where N + C reaches B_cancer (the soft burden penalty level).", :lower), ("Toxicity limit hit", "Share where $(TX.sym) reaches $(TX.lim).", :lower),
          ("Weight limit hit", "Share where W reaches W_min.", :lower), ("C day $DSTR", "Median resistant cells (95% range).", :lower),
          ("N + C day $DSTR", "Median total (95% range).", :lower), ("Dose (µM·d)", "Median cumulative dose.", :lower), ("Fasting days", "Median days fasting.", :lower)], rows))
 <h3>Paired comparison on the closed-loop draws $(tip("Closed-loop MPC minus each policy, draw by draw on the same bootstrap plants (paired), then summarised: the median difference and the share of draws in which the closed loop does better.", "Negative differences and shares above 50% favour the closed-loop MPC."))</h3>
@@ -435,7 +445,7 @@ function limits_section()
 <li><b>The burden limit is a soft penalty.</b> B_cancer = $(BC_FRAC) K is where a relaxed barrier (a penalty) starts to dominate the cost, not a hard cap; growing cultures pass it, the tables count whether and for how long, and its position and the terminal weight are swept.</li>
 <li><b>Fasting without drug</b> is predicted with an RMSE of $(cells(FC[:checks][:interp].rmse)) cells (the Stage 3b fit: $(cells(FC[:checks][:s3b_rmse])) cells on the points it used; checks above), and the drug × low-resource interaction was measured at one dose only (1 µM).</li>
 <li><b>Host states are literature-informed proxies</b>: nothing in these experiments measured toxicity, weight or protection. The weight rates come from a case series, the weight limit is an assumption informed by a consensus cachexia definition, and the protection strength is an assumption (the randomized DIRECT trial found less DNA damage in T cells but no difference in toxicity grades, so p_H = 0 is in the sweep).</li>
-<li><b>Resistant kill in coculture</b> (scenario A vs B) remains the largest structural uncertainty, as in the 14-day report. Scenario A passes leave-one-ratio-out validation but was fitted to the treated cocultures; only scenario B was tested on held-out treated cocultures.</li><li><b>The toxicity limit is inactive at the default settings.</b> T can never exceed a_H/r_H = $(round(default_tox().a_H / default_tox().r_H; sigdigits=3)) (less while fasting protects healthy tissue), below the bound B_tox = $(CFG["toxicity"]["B_tox"]); the toxicity cost still discourages dosing, but the toxicity barrier never decides a schedule here.</li>
+<li><b>Resistant kill in coculture</b> (scenario A vs B) remains the largest structural uncertainty, as in the 14-day report. $(hesc(KILL_LIMIT_NOTE)) $(hesc(B_NOTE))</li><li><b>Beyond the data.</b> $(hesc(EXTRAP_NOTE)) $(hesc(LOWRES_NOTE)) Fasting is modelled as low resource, so every fasting result rests on that single treated low-resource series.</li><li><b>The toxicity limit is inactive at the default settings.</b> T can never exceed a_H/r_H = $(round(default_tox().a_H / default_tox().r_H; sigdigits=3)) (less while fasting protects healthy tissue), below the bound B_tox = $(CFG["toxicity"]["B_tox"]); the toxicity cost still discourages dosing, but the toxicity barrier never decides a schedule here.</li>
 <li><b>Measurement and state estimation.</b> The closed-loop robustness runs assume each media change gives separate counts of N and C with $(round(Int, 100CV_OBS))% noise and that the hidden drug-effect, stress and host states follow the planner's own model. Scenario B's bootstrap draws borrow the Stage 3a bootstrap ratios for its crowding parameters.</li></ul></div>
 <h2>References</h2>
 <div class='intro'><ul class='muted'>
@@ -446,6 +456,7 @@ function limits_section()
 <li>de Groot S et al. (2020). Fasting mimicking diet as an adjunct to neoadjuvant chemotherapy for breast cancer in the multicentre randomized phase 2 DIRECT trial. Nat Commun 11:3083.</li>
 <li>Obrist F et al. (2018). Metabolic vulnerability of cisplatin-resistant cancers. EMBO J 37:e98597.</li>
 <li>Fearon K et al. (2011). Definition and classification of cancer cachexia: an international consensus. Lancet Oncol 12:489–495.</li>
+$(join(["<li>$(hesc(r))</li>" for r in TX.refs]))
 <li>de Pillis LG, Radunskaya AE (2001). A mathematical tumor model with immune resistance and drug therapy: an optimal control approach. J Theor Med 3:79–100 (values as tabulated in DTR-Bench, Luo et al. 2024, arXiv:2405.18610).</li>
 <li>Feller C, Ebenbauer C (2017). Relaxed logarithmic barrier function based model predictive control of linear systems. IEEE Trans Autom Control 62:1223–1238.</li>
 <li>Zhang J et al. (2017). Integrating evolutionary dynamics into treatment of metastatic castrate-resistant prostate cancer. Nat Commun 8:1816.</li></ul></div>"""
@@ -529,13 +540,14 @@ function write_report()
 <script>window.MathJax={tex:{inlineMath:[['\\\\(','\\\\)']],displayMath:[['\\\\[','\\\\]']]}};</script><script defer src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>$nav
 <h1>Optimal control over $DSTR days: cisplatin and fasting</h1>
-<div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control_fasting.jl</code> and <code>control_fasting_report.jl</code>. Model-predictive control now chooses two things at every media change (every 2 days) for $DSTR days: the cisplatin dose and whether the next 2 days are run in low resource ("fasting", 0.5% FBS). The goal is the same as in the 14-day report: the longest time to progression (keep N + C under B_prog = $(CFG["progression"]["threshold_fraction_of_K"]) K, 80% confluence), with the resistant cells left at the end of each look-ahead priced and a soft burden penalty above B_cancer; MPC minimises this weighted cost. Fasting has a host cost (body weight, with a 5% weight-loss limit) and a host benefit (protection of healthy tissue from the drug), both informed by the fasting-and-chemotherapy literature. Every run starts from the nominal seeding (100 cells split by the ratio). The look-ahead is $(LOOK_DAYS) days at every decision, also near day $DSTR (the plan runs past it), re-planned every 2 days, so the schedule is the first $NRUN decisions of a continuing policy. Scenarios A and B are as in the <a href='../control/report.html'>14-day report</a>.</p>
+<div class='intro'><p><b>$(fits_used_text())</b></p><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control_fasting.jl</code> and <code>control_fasting_report.jl</code>. Model-predictive control now chooses two things at every media change (every 2 days) for $DSTR days: the cisplatin dose and whether the next 2 days are run in low resource ("fasting", 0.5% FBS). The goal is the same as in the 14-day report: the longest time to progression (keep N + C under B_prog = $(CFG["progression"]["threshold_fraction_of_K"]) K, 80% confluence), with the resistant cells left at the end of each look-ahead priced and a soft burden penalty above B_cancer; MPC minimises this weighted cost. Fasting has a host cost (body weight, with a 5% weight-loss limit) and a host benefit (protection of healthy tissue from the drug), both informed by the fasting-and-chemotherapy literature. Every run starts from the nominal seeding (100 cells split by the ratio). The look-ahead is $(LOOK_DAYS) days at every decision, also near day $DSTR (the plan runs past it), re-planned every 2 days, so the schedule is the first $NRUN decisions of a continuing policy. Scenarios A and B are as in the <a href='../control/report.html'>14-day report</a>.</p>
 $(stopping_note())
 <h3>Key findings (50:50 start) $(tip("Auto-generated from the runs below; each metric is compared with the fixed policy that is best on that metric.", :none))</h3>$(key_findings())</div>
 <p class='warnline'><b>Read first</b> $(warn([:extrapolation, :not_patient_days, W_UPPER, W_HOST, W_UNTESTED])) <span class='muted'>click each ⚠; all caveats are listed in full under <a href='#limits'>What the data do not support</a>.</span></p>
 $(model_section())
 $(checks_section())
-<h2>Results $(tip("For each scenario: plots from the 50:50 start, then outcome tables for all three seeding ratios. Policies: five fed baselines (as in the 14-day report), three fixed fasting schedules in the style of the clinical studies, MPC without fasting, MPC with fasting (measured levels, solved exactly) and a continuous demonstration.", :none))</h2>
+<div class='intro'><ul><li>$(hesc(EXTRAP_NOTE)) The tables give day $DSTR; days 15–$DSTR are model extrapolation.</li><li>$(hesc(LOWRES_NOTE))</li><li>$(hesc(KILL_LIMIT_NOTE))</li></ul></div>
+<h2>Results $(tip("For each scenario: plots from the 50:50 start, then outcome tables for all three seeding ratios. Policies: five fed baselines (as in the 14-day report), four fixed fasting schedules in the style of the clinical studies (the 8-day one keeps the weight limit; the others are flagged where they break it), MPC without fasting, MPC with fasting (measured levels, solved exactly) and a continuous demonstration.", :none))</h2>
 $(snapshot_section())
 $(join([scen_section(sc) for sc in SCENS]))
 $(washout_section())
@@ -546,8 +558,10 @@ $(tests_section())
 $(limits_section())
 <p class='muted'>Outputs: <code>fasting_outcomes.csv</code> in <code>Modeling_Approaches/02_mechanical_automatic_package/outputs/control_$(DSTR)d/</code>. Code: control_config.toml ([fasting], [host]), control_fasting.jl, run_control_fasting.jl, control_fasting_report.jl, test/test_control_fasting.jl.</p>
 </main></body></html>"""
-    write(joinpath(FOUT, "report.html"), stage_names(html)); mkpath(FDOCS); cp(joinpath(FOUT, "report.html"), joinpath(FDOCS, "report.html"); force=true)
-    println("Wrote $(joinpath(FDOCS, "report.html"))")
+    write(joinpath(FOUT, "report.html"), stage_names(html)); if isempty(CONTROL_TAG)
+        mkpath(FDOCS); cp(joinpath(FOUT, "report.html"), joinpath(FDOCS, "report.html"); force=true)
+    end
+    println("Wrote $(joinpath(isempty(CONTROL_TAG) ? FDOCS : FOUT, "report.html"))")
 end
 
 # One continuing run read off at the snapshot days: totals, resistant cells, dose and fasting up to each day
@@ -598,4 +612,4 @@ function write_control_long_js()
     write(joinpath(ROOT, "docs", "outputs", "results", "controlLong.js"), stage_names(out))
 end
 write_report()
-write_control_long_js()
+isempty(CONTROL_TAG) && write_control_long_js()

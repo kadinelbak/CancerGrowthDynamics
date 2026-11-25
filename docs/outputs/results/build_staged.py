@@ -15,7 +15,9 @@ import csv, json, re, html, pathlib, sys
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 OUT = ROOT / "Modeling_Approaches/02_mechanical_automatic_package/outputs"
 HERE = pathlib.Path(__file__).resolve().parent
-HEADLINE = "B"          # control_config.toml [scenarios] headline
+import tomllib
+with open(ROOT / "Modeling_Approaches/02_mechanical_automatic_package/control_config.toml", "rb") as _f:
+    HEADLINE = tomllib.load(_f).get("scenarios", {}).get("headline", "A")   # control_config.toml [scenarios] headline
 RATIO = "50:50"
 
 def rows(p):

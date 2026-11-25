@@ -8,7 +8,7 @@
 # Replace ASSUMPTION values with measurements when they exist.
 
 [scenarios]
-headline = "B"   # ASSUMPTION (user, 2026-11-02): B (monoculture kills for both lines) is the reported main result because a fully drug-inactive resistant line is not biologically plausible; A (Stage 3a coculture fit, resistant kill 0) is a sensitivity case
+headline = "A"   # ASSUMPTION (user, 2026-11-12): A (the Stage 3a coculture fit) is the main result, as it reproduces the treated cocultures; B (monoculture drug response in coculture) is a labelled what-if, contradicted by the treated cocultures (1 µM day-14 total ~620 predicted vs ~3,300 measured at 50:50). B was the headline 2026-11-02 to 2026-11-12
 
 [schedule]
 decision_interval_days = 2.0     # DATA: media are changed about every 2 days, so a new dose can start at each change
@@ -37,12 +37,43 @@ run_days = [14.0, 30.0, 60.0]    # ASSUMPTION (user, 2026-10-27): run lengths of
 units = "µM cisplatin in the medium"   # DATA: the experimental dose unit
 u_max_data = 1.47                # DATA: highest dose with measurements (Stage 2 monoculture, IC25 file)
 levels_data = [0.0, 0.62, 1.0, 1.47]   # DATA: every dose that was measured
+mpc_high_levels = [0.0, 0.62, 1.0, 1.47, 2.0, 3.0]   # ASSUMPTION (user, 2026-11-22; main runs since 2026-11-23): dose levels of the extra higher-cap MPC policies, e.g. [0.0, 0.62, 1.0, 1.47, 2.0, 3.0] for "≤ 3 µM" (extrapolated above 1.47 µM; the kidney limit E_lim still applies); empty = none (CONTROL_MPC_HIGH_LEVELS overrides)
+mpc_levels = [0.0, 0.62, 1.0, 1.47]    # ASSUMPTION (user, 2026-11-22): the doses the data-supported MPC may choose; the measured doses by default (CONTROL_MPC_LEVELS overrides, e.g. "0,0.62,1,1.47,2,3" for a cap at 3 µM, extrapolated above 1.47 µM)
 u_max_demo = 3.0                 # ASSUMPTION: demonstration mode only; above 1.47 µM the fitted dose response is extrapolated
 cumulative_max_uM_days = 0.0     # ASSUMPTION: optional budget on ∫u dt; 0 = no budget (none is used)
 min_gap_days = 0.0               # ASSUMPTION: optional minimum time between dosing intervals (discrete mode); 0 = none (none is used)
 
 [toxicity]
-# Host-tissue toxicity, following the normal-cell compartment of de Pillis & Radunskaya (2001,
+# Host toxicity model (user, 2026-11-21): "xie2020" (default) = kidney toxicity; "depillis" = the earlier
+# healthy-tissue proxy, kept selectable for comparison (its settings follow the xie2020 block below).
+model = "xie2020"
+#
+# xie2020: the indirect-response nephrotoxicity model of Xie et al. 2020 (AAPS J 22:96,
+# doi 10.1208/s12248-020-00489-2), fitted in 50 ovarian cancer patients on cisplatin:
+#   dResp/dt = kin·(1 + Emax·Cp/(EC50 + Cp)) − kout·Resp,   kin = kout
+# The toxicity state holds the excess E = Resp − 1 (0 at baseline), with the fasting protection of [host] p_H:
+#   dE/dt = k_N·Emax·Cp/(EC50 + Cp)·(1 − p_H·P) − k_N·E,   Cp = γ·u
+# Cp is a surrogate plasma level: the medium concentration used as a stand-in for plasma level. In-vitro data
+# carry no host or kidney, so γ is a calibration, not a measurement (control_model.jl xie_calibration):
+#   ASSUMPTION (calibration rule): γ makes constant 1 µM give the same time-averaged excess Ē as the standard
+#   clinical schedule, 75 mg/m² every 21 days as a 1-hour infusion, at its periodic steady state. The plasma
+#   curve of intact cisplatin is scaled from Liston & Davis 2017 (Clin Cancer Res 23:3489; 80 mg/m²: Cmax
+#   14.4 µM, t1/2 0.44 h): Cmax × 75/80, zero-order 1-hour infusion, then mono-exponential decay.
+#   ASSUMPTION (limit): E_lim = the peak E of that clinical schedule at its periodic steady state; it replaces
+#   B_tox in the objective q_T·(E/E_lim)², the host barrier, the violation flags and the reports.
+# γ, ΔE (rise per clinical dose), Ē and E_lim are computed at load time and printed in the logs and reports.
+k_N = 0.1666                     # LITERATURE: kin = kout = 0.00694 /h (Xie et al. 2020) = 0.1666 /day
+Emax = 344.0                     # LITERATURE: Emax (Xie et al. 2020)
+EC50_uM = 1.443                  # LITERATURE: EC50 0.433 µg/mL intact cisplatin (Xie et al. 2020); MW 300.05 → 1.443 µM
+clin_dose_mg_m2 = 75.0           # LITERATURE: standard cisplatin dose in ovarian cancer, 75 mg/m² every 21 days
+clin_cycle_days = 21.0           # LITERATURE: the 21-day cycle
+clin_infusion_h = 1.0            # ASSUMPTION: a 1-hour zero-order infusion
+clin_ref_dose_mg_m2 = 80.0       # LITERATURE: dose of the plasma curve below (Liston & Davis 2017)
+clin_Cmax_uM = 14.4              # LITERATURE: intact-cisplatin Cmax at 80 mg/m² (Liston & Davis 2017)
+clin_half_life_h = 0.44          # LITERATURE: intact-cisplatin half-life (Liston & Davis 2017)
+gamma_mult_sweep = [1.0, 3.0, 10.0]   # ASSUMPTION: γ multipliers in the robustness sweep (×10 approaches a peak-exposure mapping)
+#
+# depillis: host-tissue toxicity, following the normal-cell compartment of de Pillis & Radunskaya (2001,
 # Comput Math Methods Med 3:79–100) with the parameter values tabulated in DTR-Bench (Luo et al.
 # 2024, arXiv:2405.18610, Table IX):
 #   dB/dt = s_B·u − d_B·B                         systemic drug burden (their dB/dt = −d2·B + u)
@@ -55,10 +86,10 @@ a_H = 0.1                        # LITERATURE: fractional normal-cell kill a3 = 
 d_B = 1.0                        # LITERATURE: drug decay d2 = 1.0 /day (de Pillis & Radunskaya 2001)
 s_B = 1.0                        # ASSUMPTION: 1 µM in the medium = 1 dose unit of the literature model (1 µM = the A2780 IC50)
 B_tox = 0.25                     # LITERATURE: normal cells kept ≥ 75% of capacity (de Pillis & Radunskaya 2001); 0.30 (70%) in later RL work
-# sweeps reported in the robustness section
+# sweeps reported in the robustness section (r_H, s_B and B_tox: depillis only)
 r_H_sweep = [1.0, 0.5, 0.2]      # ASSUMPTION: 0.2 /day ~ a 5-day recovery, the order of the maturation time in Friberg et al. 2002 (J Clin Oncol 20:4713)
 s_B_sweep = [1.0, 2.0, 4.0]      # ASSUMPTION: stronger mappings of medium µM to systemic burden
-B_tox_sweep = [0.15, 0.25, 0.30] # ASSUMPTION: stricter and looser healthy-tissue limits around the literature value
+B_tox_sweep = [0.15, 0.25, 0.30] # ASSUMPTION: stricter and looser healthy-tissue limits around the literature value (depillis only)
 
 [cancer]
 # B_cancer is a SOFT burden penalty, not a hard limit: a relaxed log barrier (Feller & Ebenbauer 2017,
@@ -84,6 +115,7 @@ terminal_factor_sweep = [1.0, 5.0, 10.0] # ASSUMPTION: sensitivity of the 50:50 
 # total, in Mean Cells units, split by the seeding ratio: 25:75 -> N = 25, C = 75), not a measured
 # day-0 value. The drug, stress and host states start at 0 (body weight W at 1).
 seeding_total = 100.0            # DATA: experimental design (seeding density)
+source = "fitted_treated"        # ASSUMPTION (user, 2026-11-12): each ratio starts from the Stage 3a fitted starting state of its treated (Ce1) series, so the controller simulates the same wells as the fit; "nominal" = seeding_total split by the ratio (before 2026-11-12)
 
 [observation]
 # Closed-loop robustness runs: the controller sees only the cell counts N and C, with multiplicative
@@ -116,14 +148,18 @@ resistant_threshold_fraction_of_K = 0.5   # ASSUMPTION (user, 2026-11-03): resis
 sensitive_threshold_of = "plateau"        # ASSUMPTION (2026-11-03): "plateau" or "K"; the user proposed 0.8 K, which the sensitive line cannot reach (its untreated coculture plateau is about 0.76 K)
 sensitive_threshold_fraction = 0.85       # ASSUMPTION (2026-11-03): 85% of the untreated sensitive plateau (about 0.65 K in the 2026-11-02 fit)
 threshold_fraction_of_K = 0.5    # ASSUMPTION (user, 2026-10-27: K/2, the same level as B_cancer; 0.8 = "80% confluence" before): the untreated plateau (0.71–0.84 K) sat right at 0.8 K, which made the objective flat
-step_width_fraction_of_K = 0.02  # ASSUMPTION (numerical): width s of the smooth step, 2% of K (σ goes from 0.12 to 0.88 over ±4% of K)
+cost = "step"                    # ASSUMPTION (user, 2026-11-24 asked whether progression should be a barrier): "step" = the smooth step below (≈ 0 under each threshold, qP above it), or "barrier" = a relaxed log barrier per line on 1 − N/BpN and 1 − C/BpC (rises as a line nears its threshold, so MPC keeps a margin); compared side by side in the 2026-11-24 report (CONTROL_PROG_COST)
+mu_prog = 0.1                    # ASSUMPTION: weight of each line's barrier with cost = "barrier", times qP (qP·μ_P·(−log z) = 0.69 per interval at half a threshold)
+thresholds_in_low_resource = "normal"   # ASSUMPTION (user, 2026-11-24, fix 3): progression thresholds are fixed cell numbers, taken from the normal-medium (fed) plant in every environment; "own" = each low-resource plant's own untreated plateau (2026-11-03 to 2026-11-24)
+step_width_fraction_of_K = 0.01  # ASSUMPTION (numerical; user, 2026-11-12; 0.02 before): width s of the smooth progression step, 1% of K (σ goes from 0.12 to 0.88 over ±2% of K), so it leaks less cost below the thresholds into the second tier
 qP = 10.0                        # ASSUMPTION: cost of one decision interval spent progressed; dominates the other terms (swept)
 qRT = 10.0                       # ASSUMPTION: terminal cost of the resistant cells, qRT·C/K at the end of the look-ahead (swept 0 / 10 / 30)
 # Time to progression first (user, 2026-11-01). The progression cost is the time spent at or above B_prog,
 # averaged over `substeps` pieces of each decision interval; every other term of the objective is multiplied
 # by tiebreak_scale, so they only break ties between plans with the same time to progression.
 substeps = 8                     # ASSUMPTION (numerical): 0.25-day pieces of a 2-day interval (the RK4 steps are unchanged)
-tiebreak_scale = 0.001           # ASSUMPTION: tie-breakers (burden, resistant cells, dose, toxicity, host weight, fasting) at 1/1000 of their [weights] values
+tiebreak_scale = 0.1             # ASSUMPTION (user, 2026-11-12; 0.001 2026-11-01 to 2026-11-12): the second tier (burden, resistant cells, dose, toxicity, host weight, fasting, and the inside of the host barriers) at 1/10 of its [weights] values. Time to progression still comes first (a whole interval of second-tier cost is worth well under an hour progressed); at 0.01 the leak of the smooth progression step below the thresholds was as large as the second tier and moved the 14-day schedule
+tiebreak_sweep = [0.001, 0.01, 0.1, 0.3]   # ASSUMPTION: the tie-break scale, swept in the 14-day report (run_control.jl)
 # Stopping (user, 2026-11-01): no MPC decisions are computed once the result is known. A run stops when
 # progression is confirmed at confirm_decisions successive decision times (the controller keeps trying to
 # bring the culture back through all of them), or when MPC has gone settle_margin_days past the latest
@@ -143,8 +179,8 @@ sustain_days = 10.0              # ASSUMPTION (reporting): time to progression =
 # qR is the extra cost of a resistant cell: with qR = 1 a resistant cell counts as two cells, because
 # further cisplatin cannot remove it. On top: a soft burden penalty (relaxed barrier above B_cancer) and
 # a relaxed barrier at the toxicity limit B_tox.
-qB = 0.1                         # ASSUMPTION: weight of the total burden (N + C)/K; a tie-breaker under the time-to-progression goal (1 before 2026-10-07)
-qR = 0.0                         # ASSUMPTION: per-interval resistance premium; resistance now enters through the terminal qRT ([progression]); 1 before 2026-10-07
+qB = 1.0                         # ASSUMPTION (user, 2026-11-12: the 2026-10-02 relative weights, inside the tie-break tier; 0.1 2026-10-07 to 2026-11-12): weight of the total burden (N + C)/K
+qR = 1.0                         # ASSUMPTION (user, 2026-11-12; 0 2026-10-07 to 2026-11-12): per-interval resistance premium C/K, inside the tie-break tier, on top of the terminal qRT ([progression])
 qT = 1.0                         # ASSUMPTION: weight of toxicity (T/B_tox)²; swept 1 / 3
 ru = 0.1                         # ASSUMPTION: weight of the dose (u/u_max)², a small cost of drug use; swept 0.1 / 1
 terminal_factor = 5.0            # ASSUMPTION: terminal cost = this × (progression + burden + resistance + toxicity terms) at the end of the look-ahead, plus qRT·C/K ([progression]); swept 1 / 5 / 10
@@ -154,7 +190,7 @@ barrier_delta = 0.02             # ASSUMPTION: relaxed-barrier switch point δ (
 # objective weights [qB, qR, qT, ru, qP, qRT] (sensitivity of the 50:50 MPC): the default, the 2026-10-02 objective
 # (burden + resistance, no progression term), no terminal resistant cost, a 3× terminal resistant cost, a
 # weaker progression weight, toxicity ×3 and drug cost ×10
-sweep = [[0.1, 0.0, 1.0, 0.1, 10.0, 10.0], [1.0, 1.0, 1.0, 0.1, 0.0, 0.0], [0.1, 0.0, 1.0, 0.1, 10.0, 0.0], [0.1, 0.0, 1.0, 0.1, 10.0, 30.0], [0.1, 0.0, 1.0, 0.1, 3.0, 10.0], [0.1, 0.0, 3.0, 0.1, 10.0, 10.0], [0.1, 0.0, 1.0, 1.0, 10.0, 10.0]]   # ASSUMPTION
+sweep = [[1.0, 1.0, 1.0, 0.1, 10.0, 10.0], [0.1, 0.0, 1.0, 0.1, 10.0, 10.0], [1.0, 1.0, 1.0, 0.1, 0.0, 0.0], [1.0, 1.0, 1.0, 0.1, 10.0, 0.0], [1.0, 1.0, 1.0, 0.1, 10.0, 30.0], [1.0, 1.0, 1.0, 0.1, 3.0, 10.0], [1.0, 1.0, 3.0, 0.1, 10.0, 10.0], [1.0, 1.0, 1.0, 1.0, 10.0, 10.0]]   # ASSUMPTION: [qB, qR, qT, ru, qP, qRT]; the default first (2026-11-12), then the 2026-11-01 to 2026-11-12 default, the objective without progression, and one-at-a-time changes of the default
 
 [sqp]
 max_iter = 40                    # ASSUMPTION (numerical setting)
@@ -169,6 +205,8 @@ tol = 1e-7                       # ASSUMPTION (numerical setting): relative chan
 levels = [0.0, 1.0]              # DATA: the two measured media (10% and 0.5% FBS)
 max_consecutive_intervals = 1    # LITERATURE-informed: one 2-day interval = a 48-h fast; fasts of 24–72 h around platinum chemotherapy were feasible (Dorff et al. 2016, BMC Cancer 16:360)
 min_gap_intervals = 1            # ASSUMPTION: at least one fed interval (2 days of refeeding) between fasts
+in_vivo_strength = 1.0           # ASSUMPTION (user, 2026-11-24, fix 4): a in u_R = 0.955·a·v, the share of the in-vitro low-resource effect a fast has on the cancer cells; 1 = full in-vitro strength (an upper bound, the default so far)
+in_vivo_strength_sweep = [0.1, 0.3, 0.5, 1.0]   # ASSUMPTION: swept for the dose + fasting MPC (the smallest a at which it still beats dose-only MPC is the claim's real support)
 rv = 0.05                        # ASSUMPTION: cost weight of a fasting interval (burden of fasting itself), stage cost rv·v²
 # Drug × low-resource interaction. Two conditions were measured: low resource alone (Stages 1b/3b,
 # strength ε = 1) and low resource + 1 µM cisplatin (Stage 4, ε_N ≈ 7.6, ε_C ≈ 0.36 since the 2026-10-01 refit). The plant

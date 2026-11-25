@@ -14,6 +14,7 @@ using TOML, Dates, SHA
 
 const HPKG = joinpath(@__DIR__, "Modeling_Approaches", "02_mechanical_automatic_package")
 const HIST = joinpath(@__DIR__, "docs", "outputs", "final_report", "history")
+include(joinpath(HPKG, "fit_set.jl"))      # which saved fit set the version uses (user, 2026-11-23)
 
 hfmt(x::Bool) = x ? "yes" : "no"
 hfmt(x::Integer) = string(x)
@@ -245,9 +246,14 @@ function report_provenance(pkg=HPKG)
         push!(recs, Dict{String,Any}("step" => name, "label" => label, "status" => status, "when" => when, "detail" => text))
         push!(parts, "$label: $text")
     end
+    # the saved fit set the version's fits are (fit_set.jl): its name heads the summary, so the version list shows it
+    fs = fit_set_info(joinpath(pkg, "outputs", "zoo_fits", "zoo_state.jls"))
+    fitset = Dict{String,Any}("name" => string(get(fs, "name", "")), "matched" => get(fs, "matched", false), "fit_run" => string(get(fs, "fit_run", "")),
+                              "fit_commit" => string(get(fs, "fit_commit", "")), "text" => fits_used_text(fs))
+    pushfirst!(parts, "Fits used: $(fitset["name"])")
     Dict{String,Any}("recorded" => true, "started" => started, "finished" => string(get(M, "finished", "")),
                      "commit" => string(get(get(M, "git", Dict()), "commit", "")), "continued_from" => cont, "resume" => resume,
-                     "partly_reused" => reused, "summary" => join(parts, " · "), "steps" => recs)
+                     "partly_reused" => reused, "summary" => join(parts, " · "), "steps" => recs, "fit_set" => fitset)
 end
 # the provenance line shown at the top of the Final Report
 function provenance_html(prov)
@@ -257,7 +263,8 @@ function provenance_html(prov)
     "<p class='prov$(get(prov, "partly_reused", false) ? " warn" : "")'><b>Data provenance:</b>$tag $(hesc_(get(prov, "summary", ""))). " *
     "Run started $(hesc_(hwhen(get(prov, "started", ""))))$(isempty(get(prov, "finished", "")) ? "" : ", finished " * hesc_(hwhen(prov["finished"])))" *
     "$(isempty(get(prov, "commit", "")) ? "" : ", commit <code>" * hesc_(first(prov["commit"], 7)) * "</code>")." *
-    "$(get(prov, "partly_reused", false) ? " A new report assumes new settings or a new optimal control; read the reused steps as results of the earlier run." : "")</p>"
+    "$(get(prov, "partly_reused", false) ? " A new report assumes new settings or a new optimal control; read the reused steps as results of the earlier run." : "")</p>" *
+    (haskey(prov, "fit_set") ? "<p class='prov'><b>$(hesc_(prov["fit_set"]["text"]))</b></p>" : "")
 end
 
 decision_log(pkg=HPKG) = (f = joinpath(pkg, "decisions.toml"); isfile(f) ? get(TOML.parsefile(f), "decision", Any[]) : Any[])

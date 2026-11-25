@@ -24,8 +24,15 @@ end
 function heldout_model_B()
     c3 = zgroup("s3").cands[1]; LN, LC = c3.sys.lines
     βof(c) = c.params[findfirst(==(:β), c.slots)]
-    LN2 = merge(LN, (s=merge(LN.s, (β=Slot(0, βof(zgroup("s2-a2780").cands[1])),)),))
-    LC2 = merge(LC, (s=merge(LC.s, (β=Slot(0, βof(zgroup("s2-a2780cis").cands[1])),)),))
+    kof(c) = (i = findfirst(==(:k), c.slots); i === nothing ? nothing : c.params[i])
+    # as zoo_heldout.jl mono_drug_line: Stage 2b kill and delay rate, no coculture drug modifier (φ, ρ, γ)
+    function mono(L, c)
+        s = merge(L.s, (β=Slot(0, βof(c)),))
+        k = kof(c); k !== nothing && L.s.k.i > 0 && (s = merge(s, (k=Slot(0, k),)))
+        L2 = merge(L, (s=s,))
+        cc_on(L2) ? merge(L2, (cc=merge(L2.cc, (kf=Slot(0, 1.0), pr=Slot(0, 0.0), cs=Slot(0, 0.0))),)) : L2
+    end
+    LN2 = mono(LN, zgroup("s2-a2780").cands[1]); LC2 = mono(LC, zgroup("s2-a2780cis").cands[1])
     make_system_model(build_system([LN2, LC2], c3.sys.envs, c3.sys.alpha)), AN_STATE[:validation].ce1[1].params
 end
 
@@ -273,6 +280,46 @@ end
         @test relaxed_barrier(1.0, μ, δ) == 0                                                            # no burden penalty: B_cancer = Inf gives z = 1
     end
 
+    # host limits (user, 2026-11-12): the inside of the barrier is a tie-breaker, a violation keeps the full penalty
+    @testset "host barrier: tie-break inside, full penalty outside" begin
+        μ, δ, s = 0.05, 0.02, 0.01
+        for z in (0.9, 0.5, 0.03, 0.01, 0.0)
+            @test host_barrier(z, μ, δ, s) ≈ s * relaxed_barrier(z, μ, δ)                     # inside the limit: scaled
+        end
+        @test host_barrier(-0.1, μ, δ, s) ≈ s * relaxed_barrier(-0.1, μ, δ) + μ / (2δ^2) * 0.01   # outside: + the full quadratic
+        @test host_barrier(-0.1, μ, δ, s) > 0.5 * μ / (2δ^2) * 0.01                               # a violation is never cheap
+        @test host_barrier(1.0, μ, δ, s) == 0 && all(host_barrier(z, μ, δ, s) >= 0 for z in -1:0.01:1)
+        @test isapprox(host_barrier(1e-9, μ, δ, s), host_barrier(-1e-9, μ, δ, s); atol=1e-8)       # continuous at the limit
+        P = scenario_plant(:A); W = default_weights(P)
+        @test W.sB == CFG["progression"]["tiebreak_scale"] && default_weights(P; w=[1.0, 1.0, 1.0, 0.1, 0.0, 0.0]).sB == 1.0
+    end
+
+    # starting counts (user, 2026-11-12): the Stage 3a fitted start of each ratio's treated (Ce1) series by default
+    @testset "starting counts: the fitted start of the treated coculture" begin
+        c3 = zgroup("s3").cands[1]
+        for ratio in ("25:75", "50:50", "75:25")
+            s = fitted_start(ratio, true); e = coculture_env(ratio, true)
+            @test s.N0 == c3.u0[e.iN] && s.C0 == c3.u0[e.iC] && s.N0 > 0 && s.C0 > 0
+            @test start_counts(ratio) == (initial_source() == "fitted_treated" ? s : nominal_seeding(ratio))
+            u = fitted_start(ratio, false); n = nominal_seeding(ratio)
+            @test u.C0 ≈ n.C0                                    # the resistant start is the nominal seeding in both series
+        end
+    end
+
+    # The 14-day plant against the treated cocultures (user, 2026-11-12). Scenario A is the Stage 3a fit itself, so
+    # from the fitted Ce1 start at a constant 1 µM it must (1) equal the fitted model at day 14 (fixed-step RK4 vs
+    # Tsit5: 0.5%) and (2) sit within 2 × the fit's residual RMSE of that series of the measured day-14 counts
+    # (a ~95% band for a residual of that size; the residuals are the only measure of the data's scatter here).
+    @testset "plant vs data: scenario A at 1 µM reproduces the treated cocultures at day 14" begin
+        rows = [r for r in plant_vs_data() if r.scenario == :A && startswith(r.condition, "Ce1")]
+        @test length(rows) == 3
+        for r in rows
+            d = coculture_day14(r.ratio, true)
+            @test isapprox(r.N, d.fitN; rtol=5e-3) && isapprox(r.C, d.fitC; rtol=5e-3)
+            @test abs(r.N - r.N_data) <= 2 * r.rmseN && abs(r.C - r.C_data) <= 2 * r.rmseC
+        end
+    end
+
     # PRD 2026-10-27: the four burden-penalty shapes at B_cancer ([cancer] barrier, swept by run_control_sweep.jl)
     @testset "burden barrier shapes" begin
         P = scenario_plant(:A)
@@ -343,5 +390,24 @@ end
         # the last decision equals the exact one-interval problem from the state it starts in
         xl = foldl((x, u) -> F(x, u, P, Δ), cl.U[1:end-1]; init=copy(x0))
         @test cl.U[end] == discrete_solve(xl, P, Δ, [1], LEVELS, W).U[1]
+    end
+    @testset "kidney toxicity (xie2020): calibration and dynamics" begin
+        if TOX_MODEL == "xie2020"
+            t = default_tox(); P = scenario_plant(:A)
+            # γ solves Emax·γ/(EC50 + γ) = Ē, and the periodic-steady-state peak sits above the mean
+            @test t.Emax * t.γ / (t.EC50 + t.γ) ≈ XIE.Ebar rtol = 1e-10
+            @test XIE.Elim > XIE.Ebar > 0 && XIE.ΔE > 0 && tox_limit() == XIE.Elim
+            # a constant 1 µM drives E to Ē (k_N ≈ 1/6 per day: 60 days ≈ 10 time constants), with no dose E decays
+            x = x0_for(P, 50.0, 50.0)
+            for _ in 1:30; x = F(x, 1.0, P, 2.0); end
+            @test x[P.iT] ≈ XIE.Ebar rtol = 1e-3
+            for _ in 1:10; x = F(x, 0.0, P, 2.0); end
+            @test x[P.iT] ≈ XIE.Ebar * exp(-t.kN * 20) rtol = 1e-3
+            # the drug burden B no longer feeds the toxicity, and the limit is the weights' limit
+            @test default_weights(P).Btox == XIE.Elim
+            @test xie_drive(t, 0.0) == 0 && xie_drive(merge(t, (γ=3t.γ,)), 1.0) > xie_drive(t, 1.0)
+        else
+            @test default_tox().Elim == CFG["toxicity"]["B_tox"]
+        end
     end
 end

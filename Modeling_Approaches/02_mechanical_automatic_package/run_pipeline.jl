@@ -77,7 +77,7 @@ const STEPS = [
     ("control60",  "60-day optimal control (dose; beyond the data; only with --control60)", PKG, ["run_control.jl"], true, merge(redo, Dict("CONTROL_DAYS" => "60")), ["analyses"]),
     ("report60",   "60-day control report (only with --control60)",         PKG,  ["control_report.jl"],              false, Dict("CONTROL_DAYS" => "60"), ["control60"]),
     # the variant reads the main run's saved fits (same data = same fits), so it waits for the main fits
-    ("alldoses",   "Stage fits keeping the A2780cis 1 µM monoculture (variant, point fits)", PKG, ["run_zoo_fits.jl"], true, Dict("ZOO_NO_EXCLUDE" => "1", "ZOO_OUT" => joinpath(PKG, "outputs", "sensitivity", "all_doses"), "BOOT_B" => "0"), ["fits"]),
+    ("alldoses",   "Stage fits keeping the A2780cis 1 µM monoculture (variant, point fits)", PKG, ["run_zoo_fits.jl"], true, Dict("ZOO_NO_EXCLUDE" => "1", "ZOO_OUT" => joinpath(PKG, "outputs", "sensitivity", "all_doses"), "BOOT_B" => "0", "ZOO_FIT_WORK_CAP" => "2000000000"), ["fits"]),   # work cap: fit_parallel.jl
     ("sweep",      "control sweep: barriers, thresholds, run lengths",       PKG,  ["run_control_sweep.jl"],           true,  redo, ["analyses"]),
     # both sweeps write outputs/control_sweep/sweep_outcomes.csv, so they run one after the other
     ("sweep_all",  "control sweep on the all-doses variant",                PKG,  ["run_control_sweep.jl"],           true,  merge(redo, Dict("ZOO_STATE" => joinpath(PKG, "outputs", "sensitivity", "all_doses", "zoo_state.jls"), "SWEEP_DATA" => "all doses")), ["alldoses", "sweep"]),

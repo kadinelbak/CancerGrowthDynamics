@@ -56,18 +56,19 @@ struct Weights
     qP::Float64; Bp::Float64; sP::Float64; qRT::Float64      # progression weight, threshold, step width; terminal resistant weight
     barrier::Symbol; hw::Float64; hs::Float64                 # burden penalty shape at B_cancer ([cancer] barrier); hard-wall weight and width (cells)
     BpN::Float64; BpC::Float64                                # per-line thresholds (cells) of the "lines" progression rule; Inf with the "total" rule
+    sB::Float64                                               # scale of the inside of the host barriers (host_barrier): the tie-break scale, 1 when qP = 0
 end
 # a copy of a weight struct with some fields replaced, e.g. with_fields(W; Bc=…)
 with_fields(W::T; kw...) where {T} = T((haskey(kw, f) ? kw[f] : getfield(W, f) for f in fieldnames(T))...)
 # the objective weights (qB, qR, qT, ru, qP, qRT): w overrides them (a 4-vector keeps the default qP, qRT)
-function objective_weights(w)
+function objective_weights(w; ts=tiebreak_scale())
     c = CFG["weights"]; p = CFG["progression"]
     qB, qR, qT, ru, qP, qRT = w === nothing ? Float64.((c["qB"], c["qR"], c["qT"], c["ru"], p["qP"], p["qRT"])) :
                               length(w) == 6 ? Tuple(Float64.(w)) : (Float64.(w)..., Float64(p["qP"]), Float64(p["qRT"]))
     # time to progression first (user, 2026-11-01): with a progression term every other objective term is a
     # tie-breaker, scaled by tiebreak_scale so that together they never outweigh a fraction of a day progressed
     # (an objective without a progression term, qP = 0, is left as it is)
-    s = qP > 0 ? tiebreak_scale() : 1.0
+    s = qP > 0 ? ts : 1.0
     (qB * s, qR * s, qT * s, ru * s, qP, qRT * s)
 end
 tiebreak_scale() = Float64(get(CFG["progression"], "tiebreak_scale", 1.0))
@@ -92,24 +93,39 @@ function sensitive_plateau(P::Plant; days=400.0)
     for _ in 1:round(Int, days / 2); x = F(x, 0.0, P, 2.0); end
     x[P.iN]
 end
+# Plateau the sensitive threshold is taken from (user, 2026-11-24, fix 3): progression is a fixed number of cells,
+# the same in every environment, so a low-resource plant (P.fp, held at v = 1) uses the normal-medium (fed) plateau
+# of the same model ([progression] thresholds_in_low_resource = "normal"). "own" = the low-resource plant's own
+# untreated plateau (2026-11-03 to 2026-11-24): every untreated low-resource culture then "progresses" by reaching
+# 85% of its own plateau, so MPC dosed throughout to hold A2780 down while A2780cis was dying anyway.
+const LR_THRESHOLDS = String(get(CFG["progression"], "thresholds_in_low_resource", "own"))
+LR_THRESHOLDS in ("own", "normal") || error("[progression] thresholds_in_low_resource must be \"own\" or \"normal\"")
+threshold_plateau(P::Plant) = (LR_THRESHOLDS == "normal" && P.fp !== nothing) ? sensitive_plateau(P.fp) : sensitive_plateau(P)
 # bc_frac: B_cancer as a fraction of K (0 = no burden penalty); tf: terminal factor (both swept in the report)
-function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]),
+function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=tox_limit(P.tox),
                          bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
                          prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]),
-                         barrier=Symbol(get(CFG["cancer"], "barrier", "relaxed_log")))
+                         barrier=Symbol(get(CFG["cancer"], "barrier", "relaxed_log")), ts=tiebreak_scale())
     c = CFG["weights"]; cc = CFG["cancer"]
     barrier in BARRIERS || error("unknown burden barrier $barrier (one of $(join(BARRIERS, ", ")))")
-    qB, qR, qT, ru, qP, qRT = objective_weights(w)
+    qB, qR, qT, ru, qP, qRT = objective_weights(w; ts=ts)
     Bp, sP = progression_scale(P.K; prog_frac=prog_frac)
-    BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(P.K, sensitive_plateau(P); prog_frac=prog_frac) : (Inf, Inf)
+    BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(P.K, threshold_plateau(P); prog_frac=prog_frac) : (Inf, Inf)
     Weights(qB, qR, qT, ru, tf, c["mu_cancer"], c["mu_tox"], c["barrier_delta"],
             bc_frac > 0 ? bc_frac * P.K : Inf, Btox, umax, P.K, qP, Bp, sP, qRT,
-            barrier, Float64(get(cc, "hard_weight", 1000.0)), Float64(get(cc, "hard_width_fraction_of_K", 0.001)) * P.K, BpN, BpC)
+            barrier, Float64(get(cc, "hard_weight", 1000.0)), Float64(get(cc, "hard_width_fraction_of_K", 0.001)) * P.K, BpN, BpC,
+            qP > 0 ? ts : 1.0)
 end
 
 # tumour burden plus the resistance premium, linear in the counts (≥ 0, so the exact search can prune)
 burden_cost(N, C, W) = (W.qB * (max(N, zero(N)) + max(C, zero(C))) + W.qR * max(C, zero(C))) / W.K
 relaxed_barrier(z, μ, δ) = z >= δ ? -μ * log(z) : μ * (0.5 * ((z - 2δ) / δ)^2 - 0.5 - log(δ))
+# Host limits (toxicity T ≤ B_tox, body weight W ≥ W_min; z = the slack, 1 − T/B_tox or 1 − weight loss), user
+# 2026-11-12: the inside of the relaxed barrier is positive everywhere (−μ log z > 0 for z < 1), so at full scale
+# it priced every dose and every fast far above the burden they remove (a 48-h fast: 0.033 per interval against
+# a burden term of ~7e-5, so the dose + fasting MPC never fasted). The inside is now a tie-breaker (s = the
+# tie-break scale, 1 when qP = 0), while a violation (z < 0) keeps the full quadratic penalty μ z²/(2δ²). ≥ 0.
+host_barrier(z, μ, δ, s) = s * relaxed_barrier(z, μ, δ) + (z < 0 ? μ / (2 * δ^2) * z^2 : zero(z))
 logistic(z) = z >= 0 ? 1 / (1 + exp(-z)) : exp(z) / (1 + exp(z))       # overflow-safe
 # Soft burden penalty at B_cancer, by shape (PRD 2026-10-27, swept by run_control_sweep.jl). All are ≥ 0, so
 # the exact search can still prune, and all are differentiable for SQP.
@@ -136,7 +152,20 @@ function progressed(N, C, W)
 end
 # progression index: ≥ 1 exactly when the culture is progressed (stop rules and time to progression)
 prog_index(N, C, W) = uses_lines(W) ? max(N / W.BpN, C / W.BpC) : (N + C) / W.Bp
-progression_cost(N, C, W) = W.qP * progressed(N, C, W)
+# Shape of the progression term (user, 2026-11-24, "should it be set up as a barrier"): "step" (the smooth step
+# above, ≈ 0 below each threshold and ≈ 1 above: the controller can ride just under a line) or "barrier" (a relaxed
+# log barrier per line, Feller & Ebenbauer 2017, on z = 1 − N/BpN and 1 − C/BpC: it rises as either line approaches
+# its threshold, so the controller keeps a margin, and continues as a steep quadratic beyond it). Both are ≥ 0, so the
+# exact search can still prune. CONTROL_PROG_COST overrides [progression] cost (side runs into CONTROL_OUT).
+const PROG_COST = Symbol(get(ENV, "CONTROL_PROG_COST", String(get(CFG["progression"], "cost", "step"))))
+PROG_COST in (:step, :barrier) || error("unknown [progression] cost $PROG_COST (step or barrier)")
+const MU_PROG = parse(Float64, get(ENV, "CONTROL_MU_PROG", string(get(CFG["progression"], "mu_prog", 0.1))))
+function prog_shape(N, C, W)
+    (PROG_COST === :barrier && uses_lines(W)) || return progressed(N, C, W)
+    N⁺ = max(N, zero(N)); C⁺ = max(C, zero(C))
+    MU_PROG * (relaxed_barrier(1 - N⁺ / W.BpN, 1.0, W.δ) + relaxed_barrier(1 - C⁺ / W.BpC, 1.0, W.δ))
+end
+progression_cost(N, C, W) = W.qP * prog_shape(N, C, W)
 # Time spent progressed within one decision interval (user, 2026-11-01: maximise time to progression): the
 # interval is simulated in PROG_SUB pieces and the step σ is averaged over their ends, so qP·(fraction of
 # the interval at or above B_prog) is charged instead of σ at the interval's end only. With the default
@@ -149,7 +178,7 @@ function step_progressed(x, u, P::Plant, Δ, W)
     PROG_SUB <= 1 && (y = F(x, u, P, Δ); return (y, progression_cost(y[P.iN], y[P.iC], W)))
     p = 0.0; h = Δ / PROG_SUB
     for _ in 1:PROG_SUB
-        x = F(x, u, P, h); p += progressed(x[P.iN], x[P.iC], W)
+        x = F(x, u, P, h); p += prog_shape(x[P.iN], x[P.iC], W)
     end
     (x, W.qP * p / PROG_SUB)
 end
@@ -158,7 +187,7 @@ interval_cost(x, u, P::Plant, W, pc) = stage_cost(x, u, P, W) - progression_cost
 function stage_cost(x, u, P::Plant, W::Weights)
     N, C, T = x[P.iN], x[P.iC], x[P.iT]
     progression_cost(N, C, W) + burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.ru * (u / W.umax)^2 +
-        burden_penalty(N + C, W) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ)
+        burden_penalty(N + C, W) + host_barrier(1 - T / W.Btox, W.μT, W.δ, W.sB)
 end
 # terminal: the state-cost terms ×tf, plus the resistant cells left at the end of the look-ahead
 terminal_cost(x, P::Plant, W::Weights) = W.tf * (progression_cost(x[P.iN], x[P.iC], W) + burden_cost(x[P.iN], x[P.iC], W) + W.qT * (x[P.iT] / W.Btox)^2) +
@@ -192,7 +221,7 @@ function cost_terms(P::Plant, x0, U, Δ, W::Weights)
     for k in eachindex(U)
         x = xs[k+1]; N, C, T = x[P.iN], x[P.iC], x[P.iT]
         z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (U[k] / W.umax)^2,
-               burden_penalty(N + C, W), relaxed_barrier(1 - T / W.Btox, W.μT, W.δ), progression_cost(N, C, W)]
+               burden_penalty(N + C, W), host_barrier(1 - T / W.Btox, W.μT, W.δ, W.sB), progression_cost(N, C, W)]
     end
     (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6], progression=z[7], total=sum(z))
 end
@@ -214,7 +243,7 @@ end
 function cost_gradient(x0, U, P::Plant, Δ, W::Weights)
     xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Vector{Float64}[]
     for k in eachindex(U)
-        xn, A, B = linearize(xs[k], U[k], P, Δ); push!(xs, xn); push!(As, A); push!(Bs, B)
+        xn, A, B = linearize(xs[k], U[k], P, Δ; lo=0.0, hi=W.umax); push!(xs, xn); push!(As, A); push!(Bs, B)
     end
     adjoint_gradient(xs, As, Bs, U, P, W)
 end
@@ -261,6 +290,20 @@ function qp_step(Hm, g, U, lo, hi, Δ, cum)
     box_qp(Hm, c .+ b * Δ, lo, hi, U)
 end
 
+# projected-gradient step U → clamp(U − g/L) with Armijo backtracking (L: the Gauss–Newton Hessian's norm);
+# the SQP fallback when the QP step is rejected. Returns (U, J) or nothing (no descent, or over the budget).
+function pg_step(Jf, J, g, U, lo, hi, L; cum=0.0, Δ=1.0)
+    d = clamp.(U .- g ./ L, lo, hi) .- U; slope = LA.dot(g, d)
+    (slope < 0 && !(cum > 0 && Δ * sum(U .+ d) > cum + 1e-12)) || return nothing
+    α = 1.0
+    for _ in 1:25
+        Un = U .+ α .* d; Jn = Jf(Un)
+        Jn <= J + 1e-4 * α * slope && return (Un, Jn)
+        α /= 2
+    end
+    nothing
+end
+
 # SQP solve of the finite-horizon problem from x0 (continuous doses)
 function sqp_solve(x0, U0, P::Plant, Δ, W::Weights; cum=0.0, max_iter=Int(CFG["sqp"]["max_iter"]), tol=Float64(CFG["sqp"]["tol"]))
     H = length(U0); lo = zeros(H); hi = fill(W.umax, H)
@@ -272,7 +315,7 @@ function sqp_solve(x0, U0, P::Plant, Δ, W::Weights; cum=0.0, max_iter=Int(CFG["
     for outer it in 1:max_iter
         xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Vector{Float64}[]
         for k in 1:H
-            xn, A, B = linearize(xs[k], U[k], P, Δ)
+            xn, A, B = linearize(xs[k], U[k], P, Δ; lo=lo[k], hi=hi[k])
             push!(xs, xn); push!(As, A); push!(Bs, B)
         end
         g = adjoint_gradient(xs, As, Bs, U, P, W)
@@ -286,6 +329,10 @@ function sqp_solve(x0, U0, P::Plant, Δ, W::Weights; cum=0.0, max_iter=Int(CFG["
                 U, Jold, J = Un, J, Jn; accepted = true; break
             end
             α /= 2
+        end
+        if !accepted         # QP step rejected (the Gauss–Newton model misses the progression step's curvature)
+            pg = pg_step(V -> total_cost(x0, V, P, Δ, W), J, g, U, lo, hi, max(LA.opnorm(Hm), 1e-12); cum=cum, Δ=Δ)
+            pg === nothing || ((U, Jold, J) = (pg[1], J, pg[2]); accepted = true)
         end
         push!(hist, J)
         (!accepted || abs(Jold - J) < tol * (1 + abs(J))) && break
@@ -408,7 +455,7 @@ function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:c
             U0 = Uwarm[1:Hk]
             if cum <= 0
                 bd = shrink ? cut_blocks(as_blocks(H), n_dec - k + 1) : as_blocks(H)
-                Ud = expand_blocks(discrete_solve(xm, Pm, Δ, bd, Float64.(CFG["dose"]["levels_data"]), W).U, bd)
+                Ud = expand_blocks(discrete_solve(xm, Pm, Δ, bd, MPC_LEVELS, W).U, bd)
                 total_cost(xm, Ud, Pm, Δ, W) < total_cost(xm, U0, Pm, Δ, W) && (U0 = Ud)
             end
             sol = sqp_solve(xm, U0, Pm, Δ, W; cum=cum > 0 ? max(rem, 1e-9) : 0.0)
@@ -510,10 +557,11 @@ function outcomes(P::Plant, x0, U, Δ, W::Weights; t_stop=Inf)
     N = [x[P.iN] for x in xs]; C = [x[P.iC] for x in xs]; T = [x[P.iT] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)
+    days_half_K = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.K / 2); init=0.0)   # reported next to time to progression (user, 2026-11-12)
     tp, ip = progression_window(ts, prog_index.(N, C, Ref(W)), 1.0, t_stop)   # N + C ≥ B_prog, or either line over its threshold
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      max_total=maximum(tot), max_tox=maximum(T), cum_dose=sum(U) * Δ, cancer_violation=over !== nothing,
-     tox_violation=maximum(T) >= W.Btox, day_over_bound=over === nothing ? NaN : ts[over], days_over=days_over,
+     tox_violation=maximum(T) >= W.Btox, day_over_bound=over === nothing ? NaN : ts[over], days_over=days_over, days_half_K=days_half_K,
      ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days, N_prog=ip > 0 ? N[ip] : NaN, C_prog=ip > 0 ? C[ip] : NaN,
      stop_day=isfinite(t_stop) ? t_stop : NaN, ts=ts, N=N, C=C, T=T)
 end

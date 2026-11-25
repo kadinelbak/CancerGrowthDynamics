@@ -13,7 +13,8 @@
 # so v = 0 gives exactly the normal-medium plant, and (u = 1, v = 1) gives exactly the Stage 4 model.
 # Host (control_config.toml [toxicity], [host]):
 #   dB/dt = s_B·u − d_B·B
-#   dT/dt = a_H·(1 − p_H·P)·(1 − e^(−B))·(1 − T) − r_H·T·(1 − T)
+#   dT/dt = a_H·(1 − p_H·P)·(1 − e^(−B))·(1 − T) − r_H·T·(1 − T)      ([toxicity] model = "depillis")
+#   dE/dt = k_N·Emax·γu/(EC50 + γu)·(1 − p_H·P) − k_N·E                ("xie2020", the default: kidney excess, Xie et al. 2020)
 #   dP/dt = k_P·(v − P)
 #   dW/dt = −k_W·v + r_W·(1 − W)·(1 − v)
 
@@ -39,12 +40,16 @@ struct FPlant{TT<:NamedTuple,HT<:NamedTuple}
     tox::TT; host::HT
     spec::Vector{LineSpec}
     koff::Float64               # fade rate of low-resource stress after refeeding; NaN = the fitted build-up rate (the zoo model)
+    a::Float64                  # in-vivo strength of a fast on the cancer cells (user, 2026-11-24, fix 4): u_R = 0.955·a·v; 1 = the
+                                # in-vitro low-resource effect at full strength (an upper bound); the low-resource plant always uses 1
 end
+# [fasting] in_vivo_strength (FAST_STRENGTH overrides it for a side run)
+default_fast_strength() = parse(Float64, get(ENV, "FAST_STRENGTH", string(get(FCFG, "in_vivo_strength", 1.0))))
 
 shift_slots(s, np) = NamedTuple{keys(s)}(Tuple(v.i > 0 ? Slot(v.i + np, v.v) : v for v in values(s)))
 
 function fast_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox(), host=default_host(),
-                    eps_mode=Symbol(FCFG["eps_mode"]), koff=NaN)
+                    eps_mode=Symbol(FCFG["eps_mode"]), koff=NaN, a=default_fast_strength())
     P0 = scenario_plant(scen; b=b, tox=tox)
     P0 === nothing && return nothing
     # Stage 4 adds each line's low-resource module and whatever it refits: low-resource strengths ε (free ε slots
@@ -69,7 +74,7 @@ function fast_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox
     name = (scen == :A ? "A: Stage 3 coculture model as selected" : "B: monoculture drug response for both lines") *
            " + fitted low-resource modules"
     FPlant(name, base, iε, ε, eps_mode, Float64(FCFG["eps_u_ref"]),
-           n + 4, base.iN, base.iC, n + 1, n + 2, n + 3, n + 4, base.K, tox, host, line_specs(base, iε), Float64(koff))
+           n + 4, base.iN, base.iC, n + 1, n + 2, n + 3, n + 4, base.K, tox, host, line_specs(base, iε), Float64(koff), Float64(a))
 end
 
 # The 14-day controller's low-resource environment (control_model.jl Plant interface): the same plant
@@ -77,7 +82,7 @@ end
 # resource is the culture's environment there, not a fast the host chooses. ε(u) follows eps_mode as above,
 # so u = 0 gives the low-resource-only model and u = 1 µM the Stage 4 model.
 function lr_plant(scen::Symbol; b::Union{Nothing,Int}=nothing, tox=default_tox())
-    FP = fast_plant(scen; b=b, tox=tox, host=merge(default_host(), (p_H=0.0,)))
+    FP = fast_plant(scen; b=b, tox=tox, host=merge(default_host(), (p_H=0.0,)), a=1.0)     # the medium itself: full strength
     FP === nothing && return nothing
     B = FP.base
     name = (scen == :A ? "A (low resource): Stage 3 coculture model" : "B (low resource): monoculture drug response") *
@@ -95,7 +100,7 @@ function fast_rhs_ref!(du, x, w, FP::FPlant)       # reference: the zoo right-ha
     for (j, i) in enumerate(FP.iε)
         p[i] = 1 + (FP.ε[j] - 1) * f
     end
-    envc = (D=T(u), R=T(U_R) * v)
+    envc = (D=T(u), R=T(U_R) * T(FP.a) * v)
     for (j, l) in enumerate(env.lines)
         xi = S.xi[1][j]; L = S.lines[l]
         crowd = max(x[xi+1], zero(T)); other = zero(T)
@@ -108,7 +113,8 @@ function fast_rhs_ref!(du, x, w, FP::FPlant)       # reference: the zoo right-ha
     end
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
     du[FP.iB] = tp.s_B * u - tp.d_B * Bd
-    du[FP.iT] = tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, zero(T)))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
+    du[FP.iT] = tp.xie ? xie_drive(tp, u) * (1 - h.p_H * Pr) - tp.kN * Tx :
+                         tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, zero(T)))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
     du[FP.iP] = h.k_P * (v - Pr)
     du[FP.iW] = -h.k_W * v + h.r_W * (1 - Wt) * (1 - v)
     nothing
@@ -116,10 +122,11 @@ end
 function fast_rhs!(du, x, w, FP::FPlant)
     u, v = w[1], w[2]
     T = promote_type(eltype(x), eltype(w)); z = zero(T)
-    spec_cells_rhs!(du, x, T(u), T(U_R) * v, εfactor(FP, T(u)), FP.spec, FP.ε, FP.koff, v)     # control_model.jl
+    spec_cells_rhs!(du, x, T(u), T(U_R) * T(FP.a) * v, εfactor(FP, T(u)), FP.spec, FP.ε, FP.koff, v)     # control_model.jl
     Bd = x[FP.iB]; Tx = x[FP.iT]; Pr = x[FP.iP]; Wt = x[FP.iW]; tp = FP.tox; h = FP.host
     du[FP.iB] = tp.s_B * u - tp.d_B * Bd
-    du[FP.iT] = tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, z))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
+    du[FP.iT] = tp.xie ? xie_drive(tp, u) * (1 - h.p_H * Pr) - tp.kN * Tx :
+                         tp.a_H * (1 - h.p_H * Pr) * (1 - exp(-max(Bd, z))) * (1 - Tx) - tp.r_H * Tx * (1 - Tx)
     du[FP.iP] = h.k_P * (v - Pr)
     du[FP.iW] = -h.k_W * v + h.r_W * (1 - Wt) * (1 - v)
     nothing
@@ -145,10 +152,19 @@ function trajectory2(x0, U, FP::FPlant, Δ; dt=0.1)
     ts, xs
 end
 # A_k = ∂F/∂x (nx×nx), B_k = ∂F/∂w (nx×2), one forward-mode Jacobian over [x; u; v]
-function linearize2(x, w, FP::FPlant, Δ)
+# at an input bound (w ≤ lo or w ≥ hi) that column of B is the one-sided derivative into the feasible side,
+# as in linearize (control_model.jl): AD misses the dose sensitivity on the max(E, 0) clamp
+function linearize2(x, w, FP::FPlant, Δ; lo=fill(-Inf, length(w)), hi=fill(Inf, length(w)))
     nx = length(x)
     J = ForwardDiff.jacobian(z -> F2(z[1:nx], z[nx+1:end], FP, Δ), vcat(x, w))
-    F2(x, w, FP, Δ), J[:, 1:nx], J[:, nx+1:end]
+    Fx = F2(x, w, FP, Δ); B = J[:, nx+1:end]
+    for i in eachindex(w)
+        s = w[i] <= lo[i] ? 1.0 : w[i] >= hi[i] ? -1.0 : 0.0
+        s == 0 && continue
+        e = (1e-4 * s) .* (eachindex(w) .== i)
+        B[:, i] = (4 .* F2(x, w .+ e, FP, Δ) .- F2(x, w .+ 2 .* e, FP, Δ) .- 3 .* Fx) ./ (2e-4 * s)
+    end
+    Fx, J[:, 1:nx], B
 end
 function x0_fast(FP::FPlant, N0, C0)
     x = zeros(FP.nx); x[FP.iN] = N0; x[FP.iC] = C0; x[FP.iW] = 1.0
@@ -162,6 +178,7 @@ struct Weights2
     Bc::Float64; Btox::Float64; Wmin::Float64; umax::Float64; K::Float64
     qP::Float64; Bp::Float64; sP::Float64; qRT::Float64      # time to progression (control_mpc.jl)
     BpN::Float64; BpC::Float64                                # per-line thresholds of the "lines" rule (control_mpc.jl line_thresholds)
+    sB::Float64                                               # scale of the inside of the host barriers (control_mpc.jl host_barrier)
 end
 # untreated, unfasted sensitive-only plateau of the fasting plant (normal medium)
 function sensitive_plateau(FP::FPlant; days=400.0)
@@ -172,14 +189,14 @@ end
 # bc_frac: B_cancer as a fraction of K (0 = no soft burden penalty); tf: terminal factor (both swept)
 function weights2(FP::FPlant; umax=Float64(CFG["dose"]["u_max_data"]), Wmin=Float64(HCFG["W_min"]), w=nothing, rv=Float64(FCFG["rv"]),
                   bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
-                  prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]))
+                  prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]), ts=tiebreak_scale())
     c = CFG["weights"]
-    qB, qR, qT, ru, qP, qRT = objective_weights(w)
+    qB, qR, qT, ru, qP, qRT = objective_weights(w; ts=ts)
     Bp, sP = progression_scale(FP.K; prog_frac=prog_frac)
     BpN, BpC = prog_rule() === :lines && prog_frac > 0 ? line_thresholds(FP.K, sensitive_plateau(FP); prog_frac=prog_frac) : (Inf, Inf)
-    sc = qP > 0 ? tiebreak_scale() : 1.0           # host weight and fasting costs are tie-breakers too (control_mpc.jl)
+    sc = qP > 0 ? ts : 1.0           # host weight and fasting costs are tie-breakers too (control_mpc.jl)
     Weights2(qB, qR, qT, HCFG["qW"] * sc, ru, rv * sc, tf, c["mu_cancer"], c["mu_tox"], HCFG["mu_host"], c["barrier_delta"],
-             bc_frac > 0 ? bc_frac * FP.K : Inf, CFG["toxicity"]["B_tox"], Wmin, umax, FP.K, qP, Bp, sP, qRT, BpN, BpC)
+             bc_frac > 0 ? bc_frac * FP.K : Inf, tox_limit(FP.tox), Wmin, umax, FP.K, qP, Bp, sP, qRT, BpN, BpC, sc)
 end
 wloss(x, FP, W) = (1 - x[FP.iW]) / (1 - W.Wmin)
 # the soft burden penalty at B_cancer follows control_config [cancer] barrier: "none" (default since
@@ -189,8 +206,8 @@ function stage_cost2(x, w, FP::FPlant, W::Weights2)
     N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
     progression_cost(N, C, W) + burden_cost(N, C, W) + W.qT * (T / W.Btox)^2 + W.qW * wloss(x, FP, W)^2 +
         W.ru * (w[1] / W.umax)^2 + W.rv * w[2]^2 +
-        (BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : zero(N)) + relaxed_barrier(1 - T / W.Btox, W.μT, W.δ) +
-        relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ)
+        (BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : zero(N)) + host_barrier(1 - T / W.Btox, W.μT, W.δ, W.sB) +
+        host_barrier(1 - wloss(x, FP, W), W.μW, W.δ, W.sB)
 end
 terminal_cost2(x, FP::FPlant, W::Weights2) = W.tf * (progression_cost(x[FP.iN], x[FP.iC], W) + burden_cost(x[FP.iN], x[FP.iC], W) +
                                                      W.qT * (x[FP.iT] / W.Btox)^2 + W.qW * wloss(x, FP, W)^2) +
@@ -211,7 +228,7 @@ function plan_cost2(x0, U, FP, Δ, W)
     for k in axes(U, 1)
         w = U[k, :]; pc = 0.0
         for _ in 1:PROG_SUB
-            x = F2(x, w, FP, Δ / PROG_SUB); pc += progressed(x[FP.iN], x[FP.iC], W)
+            x = F2(x, w, FP, Δ / PROG_SUB); pc += prog_shape(x[FP.iN], x[FP.iC], W)
         end
         J += stage_cost2(x, w, FP, W) - progression_cost(x[FP.iN], x[FP.iC], W) + W.qP * pc / PROG_SUB
     end
@@ -225,8 +242,8 @@ function cost_terms2(FP::FPlant, x0, U, Δ, W::Weights2)
     for k in axes(U, 1)
         w = U[k, :]; x = F2(x, w, FP, Δ); N, C, T = x[FP.iN], x[FP.iC], x[FP.iT]
         z .+= [W.qB * (max(N, 0.0) + max(C, 0.0)) / W.K, W.qR * max(C, 0.0) / W.K, W.qT * (T / W.Btox)^2, W.ru * (w[1] / W.umax)^2,
-               BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : 0.0, relaxed_barrier(1 - T / W.Btox, W.μT, W.δ),
-               W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, relaxed_barrier(1 - wloss(x, FP, W), W.μW, W.δ), progression_cost(N, C, W)]
+               BURDEN_BARRIER2 ? relaxed_barrier(1 - (N + C) / W.Bc, W.μC, W.δ) : 0.0, host_barrier(1 - T / W.Btox, W.μT, W.δ, W.sB),
+               W.qW * wloss(x, FP, W)^2, W.rv * w[2]^2, host_barrier(1 - wloss(x, FP, W), W.μW, W.δ, W.sB), progression_cost(N, C, W)]
     end
     (burden=z[1], resistance=z[2], toxicity=z[3], dose=z[4], penalty_burden=z[5], barrier_tox=z[6],
      weight=z[7], fasting=z[8], barrier_weight=z[9], progression=z[10], total=sum(z))
@@ -237,7 +254,7 @@ function grad_hess2(x0, U, FP::FPlant, Δ, W::Weights2)
     H = size(U, 1); m = size(U, 2)
     xs = [copy(x0)]; As = Matrix{Float64}[]; Bs = Matrix{Float64}[]
     for k in 1:H
-        xn, A, B = linearize2(xs[k], U[k, :], FP, Δ)
+        xn, A, B = linearize2(xs[k], U[k, :], FP, Δ; lo=[0.0, 0.0], hi=[W.umax, 1.0])
         push!(xs, xn); push!(As, A); push!(Bs, B)
     end
     # adjoint gradient
@@ -279,6 +296,10 @@ function sqp_solve2(x0, U0, FP::FPlant, Δ, W::Weights2; max_iter=Int(CFG["sqp"]
             end
             α /= 2
         end
+        if !accepted         # QP step rejected: a projected-gradient step instead (control_mpc.jl pg_step)
+            pg = pg_step(zz -> total_cost2(x0, Um(zz), FP, Δ, W), J, g, z, lo, hi, max(LA.opnorm(Hs), 1e-12))
+            pg === nothing || ((z, Jold, J) = (pg[1], J, pg[2]); accepted = true)
+        end
         (!accepted || abs(Jold - J) < tol * (1 + abs(J))) && break
     end
     (U=Um(z), J=J, iters=it)
@@ -311,7 +332,7 @@ admissible(v, run, gap, maxrun, mingap) = v == 0 || (run < maxrun && (run > 0 ||
 # H: an Int (single intervals) or the look-ahead blocks (control_mpc.jl). In a block the dose holds for
 # every interval and a fast applies to the block's FIRST interval only (fed afterwards), so the fasting
 # rules (48-h fasts, refeeding between) still hold; the cost is summed over every interval.
-function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CFG["dose"]["levels_data"]),
+function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=MPC_LEVELS,
                          vlevels=Float64.(FCFG["levels"]), maxrun=Int(FCFG["max_consecutive_intervals"]),
                          mingap=Int(FCFG["min_gap_intervals"]), run0=0, gap0=10^6, Uinit=nothing)
     blk = as_blocks(H); H = length(blk)
@@ -325,7 +346,7 @@ function discrete_solve2(x0, FP::FPlant, Δ, H, W::Weights2; ulevels=Float64.(CF
             # time spent progressed, averaged over PROG_SUB pieces of the interval (control_mpc.jl: step_progressed)
             local pc = 0.0
             for _ in 1:PROG_SUB
-                F2!(y, tmp, (u, vj), FP, Δ / PROG_SUB, buf); copyto!(tmp, y); pc += progressed(y[FP.iN], y[FP.iC], W)
+                F2!(y, tmp, (u, vj), FP, Δ / PROG_SUB, buf); copyto!(tmp, y); pc += prog_shape(y[FP.iN], y[FP.iC], W)
             end
             cb += stage_cost2(y, (u, vj), FP, W) - progression_cost(y[FP.iN], y[FP.iC], W) + W.qP * pc / PROG_SUB
             run, gap = vj > 0 ? (run + 1, 0) : (0, gap + 1)
@@ -442,6 +463,8 @@ baseline_policies2(FP::FPlant, W::Weights2) = [
     ("Fasting only, 48 h every 6 days", (x, k) -> [0.0, k % 3 == 1 ? 1.0 : 0.0]),
     ("Periodic 1 µM with a 48-h fast on each dosing interval", (x, k) -> isodd(k) ? [1.0, 1.0] : [0.0, 0.0]),
     ("Constant 1 µM + 48-h fast every 6 days", (x, k) -> [1.0, k % 3 == 1 ? 1.0 : 0.0]),
+    # a fixed fasting schedule that keeps W ≥ W_min (user, 2026-11-12: the two above break the weight limit)
+    ("Constant 1 µM + 48-h fast every 8 days", (x, k) -> [1.0, k % 4 == 1 ? 1.0 : 0.0]),
 ]
 
 function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2; t_stop=Inf)
@@ -450,11 +473,12 @@ function outcomes2(FP::FPlant, x0, U, Δ, W::Weights2; t_stop=Inf)
     Pr = [x[FP.iP] for x in xs]; Wt = [x[FP.iW] for x in xs]; tot = N .+ C
     over = findfirst(>=(W.Bc), tot)
     days_over = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.Bc); init=0.0)     # days with N + C ≥ B_cancer
+    days_half_K = sum((ts[i+1] - ts[i] for i in 1:length(ts)-1 if tot[i+1] >= W.K / 2); init=0.0)
     tp, ip = progression_window(ts, prog_index.(N, C, Ref(W)), 1.0, t_stop)       # up to the closed loop's stop (control_mpc.jl)
     (N_final=N[end], C_final=C[end], total_final=tot[end], resistant_fraction=C[end] / max(tot[end], 1e-9),
      ttp_first=tp.first, ttp=tp.loss, days_progressed=tp.days, N_prog=ip > 0 ? N[ip] : NaN, C_prog=ip > 0 ? C[ip] : NaN,
      stop_day=isfinite(t_stop) ? t_stop : NaN,
      max_total=maximum(tot), max_tox=maximum(T), min_weight=minimum(Wt), cum_dose=sum(U[:, 1]) * Δ, fast_days=sum(U[:, 2]) * Δ,
-     cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin, days_over=days_over,
+     cancer_violation=over !== nothing, tox_violation=maximum(T) >= W.Btox, weight_violation=minimum(Wt) <= W.Wmin, days_over=days_over, days_half_K=days_half_K,
      ts=ts, N=N, C=C, T=T, P=Pr, W=Wt)
 end
