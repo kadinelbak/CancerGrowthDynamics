@@ -1,0 +1,21 @@
+Kidney toxicity (Xie et al. 2020) calibrated to 75 mg/m² every 21 days: γ = 0.006586 per µM, ΔE = 5.313, Ē = 1.563, E_lim = 5.479
+=== optimal control: 12 threads; Δ = 2.0 d, 7 decisions (14.0 days, fixed look-ahead 28 days, blocks [1, 1, 2, 2, 4, 4]); checkpoint has Symbol[] ===
+  lowres  B 25:75 done [31s]
+  lowres  B 75:25 done [33s]
+  lowres  B 50:50 done [34s]
+  lowres  A 25:75 done [69s]
+  lowres  A 50:50 done [70s]
+  lowres  A 75:25 done [71s]
+  normal  A 25:75 done [134s]
+  normal  B 75:25 done [139s]
+  normal  B 50:50 done [140s]
+  normal  B 25:75 done [141s]
+  normal  A 50:50 done [149s]
+  normal  A 75:25 done [150s]
+  sweeps done
+  robustness normal  A: 200 draws, 40 closed-loop
+  robustness normal  B: 200 draws, 40 closed-loop
+  robustness lowres  A: 200 draws, 40 closed-loop
+  robustness lowres  B: 200 draws, 40 closed-loop
+  Activating project at `~/Desktop/Research/CGD-fixes34/Modeling_Approaches/02_mechanical_automatic_package`
+Wrote /home/kadin/Desktop/Research/CGD-fixes34/Modeling_Approaches/02_mechanical_automatic_package/outputs/control_fixes_step/control_outcomes.csv

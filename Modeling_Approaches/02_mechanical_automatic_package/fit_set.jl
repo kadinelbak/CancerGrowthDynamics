@@ -8,7 +8,8 @@ using TOML, SHA
 
 const FIT_SETS_DIR = joinpath(@__DIR__, "outputs", "fit_sets")
 
-function fit_set_info(state=joinpath(@__DIR__, "outputs", "zoo_fits", "zoo_state.jls"))
+# ZOO_STATE (control_model.jl) points a control run at another zoo_state.jls, e.g. a saved fit set
+function fit_set_info(state=get(ENV, "ZOO_STATE", joinpath(@__DIR__, "outputs", "zoo_fits", "zoo_state.jls")))
     isfile(state) || return Dict{String,Any}("name" => "none", "matched" => false)
     h = bytes2hex(open(sha256, state))
     if isdir(FIT_SETS_DIR)

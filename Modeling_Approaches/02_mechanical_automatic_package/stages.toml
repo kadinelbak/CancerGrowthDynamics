@@ -216,6 +216,27 @@ betaC_floor = 0.1
   label = "Shared K + crowding + coculture death, kill factor per line"
   family = "Coculture kill factor"
   free = ["K", "αNC", "αCN", "dN", "dC", "φN", "φC"]
+  # shared K fixed at the mean of the Stage 1 monoculture capacities (user, 2026-11-24): the data pin down each
+  # line's plateau K(1 − d/r), so a free K can grow while the coculture deaths d grow with it (K 5,477 with
+  # d ≈ 0.21 vs K ≈ 3,200–3,450 without deaths). With K fixed, d and α must explain the coculture on their own.
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_death_phiNC"
+  label = "K = mean monoculture K + crowding + coculture death, kill factor per line"
+  family = "Coculture kill factor (K fixed)"
+  free = ["αNC", "αCN", "dN", "dC", "φN", "φC"]
+  K_from = "mono_mean"
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_phiNC"
+  label = "K = mean monoculture K + crowding, kill factor per line"
+  family = "Coculture kill factor (K fixed)"
+  free = ["αNC", "αCN", "φN", "φC"]
+  K_from = "mono_mean"
+  [[stage.candidate]]
+  name = "cc_Kmono_alpha_death"
+  label = "K = mean monoculture K + crowding + coculture death, drug mechanisms from Stage 2"
+  family = "Coculture kill factor (K fixed)"
+  free = ["αNC", "αCN", "dN", "dC"]
+  K_from = "mono_mean"
   # phenotype switching (2026-11-09): sensitive cells switch at a low rate into a resistant-like state that keeps
   # the sensitive label (counted as A2780) but grows at r_C and feels the resistant Stage 2b kill β_C;
   # spontaneous μ0 (also in untreated wells) or drug-induced μD × the sensitive drug-effect state

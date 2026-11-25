@@ -344,6 +344,9 @@ function coculture_rows(st)
     growth = PL[st["inherits"]["growth"]]
     cands = [begin
                  fx = Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(c, "fixed", Dict()))
+                 # K_from = "mono_mean" (user, 2026-11-24): the shared K is not fitted but fixed at the mean of the two
+                 # Stage 1 monoculture capacities, so a large K cannot be traded against coculture deaths
+                 get(c, "K_from", "") == "mono_mean" && (fx[:K] = (growth["A2780"].K + growth["A2780cis"].K) / 2)
                  if haskey(c, "fixed_from")
                      b = CC[c["fixed_from"]].rows[1]
                      merge!(fx, Dict(:K => ccval(b, :K, NaN), :αNC => ccval(b, :αNC, 1.0), :αCN => ccval(b, :αCN, 1.0)))

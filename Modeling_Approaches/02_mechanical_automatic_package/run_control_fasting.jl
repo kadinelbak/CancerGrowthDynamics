@@ -174,6 +174,10 @@ if !haskey(fck, :sweeps)
         for v in (0.01, 0.05, 0.2)
             push!(tasks, (kind="fasting cost", scen=scen, label="r_v = $v", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP; rv=v)))))
         end
+        for a in get(FCFG, "in_vivo_strength_sweep", Float64[])
+            Float64(a) == default_fast_strength() && continue
+            push!(tasks, (kind="fasting strength", scen=scen, label="in-vivo strength a = $a (u_R = 0.955·a·v)", f=() -> (FP = fast_plant(scen; a=Float64(a)); mpc(FP, weights2(FP)))))
+        end
         push!(tasks, (kind="drug × low resource", scen=scen, label="ε = Stage 4 value at every dose", f=() -> (FP = fast_plant(scen; eps_mode=:stage4); mpc(FP, weights2(FP)))))
         push!(tasks, (kind="fasting rules", scen=scen, label="fasts up to 4 days (2 intervals)", f=() -> (FP = fast_plant(scen); mpc(FP, weights2(FP); maxrun=2))))
         for b in CFG["schedule"]["lookahead_sweep"]
