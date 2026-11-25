@@ -6,6 +6,7 @@
 # outputs/sensitivity/hill/** (drug-response shape) and the neural-network comparison, when present.
 include(joinpath(@__DIR__, "zoo_common.jl")); include(joinpath(@__DIR__, "zoo_models.jl")); include(joinpath(@__DIR__, "bootstrap_tools.jl"))
 include(joinpath(@__DIR__, "info_tips.jl"))
+include(joinpath(@__DIR__, "fit_set.jl"))              # which saved fit set the outputs use (user, 2026-11-23)
 using Serialization, Printf, Statistics
 
 const OUTD = joinpath(@__DIR__, "outputs")
@@ -206,7 +207,7 @@ html = """<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name=
 <style>$CSS</style>$INFO_TIPS_HEAD</head><body><main>
 <p><a href='../../../../index.html'>Reports home</a> · <a href='../../../../outputs/final_report/report.html'>Final report</a></p>
 <h1>Key findings, assumptions and limitations</h1>
-<div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the outputs of the latest pipeline run (zoo fits of $(Libc.strftime("%Y-%m-%d %H:%M", mtime(joinpath(OUTD, "zoo_fits", "zoo_state.jls"))))). Every number below is read from that run's files.</p></div>
+<div class='intro'><p><b>$(fits_used_text())</b></p><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) from the outputs of the latest pipeline run (zoo fits of $(Libc.strftime("%Y-%m-%d %H:%M", mtime(joinpath(OUTD, "zoo_fits", "zoo_state.jls"))))). Every number below is read from that run's files.</p></div>
 $(glance())
 $(transport())
 $(starts())

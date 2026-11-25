@@ -1,0 +1,67 @@
+Pipeline: fits (12 threads, resume)
+
+[13:06] fits: staged model-zoo fits and bootstrap  (log: outputs/logs/fits.log)
+[ Info: fits done in 77602 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: analyses (12 threads, resume)
+
+[10:39] analyses: bootstrap comparison, sensitivity, validation  (log: outputs/logs/analyses.log)
+[ Info: analyses done in 267 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: control14 (12 threads)
+
+[10:43] control14: 14-day optimal control (dose)  (log: outputs/logs/control14.log)
+[ Info: control14 done in 422 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+control14: empty checkpoint confirmed
+Pipeline: report14 (12 threads)
+
+[10:50] report14: 14-day control report  (log: outputs/logs/report14.log)
+[ Info: report14 done in 43 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: control_long (12 threads)
+
+[10:51] control_long: long optimal control, dose + fasting (control_config long_days)  (log: outputs/logs/control_long.log)
+[ Info: control_long done in 1730 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: report_long (12 threads)
+
+[11:20] report_long: long control report  (log: outputs/logs/report_long.log)
+[ Info: report_long done in 45 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: control30 (12 threads)
+
+[11:21] control30: 30-day optimal control (dose; beyond the data)  (log: outputs/logs/control30.log)
+[ Info: control30 done in 947 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: report30 (12 threads)
+
+[11:37] report30: 30-day control report  (log: outputs/logs/report30.log)
+[ Info: report30 done in 44 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: control60 (12 threads)
+
+[11:38] control60: 60-day optimal control (dose; beyond the data)  (log: outputs/logs/control60.log)
+[ Info: control60 done in 1870 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: report60 (12 threads)
+
+[12:09] report60: 60-day control report  (log: outputs/logs/report60.log)
+[ Info: report60 done in 44 s
+
+Done. Run manifest: /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/run_manifest.toml
+Pipeline: alldoses (12 threads)
+
+[12:09] alldoses: Stage fits keeping the A2780cis 1 µM monoculture (variant, point fits)  (log: outputs/logs/alldoses.log)
+[ Info: alldoses FAILED in 115434 s
+Stopped: step alldoses failed; see /home/kadin/Desktop/Research/CancerGrowthDynamics/Modeling_Approaches/02_mechanical_automatic_package/outputs/logs/alldoses.log
+[20:13] CHAIN STOPPED: alldoses failed

@@ -391,4 +391,23 @@ end
         xl = foldl((x, u) -> F(x, u, P, Δ), cl.U[1:end-1]; init=copy(x0))
         @test cl.U[end] == discrete_solve(xl, P, Δ, [1], LEVELS, W).U[1]
     end
+    @testset "kidney toxicity (xie2020): calibration and dynamics" begin
+        if TOX_MODEL == "xie2020"
+            t = default_tox(); P = scenario_plant(:A)
+            # γ solves Emax·γ/(EC50 + γ) = Ē, and the periodic-steady-state peak sits above the mean
+            @test t.Emax * t.γ / (t.EC50 + t.γ) ≈ XIE.Ebar rtol = 1e-10
+            @test XIE.Elim > XIE.Ebar > 0 && XIE.ΔE > 0 && tox_limit() == XIE.Elim
+            # a constant 1 µM drives E to Ē (k_N ≈ 1/6 per day: 60 days ≈ 10 time constants), with no dose E decays
+            x = x0_for(P, 50.0, 50.0)
+            for _ in 1:30; x = F(x, 1.0, P, 2.0); end
+            @test x[P.iT] ≈ XIE.Ebar rtol = 1e-3
+            for _ in 1:10; x = F(x, 0.0, P, 2.0); end
+            @test x[P.iT] ≈ XIE.Ebar * exp(-t.kN * 20) rtol = 1e-3
+            # the drug burden B no longer feeds the toxicity, and the limit is the weights' limit
+            @test default_weights(P).Btox == XIE.Elim
+            @test xie_drive(t, 0.0) == 0 && xie_drive(merge(t, (γ=3t.γ,)), 1.0) > xie_drive(t, 1.0)
+        else
+            @test default_tox().Elim == CFG["toxicity"]["B_tox"]
+        end
+    end
 end

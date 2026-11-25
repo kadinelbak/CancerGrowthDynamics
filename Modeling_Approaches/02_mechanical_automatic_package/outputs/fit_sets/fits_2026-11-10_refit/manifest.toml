@@ -1,0 +1,30 @@
+# Frozen fit set (user, 2026-11-23): the stage fits every control run since 10 Nov 2026 reads.
+# Copies only; the originals in outputs/zoo_fits and outputs/zoo_analyses are unchanged. *.jls files are
+# git-ignored (kept on kadin-main-sys only); their checksums below identify them.
+name = "fits_2026-11-10_refit"
+description = "A2780 staged fits refitted with main's Stage 3a candidates (PR #17); Stage 3a cc_K_alpha_death_phiNC, Stage 3b lrcc_epsN, Stage 4 s4_eps"
+fit_run = "merged_refit_chain_20261109_1305 (fits step 9 Nov 13:06 to 10 Nov 10:34, ZOO_RESUME=1 ZOO_REUSE_BOOT=1, B = 200; analyses 10 Nov 10:39 to 10:43)"
+fit_commit = "c88210306dd43ddf7109ce2211d35b594234f81e"   # code commit of the fits step (run_manifest: uncommitted_changes = true)
+outputs_commit = "819e46d"                                  # commit that recorded these fit outputs
+first_final_report = "2026-11-11_2117"                       # first Final Report version built from these fits
+state_sha256 = "4eab783b35a1dd95a22b11da9e4915209690d1ee6f5b937d62e720fa91ef83fc"   # zoo_fits/zoo_state.jls: control and report code compare the live file with this
+
+[files]
+"logs/analyses.log" = { sha256 = "0a8919ce2e62980f939a677fb443b57eedc42062ccb5a4bcc72f4125583bd99a", bytes = 1496 }
+"logs/fits.log" = { sha256 = "630d3a1cd5b1c653275274054f6911235769bede8da30ee64c7a80566340055e", bytes = 12823 }
+"logs/merged_refit_chain_20261109_1305.log" = { sha256 = "981c8f4f7e6f7aa591a998d62646ee934fdbe3c01d46e9de2709a53abf6d4559", bytes = 3479 }
+"logs/merged_refit_chain_20261109_1305.sh" = { sha256 = "aaf9fbd2729f43ec3b048590d6da57ecfd3c8db37862b86a3628df8ab92e6238", bytes = 1104 }
+"zoo_fits/fit_starts.csv" = { sha256 = "a2bc6afad5f8e3a07fe5912874e317d1a8d53c49ebc62667b18451ce228d763b", bytes = 10654 }
+"zoo_fits/heldout_ce1.csv" = { sha256 = "d2e6e13be436dcf0bea50b1ea5326baceadac85855291e814493d2caac40dc7c", bytes = 883 }
+"zoo_fits/starting_values.csv" = { sha256 = "ce8054e569da7c8e589273ffa739e26a81c1e41f36c3edddf602b16f95866816", bytes = 2606 }
+"zoo_fits/time_limit_hits.csv" = { sha256 = "ada2df46d0bda70ecc7f6595651751cdd22aeb248b654fdd9e91f4a0c835e891", bytes = 3955 }
+"zoo_fits/zoo_model_selection.csv" = { sha256 = "2233500c04c7beb4b54b79d7ef1686314f2fcca5b3be300345dfe152575ebbf0", bytes = 39562 }
+"zoo_fits/zoo_parameters.csv" = { sha256 = "839ab6c61881bba1fcf3e36db236a038b0872da80068df44a844bd7eb6631aee", bytes = 2819 }
+"zoo_fits/zoo_state.jls" = { sha256 = "4eab783b35a1dd95a22b11da9e4915209690d1ee6f5b937d62e720fa91ef83fc", bytes = 1803236 }
+"zoo_analyses/analyses_state.jls" = { sha256 = "ef716bee3e68f318f61d6484388f0e21136788137b5fe5b4df82b01cb434f5b4", bytes = 29387 }
+"zoo_analyses/bootstrap_parameters.csv" = { sha256 = "76b2fff3a34c45b6385ca44c9cd9180dfa81c4b529c5bdba17604e0b48c75c96", bytes = 3232 }
+"zoo_analyses/bootstrap_selection.csv" = { sha256 = "7d0cce226017dc8e883c1b216e8ce1da4d30f3a8c1faf381043adfe6edcb8a68", bytes = 9417 }
+"zoo_analyses/sensitivity_global.csv" = { sha256 = "6aa2916666cc5c72cc81f766a11f2e9b0bbae2a3a429a7930ec413c44d26d025", bytes = 18875 }
+"zoo_analyses/sensitivity_local.csv" = { sha256 = "d36cbd35cc3c5a38108d04573cb3bff13bf74bdcd8b4e0cd745992a50c4054b5", bytes = 1999 }
+"zoo_analyses/sensitivity_profile.csv" = { sha256 = "411f902e2c3dfc92e8fbfb846ffc65ca663451382def9f01d6307bece26a532c", bytes = 4568 }
+"zoo_analyses/validation_blocked.csv" = { sha256 = "87d26bd5670e61f99c0ef0d75b13350a3756ea055569741ac065f8293fc6b1d7", bytes = 3926 }

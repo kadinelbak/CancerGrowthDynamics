@@ -13,11 +13,12 @@ const SOUT = joinpath(PKG, "outputs", "control_sweep")
 const SDOCS = joinpath(ROOT, "docs", "Modeling_Approaches", "02_mechanical_automatic_package", "outputs", "control_sweep")
 const Δ0 = Float64(CFG["schedule"]["decision_interval_days"])
 const DATA_DAYS = Float64(CFG["schedule"]["data_days"])
-const MPC = "MPC, measured doses only"
 # headline drug-response scenario (control_config.toml [scenarios].headline, user 2026-11-02): listed first, marked "(main result)"
 const HEADLINE = String(get(get(CFG, "scenarios", Dict{String,Any}()), "headline", "A"))
 scen_order(v) = sort(string.(unique(v)); by=x -> x == HEADLINE ? 0 : 1)
 include(joinpath(PKG, "control_text.jl"))   # scenario_role and the shared caveats
+include(joinpath(PKG, "fit_set.jl"))        # which saved fit set the control uses (user, 2026-11-23)
+const MPC = MPC_D
 scen_tag(x) = " ($(scenario_role(x)))"      # A main result since 2026-11-12 (user), B the what-if
 # the B what-if sentence from the 14-day report's plant-vs-data table (outputs/control/plant_vs_data.csv)
 function b_whatif_note()
@@ -28,7 +29,7 @@ function b_whatif_note()
     b_whatif_text(b.N + b.C, b.N_data + b.C_data, a.N + a.C)
 end
 const COMPARATORS = ["No treatment", "Constant 1 µM", "Maximum measured dose (1.47 µM)", "Periodic 1 µM, 2 days on / 2 off", "Threshold adaptive (Zhang-style)"]
-const LEVELS = Float64.(CFG["dose"]["levels_data"])
+const LEVELS = MPC_LEVELS
 const DOSE_COL = ["#f3f4f6", "#9ecae1", "#3182bd", "#08306b"]       # 0, 0.62, 1.0, 1.47 µM
 
 hesc(s) = replace(string(s), "&" => "&amp;", "<" => "&lt;", ">" => "&gt;", "'" => "&#39;")
@@ -116,7 +117,7 @@ table{border-collapse:collapse;font-size:13px;width:100%}th,td{border-bottom:1px
 td.num{text-align:right;font-variant-numeric:tabular-nums}td.win{background:#e7f6ec;font-weight:600}tr.beyond td{background:#f5f3ff}.tscroll{overflow-x:auto}
 details{margin:8px 0}summary{cursor:pointer;font-weight:600;padding:6px 0}.muted{color:#5b6b73}code{background:#eef3f5;padding:1px 4px;border-radius:4px}</style></head><body><main>
 <h1>Control sweep: barriers, thresholds, run lengths</h1>
-<div class='intro'><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control_sweep.jl</code> and <code>control_sweep_report.jl</code> (PRD, user 2026-10-27). Normal medium; $nv variants, each axis changed one at a time from the default ($(CFG["cancer"]["barrier"]) barrier, B_cancer = B_prog = $(CFG["cancer"]["B_cancer_fraction_of_K"]) K, $(round(Int, CFG["schedule"]["closed_loop_days"])) days, look-ahead $(CFG["schedule"]["lookahead_to_end"] ? "ending with the run" : "fixed"), time-to-progression objective), plus the full barrier × run-length cross. Every variant is scored with its own thresholds, and every comparator is rerun under it.</p>
+<div class='intro'><p><b>$(fits_used_text())</b></p><p>Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) by <code>run_control_sweep.jl</code> and <code>control_sweep_report.jl</code> (PRD, user 2026-10-27). Normal medium; $nv variants, each axis changed one at a time from the default ($(CFG["cancer"]["barrier"]) barrier, B_cancer = B_prog = $(CFG["cancer"]["B_cancer_fraction_of_K"]) K, $(round(Int, CFG["schedule"]["closed_loop_days"])) days, look-ahead $(CFG["schedule"]["lookahead_to_end"] ? "ending with the run" : "fixed"), time-to-progression objective), plus the full barrier × run-length cross. Every variant is scored with its own thresholds, and every comparator is rerun under it.</p>
 <p><b>Barriers.</b> relaxed_log: the relaxed log barrier (Feller &amp; Ebenbauer 2017); quadratic: zero below B_cancer, a quadratic penalty above; hard: a near-wall that makes any interval at or above B_cancer cost about $(CFG["cancer"]["hard_weight"]), so a crossing plan is chosen only when every plan crosses; none: no burden penalty, the progression step only.</p>
 <p><b>Read with care.</b> Runs longer than $(round(Int, DATA_DAYS)) days (shaded) follow the fitted equations beyond the data. A green cell marks an MPC that progresses later than every comparator. Scenario A (the main result) has no detectable resistant kill in coculture, so no cost design can kill resistant cells there: killing sensitive cells frees room for resistant ones. $(hesc(KILL_LIMIT_NOTE)) $(hesc(EXTRAP_NOTE)) $(hesc(b_whatif_note()))</p></div>
 $(join(secs))

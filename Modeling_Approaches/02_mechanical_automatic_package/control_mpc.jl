@@ -94,7 +94,7 @@ function sensitive_plateau(P::Plant; days=400.0)
     x[P.iN]
 end
 # bc_frac: B_cancer as a fraction of K (0 = no burden penalty); tf: terminal factor (both swept in the report)
-function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=Float64(CFG["toxicity"]["B_tox"]),
+function default_weights(P::Plant; umax=Float64(CFG["dose"]["u_max_data"]), w=nothing, Btox=tox_limit(P.tox),
                          bc_frac=Float64(CFG["cancer"]["B_cancer_fraction_of_K"]), tf=Float64(CFG["weights"]["terminal_factor"]),
                          prog_frac=Float64(CFG["progression"]["threshold_fraction_of_K"]),
                          barrier=Symbol(get(CFG["cancer"], "barrier", "relaxed_log")), ts=tiebreak_scale())
@@ -434,7 +434,7 @@ function closed_loop(Pm::Plant, Pp::Plant, x0, Δ, n_dec, H, W::Weights; mode=:c
             U0 = Uwarm[1:Hk]
             if cum <= 0
                 bd = shrink ? cut_blocks(as_blocks(H), n_dec - k + 1) : as_blocks(H)
-                Ud = expand_blocks(discrete_solve(xm, Pm, Δ, bd, Float64.(CFG["dose"]["levels_data"]), W).U, bd)
+                Ud = expand_blocks(discrete_solve(xm, Pm, Δ, bd, MPC_LEVELS, W).U, bd)
                 total_cost(xm, Ud, Pm, Δ, W) < total_cost(xm, U0, Pm, Δ, W) && (U0 = Ud)
             end
             sol = sqp_solve(xm, U0, Pm, Δ, W; cum=cum > 0 ? max(rem, 1e-9) : 0.0)
