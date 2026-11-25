@@ -44,10 +44,12 @@
 # that keeps the line's label (so it is counted in this line's X) but grows at the resistant line's r and
 # feels the resistant line's monoculture kill β. Z is one extra hidden state at the end of the line's block.
 
-const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d, :EC50)
+# pn: exponent of the Norton–Simon growth factor (1 = full coupling, the 6 Oct default; 0 = kill not tied to growth;
+# between = partial coupling, fitted by the _nsp candidates, user 2026-11-09 fix review X13)
+const SLOT_KEYS = (:r, :K, :θ, :k, :ω, :ζ, :β, :h, :δ, :d0, :c, :ρr, :ρK, :rLR, :γ, :κ, :τ, :ε, :d, :EC50, :pn)
 # EC50 has no default: every line sets its own (a Hill line without one is an error, see build_system)
 const SLOT_DEFAULT = (r=NaN, K=NaN, θ=1.0, k=1.0, ω=1.0, ζ=1.0, β=0.0, h=1.0, δ=1.0, d0=0.0, c=0.0, ρr=1.0, ρK=1.0,
-                      rLR=NaN, γ=0.0, κ=0.0, τ=1.0, ε=1.0, d=0.0, EC50=NaN)
+                      rLR=NaN, γ=0.0, κ=0.0, τ=1.0, ε=1.0, d=0.0, EC50=NaN, pn=1.0)
 
 struct Slot
     i::Int        # index into the parameter vector, 0 = fixed
@@ -217,6 +219,11 @@ ns_on(L) = hasproperty(L, :ns) && L.ns
     g == :theta && return max(1 - x^θ, zero(x))
     error("Norton–Simon coupling needs logistic or theta-logistic growth")
 end
+# the growth factor raised to the coupling exponent pn (pn = 1: unchanged; a zero factor stays zero, so the
+# derivative in pn is finite at full crowding)
+# lines saved before 2026-11-09 have no pn slot: full coupling
+@inline pn_of(s, p, ::Type{T}) where {T} = hasproperty(s, :pn) ? sv(s.pn, p, T) : one(T)
+@inline nspow(g, pn) = pn == 1 ? g : pn == 0 ? one(g) : g > 0 ? g^pn : zero(g)
 
 # ── coculture modifiers (L.cc) ────────────────────────────────────────────────
 # L.cc = (kf, pr, cs, csimm, di): Slots for the kill factor φ (default 1), protection ρ (0), cytostatic γ (0)
@@ -243,6 +250,9 @@ end
     g = γ == 0 ? one(T) : max(1 - γ * (c.csimm ? w * sv(M.s.ε, p, T) : drug_exposure(u, o, M, w, p, T)), z)
     fk, g, sv(c.di, p, T) * y
 end
+# interference death η·Y/K alone (a line whose own module is not the drug module, e.g. Stage 3b: the Stage 3a
+# interference carries over to the low-resource cocultures, fix review X3, 2026-11-09)
+@inline cc_di(L, p, other, K, ::Type{T}) where {T} = cc_on(L) ? sv(L.cc.di, p, T) * max(other, zero(T)) / K : zero(T)
 freeze_cc(c, p) = merge(c, (kf=freeze_slot(c.kf, p), pr=freeze_slot(c.pr, p), cs=freeze_slot(c.cs, p), di=freeze_slot(c.di, p)))
 freeze_slot(s::Slot, p) = s.i > 0 ? Slot(0, p[s.i]) : s
 freeze_sw(w, p) = merge(w, (μ0=freeze_slot(w.μ0, p), μD=freeze_slot(w.μD, p), r=freeze_slot(w.r, p), β=freeze_slot(w.β, p)))
@@ -261,11 +271,12 @@ function line_rhs!(du, u, xi, o, L, p, w, crowd, ::Type{T}; other=zero(T)) where
     # damaged compartment is scaled (the module's own capacity is K, as no drug action changes K)
     ns = ns_on(L) && L.input == :D
     # coculture modifiers: kill factor fk (on the loss or the transfer into damaged cells), growth factor gm, death di
-    fk, gm, di = L.input == :D ? cc_terms(L, u, o, L, p, w, other, K, T) : (one(T), one(T), z)
-    ks = ns && L.action in (:damage, :transit) ? growth_factor(L.growth, crowd / K, θ) : one(T)
+    fk, gm, di = L.input == :D ? cc_terms(L, u, o, L, p, w, other, K, T) : (one(T), one(T), cc_di(L, p, other, K, T))
+    pn = pn_of(s, p, T)
+    ks = ns && L.action in (:damage, :transit) ? nspow(growth_factor(L.growth, crowd / K, θ), pn) : one(T)
     reff, Keff, loss, out = module_effect!(du, u, o, L, p, w, X, V, r, K, T; ks=ks*fk)
     loss *= fk
-    gf = ns ? growth_factor(L.growth, crowd / Keff, θ) : one(T)
+    gf = ns ? nspow(growth_factor(L.growth, crowd / Keff, θ), pn) : one(T)
     loss *= gf
     dth = sv(s.d, p, T) + di
     if !sw_on(L)
@@ -304,34 +315,25 @@ function line_rhs_multi!(du, u, xi, o, L, p, env, crowd, ::Type{T}; other=zero(T
     reff, Keff, loss, out = r, K, sv(s.d, p, T), z
     χ = hasproperty(L, :chi) ? sv(L.chi, p, T) : z
     # coculture modifiers act through the first drug module (the line's own module, L itself, at offset o)
-    fk, gm, di = L.input == :D ? cc_terms(L, u, o, L, p, T(env.D), other, K, T) : (one(T), one(T), z)
+    fk, gm, di = L.input == :D ? cc_terms(L, u, o, L, p, T(env.D), other, K, T) : (one(T), one(T), cc_di(L, p, other, K, T))
     sw_on(L) && error("phenotype switching is only implemented for single-module lines")
-    cc_on(L) && any(M -> M.input == :D && M.action in (:damage, :transit), mods) &&
-        error("coculture modifiers with a damaged-cell drug action are only implemented for single-module lines")
     reff *= gm; loss += di
     χf = fk
-    off = o
-    if !ns_on(L)
-        for M in mods
-            w = M.input == :D ? T(env.D) : T(env.R)
-            re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T)
-            reff *= re / r; Keff *= Ke / K
-            loss += M.input == :D ? χf * lo * (1 + χ * T(env.R) / T(U_R)) : lo
-            out += ou; off += mwidth(M)
-        end
-    else                                     # Norton–Simon: drug losses scaled by the growth factor
-        any(M -> M.input == :D && M.action in (:damage, :transit), mods) &&
-            error("Norton–Simon with a damaged-cell drug action is only implemented for single-module lines")
-        dloss = z
-        for M in mods
-            w = M.input == :D ? T(env.D) : T(env.R)
-            re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T)
-            reff *= re / r; Keff *= Ke / K
-            M.input == :D ? (dloss += χf * lo * (1 + χ * T(env.R) / T(U_R))) : (loss += lo)
-            out += ou; off += mwidth(M)
-        end
-        loss += dloss * growth_factor(L.growth, crowd / Keff, θ)
+    # Norton–Simon (exponent pn): drug losses × growth factor^pn; the transfer of a damaged-cell drug action
+    # (:damage, :transit) is scaled the same way, by crowding over K, as in line_rhs! (2026-11-09, fix review X6)
+    ns = ns_on(L); pn = pn_of(s, p, T)
+    ksd = ns ? nspow(growth_factor(L.growth, crowd / K, θ), pn) : one(T)
+    dloss = z; off = o
+    for M in mods
+        isD = M.input == :D
+        w = isD ? T(env.D) : T(env.R)
+        fχ = isD ? χf * (1 + χ * T(env.R) / T(U_R)) : one(T)
+        re, Ke, lo, ou = module_effect!(du, u, off, M, p, w, X, V, r, K, T; ks=isD ? fχ * ksd : one(T))
+        reff *= re / r; Keff *= Ke / K
+        isD ? (dloss += fχ * lo) : (loss += lo)
+        out += ou; off += mwidth(M)
     end
+    loss += ns ? dloss * nspow(growth_factor(L.growth, crowd / Keff, θ), pn) : dloss
     du[xi+1] = growth_term(L.growth, reff, V, crowd / Keff, θ) - loss*V - out
     nothing
 end
@@ -380,7 +382,7 @@ end
 function slot_name(k::Symbol, X, input; combo=false)
     if input == :D
         return Dict(:β => "β_$X", :k => "k_$X", :h => "h_$X", :δ => "δ_$X", :τ => "τ_$X", :ω => "ω_$X", :ζ => "ζ_$X",
-                    :ε => "ε_$X", :d => "d_$X", :r => "r_$X", :K => "K_$X", :θ => "θ_$X", :d0 => "d_$(X)^0")[k]
+                    :ε => "ε_$X", :d => "d_$X", :r => "r_$X", :K => "K_$X", :θ => "θ_$X", :d0 => "d_$(X)^0", :pn => "p_$X")[k]
     end
     Dict(:β => combo ? "d_$(X)^acc" : "d_$(X)^LR", :d0 => "d_$(X)^LR", :k => "k_$(X)^R", :h => "h_$(X)^R", :δ => "δ_$(X)^R",
          :τ => "τ_$(X)^R", :ω => "ω_$(X)^R", :ζ => "ζ_$(X)^R", :c => "c_$X", :ρr => "ρ_r", :ρK => "ρ_K", :rLR => "r_$(X)^LR",
@@ -474,6 +476,8 @@ function line_tex(L, X, crowd, Ksym)
     kf = (has(cc.kf, 1.0) ? "\\phi_{$X}" : "") * (has(cc.pr, 0.0) ? "\\frac{1}{1+\\rho_{$X}$Y/$Ksym}" : "")
     chi = hasproperty(L, :chi) && !isoff(L.chi)
     nsf = !ns_on(L) ? "" : L.growth == :theta ? "\\left[1-\\left($frac\\right)^{$th}\\right]" : "\\left(1-$frac\\right)"
+    pnd = hasproperty(L.s, :pn) && (L.s.pn.i > 0 || L.s.pn.v != 1)
+    (nsf != "" && pnd) && (nsf *= "^{$(L.s.pn.i > 0 ? ptex(slot_name(:pn, X, L.input)) : string(round(L.s.pn.v; sigdigits=3)))}")
     for q in parts, lo in q.losses
         lo = (chi && q.input == :D) ? "-\\left(1+\\chi_{$X}\\,\\hat u_R\\right)\\left[$(lo[2:end])\\right]" : lo
         lo = (kf != "" && q.input == :D) ? "-$kf\\left[$(lo[2:end])\\right]" : lo
@@ -548,7 +552,9 @@ const LR_ZOO = vcat(zoo_grid(:R), [
 # undamped spring to bend through one dip in the A2780 low-serum counts)
 const SLOT_BOUNDS = Dict(:β => (0.0, 50.0), :k => (1e-3, 20.0), :h => (0.1, 10.0), :δ => (1e-3, 10.0), :τ => (1e-3, 10.0),
                          :ω => (1e-3, 20.0), :ζ => (1.0, 5.0), :d0 => (0.0, 50.0), :c => (0.0, 1000.0), :ρr => (0.0, 20.0),
-                         :ρK => (1e-3, 3.0), :rLR => (1e-4, 5.0), :γ => (0.0, 10.0), :κ => (0.0, 10.0), :ε => (0.0, 5.0), :d => (0.0, 3.0))
+                         :ρK => (1e-3, 3.0), :rLR => (1e-4, 5.0), :γ => (0.0, 10.0), :κ => (0.0, 10.0), :ε => (0.0, 5.0), :d => (0.0, 3.0),
+                         :pn => (0.0, 1.0))
 const SLOT_STARTS = Dict(:β => [0.3, 1.0, 0.05], :k => [0.5, 2.0, 0.1], :h => [2.0, 1.0, 4.0], :δ => [0.5, 2.0, 0.1], :τ => [0.5, 2.0, 0.1],
                          :ω => [0.5, 2.0, 0.2], :ζ => [1.0, 2.0, 4.0], :d0 => [0.3, 0.05, 1.0], :c => [1.0, 5.0, 0.2], :ρr => [1.0, 2.0, 0.5],
-                         :ρK => [0.8, 0.3, 1.2], :rLR => [0.5, 0.1, 1.0], :γ => [0.1, 0.5, 0.02], :κ => [0.1, 0.5, 0.01], :ε => [1.0, 0.5, 2.0], :d => [0.1, 0.02, 0.5])
+                         :ρK => [0.8, 0.3, 1.2], :rLR => [0.5, 0.1, 1.0], :γ => [0.1, 0.5, 0.02], :κ => [0.1, 0.5, 0.01], :ε => [1.0, 0.5, 2.0], :d => [0.1, 0.02, 0.5],
+                         :pn => [0.5, 0.9, 0.1])

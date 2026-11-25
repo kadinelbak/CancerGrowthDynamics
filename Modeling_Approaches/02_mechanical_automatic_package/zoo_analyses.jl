@@ -184,13 +184,14 @@ function local_si(g; pert=0.1)
     rows
 end
 
-# Profile likelihood: fix one parameter on a grid (0.5×–2× the estimate), refit the others with
+# Profile likelihood: fix one parameter on a grid (0.1×–10× the estimate, log-spaced), refit the others with
 # run_joint_multistart (residual-weighted like the carried fit, 3 starts, the first at the estimate) and
 # record d(θ) = n·ln(SSE_w(θ)/SSE_w,min), SSE_w,min the lowest weighted SSE of the carried fit and every
 # profile refit of the group. A 95% interval is where d stays below the small-sample likelihood-ratio
 # threshold n·ln(1 + F_{1,n−k;0.95}/(n−k)) (→ 3.84 as n grows); its ends are interpolated linearly
 # between grid points. An estimate at a search bound is flagged "at bound" and not profiled.
-const PROFILE_MULT = [0.5, 0.63, 0.79, 0.9, 1.0, 1.11, 1.26, 1.59, 2.0]
+# widened 2026-11-09 (fix review X8, user): 0.5×–2× left open intervals that may only have reached the grid edge
+const PROFILE_MULT = [0.1, 0.16, 0.25, 0.4, 0.5, 0.63, 0.79, 0.9, 1.0, 1.11, 1.26, 1.59, 2.0, 2.5, 4.0, 6.3, 10.0]
 const PROFILE_STARTS = 3
 # F_{1,ν;0.95} = t²_{ν;0.975}: Distributions (loaded by GrowthParameterEstimation) if reachable, else the
 # Cornish–Fisher expansion of the t quantile (F error < 2e-3 for ν ≥ 5, < 1e-4 for ν ≥ 10)
@@ -215,7 +216,7 @@ function profile_jobs(gs)
     for g in gs, (i, n) in enumerate(g.cands[1].pnames)
         c = g.cands[1]; lo, hi = c.bounds[i]; est = c.params[i]
         at_bound(c, i) && continue
-        vals = abs(est) > 1e-6 ? est .* PROFILE_MULT : collect(range(lo, lo + 0.1 * (hi - lo); length=9))
+        vals = abs(est) > 1e-6 ? est .* PROFILE_MULT : collect(range(lo, lo + 0.1 * (hi - lo); length=length(PROFILE_MULT)))
         vals = unique(clamp.(vals, lo, hi))
         for (jv, v) in enumerate(vals)
             push!(jobs, (gid=g.id, i=i, name=n, v=v, seed=10_000 * gidx[g.id] + 100 * i + jv))
@@ -661,7 +662,7 @@ const BETTER = Dict{String,Any}(
     "Lowest BIC" => :higher,
     "Sensitivity index" => "Neither: large means the prediction depends strongly on this parameter (so it must be known precisely); near 0 means it barely matters.",
     "Largest change of the prediction" => "Neither: larger means the prediction is more sensitive to this parameter.",
-    "Profile 95% range (within 0.5–2×)" => "Narrower is better: the parameter is more precisely determined.",
+    "Profile 95% range (within 0.1–10×)" => "Narrower is better: the parameter is more precisely determined.",
     "Profile" => "Better: Identifiable (pinned on both sides); One-sided is weaker; Flat is worst.",
     "Bound check" => "Better: not at a bound.",
     "SD" => "Lower means the prediction is less uncertain across the plausible parameter ranges.",
@@ -779,7 +780,7 @@ function profile_svg(title, prof, est, thr; W=360, H=200)
          join([@sprintf("<circle cx='%.1f' cy='%.1f' r='2.5' fill='#176b87'/>", sx(v), sy(d)) for (v, d) in zip(vs, ds)]), "</svg>"]
     join(p)
 end
-const T_PROFILE = "Profile likelihood. x: the value this parameter is fixed at (0.5× to 2× the estimate). y: d = n·ln(SSE_w/SSE_w,min) after refitting the other parameters with the same residual weights as the fit (SSE_w = weighted sum of squared residuals; SSE_w,min = the lowest value found by the carried fit or any profile refit), 0 at the best fit and capped at 30. Values under the dashed line fit the data equally well at the 95% level; the line is the small-sample threshold n·ln(1 + F(1, n−k; 0.95)/(n−k)), slightly above the large-sample 3.84. The interval ends are interpolated between grid points. A narrow valley = well determined; a flat curve = poorly determined. Grey line: the estimate."
+const T_PROFILE = "Profile likelihood. x: the value this parameter is fixed at (0.1× to 10× the estimate, log-spaced). y: d = n·ln(SSE_w/SSE_w,min) after refitting the other parameters with the same residual weights as the fit (SSE_w = weighted sum of squared residuals; SSE_w,min = the lowest value found by the carried fit or any profile refit), 0 at the best fit and capped at 30. Values under the dashed line fit the data equally well at the 95% level; the line is the small-sample threshold n·ln(1 + F(1, n−k; 0.95)/(n−k)), slightly above the large-sample 3.84. The interval ends are interpolated between grid points. A narrow valley = well determined; a flat curve = poorly determined. Grey line: the estimate."
 
 # grouped bars of Sobol indices for one output: first-order (dark) and total (light), with 95% whiskers
 function sobol_svg(title, names, rows; W=560)
@@ -824,7 +825,7 @@ function write_sensitivity()
             table([("Parameter", "Fitted parameter of this stage's carried model."), ("Estimate", "Value fitted to the data."),
                    ("Sensitivity index", "Local sensitivity: how much the predicted curves change when this parameter is moved ±10% with the others held fixed, divided by 0.1. 1 = proportional response; above 1 = the prediction amplifies changes in it; near 0 = the prediction barely depends on it."),
                    ("", "Bar length = sensitivity index relative to the largest one in this fit.", "Neither: a long bar means the prediction depends strongly on this parameter."),
-                   ("Profile 95% range (within 0.5–2×)", "Values of this parameter the data cannot distinguish from the best fit once the other parameters are refitted with the residual weights (d = n·ln(SSE_w/SSE_w,min) below the small-sample 95% threshold n·ln(1 + F(1, n−k; 0.95)/(n−k)) = $(isfinite(thr) ? @sprintf("%.2f", thr) : "—") for this fit), searched from 0.5× to 2× the estimate; the ends are interpolated between grid points. '< a' or '> b': the threshold is not crossed inside the grid, so the range extends at least that far. 'at bound': the estimate sits on a search bound and was not profiled."),
+                   ("Profile 95% range (within 0.1–10×)", "Values of this parameter the data cannot distinguish from the best fit once the other parameters are refitted with the residual weights (d = n·ln(SSE_w/SSE_w,min) below the small-sample 95% threshold n·ln(1 + F(1, n−k; 0.95)/(n−k)) = $(isfinite(thr) ? @sprintf("%.2f", thr) : "—") for this fit), searched from 0.1× to 10× the estimate; the ends are interpolated between grid points. '< a' or '> b': the threshold is not crossed inside the grid, so the range extends at least that far. 'at bound': the estimate sits on a search bound and was not profiled."),
                    ("Profile", "Identifiable: the data pin the value on both sides. One-sided: only an upper or a lower limit is pinned. Flat: within 0.5–2× the data hardly constrain it, usually because it trades off against another parameter. At bound: the estimate is on its search limit (often a term the data push to 0), so the profile test does not apply."),
                    ("Bound check", "Whether the estimate sits on its search limit (within 0.1% of the range) or near it (top 2% of the range, or pinned at the lower limit); if so the limit may need widening, or the term is not supported by the data.")], rows) *
             "<p class='muted'>n = $(isempty(pr) ? "—" : pr[1].n) points, k = $(length(c.params)) parameters; 95% profile threshold $(isfinite(thr) ? @sprintf("%.2f", thr) : "—") (large-sample χ² value 3.84).</p>" *
@@ -869,7 +870,7 @@ function write_sensitivity()
 <div class='intro'><p>Three views of how the fitted models depend on their parameters:</p><ul>
 <li><b>Global sensitivity (Sobol indices)</b>: every parameter varied together, each drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, and the variance of an output split between parameters. This is the view that matters for optimal control: which uncertain parameters actually change the predicted outcome. $(warn(["Correlations between parameters in the bootstrap are ignored, so combinations the data rule out are sampled too.", "A parameter pinned at a bound (its interval collapses, so it is varied by only ±1%) or held fixed shows an index of about 0 by construction, not because it is unimportant."]))</li>
 <li><b>Local sensitivity</b>: the index of <code>GrowthParameterEstimation.parameter_sensitivity_analysis</code>, each fitted parameter moved ±10% with the others held: \\(SI = \\max|\\Delta \\hat y| / \\max(\\hat y, 1) / 0.1\\) over every observed trajectory. (The package function handles one-state models, so the same formula is applied here to the multi-state compartment models.)</li>
-<li><b>Profile likelihood</b>: each parameter fixed at 0.5× to 2× its estimate and the others refitted with <code>run_joint_multistart</code> (3 starts, the same residual weights as the fit), to see whether the data pin it down. The profile is \\(d(\\theta) = n\\ln(SSE_w(\\theta)/SSE_{w,min})\\) and a value is inside the 95% range while \\(d\\) stays below the small-sample threshold \\(n\\ln(1 + F_{1,n-k;0.95}/(n-k))\\) ($(isempty(pr_all) ? "—" : @sprintf("%.2f–%.2f", extrema(p.threshold for p in pr_all)...)) for these fits, against 3.84 for large n); the range ends are interpolated between grid points. Estimates on a search bound are flagged and not profiled ($(nb == 0 ? "no estimate sits at or near a search limit" : "$(nb) estimate(s) sit at or near a search limit, $(nab) of them on it")).</li></ul>
+<li><b>Profile likelihood</b>: each parameter fixed at 0.1× to 10× its estimate and the others refitted with <code>run_joint_multistart</code> (3 starts, the same residual weights as the fit), to see whether the data pin it down. The profile is \\(d(\\theta) = n\\ln(SSE_w(\\theta)/SSE_{w,min})\\) and a value is inside the 95% range while \\(d\\) stays below the small-sample threshold \\(n\\ln(1 + F_{1,n-k;0.95}/(n-k))\\) ($(isempty(pr_all) ? "—" : @sprintf("%.2f–%.2f", extrema(p.threshold for p in pr_all)...)) for these fits, against 3.84 for large n); the range ends are interpolated between grid points. Estimates on a search bound are flagged and not profiled ($(nb == 0 ? "no estimate sits at or near a search limit" : "$(nb) estimate(s) sit at or near a search limit, $(nab) of them on it")).</li></ul>
 <p class='note'>$(nflat) of $(length(pr_all) - nab) profiled parameters are not pinned on both sides within 0.5–2× of their estimate$(nab > 0 ? "; $(nab) more sit on a search bound" : ""). $lead</p></div>
 
 <h2>Global sensitivity: the treated coculture, all parameters $(tip("The Stage 3 model of the 50:50 coculture at 1 µM cisplatin, started from the nominal seeding, with every free parameter of the carried Stage 3 model and every parameter it inherits unchanged from the carried Stage 1 and Stage 2 models varied together (the list is built from the current models). Each is drawn uniformly and independently across its marginal 95% block-bootstrap percentile interval, $(GSA_N) × (k + 2) model runs (Saltelli sampling). Outputs are the predicted counts on day 14.", :none; warn=["Drawn independently: correlations between parameters are ignored.", "A parameter pinned at a bound or fixed shows ≈ 0 by construction."]))</h2>

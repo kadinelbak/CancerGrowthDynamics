@@ -240,8 +240,21 @@ function mechanism_rows(st, L, g)
     srcs = stage_sources(st; line=L.line); input = Symbol(st["input"])
     S = [series(s["id"]) for s in srcs]
     envs = [mono_env(env_inputs(s)...) for s in srcs]
-    cands = zoo_line_cands(CATALOGUES[st["catalogue"]], L.sym, input, g, envs, [[s.nom] for s in S];
-                           ns=get(st, "kill_growth_coupled", false) && input == :D, x0=[x0_info(s) for s in S])
+    zoo = CATALOGUES[st["catalogue"]]
+    ns = get(st, "kill_growth_coupled", false) && input == :D
+    cands = zoo_line_cands(zoo, L.sym, input, g, envs, [[s.nom] for s in S]; ns=ns, x0=[x0_info(s) for s in S])
+    # fix review X6 / X13 (user, 2026-11-09): the same mechanisms with the kill (or the move into arrested,
+    # damaged cells) not tied to growth ("_unc"), and with partial coupling, growth factor^p_X fitted ("_nsp")
+    entry(n) = (i = findfirst(c -> c[1] == n, zoo); i === nothing ? error("$(st["id"]): no catalogue entry $n") : zoo[i])
+    if ns
+        cands = Any[cands...]   # "_unc" lines carry no ns field, so the vector must hold both shapes
+        unc = [(e = entry(n); (e[1] * "_unc", e[2] * " (kill not tied to growth)", "Kill not tied to growth", e[4], e[5], e[6]))
+               for n in get(st, "uncoupled", String[])]
+        nsp = [(e = entry(n); (e[1] * "_nsp", e[2] * " (partly tied to growth, fitted exponent)", "Kill partly tied to growth", e[4], e[5], vcat(e[6], [:pn])))
+               for n in get(st, "partial", String[])]
+        isempty(unc) || append!(cands, zoo_line_cands(unc, L.sym, input, g, envs, [[s.nom] for s in S]; ns=false, x0=[x0_info(s) for s in S]))
+        isempty(nsp) || append!(cands, zoo_line_cands(nsp, L.sym, input, g, envs, [[s.nom] for s in S]; ns=true, x0=[x0_info(s) for s in S]))
+    end
     # optional restriction to named catalogue entries (stages.toml only = [...]; e.g. a Hill-only variant)
     haskey(st, "only") && (cands = [c for c in cands if c.name in st["only"]]; isempty(cands) && error("$(st["id"]): no candidate left by `only`"))
     obs = sys_obs(cands[1].sys)
@@ -299,7 +312,9 @@ function make_cc(name, label, free, rows, growth, envs, X0, datasets_max; fixed=
     LN = cc_line(rows[1], growth["A2780"], Kslot, fN, xN, LINES[1].ec50)
     LC = cc_line(rows[2], growth["A2780cis"], Kslot, fC, xC, LINES[2].ec50)
     # Norton–Simon: each line's drug kill scales with its growth factor (crowded cells die less)
-    kill_growth_coupled && (LN = merge(LN, (ns=true,)); LC = merge(LC, (ns=true,)))
+    # (only for a line whose Stage 2b model is coupled: an uncoupled "_unc" winner stays uncoupled, 2026-11-09)
+    kill_growth_coupled && ns_on(rows[1].sys.lines[1]) && (LN = merge(LN, (ns=true,)))
+    kill_growth_coupled && ns_on(rows[2].sys.lines[1]) && (LC = merge(LC, (ns=true,)))
     # coculture modifiers (only on candidates that use them, so the earlier candidates are rebuilt exactly)
     if any(k -> k in free || haskey(fixed, k), CC_MOD_KEYS)
         cytostatic in ("imm", "delay") || error("$name: cytostatic must be \"imm\" or \"delay\"")
@@ -350,6 +365,17 @@ function coculture_rows(st)
                  if haskey(c, "fixed_from")
                      b = CC[c["fixed_from"]].rows[1]
                      merge!(fx, Dict(:K => ccval(b, :K, NaN), :αNC => ccval(b, :αNC, 1.0), :αCN => ccval(b, :αCN, 1.0)))
+                     # fix review X3 (user, 2026-11-09): the coculture deaths and interference fitted with that K come
+                     # along (they are not drug terms, so they act in low resource too); φ, ρ, γ are drug-only
+                     for k in (:dN, :dC, :ηN, :ηC)
+                         v = ccval(b, k, 0.0); v != 0 && (fx[k] = v)
+                     end
+                 end
+                 # K fixed at the monoculture capacity (mean of the two lines' Stage 1 K): K keeps its meaning as the
+                 # level the wells reach (fix review X1/X3, user 2026-11-09)
+                 get(c, "K_mono", false) && (fx[:K] = (growth["A2780"].K + growth["A2780cis"].K) / 2)
+                 for k in get(c, "release", String[])          # drop an inherited value, so `free` may refit it
+                     delete!(fx, Symbol(k))
                  end
                  make_cc(c["name"], c["label"], Symbol[Symbol(x) for x in c["free"]], mech, growth, envs, X0, ymax; fixed=fx,
                          noinput=get(c, "noinput", false), betaC_floor=Float64(get(st, "betaC_floor", 0.0)),

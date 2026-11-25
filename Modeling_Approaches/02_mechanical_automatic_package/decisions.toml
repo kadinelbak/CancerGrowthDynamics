@@ -292,6 +292,55 @@ was = ""
 by = "claude"
 where = "stages.toml s3 candidates"
 
+# ── fix review, 2026-11-09 (user, https://claude.ai/artifact/DS3Pvv5X6Dvov9JJfYSmmF; X5 Huber loss, X10 imaging-day
+# effect and X11 hierarchical fit were denied) ─────────────────────────────────────────────────────────────────────
+[[decision]]
+date = "2026-11-09"
+area = "data"
+decision = "X2: every series' starting value is estimated, in a band anchored on its first measured count y1 at day t1: [y1/(3·e^(1·t1)), 3·y1]. Day 0 is the nominal seeding and never measured; plates differ in imaging scale (low-resource day-1 counts 3–16 × nominal, others 0.4–2 ×)."
+was = "estimate = mono; band nominal/10 to 3·max(nominal, y1) (Stage 3b run 2 · 1:3 sensitive sat on 2.5 cells against a day-1 count of 159)"
+by = "user"
+where = "stages.toml [starting_values]; zoo_data.jl x0_info"
+
+[[decision]]
+date = "2026-11-09"
+area = "data"
+decision = "X4: terminal-collapse QC rule for cocultures: on one of the last 2 measured days, one line below 0.6 × the median of its previous 3 kept points while the other rises above median/0.6 (each by > 50 cells): both points excluded. Flags only Stage 3b run 2 · 1:3 day 12 (A2780 1,836 → 336, A2780cis 31 → 99)."
+was = "no rule for crashes at the end of a series"
+by = "user"
+where = "data/qc_rules.toml [terminal_collapse]; data/build_tidy.jl terminal_collapse!"
+
+[[decision]]
+date = "2026-11-09"
+area = "model"
+decision = "X1: Stage 3a candidates with K fixed at the monoculture capacity (mean of the two lines' Stage 1 K) and with density-dependent suppression η·Y/K instead of constant coculture deaths (cc_Kmono_*). The free-K constant-death model put K at 5,477, above any count: its plateau is K(1 − d/r)."
+was = "K always free in Stage 3a"
+by = "user"
+where = "stages.toml s3 candidates (K_mono = true); run_zoo_fits.jl coculture_rows"
+
+[[decision]]
+date = "2026-11-09"
+area = "model"
+decision = "X3 / X7: Stage 3b inherits the Stage 3a coculture deaths and interference with K and α (interference now acts in a low-resource line too), and adds lrcc_epsN_K (K refitted), lrcc_epsN_Kmono (K at monoculture capacity) and lrcc_epsN_resLR (the resistant low-resource kill d_C^acc, k_C^R refitted on the six low-resource cocultures). The full joint Stage 1b + 3b fit was not done: it needs Stage 3a crowding before Stage 1b."
+was = "3b took only K, α_NC, α_CN from 3a"
+by = "user"
+where = "run_zoo_fits.jl coculture_rows (fixed_from); zoo_models.jl cc_di; stages.toml s3b"
+
+[[decision]]
+date = "2026-11-09"
+area = "model"
+decision = "X6 / X13: Stage 2b adds the same mechanisms with the kill not tied to growth (_unc: chain2/chain3/comp linear kill, and chain2/comp damaged-cell = arrested state: cells stop dividing, stay counted, take space and die at δ) and with partial coupling, growth factor^p_X with p fitted in [0, 1] (_nsp). An uncoupled winner stays uncoupled in Stages 3a and 4. Literature: cisplatin at about 1 µM mainly arrests A2780 in S/G2-M with little early apoptosis (He et al. 2011), sub-apoptotic doses cause senescence (Li et al. 2014)."
+was = "every drug candidate Norton–Simon coupled (user, 2026-10-06)"
+by = "user"
+where = "stages.toml s2 uncoupled / partial; run_zoo_fits.jl mechanism_rows, make_cc; zoo_models.jl pn slot, nspow, line_rhs_multi!; zoo_stage4.jl; control_model.jl"
+
+[[decision]]
+date = "2026-11-09"
+area = "validation"
+decision = "X8: profile likelihood on a log grid 0.1×–10× (17 points), so an open interval is not just the edge of the old 0.5×–2× grid. X9: the held-out Ce1 test is also reported from the full fit's estimated (day-1 anchored) starts, and with one Ce1 ratio held out at a time (Stage 3 model refitted to Ce0 + the other two Ce1 ratios)."
+was = "grid 0.5×–2×; Ce1 predicted only from nominal seeding and monoculture kills"
+by = "user"
+where = "zoo_analyses.jl PROFILE_MULT; zoo_heldout.jl heldout_ce1"
 [[decision]]
 date = "2026-11-09"
 area = "pipeline"

@@ -103,6 +103,7 @@ struct LineSpec
     # coculture modifiers (zoo_models.jl L.cc; neutral 1, 0, 0, true, 0 for lines without them): kill factor φ,
     # protection ρ, cytostatic γ (immediate or through the first drug module's delay), interference η
     kf::Float64; pr::Float64; cs::Float64; csimm::Bool; di::Float64
+    pn::Float64                 # Norton–Simon exponent (zoo_models.jl nspow; 1 = full coupling)
 end
 const FAST_KERNELS = (:none, :comp1, :chain2, :chain3, :second, :auc)
 # iε: positions in p of free low-resource strengths (control_fasting.jl); none in normal medium
@@ -131,7 +132,8 @@ function line_specs(S, p, iε)
         push!(out, LineSpec(xi + 1, S.xi[1][m] + 1, sv(S.alpha[l][S.envs[1].lines[m]], p, Float64), L.growth == :logistic,
                             sv(L.s.r, p, Float64), sv(L.s.K, p, Float64), sv(L.s.θ, p, Float64), sv(L.s.d, p, Float64), mods, ns_on(L),
                             hasproperty(L, :chi) ? sv(L.chi, p, Float64) : 0.0,
-                            sv(cc.kf, p, Float64), sv(cc.pr, p, Float64), sv(cc.cs, p, Float64), cc.csimm, sv(cc.di, p, Float64)))
+                            sv(cc.kf, p, Float64), sv(cc.pr, p, Float64), sv(cc.cs, p, Float64), cc.csimm, sv(cc.di, p, Float64),
+                            pn_of(L.s, p, Float64)))
     end
     out
 end
@@ -182,7 +184,7 @@ function spec_cells_rhs!(du, x, u, uR, f, spec, εv, koff, v)
         loss += L.di * y
         gm = L.cs == 0 ? one(T) : max(1 - L.cs * Ecs, z)
         dloss *= 1 + L.chi * T(uR) / T(U_R)        # drug × low-resource interaction (0 unless Stage 4 carries χ)
-        loss += L.ns ? dloss * (L.logistic ? max(1 - q, z) : max(1 - q^L.θ, z)) : dloss
+        loss += L.ns ? dloss * nspow(L.logistic ? max(1 - q, z) : max(1 - q^L.θ, z), L.pn) : dloss
         du[L.ix] = gm * L.r * X * (L.logistic ? 1 - q : 1 - q^L.θ) - loss * X
     end
     nothing
