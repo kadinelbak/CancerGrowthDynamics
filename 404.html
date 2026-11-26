@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found</title>
+  <!-- GitHub Pages serves this page for any missing path. The site lives in docs/, so links written
+       without the docs/ prefix (e.g. .../CancerGrowthDynamics/outputs/results/staged.html) are sent
+       to the same path under docs/. -->
+  <script>
+    (function () {
+      var base = '/CancerGrowthDynamics/';
+      var p = location.pathname;
+      if (p.indexOf(base) === 0) {
+        var rest = p.slice(base.length);
+        if (rest.indexOf('docs/') !== 0) {
+          location.replace(base + 'docs/' + rest + location.search + location.hash);
+        }
+      }
+    })();
+  </script>
+  <style>body{font-family:Arial,Helvetica,sans-serif;margin:40px;color:#1f2933;background:#f7f9fb}a{color:#2563eb}</style>
+</head>
+<body>
+  <h1>Page not found</h1>
+  <p>Go to <a href="/CancerGrowthDynamics/docs/index.html">the Reports hub</a>.</p>
+</body>
+</html>
